@@ -1,0 +1,24 @@
+/* Age Filter Modular Guide - Standard Dashboard Theme Integration */
+
+.age-filter-guide-panel.achievements-guide-panel {
+    border-color: rgba(245, 158, 11, 0.3);
+    /* Amber/Gold border for Age Filter */
+}
+
+/* Specific overrides for the Age Filter highlight color (using amber/gold) */
+.age-filter-guide-panel .guide-section h4 {
+    color: #f59e0b !important;
+    text-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+/* Micro-copy optimization */
+.age-filter-guide-panel .guide-section p {
+    color: #94a3b8;
+    font-size: 10px;
+    line-height: 1.4;
+}
+
+/* Icon specific glow */
+.age-filter-guide-panel .guide-icon {
+    filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.4));
+}

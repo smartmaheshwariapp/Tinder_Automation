@@ -1,0 +1,127 @@
+/**
+ * Navigation Tabs – Premium White Theme
+ * Replaces status-banner + old dark tabs with a clean 3-tab layout.
+ * Status banner is visually hidden but kept in DOM for JS functionality.
+ */
+
+/* ── 1. Hide Status Banner (preserve DOM for JS) ── */
+.status-banner {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Also visually hide the platform hint bar */
+.platform-hint {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    border: 0 !important;
+}
+
+/* ── 2. Premium White Tab Bar ── */
+.tabs {
+    display: flex !important;
+    background: #ffffff !important;
+    padding: 0 20px !important;
+    gap: 0 !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+    height: 48px !important;
+    flex-shrink: 0 !important;
+    position: relative !important;
+    align-items: stretch !important;
+}
+
+/* Remove old sliding underline pseudo-element */
+.tabs::after {
+    display: none !important;
+}
+
+/* ── 3. Tab Buttons ── */
+.tab-btn {
+    flex: none !important;
+    padding: 0 4px !important;
+    border: none !important;
+    background: transparent !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #94A3B8 !important;
+    cursor: pointer !important;
+    position: relative !important;
+    transition: color 0.25s ease !important;
+    letter-spacing: -0.01em !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-right: 24px !important;
+}
+
+.tab-btn:hover {
+    color: #475569 !important;
+}
+
+.tab-btn.active {
+    color: #0F172A !important;
+    font-weight: 700 !important;
+}
+
+/* ── Tutorial Button ── */
+.guide-btn {
+    margin-left: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 5px 10px !important;
+    align-self: center !important;
+    background: #F1F5F9 !important;
+    border: 1.5px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    color: #64748B !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
+    letter-spacing: 0.01em !important;
+    white-space: nowrap !important;
+    line-height: 1 !important;
+}
+
+.guide-btn:hover {
+    background: #fdf2f8 !important;
+    border-color: rgba(233, 30, 140, 0.3) !important;
+    color: #e91e8c !important;
+}
+
+.guide-btn svg {
+    flex-shrink: 0 !important;
+    transition: color 0.2s ease !important;
+}
+
+/* Fluid tab slider indicator (injected via JS) */
+.tab-slider {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 40px !important;
+    height: 3px !important;
+    background: #e91e8c !important;
+    border-radius: 3px 3px 0 0 !important;
+    z-index: 10 !important;
+    pointer-events: none !important;
+    /* transform and transition are dynamically managed by tab-navigation.js */
+}

@@ -1,0 +1,2440 @@
+/*
+ * FlirtEasy In-Page Status Bar — 6 State Variations
+ */
+
+#flirteasy-status-bar {
+    display: block !important;
+    position: fixed !important;
+    top: 16px !important;
+    left: 50% !important;
+    transform: translateX(-50%) translateY(-140%) !important;
+    opacity: 0 !important;
+    z-index: 9999999 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease !important;
+    pointer-events: none !important;
+    white-space: nowrap !important;
+    line-height: normal !important;
+}
+
+#flirteasy-status-bar * {
+    box-sizing: border-box !important;
+    font-family: inherit !important;
+    line-height: normal !important;
+    list-style: none !important;
+}
+
+#flirteasy-status-bar.fe-visible {
+    transform: translateX(-50%) translateY(0) !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* ── Base inner bar ── */
+#flirteasy-status-bar .fe-bar-inner {
+    display: inline-flex !important;
+    align-items: center !important;
+    background: #eef1f6 !important;
+    border: none !important;
+    border-radius: 9999px !important;
+    height: 60px !important;
+    padding: 0 18px 0 8px !important;
+    margin: 0 !important;
+    box-shadow: 10px 10px 28px rgba(0,0,0,0.35), -8px -8px 20px rgba(0,0,0,0.18) !important;
+    min-width: 760px !important;
+    gap: 0 !important;
+    position: relative !important;
+    overflow: hidden !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    transition: box-shadow 0.3s ease, transform 0.25s ease !important;
+    cursor: grab !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner:active {
+    cursor: grabbing !important;
+    box-shadow: 6px 6px 14px rgba(0,0,0,0.28), -5px -5px 12px rgba(0,0,0,0.14) !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner:hover {
+    box-shadow: 14px 14px 32px rgba(0,0,0,0.40), -10px -10px 24px rgba(0,0,0,0.20) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Shimmer sweep on hover */
+#flirteasy-status-bar .fe-bar-inner::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: -100% !important;
+    width: 35% !important;
+    height: 100% !important;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent) !important;
+    transform: skewX(-15deg) !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+    opacity: 0 !important;
+    transition: none !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner:hover::before {
+    animation: fe-shimmer-hover 0.65s ease forwards !important;
+}
+
+@keyframes fe-shimmer-hover {
+    0%   { left: -100%; opacity: 1; }
+    100% { left: 150%; opacity: 1; }
+}
+
+/* ── State: Idle ── */
+#flirteasy-status-bar .fe-bar-inner.fe-state-idle {
+    box-shadow: 10px 10px 28px rgba(0,0,0,0.35), -8px -8px 20px rgba(0,0,0,0.18) !important;
+    opacity: 1 !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner.fe-state-idle:hover {
+    opacity: 1 !important;
+    box-shadow: 10px 10px 28px rgba(0,0,0,0.32), -8px -8px 20px rgba(0,0,0,0.16) !important;
+}
+
+#flirteasy-status-bar .fe-state-idle .fe-dot-ping  { animation: none !important; opacity: 0 !important; }
+#flirteasy-status-bar .fe-state-idle .fe-dot-inner { background: #cbd5e1 !important; }
+#flirteasy-status-bar .fe-state-idle .fe-phase-label { color: #94a3b8 !important; }
+#flirteasy-status-bar .fe-state-idle .fe-brand-name  { color: #64748b !important; }
+
+#flirteasy-status-bar .fe-state-idle .fe-activity-pill {
+    background: #eef1f6 !important;
+    border: none !important;
+    box-shadow: inset 3px 3px 7px #c8ccd4, inset -2px -2px 5px rgba(0,0,0,0.08) !important;
+}
+
+#flirteasy-status-bar .fe-state-idle .fe-activity-icon {
+    color: #cbd5e1 !important;
+    animation: none !important;
+}
+
+#flirteasy-status-bar .fe-state-idle .fe-activity-text { color: #94a3b8 !important; }
+#flirteasy-status-bar .fe-state-idle .fe-stat-pill {
+    background: #eef1f6 !important;
+    box-shadow: 3px 3px 6px #d0d4db, -2px -2px 5px rgba(0,0,0,0.10) !important;
+}
+#flirteasy-status-bar .fe-state-idle .fe-pill-num  { color: #94a3b8 !important; opacity: 1 !important; }
+#flirteasy-status-bar .fe-state-idle .fe-pill-unit { color: #cbd5e1 !important; opacity: 1 !important; }
+
+/* ── State: Match (full pink gradient) ── */
+#flirteasy-status-bar .fe-bar-inner.fe-state-match {
+    background: linear-gradient(to right, #e8197d, #f06292) !important;
+    box-shadow: 10px 10px 24px rgba(220, 60, 130, 0.45), -8px -8px 20px rgba(255,180,210,0.35) !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner.fe-state-match:hover {
+    box-shadow: 14px 14px 30px rgba(220, 60, 130, 0.55), -10px -10px 24px rgba(255,180,210,0.4) !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner.fe-state-match::before {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent) !important;
+    animation: fe-shimmer-continuous 3s linear infinite !important;
+    opacity: 1 !important;
+    left: -100% !important;
+}
+
+@keyframes fe-shimmer-continuous {
+    0%   { left: -100%; }
+    100% { left: 200%; }
+}
+
+/* ── State: Lead (golden amber gradient) ── */
+#flirteasy-status-bar .fe-bar-inner.fe-state-lead {
+    background: linear-gradient(to right, #f59e0b, #fbbf24) !important;
+    box-shadow: 10px 10px 24px rgba(245,158,11,0.4), -8px -8px 20px rgba(254,243,199,0.5) !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner.fe-state-lead:hover {
+    box-shadow: 14px 14px 30px rgba(245,158,11,0.52), -10px -10px 24px rgba(254,243,199,0.6) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Golden fill bursts from center — grey overlay shrinks via clip-path */
+#flirteasy-status-bar .fe-bar-inner.fe-state-lead::after {
+    content: '' !important;
+    position: absolute !important;
+    inset: 0 !important;
+    background: #eef1f6 !important;
+    border-radius: inherit !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
+    animation: fe-lead-burst 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+@keyframes fe-lead-burst {
+    0%   { clip-path: circle(150% at 50% 50%); }
+    100% { clip-path: circle(0% at 50% 50%); }
+}
+
+/* Exit: grey covers back from center outward */
+#flirteasy-status-bar .fe-bar-inner.fe-state-lead.fe-lead-exiting::after {
+    animation: fe-lead-burst-out 0.5s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+}
+
+@keyframes fe-lead-burst-out {
+    0%   { clip-path: circle(0% at 50% 50%); }
+    100% { clip-path: circle(150% at 50% 50%); }
+}
+
+#flirteasy-status-bar .fe-bar-inner.fe-state-lead::before {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent) !important;
+    animation: fe-shimmer-continuous 3s linear infinite 0.6s !important;
+    opacity: 1 !important;
+    left: -100% !important;
+    z-index: 2 !important;
+}
+
+#flirteasy-status-bar .fe-state-lead .fe-identity    { position: relative !important; z-index: 2 !important; }
+#flirteasy-status-bar .fe-state-lead .fe-right       { position: relative !important; z-index: 2 !important; }
+#flirteasy-status-bar .fe-state-lead .fe-controls    { position: relative !important; z-index: 2 !important; }
+#flirteasy-status-bar .fe-state-lead .fe-ctrl-divider { position: relative !important; z-index: 2 !important; }
+#flirteasy-status-bar .fe-state-lead .fe-brand-name  { color: #78350f !important; }
+#flirteasy-status-bar .fe-state-lead .fe-phase-label { color: #92400e !important; }
+#flirteasy-status-bar .fe-state-lead .fe-dot-ping    { background: #b45309 !important; animation-duration: 1s !important; }
+#flirteasy-status-bar .fe-state-lead .fe-dot-inner   { background: #b45309 !important; }
+#flirteasy-status-bar .fe-state-lead .fe-ctrl-divider { background: linear-gradient(to bottom, transparent, rgba(120,53,15,0.3), transparent) !important; }
+#flirteasy-status-bar .fe-state-lead .fe-ctrl        { color: rgba(120,53,15,0.7) !important; }
+#flirteasy-status-bar .fe-state-lead .fe-ctrl:hover  { color: #78350f !important; background: rgba(255,255,255,0.2) !important; }
+
+/* Lead pill */
+#flirteasy-status-bar .fe-lead-pill {
+    background: rgba(255,255,255,0.3) !important;
+    border: 1.5px solid rgba(255,255,255,0.55) !important;
+    box-shadow: inset 0 1px 6px rgba(255,255,255,0.2), 0 4px 16px rgba(0,0,0,0.06) !important;
+    backdrop-filter: blur(4px) !important;
+    gap: 10px !important;
+}
+
+#flirteasy-status-bar .fe-lead-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #78350f !important;
+    flex-shrink: 0 !important;
+    animation: fe-phone-ring 1.6s ease-in-out infinite !important;
+}
+
+@keyframes fe-phone-ring {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    10%       { transform: rotate(-15deg) scale(1.1); }
+    20%       { transform: rotate(15deg) scale(1.1); }
+    30%       { transform: rotate(-10deg) scale(1.05); }
+    40%       { transform: rotate(10deg) scale(1.05); }
+    50%       { transform: rotate(0deg) scale(1); }
+}
+
+#flirteasy-status-bar .fe-lead-text {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: #78350f !important;
+    letter-spacing: -0.01em !important;
+    white-space: nowrap !important;
+}
+
+#flirteasy-status-bar .fe-lead-text strong {
+    font-weight: 800 !important;
+    color: #451a03 !important;
+}
+
+/* Take Over button (lead state) */
+#flirteasy-status-bar .fe-action-btn-lead {
+    background: rgba(255,255,255,0.3) !important;
+    color: #78350f !important;
+    border: 1.5px solid rgba(255,255,255,0.6) !important;
+    backdrop-filter: blur(4px) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+    padding: 5px 14px 5px 16px !important;
+    font-weight: 700 !important;
+}
+
+#flirteasy-status-bar .fe-action-btn-lead:hover {
+    background: rgba(255,255,255,0.45) !important;
+    transform: translateY(-1px) !important;
+    opacity: 1 !important;
+}
+
+/* ── State: Cooldown ── */
+#flirteasy-status-bar .fe-bar-inner.fe-state-cooldown {
+    box-shadow: 10px 10px 28px rgba(0,0,0,0.32), -8px -8px 20px rgba(0,0,0,0.16) !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner.fe-state-cooldown:hover {
+    box-shadow: 14px 14px 32px rgba(0,0,0,0.40), -10px -10px 24px rgba(0,0,0,0.20) !important;
+}
+
+/* ── State: Finished ── */
+#flirteasy-status-bar .fe-bar-inner.fe-state-finished {
+    box-shadow: 10px 10px 28px rgba(0,0,0,0.32), -8px -8px 20px rgba(0,0,0,0.16) !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner.fe-state-finished:hover {
+    box-shadow: 14px 14px 32px rgba(0,0,0,0.40), -10px -10px 24px rgba(0,0,0,0.20) !important;
+}
+
+/* ── State: Analyzing ── */
+#flirteasy-status-bar .fe-bar-inner.fe-state-analyzing {
+    box-shadow: 10px 10px 28px rgba(0,0,0,0.32), -8px -8px 20px rgba(0,0,0,0.16) !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner.fe-state-analyzing:hover {
+    box-shadow: 14px 14px 32px rgba(0,0,0,0.40), -10px -10px 24px rgba(0,0,0,0.20) !important;
+}
+
+/* ── Identity section ── */
+#flirteasy-status-bar .fe-identity {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0 !important;
+    flex-shrink: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+#flirteasy-status-bar .fe-logo-wrap {
+    width: 40px !important;
+    height: 40px !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-identity-text {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    margin: 0 0 0 4px !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-brand-name {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #3d4a5c !important;
+    letter-spacing: -0.025em !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-state-match .fe-brand-name    { color: #ffffff !important; }
+#flirteasy-status-bar .fe-state-cooldown .fe-brand-name { color: #64748b !important; }
+
+/* ── Status row ── */
+#flirteasy-status-bar .fe-status-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* ── Ping dot ── */
+#flirteasy-status-bar .fe-dot-wrap {
+    position: relative !important;
+    width: 8px !important;
+    height: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-dot-ping {
+    position: absolute !important;
+    inset: 0 !important;
+    border-radius: 50% !important;
+    background: #e8197d !important;
+    opacity: 0.75 !important;
+    animation: fe-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-dot-inner {
+    position: relative !important;
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #e8197d !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+@keyframes fe-ping {
+    75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+/* Cooldown: solid blue, no ping */
+#flirteasy-status-bar .fe-state-cooldown .fe-dot-ping   { animation: none !important; opacity: 0 !important; }
+#flirteasy-status-bar .fe-state-cooldown .fe-dot-inner  { background: #3b82f6 !important; }
+
+/* Match: white ping */
+#flirteasy-status-bar .fe-state-match .fe-dot-ping  { background: #ffffff !important; animation-duration: 1s !important; }
+#flirteasy-status-bar .fe-state-match .fe-dot-inner { background: #ffffff !important; }
+
+/* Finished: solid emerald, no ping */
+#flirteasy-status-bar .fe-state-finished .fe-dot-ping  { animation: none !important; opacity: 0 !important; }
+#flirteasy-status-bar .fe-state-finished .fe-dot-inner { background: #10b981 !important; }
+
+/* Analyzing: purple, no ping */
+#flirteasy-status-bar .fe-state-analyzing .fe-dot-ping  { animation: none !important; opacity: 0 !important; }
+#flirteasy-status-bar .fe-state-analyzing .fe-dot-inner { background: #8b5cf6 !important; }
+
+/* ── Phase label ── */
+#flirteasy-status-bar .fe-phase-label {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    color: #e8197d !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+}
+
+#flirteasy-status-bar .fe-state-cooldown .fe-phase-label  { color: #3b82f6 !important; }
+#flirteasy-status-bar .fe-state-match .fe-phase-label     { color: rgba(255,255,255,0.9) !important; }
+#flirteasy-status-bar .fe-state-finished .fe-phase-label  { color: #10b981 !important; }
+#flirteasy-status-bar .fe-state-analyzing .fe-phase-label { color: #8b5cf6 !important; }
+
+/* ── Activity center ── */
+#flirteasy-status-bar .fe-activity {
+    flex: 1 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    min-width: 0 !important;
+    position: relative !important;
+    z-index: 2 !important;
+}
+
+/* Activity pill — base */
+#flirteasy-status-bar .fe-activity-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    padding: 6px 28px !important;
+    border-radius: 9999px !important;
+    margin: 0 !important;
+    width: 100% !important;
+    transition: background 0.2s ease !important;
+}
+
+/* ACTIVE: neumorphic inset pink */
+#flirteasy-status-bar .fe-state-active .fe-activity-pill {
+    background: #eef1f6 !important;
+    border: none !important;
+    box-shadow: inset 4px 4px 8px #d6d9e0, inset -2px -2px 5px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(236,72,153,0.15) !important;
+}
+
+/* DRAFTING: neumorphic inset pink tint */
+#flirteasy-status-bar .fe-state-drafting .fe-activity-pill {
+    background: #f5eef4 !important;
+    border: none !important;
+    box-shadow: inset 4px 4px 8px #d8ccd6, inset -2px -2px 5px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(236,72,153,0.2) !important;
+}
+
+/* COOLDOWN: neumorphic inset blue tint */
+#flirteasy-status-bar .fe-state-cooldown .fe-activity-pill:not(.fe-cooldown-pill):not(.fe-transition-pill) {
+    background: #edf2f8 !important;
+    border: none !important;
+    box-shadow: inset 4px 4px 8px #d0d8e4, inset -2px -2px 5px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(59,130,246,0.18) !important;
+}
+
+/* MATCH: translucent white pill */
+#flirteasy-status-bar .fe-state-match .fe-activity-pill {
+    background: rgba(255, 255, 255, 0.22) !important;
+    border: 1px solid rgba(255, 255, 255, 0.45) !important;
+    box-shadow: inset 0 1px 6px rgba(255,255,255,0.15), 0 4px 16px rgba(0,0,0,0.08) !important;
+}
+
+/* FINISHED: neumorphic inset emerald tint */
+#flirteasy-status-bar .fe-state-finished .fe-activity-pill {
+    background: #edf6f1 !important;
+    border: none !important;
+    box-shadow: inset 4px 4px 8px #ccddd5, inset -2px -2px 5px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(16,185,129,0.2) !important;
+}
+
+/* ANALYZING: neumorphic inset violet tint */
+#flirteasy-status-bar .fe-state-analyzing .fe-activity-pill {
+    background: #f0eef8 !important;
+    border: none !important;
+    box-shadow: inset 4px 4px 8px #d4ceea, inset -2px -2px 5px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(139,92,246,0.18) !important;
+}
+
+/* Activity icon color per state */
+#flirteasy-status-bar .fe-activity-icon {
+    display: flex !important;
+    align-items: center !important;
+    flex-shrink: 0 !important;
+    color: #e8197d !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-state-cooldown .fe-activity-icon  { color: #3b82f6 !important; }
+#flirteasy-status-bar .fe-state-match .fe-activity-icon     { color: #fde047 !important; }
+#flirteasy-status-bar .fe-state-finished .fe-activity-icon  { color: #10b981 !important; }
+#flirteasy-status-bar .fe-state-analyzing .fe-activity-icon { color: #8b5cf6 !important; }
+
+/* Heart bounce on active */
+@keyframes fe-heart-bounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    40%       { transform: translateY(-2px) scale(1.15); }
+    60%       { transform: translateY(0) scale(1); }
+    75%       { transform: translateY(-1px) scale(1.08); }
+}
+
+#flirteasy-status-bar .fe-state-active .fe-activity-icon {
+    animation: fe-heart-bounce 2s ease-in-out infinite !important;
+}
+
+/* Lightning pulse on match */
+@keyframes fe-lightning-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.7; transform: scale(1.2); }
+}
+
+#flirteasy-status-bar .fe-state-match .fe-activity-icon {
+    animation: fe-lightning-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+}
+
+/* Activity text */
+#flirteasy-status-bar .fe-activity-text {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: #475569 !important;
+    white-space: nowrap !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-activity-text strong {
+    font-weight: 600 !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-state-active .fe-activity-text            { color: #e8197d !important; }
+#flirteasy-status-bar .fe-state-active .fe-activity-text strong     { color: #e8197d !important; font-weight: 700 !important; }
+#flirteasy-status-bar .fe-state-drafting .fe-activity-text          { color: #e8197d !important; }
+#flirteasy-status-bar .fe-state-drafting .fe-activity-text strong   { color: #e8197d !important; font-weight: 700 !important; }
+#flirteasy-status-bar .fe-state-cooldown .fe-activity-text          { color: #1e3a8a !important; }
+#flirteasy-status-bar .fe-state-cooldown .fe-activity-text strong   { color: #1d4ed8 !important; }
+#flirteasy-status-bar .fe-state-match .fe-activity-text             { color: #ffffff !important; font-weight: 600 !important; }
+#flirteasy-status-bar .fe-state-match .fe-activity-text strong      { color: #ffffff !important; font-weight: 700 !important; }
+#flirteasy-status-bar .fe-state-finished .fe-activity-text          { color: #065f46 !important; }
+#flirteasy-status-bar .fe-state-finished .fe-activity-text strong   { color: #047857 !important; }
+#flirteasy-status-bar .fe-state-analyzing .fe-activity-text         { color: #4c1d95 !important; }
+#flirteasy-status-bar .fe-state-analyzing .fe-activity-text strong  { color: #5b21b6 !important; }
+
+/* ── Transition pill (Getting ready to message) ── */
+#flirteasy-status-bar .fe-transition-pill {
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7) !important;
+    border: none !important;
+    box-shadow: inset 3px 3px 7px #c6e8d2, inset -2px -2px 5px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(16,185,129,0.2) !important;
+    gap: 10px !important;
+}
+
+#flirteasy-status-bar .fe-transition-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #10b981 !important;
+    animation: fe-spin 1.1s linear infinite !important;
+    flex-shrink: 0 !important;
+}
+
+@keyframes fe-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+#flirteasy-status-bar .fe-transition-text {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #059669 !important;
+    letter-spacing: -0.01em !important;
+    white-space: nowrap !important;
+}
+
+#flirteasy-status-bar .fe-transition-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 32px !important;
+    height: 24px !important;
+    padding: 0 8px !important;
+    border-radius: 9999px !important;
+    background: #10b981 !important;
+    color: #ffffff !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    font-family: 'SF Mono', ui-monospace, monospace !important;
+    letter-spacing: 0.02em !important;
+    box-shadow: 0 2px 8px rgba(16,185,129,0.4), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+    flex-shrink: 0 !important;
+}
+
+@keyframes fe-badge-tick {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+
+/* ── Preparing pill (no_likes — skip liking phase) ── */
+#flirteasy-status-bar .fe-preparing-pill {
+    background: linear-gradient(135deg, #faf5ff, #ede9fe) !important;
+    border: none !important;
+    box-shadow: inset 3px 3px 7px #d4c8f0, inset -2px -2px 5px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(139,92,246,0.2) !important;
+    gap: 10px !important;
+}
+
+#flirteasy-status-bar .fe-preparing-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #8b5cf6 !important;
+    animation: fe-preparing-pulse 1.4s ease-in-out infinite !important;
+    flex-shrink: 0 !important;
+}
+
+@keyframes fe-preparing-pulse {
+    0%, 100% { transform: scale(1);    opacity: 1;   }
+    50%       { transform: scale(1.18); opacity: 0.75; }
+}
+
+#flirteasy-status-bar .fe-preparing-text {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #6d28d9 !important;
+    letter-spacing: -0.01em !important;
+    white-space: nowrap !important;
+}
+
+#flirteasy-status-bar .fe-preparing-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 32px !important;
+    height: 24px !important;
+    padding: 0 8px !important;
+    border-radius: 9999px !important;
+    background: #8b5cf6 !important;
+    color: #ffffff !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    font-family: 'SF Mono', ui-monospace, monospace !important;
+    letter-spacing: 0.02em !important;
+    box-shadow: 0 2px 8px rgba(139,92,246,0.4), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+    flex-shrink: 0 !important;
+}
+
+/* Orb: preparing state overrides (purple tint) */
+.control-center.is-transitioning.is-preparing .state-transitioning .orb-icon  { color: #8b5cf6 !important; }
+.control-center.is-transitioning.is-preparing .state-transitioning .orb-label { color: #6d28d9 !important; }
+.control-center.is-transitioning.is-preparing .state-transitioning .orb-timer { color: #6d28d9 !important; }
+.control-center.is-transitioning.is-preparing .master-orb                     { background: rgba(139,92,246,0.06) !important; }
+.control-center.is-transitioning.is-preparing .ring-inner                     { border-color: rgba(139,92,246,0.12) !important; }
+.control-center.is-transitioning.is-preparing .orb-pulse-ring                 { box-shadow: 0 0 0 1px rgba(139,92,246,0.32), 0 0 8px 3px rgba(139,92,246,0.22), 0 0 18px 7px rgba(139,92,246,0.09) !important; }
+
+/* ── Cooldown pill (App limits reached) ── */
+#flirteasy-status-bar .fe-cooldown-pill {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe) !important;
+    border: none !important;
+    box-shadow: inset 3px 3px 7px #c2d4f0, inset -2px -2px 5px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(59,130,246,0.2) !important;
+    gap: 10px !important;
+}
+
+#flirteasy-status-bar .fe-cooldown-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #3b82f6 !important;
+    animation: fe-spin 1.4s linear infinite !important;
+    flex-shrink: 0 !important;
+}
+
+#flirteasy-status-bar .fe-cooldown-text {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #1e40af !important;
+    letter-spacing: -0.01em !important;
+    white-space: nowrap !important;
+}
+
+#flirteasy-status-bar .fe-cooldown-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 52px !important;
+    height: 24px !important;
+    padding: 0 10px !important;
+    border-radius: 9999px !important;
+    background: #3b82f6 !important;
+    color: #ffffff !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    font-family: 'SF Mono', ui-monospace, monospace !important;
+    letter-spacing: 0.02em !important;
+    box-shadow: 0 2px 8px rgba(59,130,246,0.4), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+    flex-shrink: 0 !important;
+}
+
+/* ── Safety Lock pill (Internal rate limits) ── */
+#flirteasy-status-bar .fe-network-wait-pill {
+    background: linear-gradient(135deg, #fff7ed, #ffedd5) !important;
+    border: none !important;
+    box-shadow: inset 3px 3px 7px #fed7aa, inset -2px -2px 5px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(249,115,22,0.25) !important;
+    gap: 10px !important;
+}
+
+#flirteasy-status-bar .fe-network-wait-pill .fe-cooldown-icon {
+    color: #ea580c !important;
+    animation: fe-wifi-pulse 1.4s ease-in-out infinite !important;
+}
+
+#flirteasy-status-bar .fe-network-wait-pill .fe-cooldown-text {
+    color: #9a3412 !important;
+    font-weight: 700 !important;
+}
+
+@keyframes fe-wifi-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.92); }
+}
+
+#flirteasy-status-bar .fe-safety-lock-pill {
+    background: linear-gradient(135deg, #fffbeb, #fef3c7) !important;
+    border: none !important;
+    box-shadow: inset 3px 3px 7px #f8e1a0, inset -2px -2px 5px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(245,158,11,0.25) !important;
+    gap: 10px !important;
+}
+
+#flirteasy-status-bar .fe-safety-lock-pill .fe-cooldown-icon {
+    color: #d97706 !important;
+    animation: fe-lock-wobble 2s ease-in-out infinite !important;
+}
+
+@keyframes fe-lock-wobble {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-8deg); }
+    75% { transform: rotate(8deg); }
+}
+
+#flirteasy-status-bar .fe-safety-lock-pill .fe-cooldown-text {
+    color: #92400e !important;
+    font-weight: 700 !important;
+}
+
+#flirteasy-status-bar .fe-safety-lock-pill .fe-cooldown-badge {
+    background: #f59e0b !important;
+    box-shadow: 0 2px 8px rgba(245,158,11,0.4), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+
+/* ── Trial Ended pill (purple — upgrade invitation) ── */
+#flirteasy-status-bar .fe-trial-ended-pill {
+    background: linear-gradient(135deg, #f5f3ff, #ede9fe) !important;
+    border: none !important;
+    box-shadow: inset 3px 3px 7px #ddd6fe, inset -2px -2px 5px rgba(0,0,0,0.06), 0 0 0 1.5px rgba(124,58,237,0.25) !important;
+    gap: 10px !important;
+}
+
+#flirteasy-status-bar .fe-trial-ended-pill .fe-cooldown-icon {
+    color: #7c3aed !important;
+}
+
+#flirteasy-status-bar .fe-trial-ended-pill .fe-cooldown-text {
+    color: #4c1d95 !important;
+    font-weight: 700 !important;
+}
+
+/* ── Countdown value ── */
+#flirteasy-status-bar .fe-countdown-val {
+    font-family: 'SF Mono', 'Fira Code', ui-monospace, 'Courier New', monospace !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    color: #1d4ed8 !important;
+    background: rgba(29, 78, 216, 0.08) !important;
+    border: 1px solid rgba(29, 78, 216, 0.15) !important;
+    border-radius: 5px !important;
+    padding: 1px 6px !important;
+    letter-spacing: 0.02em !important;
+    margin: 0 1px !important;
+}
+
+/* ── Typing dots ── */
+#flirteasy-status-bar .fe-typing-dots {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+    margin: 0 0 0 2px !important;
+    padding: 0 !important;
+    height: 16px !important;
+    vertical-align: middle !important;
+}
+
+#flirteasy-status-bar .fe-typing-dots span {
+    display: inline-block !important;
+    width: 4px !important;
+    height: 4px !important;
+    border-radius: 50% !important;
+    background: #e8197d !important;
+    animation: fe-typing-dot 1.4s ease-in-out infinite !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-typing-dots span:nth-child(2) { animation-delay: 0.2s !important; }
+#flirteasy-status-bar .fe-typing-dots span:nth-child(3) { animation-delay: 0.4s !important; }
+
+@keyframes fe-typing-dot {
+    0%, 100% { transform: translateY(0); opacity: 0.4; }
+    50%       { transform: translateY(-3px); opacity: 1; }
+}
+
+/* ── Right section ── */
+#flirteasy-status-bar .fe-right {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: relative !important;
+    z-index: 2 !important;
+}
+
+/* Cooldown right section dimmed */
+#flirteasy-status-bar .fe-state-cooldown .fe-right { opacity: 0.6 !important; }
+
+/* ── Stat pills ── */
+#flirteasy-status-bar .fe-stat-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 4px 10px !important;
+    margin: 0 !important;
+    border-radius: 9999px !important;
+    background: #eef1f6 !important;
+    border: none !important;
+    box-shadow: 5px 5px 10px #c8ccd4, -3px -3px 7px rgba(0,0,0,0.12) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+    cursor: default !important;
+}
+
+#flirteasy-status-bar .fe-stat-pill:hover {
+    transform: scale(1.05) !important;
+    box-shadow: 6px 6px 12px #c0c4cc, -4px -4px 8px rgba(0,0,0,0.14) !important;
+}
+
+/* Active/Drafting stat pills: pink-tinted base */
+#flirteasy-status-bar .fe-state-active .fe-stat-pill,
+#flirteasy-status-bar .fe-state-drafting .fe-stat-pill {
+    background: #f5ecf3 !important;
+    box-shadow: 5px 5px 10px #d0c0cc, -3px -3px 7px rgba(0,0,0,0.12) !important;
+}
+
+/* Drafting msgs pill: extra highlighted */
+#flirteasy-status-bar .fe-state-drafting .fe-stat-pill-msgs {
+    background: #f0e0ee !important;
+    box-shadow: 5px 5px 10px #ccb8c8, -3px -3px 7px rgba(0,0,0,0.12), 0 0 0 1.5px rgba(232,25,125,0.3) !important;
+}
+
+/* Cooldown pills */
+#flirteasy-status-bar .fe-state-cooldown .fe-stat-pill {
+    background: #eef1f6 !important;
+    box-shadow: 5px 5px 10px #c4ccd8, -3px -3px 7px rgba(0,0,0,0.12) !important;
+}
+
+/* Match: translucent raised */
+#flirteasy-status-bar .fe-state-match .fe-stat-pill {
+    background: rgba(255,255,255,0.22) !important;
+    box-shadow: 4px 4px 10px rgba(0,0,0,0.18), -3px -3px 8px rgba(255,255,255,0.25) !important;
+    border: 1px solid rgba(255,255,255,0.35) !important;
+}
+
+/* Finished */
+#flirteasy-status-bar .fe-state-finished .fe-stat-pill {
+    background: #eef1f6 !important;
+    box-shadow: 5px 5px 10px #c4d4cc, -3px -3px 7px rgba(0,0,0,0.12) !important;
+}
+
+#flirteasy-status-bar .fe-pill-num {
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    color: #e8197d !important;
+    letter-spacing: -0.01em !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-pill-unit {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    color: #e8197d !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.07em !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0.75 !important;
+}
+
+#flirteasy-status-bar .fe-state-cooldown .fe-pill-num  { color: #64748b !important; opacity: 1 !important; }
+#flirteasy-status-bar .fe-state-cooldown .fe-pill-unit { color: #94a3b8 !important; opacity: 1 !important; }
+#flirteasy-status-bar .fe-state-match .fe-pill-num     { color: #ffffff !important; opacity: 1 !important; }
+#flirteasy-status-bar .fe-state-match .fe-pill-unit    { color: rgba(255,255,255,0.85) !important; opacity: 1 !important; }
+#flirteasy-status-bar .fe-state-finished .fe-pill-num  { color: #e8197d !important; opacity: 1 !important; }
+#flirteasy-status-bar .fe-state-finished .fe-pill-unit { color: #e8197d !important; opacity: 0.75 !important; }
+
+/* ── Trial limit warning pills ── */
+#flirteasy-status-bar .fe-stat-pill.fe-pill-caution {
+    background: #fff8ed !important;
+    box-shadow: 5px 5px 10px #e8d8b8, -3px -3px 7px rgba(0,0,0,0.10) !important;
+}
+#flirteasy-status-bar .fe-stat-pill.fe-pill-caution .fe-pill-num  { color: #d97706 !important; }
+#flirteasy-status-bar .fe-stat-pill.fe-pill-caution .fe-pill-unit { color: #d97706 !important; }
+
+#flirteasy-status-bar .fe-stat-pill.fe-pill-warn {
+    background: #fff1f2 !important;
+    box-shadow: 5px 5px 10px #f0c0c4, -3px -3px 7px rgba(0,0,0,0.10), 0 0 0 1.5px rgba(220,38,38,0.25) !important;
+}
+#flirteasy-status-bar .fe-stat-pill.fe-pill-warn .fe-pill-num  { color: #dc2626 !important; }
+#flirteasy-status-bar .fe-stat-pill.fe-pill-warn .fe-pill-unit { color: #dc2626 !important; }
+
+#flirteasy-status-bar .fe-stat-pill.fe-pill-trial-ended {
+    background: #f5f3ff !important;
+    box-shadow: 5px 5px 10px #ddd6fe, -3px -3px 7px rgba(0,0,0,0.08), 0 0 0 1.5px rgba(124,58,237,0.25) !important;
+}
+#flirteasy-status-bar .fe-stat-pill.fe-pill-trial-ended .fe-pill-unit { color: #7c3aed !important; font-weight: 600 !important; }
+
+/* ── Slot machine counter ── */
+@keyframes fe-slot-spin {
+    0%   { transform: translateY(-16px); filter: blur(4px); opacity: 0; }
+    50%  { filter: blur(1px); opacity: 0.6; }
+    100% { transform: translateY(0); filter: blur(0); opacity: 1; }
+}
+
+#flirteasy-status-bar .fe-slot-spin {
+    animation: fe-slot-spin 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+/* ── iOS-quality name transition (active state, name only) ── */
+@keyframes fe-name-exit {
+    0%   { opacity: 1; transform: translateY(0) scale(1);    filter: blur(0); }
+    100% { opacity: 0; transform: translateY(-9px) scale(0.82); filter: blur(5px); }
+}
+
+@keyframes fe-name-enter {
+    0%   { opacity: 0; transform: translateY(11px) scale(0.82); filter: blur(5px); }
+    55%  { opacity: 1; filter: blur(0);  transform: translateY(-2px) scale(1.06); }
+    75%  { transform: translateY(1px) scale(0.97); }
+    100% { opacity: 1; transform: translateY(0) scale(1);    filter: blur(0); }
+}
+
+#flirteasy-status-bar .fe-swipe-name {
+    display: inline-block !important;
+}
+
+/* ── Full pill transition (state changes) ── */
+@keyframes fe-pill-exit {
+    0%   { opacity: 1; transform: translateY(0) scale(1);    filter: blur(0); }
+    100% { opacity: 0; transform: translateY(-8px) scale(0.94); filter: blur(3px); }
+}
+
+@keyframes fe-pill-enter {
+    0%   { opacity: 0; transform: translateY(10px) scale(0.94); filter: blur(3px); }
+    60%  { opacity: 1; filter: blur(0); transform: translateY(-1px) scale(1.02); }
+    100% { opacity: 1; transform: translateY(0) scale(1);    filter: blur(0); }
+}
+
+/* keep old names as aliases for any inline style references */
+@keyframes fe-pill-slide-out {
+    0%   { opacity: 1; transform: translateY(0) scale(1);    filter: blur(0); }
+    100% { opacity: 0; transform: translateY(-8px) scale(0.94); filter: blur(3px); }
+}
+
+@keyframes fe-pill-slide-in {
+    0%   { opacity: 0; transform: translateY(10px) scale(0.94); filter: blur(3px); }
+    60%  { opacity: 1; filter: blur(0); transform: translateY(-1px) scale(1.02); }
+    100% { opacity: 1; transform: translateY(0) scale(1);    filter: blur(0); }
+}
+
+/* ── Action buttons ── */
+#flirteasy-status-bar .fe-action-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 5px 14px !important;
+    margin: 0 !important;
+    border-radius: 9999px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    border: none !important;
+    transition: transform 0.15s ease, opacity 0.15s ease !important;
+    white-space: nowrap !important;
+    letter-spacing: 0.02em !important;
+    outline: none !important;
+}
+
+#flirteasy-status-bar .fe-action-btn:hover  { transform: translateY(-1px) !important; opacity: 0.9 !important; }
+#flirteasy-status-bar .fe-action-btn:active { transform: translateY(0) !important; }
+
+/* View → button (match state) */
+#flirteasy-status-bar .fe-action-btn-view {
+    background: rgba(255,255,255,0.2) !important;
+    color: #ffffff !important;
+    border: 1.5px solid rgba(255,255,255,0.65) !important;
+    backdrop-filter: blur(4px) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    padding: 5px 14px 5px 16px !important;
+}
+
+/* View Full Report button (analyzing state) */
+#flirteasy-status-bar .fe-action-btn-purple {
+    background: #eef1f6 !important;
+    color: #6d28d9 !important;
+    border: none !important;
+    box-shadow: 4px 4px 8px #d4ceea, -2px -2px 5px rgba(0,0,0,0.10) !important;
+    font-size: 11px !important;
+}
+
+#flirteasy-status-bar .fe-action-btn-purple:hover {
+    transform: scale(1.05) translateY(0) !important;
+    opacity: 1 !important;
+}
+
+/* ── Divider ── */
+#flirteasy-status-bar .fe-ctrl-divider {
+    width: 1px !important;
+    height: 22px !important;
+    background: linear-gradient(to bottom, transparent, #c8cdd6, transparent) !important;
+    flex-shrink: 0 !important;
+    margin: 0 4px 0 10px !important;
+    padding: 0 !important;
+}
+
+/* ── Drag Handle ── */
+#flirteasy-status-bar .fe-drag-handle {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    align-self: stretch !important;
+    padding: 0 14px 0 10px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    color: #c4cad4 !important;
+    cursor: grab !important;
+    transition: color 0.15s ease !important;
+}
+
+#flirteasy-status-bar .fe-drag-handle:hover {
+    color: #94a3b8 !important;
+}
+
+#flirteasy-status-bar .fe-state-match .fe-drag-handle { color: rgba(255,255,255,0.45) !important; }
+#flirteasy-status-bar .fe-state-lead .fe-drag-handle  { color: rgba(120,53,15,0.35) !important; }
+
+/* ── Brand icon logo ── */
+#flirteasy-status-bar .fe-brand-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    object-fit: contain !important;
+    display: block !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transition: filter 0.3s ease !important;
+    pointer-events: none !important;
+}
+
+/* ── Chromatic rainbow glow on hover ── */
+#flirteasy-status-bar .fe-chromatic-glow {
+    position: absolute !important;
+    inset: 0 !important;
+    background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000) !important;
+    border-radius: inherit !important;
+    filter: blur(10px) !important;
+    opacity: 0 !important;
+    z-index: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.4s ease !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#flirteasy-status-bar .fe-bar-inner:hover .fe-chromatic-glow {
+    opacity: 0.1 !important;
+    animation: fe-chromatic-rotate 10s linear infinite !important;
+}
+
+#flirteasy-status-bar .fe-state-match .fe-chromatic-glow {
+    opacity: 0 !important;
+    animation: none !important;
+}
+
+@keyframes fe-chromatic-rotate {
+    0%   { filter: hue-rotate(0deg) blur(10px); }
+    100% { filter: hue-rotate(360deg) blur(10px); }
+}
+
+/* ── Brand row (name + platform badge) ── */
+#flirteasy-status-bar .fe-brand-row {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 5px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* ── Platform badge ── */
+#flirteasy-status-bar .fe-platform-badge {
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    color: #e8197d !important;
+    background: #eef1f6 !important;
+    border: none !important;
+    border-radius: 9999px !important;
+    padding: 2px 7px !important;
+    line-height: 1 !important;
+    margin: 0 0 1px 0 !important;
+    flex-shrink: 0 !important;
+    box-shadow: 3px 3px 6px #d0d4db, -2px -2px 5px rgba(255,255,255,0.9) !important;
+}
+
+#flirteasy-status-bar .fe-state-idle .fe-platform-badge,
+#flirteasy-status-bar .fe-state-cooldown .fe-platform-badge {
+    color: #94a3b8 !important;
+}
+
+#flirteasy-status-bar .fe-state-match .fe-platform-badge {
+    color: rgba(255,255,255,0.9) !important;
+    background: rgba(255,255,255,0.22) !important;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.15), -1px -1px 3px rgba(255,255,255,0.2) !important;
+}
+
+/* ── LIVE / OFF chip ── */
+#flirteasy-status-bar .fe-live-chip {
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    border: none !important;
+    border-radius: 9999px !important;
+    padding: 2px 7px !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+    transition: background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease !important;
+}
+
+#flirteasy-status-bar .fe-live-chip--on {
+    color: #059669 !important;
+    background: #eaf5f0 !important;
+    box-shadow: 3px 3px 6px #c8ddd5, -2px -2px 5px rgba(255,255,255,0.9) !important;
+    animation: fe-live-pulse 2.5s ease-in-out infinite !important;
+}
+
+#flirteasy-status-bar .fe-live-chip--off {
+    color: #94a3b8 !important;
+    background: #eef1f6 !important;
+    box-shadow: 3px 3px 6px #d0d4db, -2px -2px 5px rgba(255,255,255,0.9) !important;
+    animation: none !important;
+}
+
+@keyframes fe-live-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.55; }
+}
+
+#flirteasy-status-bar .fe-state-match .fe-live-chip--on {
+    color: rgba(255,255,255,0.95) !important;
+    background: rgba(255,255,255,0.22) !important;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.15), -1px -1px 3px rgba(255,255,255,0.2) !important;
+}
+
+/* ── Trial days pill — inherits base fe-pill-num/unit sizing ── */
+
+/* ── PRO plan pill ── */
+#flirteasy-status-bar .fe-stat-pill-pro {
+    background: linear-gradient(135deg, #f5f0ff, #ede9fe) !important;
+    box-shadow: 3px 3px 6px #d4ccea, -2px -2px 5px rgba(255,255,255,0.9) !important;
+}
+
+#flirteasy-status-bar .fe-pill-pro-label {
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.12em !important;
+    color: #7c3aed !important;
+    background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+}
+
+#flirteasy-status-bar .fe-stat-pill-pro-expiry .fe-pill-num {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+}
+
+#flirteasy-status-bar .fe-stat-pill-pro-expiry .fe-pill-unit {
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    color: #7c3aed !important;
+}
+
+/* ══════════════════════════════════════════════════
+   BUMBLE DEAD STATE CARD
+   Injected into Bumble sidebar when user has no matches.
+   Liquid morph premium design.
+   ══════════════════════════════════════════════════ */
+
+.fe-bumble-dead-card {
+    position: relative !important;
+    width: 100% !important;
+    margin: 0 !important;
+    height: 76px !important;
+    border-radius: 0 !important;
+    cursor: pointer !important;
+    overflow: hidden !important;
+    background: #fff5f8 !important;
+    box-shadow: none !important;
+    border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+    transition: background 0.2s ease !important;
+    animation: fe-bdc-enter 0.4s cubic-bezier(0.16,1,0.3,1) both !important;
+    font-family: 'Circular', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    box-sizing: border-box !important;
+}
+
+.fe-bumble-dead-card * {
+    box-sizing: border-box !important;
+    font-family: inherit !important;
+}
+
+.fe-bumble-dead-card:hover {
+    background: #ffeef5 !important;
+}
+
+.fe-bumble-dead-card.fe-bdc-exit {
+    animation: fe-bdc-exit 0.28s ease forwards !important;
+}
+
+@keyframes fe-bdc-enter {
+    from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fe-bdc-exit {
+    to { opacity: 0; transform: translateY(-6px) scale(0.97); }
+}
+
+/* ── Gradient base layer ── */
+.fe-bumble-dead-card .fe-bdc-gradient-base {
+    position: absolute !important;
+    inset: 0 !important;
+    background: linear-gradient(135deg, rgba(252,231,243,0.5) 0%, rgba(237,233,254,0.5) 50%, rgba(255,237,213,0.5) 100%) !important;
+    z-index: 0 !important;
+}
+
+/* ── Morphing blobs ── */
+.fe-bumble-dead-card .fe-bdc-blob {
+    position: absolute !important;
+    border-radius: 50% !important;
+    mix-blend-mode: multiply !important;
+    filter: blur(18px) !important;
+    z-index: 1 !important;
+    pointer-events: none !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-blob-1 {
+    width: 80px !important;
+    height: 80px !important;
+    top: -20px !important;
+    left: -16px !important;
+    background: rgba(249,168,212,0.5) !important;
+    animation: fe-bdc-blob 7s infinite !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-blob-2 {
+    width: 90px !important;
+    height: 90px !important;
+    top: 4px !important;
+    right: -20px !important;
+    background: rgba(196,181,253,0.5) !important;
+    animation: fe-bdc-blob 7s infinite !important;
+    animation-delay: 2s !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-blob-3 {
+    width: 80px !important;
+    height: 80px !important;
+    bottom: -28px !important;
+    left: 50px !important;
+    background: rgba(254,202,202,0.5) !important;
+    animation: fe-bdc-blob 7s infinite !important;
+    animation-delay: 4s !important;
+}
+
+@keyframes fe-bdc-blob {
+    0%   { transform: translate(0,0) scale(1); }
+    33%  { transform: translate(12px,-20px) scale(1.1); }
+    66%  { transform: translate(-8px,12px) scale(0.9); }
+    100% { transform: translate(0,0) scale(1); }
+}
+
+/* ── Glass overlay ── */
+.fe-bumble-dead-card .fe-bdc-glass {
+    position: absolute !important;
+    inset: 0 !important;
+    border-radius: 0 !important;
+    background: rgba(255,255,255,0.45) !important;
+    border: 1px solid rgba(255,255,255,0.85) !important;
+    z-index: 2 !important;
+    pointer-events: none !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+}
+
+/* ── Content container ── */
+.fe-bumble-dead-card .fe-bdc-content {
+    position: relative !important;
+    z-index: 10 !important;
+    height: 100% !important;
+    padding: 10px 10px 10px 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+/* ── Avatar section ── */
+.fe-bumble-dead-card .fe-bdc-avatar-wrap {
+    position: relative !important;
+    flex-shrink: 0 !important;
+    width: 52px !important;
+    height: 52px !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-ripple {
+    position: absolute !important;
+    inset: 0 !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg, #f472b6, #a78bfa) !important;
+    animation: fe-bdc-ripple 2s cubic-bezier(0,0.2,0.8,1) infinite !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-ripple-2 {
+    animation-delay: 1s !important;
+}
+
+@keyframes fe-bdc-ripple {
+    0%   { transform: scale(0.8); opacity: 1; }
+    100% { transform: scale(1.65); opacity: 0; }
+}
+
+.fe-bumble-dead-card .fe-bdc-avatar-frame {
+    position: relative !important;
+    width: 52px !important;
+    height: 52px !important;
+    border-radius: 18px !important;
+    background: linear-gradient(135deg, #ffffff, #fce7f3) !important;
+    padding: 4px !important;
+    border: 1px solid rgba(255,255,255,0.9) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: transform 0.5s ease !important;
+}
+
+.fe-bumble-dead-card:hover .fe-bdc-avatar-frame {
+    transform: scale(1.03) !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-avatar-inner {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 14px !important;
+    background: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-shine {
+    position: absolute !important;
+    top: -6px !important;
+    right: -6px !important;
+    width: 24px !important;
+    height: 24px !important;
+    background: rgba(244,114,182,0.2) !important;
+    border-radius: 50% !important;
+    filter: blur(6px) !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-avatar-inner img {
+    width: 36px !important;
+    height: 36px !important;
+    object-fit: contain !important;
+    display: block !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-live-dot-wrap {
+    position: absolute !important;
+    bottom: -2px !important;
+    right: -2px !important;
+    width: 16px !important;
+    height: 16px !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-live-dot {
+    width: 10px !important;
+    height: 10px !important;
+    border-radius: 50% !important;
+    background: #10b981 !important;
+    display: block !important;
+}
+
+/* ── Body text ── */
+.fe-bumble-dead-card .fe-bdc-body {
+    flex: 1 !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    padding-top: 2px !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin-bottom: 1px !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-name {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    background: linear-gradient(135deg, #4c1d95, #9d174d) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* LIVE badge */
+.fe-bumble-dead-card .fe-bdc-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 3px 8px 3px 5px !important;
+    border-radius: 9999px !important;
+    background: linear-gradient(135deg, #ecfdf5, #f0fdfa) !important;
+    border: 1px solid rgba(110,231,183,0.5) !important;
+    flex-shrink: 0 !important;
+    position: relative !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-badge-ping {
+    position: absolute !important;
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #34d399 !important;
+    left: 5px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    animation: fe-bdc-ping 1.2s cubic-bezier(0,0,0.2,1) infinite !important;
+}
+
+@keyframes fe-bdc-ping {
+    75%, 100% { transform: translateY(-50%) scale(2.2); opacity: 0; }
+}
+
+.fe-bumble-dead-card .fe-bdc-badge-dot {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #10b981 !important;
+    display: inline-block !important;
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-badge-text {
+    font-size: 9px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.12em !important;
+    color: #059669 !important;
+    line-height: 1 !important;
+    padding-top: 1px !important;
+}
+
+.fe-bumble-dead-card .fe-bdc-msg {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: rgba(71,85,105,0.9) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.4 !important;
+    padding-right: 4px !important;
+}
+
+/* ── Arrow button ── */
+.fe-bumble-dead-card .fe-bdc-arrow {
+    flex-shrink: 0 !important;
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 50% !important;
+    background: rgba(255,255,255,0.65) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #a78bfa !important;
+    transition: background 0.3s, color 0.3s, transform 0.3s !important;
+}
+
+.fe-bumble-dead-card:hover .fe-bdc-arrow {
+    background: rgba(255,255,255,0.95) !important;
+    color: #e8197d !important;
+    transform: translateX(3px) !important;
+}
+
+.fe-bumble-dead-card.fe-bdc-active .fe-bdc-arrow {
+    background: rgba(255,255,255,0.95) !important;
+    color: #e8197d !important;
+}
+
+/* ══════════════════════════════════════════════════
+   BUMBLE DEAD STATE — CONVERSATION PANEL
+   Opens when user clicks the AI Wingman card.
+   Overlays the main content area (right of sidebar).
+   ══════════════════════════════════════════════════ */
+
+#fe-bumble-panel {
+    position: fixed !important;
+    top: 0 !important;
+    left: 400px !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: #fdf4f8 !important;
+    z-index: 9999990 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    font-family: 'Circular', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    animation: fe-panel-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+    border-left: 1px solid rgba(232,25,125,0.1) !important;
+}
+
+#fe-bumble-panel * {
+    box-sizing: border-box !important;
+    font-family: inherit !important;
+}
+
+@keyframes fe-panel-enter {
+    from { opacity: 0; transform: translateX(24px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fe-panel-exit {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(24px); }
+}
+
+#fe-bumble-panel.fe-panel-exiting {
+    animation: fe-panel-exit 0.22s ease forwards !important;
+    pointer-events: none !important;
+}
+
+/* ── Panel header ── */
+#fe-bumble-panel .fe-panel-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+    padding: 18px 24px !important;
+    border-bottom: 1px solid rgba(232,25,125,0.1) !important;
+    background: linear-gradient(135deg, #fff0f6 0%, #f5f0ff 100%) !important;
+    flex-shrink: 0 !important;
+}
+
+#fe-bumble-panel .fe-panel-avatar {
+    position: relative !important;
+    width: 46px !important;
+    height: 46px !important;
+    flex-shrink: 0 !important;
+    border-radius: 15px !important;
+    background: linear-gradient(135deg, #ffffff, #fce7f3) !important;
+    padding: 4px !important;
+    border: 1px solid rgba(255,255,255,0.9) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#fe-bumble-panel .fe-panel-avatar-inner-wrap {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 11px !important;
+    background: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+
+#fe-bumble-panel .fe-panel-avatar img {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 0 !important;
+    object-fit: contain !important;
+    border: none !important;
+    display: block !important;
+}
+
+#fe-bumble-panel .fe-panel-avatar .fe-panel-dot {
+    position: absolute !important;
+    bottom: -2px !important;
+    right: -2px !important;
+    width: 12px !important;
+    height: 12px !important;
+    border-radius: 50% !important;
+    background: #10b981 !important;
+    border: 2px solid #fff !important;
+}
+
+#fe-bumble-panel .fe-panel-title {
+    flex: 1 !important;
+}
+
+#fe-bumble-panel .fe-panel-name {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    background: linear-gradient(135deg, #4c1d95, #9d174d) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    display: block !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.02em !important;
+}
+
+#fe-bumble-panel .fe-panel-subtitle {
+    font-size: 12px !important;
+    color: #10b981 !important;
+    font-weight: 600 !important;
+    display: block !important;
+    margin-top: 3px !important;
+}
+
+#fe-bumble-panel .fe-panel-close {
+    width: 36px !important;
+    height: 36px !important;
+    border: none !important;
+    background: rgba(255,255,255,0.7) !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #6b7280 !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+    transition: background 0.15s, color 0.15s !important;
+    border: 1px solid rgba(0,0,0,0.06) !important;
+}
+
+#fe-bumble-panel .fe-panel-close:hover {
+    background: rgba(255,255,255,0.95) !important;
+    color: #e8197d !important;
+}
+
+/* ── Message area ── */
+#fe-bumble-panel .fe-panel-messages {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 28px 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 18px !important;
+    background: linear-gradient(160deg, #fff5fb 0%, #f9f5ff 50%, #fff8f0 100%) !important;
+}
+
+/* System label */
+#fe-bumble-panel .fe-panel-day-label {
+    text-align: center !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #c084fc !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    margin: 0 !important;
+}
+
+/* Incoming message bubble */
+#fe-bumble-panel .fe-panel-bubble {
+    display: flex !important;
+    gap: 12px !important;
+    align-items: flex-start !important;
+    max-width: 82% !important;
+}
+
+#fe-bumble-panel .fe-panel-bubble-avatar {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 11px !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+    margin-top: 2px !important;
+    background: linear-gradient(135deg, #ffffff, #fce7f3) !important;
+    padding: 3px !important;
+    border: 1px solid rgba(232,25,125,0.15) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#fe-bumble-panel .fe-panel-bubble-avatar img {
+    width: 22px !important;
+    height: 22px !important;
+    object-fit: contain !important;
+    border-radius: 0 !important;
+}
+
+#fe-bumble-panel .fe-panel-bubble-text {
+    background: rgba(255,255,255,0.85) !important;
+    border: 1px solid rgba(232,25,125,0.1) !important;
+    border-radius: 4px 18px 18px 18px !important;
+    padding: 14px 18px !important;
+    font-size: 14px !important;
+    color: #1e1b4b !important;
+    line-height: 1.6 !important;
+    box-shadow: 0 2px 12px rgba(232,25,125,0.07) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+}
+
+/* Stats row inside bubble */
+#fe-bumble-panel .fe-panel-stats {
+    display: flex !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+    padding: 6px 0 0 !important;
+}
+
+#fe-bumble-panel .fe-panel-stat {
+    display: inline-flex !important;
+    align-items: center !important;
+    background: linear-gradient(135deg, #fdf2f8, #faf5ff) !important;
+    border: 1px solid rgba(232,25,125,0.18) !important;
+    border-radius: 9999px !important;
+    padding: 5px 14px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #6d28d9 !important;
+    white-space: nowrap !important;
+}
+
+#fe-bumble-panel .fe-panel-stat-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #e8197d !important;
+    margin-right: 5px !important;
+    flex-shrink: 0 !important;
+}
+
+/* Tips list */
+#fe-bumble-panel .fe-panel-tips {
+    background: linear-gradient(135deg, rgba(255,240,246,0.9), rgba(245,240,255,0.9)) !important;
+    border: 1px solid rgba(232,25,125,0.18) !important;
+    border-radius: 16px !important;
+    padding: 16px 18px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 9px !important;
+    max-width: 82% !important;
+    margin-left: 46px !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+}
+
+#fe-bumble-panel .fe-panel-tips-title {
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    background: linear-gradient(135deg, #7c3aed, #e8197d) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+}
+
+#fe-bumble-panel .fe-panel-tip-item {
+    font-size: 13px !important;
+    color: #4c1d95 !important;
+    line-height: 1.5 !important;
+    display: flex !important;
+    gap: 8px !important;
+    align-items: flex-start !important;
+    font-weight: 500 !important;
+}
+
+#fe-bumble-panel .fe-panel-tip-item::before {
+    content: '→' !important;
+    color: #e8197d !important;
+    flex-shrink: 0 !important;
+    font-weight: 700 !important;
+}
+
+/* ══════════════════════════════════════════════════
+   TINDER DEAD STATE CARD
+   Dark theme matching Tinder's UI.
+   ══════════════════════════════════════════════════ */
+
+.fe-tinder-dead-card {
+    position: relative !important;
+    width: 100% !important;
+    margin: 0 !important;
+    height: 102px !important;
+    border-radius: 0 !important;
+    cursor: pointer !important;
+    overflow: hidden !important;
+    background: #1e1e1e !important;
+    box-shadow: none !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    transition: background 0.2s ease !important;
+    animation: fe-tdc-enter 0.4s cubic-bezier(0.16,1,0.3,1) both !important;
+    font-family: 'Circular', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    box-sizing: border-box !important;
+}
+
+.fe-tinder-dead-card * {
+    box-sizing: border-box !important;
+    font-family: inherit !important;
+}
+
+.fe-tinder-dead-card:hover {
+    background: #252525 !important;
+}
+
+.fe-tinder-dead-card.fe-tdc-exit {
+    animation: fe-tdc-exit 0.28s ease forwards !important;
+}
+
+@keyframes fe-tdc-enter {
+    from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fe-tdc-exit {
+    to { opacity: 0; transform: translateY(-6px) scale(0.97); }
+}
+
+/* ── Gradient base ── */
+.fe-tinder-dead-card .fe-tdc-gradient-base {
+    position: absolute !important;
+    inset: 0 !important;
+    background: linear-gradient(135deg, rgba(253,41,123,0.12) 0%, rgba(255,107,107,0.08) 50%, rgba(253,85,100,0.06) 100%) !important;
+    z-index: 0 !important;
+}
+
+/* ── Blobs ── */
+.fe-tinder-dead-card .fe-tdc-blob {
+    position: absolute !important;
+    border-radius: 50% !important;
+    filter: blur(18px) !important;
+    z-index: 1 !important;
+    pointer-events: none !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-blob-1 {
+    width: 80px !important;
+    height: 80px !important;
+    top: -20px !important;
+    left: -16px !important;
+    background: rgba(253,41,123,0.35) !important;
+    animation: fe-tdc-blob 7s infinite !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-blob-2 {
+    width: 90px !important;
+    height: 90px !important;
+    top: 4px !important;
+    right: -20px !important;
+    background: rgba(255,107,107,0.25) !important;
+    animation: fe-tdc-blob 7s infinite !important;
+    animation-delay: 2s !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-blob-3 {
+    width: 80px !important;
+    height: 80px !important;
+    bottom: -28px !important;
+    left: 50px !important;
+    background: rgba(253,85,100,0.2) !important;
+    animation: fe-tdc-blob 7s infinite !important;
+    animation-delay: 4s !important;
+}
+
+@keyframes fe-tdc-blob {
+    0%   { transform: translate(0,0) scale(1); }
+    33%  { transform: translate(12px,-20px) scale(1.1); }
+    66%  { transform: translate(-8px,12px) scale(0.9); }
+    100% { transform: translate(0,0) scale(1); }
+}
+
+/* ── Glass overlay ── */
+.fe-tinder-dead-card .fe-tdc-glass {
+    position: absolute !important;
+    inset: 1px !important;
+    border-radius: 0 !important;
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    z-index: 2 !important;
+    pointer-events: none !important;
+}
+
+/* ── Content ── */
+.fe-tinder-dead-card .fe-tdc-content {
+    position: relative !important;
+    z-index: 10 !important;
+    height: 100% !important;
+    padding: 14px 12px 14px 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+/* ── Avatar ── */
+.fe-tinder-dead-card .fe-tdc-avatar-wrap {
+    position: relative !important;
+    flex-shrink: 0 !important;
+    width: 62px !important;
+    height: 62px !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-ripple {
+    position: absolute !important;
+    inset: 0 !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg, #fd297b, #ff6b6b) !important;
+    animation: fe-tdc-ripple 2s cubic-bezier(0,0.2,0.8,1) infinite !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-ripple-2 {
+    animation-delay: 1s !important;
+}
+
+@keyframes fe-tdc-ripple {
+    0%   { transform: scale(0.8); opacity: 1; }
+    100% { transform: scale(1.65); opacity: 0; }
+}
+
+.fe-tinder-dead-card .fe-tdc-avatar-frame {
+    position: relative !important;
+    width: 62px !important;
+    height: 62px !important;
+    border-radius: 20px !important;
+    background: linear-gradient(135deg, #2a2a2a, #1a1a1a) !important;
+    padding: 4px !important;
+    border: 1px solid rgba(253,41,123,0.3) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: transform 0.5s ease !important;
+}
+
+.fe-tinder-dead-card:hover .fe-tdc-avatar-frame {
+    transform: scale(1.03) !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-avatar-inner {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 14px !important;
+    background: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-shine {
+    position: absolute !important;
+    top: -6px !important;
+    right: -6px !important;
+    width: 24px !important;
+    height: 24px !important;
+    background: rgba(253,41,123,0.2) !important;
+    border-radius: 50% !important;
+    filter: blur(6px) !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-avatar-inner img {
+    width: 36px !important;
+    height: 36px !important;
+    object-fit: contain !important;
+    display: block !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-live-dot-wrap {
+    position: absolute !important;
+    bottom: -2px !important;
+    right: -2px !important;
+    width: 16px !important;
+    height: 16px !important;
+    border-radius: 50% !important;
+    background: #1e1e1e !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-live-dot {
+    width: 10px !important;
+    height: 10px !important;
+    border-radius: 50% !important;
+    background: #10b981 !important;
+    display: block !important;
+}
+
+/* ── Body ── */
+.fe-tinder-dead-card .fe-tdc-body {
+    flex: 1 !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    padding-top: 2px !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin-bottom: 1px !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-name {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    background: linear-gradient(135deg, #ff6b6b, #fd297b) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* LIVE badge */
+.fe-tinder-dead-card .fe-tdc-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 3px 8px 3px 5px !important;
+    border-radius: 9999px !important;
+    background: rgba(16,185,129,0.1) !important;
+    border: 1px solid rgba(16,185,129,0.3) !important;
+    flex-shrink: 0 !important;
+    position: relative !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-badge-ping {
+    position: absolute !important;
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #34d399 !important;
+    left: 5px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    animation: fe-tdc-ping 1.2s cubic-bezier(0,0,0.2,1) infinite !important;
+}
+
+@keyframes fe-tdc-ping {
+    75%, 100% { transform: translateY(-50%) scale(2.2); opacity: 0; }
+}
+
+.fe-tinder-dead-card .fe-tdc-badge-dot {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #10b981 !important;
+    display: inline-block !important;
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-badge-text {
+    font-size: 9px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.12em !important;
+    color: #10b981 !important;
+    line-height: 1 !important;
+    padding-top: 1px !important;
+}
+
+.fe-tinder-dead-card .fe-tdc-msg {
+    font-size: 13px !important;
+    font-weight: 400 !important;
+    color: rgba(255,255,255,0.55) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.4 !important;
+    padding-right: 4px !important;
+}
+
+/* ── Arrow ── */
+.fe-tinder-dead-card .fe-tdc-arrow {
+    flex-shrink: 0 !important;
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 50% !important;
+    background: rgba(255,255,255,0.06) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: rgba(255,255,255,0.3) !important;
+    transition: background 0.3s, color 0.3s, transform 0.3s !important;
+}
+
+.fe-tinder-dead-card:hover .fe-tdc-arrow {
+    background: rgba(253,41,123,0.15) !important;
+    color: #fd297b !important;
+    transform: translateX(3px) !important;
+}
+
+.fe-tinder-dead-card.fe-tdc-active .fe-tdc-arrow {
+    background: rgba(253,41,123,0.2) !important;
+    color: #fd297b !important;
+}
+
+/* ══════════════════════════════════════════════════
+   TINDER DEAD STATE — CONVERSATION PANEL
+   Dark theme, opens right of the Tinder sidebar.
+   ══════════════════════════════════════════════════ */
+
+#fe-tinder-panel {
+    position: fixed !important;
+    top: 0 !important;
+    left: 360px !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: #111111 !important;
+    z-index: 9999990 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    font-family: 'Circular', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    animation: fe-tpanel-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+    border-left: 1px solid rgba(253,41,123,0.15) !important;
+}
+
+#fe-tinder-panel * {
+    box-sizing: border-box !important;
+    font-family: inherit !important;
+}
+
+@keyframes fe-tpanel-enter {
+    from { opacity: 0; transform: translateX(24px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fe-tpanel-exit {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(24px); }
+}
+
+#fe-tinder-panel.fe-tpanel-exiting {
+    animation: fe-tpanel-exit 0.25s ease forwards !important;
+    pointer-events: none !important;
+}
+
+/* ── Panel header ── */
+#fe-tinder-panel .fe-tpanel-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+    padding: 18px 24px !important;
+    border-bottom: 1px solid rgba(253,41,123,0.12) !important;
+    background: linear-gradient(135deg, rgba(253,41,123,0.1) 0%, rgba(255,107,107,0.06) 100%) !important;
+    flex-shrink: 0 !important;
+}
+
+#fe-tinder-panel .fe-tpanel-avatar {
+    position: relative !important;
+    width: 46px !important;
+    height: 46px !important;
+    flex-shrink: 0 !important;
+    border-radius: 15px !important;
+    background: linear-gradient(135deg, #2a2a2a, #1a1a1a) !important;
+    padding: 4px !important;
+    border: 1px solid rgba(253,41,123,0.25) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#fe-tinder-panel .fe-tpanel-avatar-inner {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 11px !important;
+    background: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+
+#fe-tinder-panel .fe-tpanel-avatar img {
+    width: 30px !important;
+    height: 30px !important;
+    object-fit: contain !important;
+    display: block !important;
+    border: none !important;
+    border-radius: 0 !important;
+}
+
+#fe-tinder-panel .fe-tpanel-avatar .fe-tpanel-dot {
+    position: absolute !important;
+    bottom: -2px !important;
+    right: -2px !important;
+    width: 12px !important;
+    height: 12px !important;
+    border-radius: 50% !important;
+    background: #10b981 !important;
+    border: 2px solid #111 !important;
+}
+
+#fe-tinder-panel .fe-tpanel-title {
+    flex: 1 !important;
+}
+
+#fe-tinder-panel .fe-tpanel-name {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    background: linear-gradient(135deg, #ff6b6b, #fd297b) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    display: block !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.02em !important;
+}
+
+#fe-tinder-panel .fe-tpanel-subtitle {
+    font-size: 12px !important;
+    color: #10b981 !important;
+    font-weight: 600 !important;
+    display: block !important;
+    margin-top: 3px !important;
+}
+
+#fe-tinder-panel .fe-tpanel-close {
+    width: 36px !important;
+    height: 36px !important;
+    border: none !important;
+    background: rgba(255,255,255,0.06) !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: rgba(255,255,255,0.4) !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+    transition: background 0.15s, color 0.15s !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+#fe-tinder-panel .fe-tpanel-close:hover {
+    background: rgba(253,41,123,0.15) !important;
+    color: #fd297b !important;
+}
+
+/* ── Messages area ── */
+#fe-tinder-panel .fe-tpanel-messages {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 28px 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 18px !important;
+    background: linear-gradient(160deg, #141414 0%, #0f0f0f 50%, #131313 100%) !important;
+}
+
+#fe-tinder-panel .fe-tpanel-day-label {
+    text-align: center !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: rgba(253,41,123,0.5) !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    margin: 0 !important;
+}
+
+/* ── Bubbles ── */
+#fe-tinder-panel .fe-tpanel-bubble {
+    display: flex !important;
+    gap: 12px !important;
+    align-items: flex-start !important;
+    max-width: 82% !important;
+}
+
+#fe-tinder-panel .fe-tpanel-bubble-avatar {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 11px !important;
+    flex-shrink: 0 !important;
+    margin-top: 2px !important;
+    background: linear-gradient(135deg, #2a2a2a, #1a1a1a) !important;
+    padding: 3px !important;
+    border: 1px solid rgba(253,41,123,0.2) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+
+#fe-tinder-panel .fe-tpanel-bubble-avatar img {
+    width: 22px !important;
+    height: 22px !important;
+    object-fit: contain !important;
+    border-radius: 0 !important;
+}
+
+#fe-tinder-panel .fe-tpanel-bubble-text {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(253,41,123,0.12) !important;
+    border-radius: 4px 18px 18px 18px !important;
+    padding: 14px 18px !important;
+    font-size: 14px !important;
+    color: rgba(255,255,255,0.85) !important;
+    line-height: 1.6 !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3) !important;
+}
+
+/* ── Stats ── */
+#fe-tinder-panel .fe-tpanel-stats {
+    display: flex !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+    padding: 10px 0 0 !important;
+}
+
+#fe-tinder-panel .fe-tpanel-stat {
+    display: inline-flex !important;
+    align-items: center !important;
+    background: rgba(253,41,123,0.08) !important;
+    border: 1px solid rgba(253,41,123,0.2) !important;
+    border-radius: 9999px !important;
+    padding: 5px 14px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: rgba(255,255,255,0.7) !important;
+    white-space: nowrap !important;
+}
+
+#fe-tinder-panel .fe-tpanel-stat-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #fd297b !important;
+    margin-right: 5px !important;
+    flex-shrink: 0 !important;
+}
+
+/* ── Tips ── */
+#fe-tinder-panel .fe-tpanel-tips {
+    background: rgba(253,41,123,0.06) !important;
+    border: 1px solid rgba(253,41,123,0.18) !important;
+    border-radius: 16px !important;
+    padding: 16px 18px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 9px !important;
+    max-width: 82% !important;
+    margin-left: 46px !important;
+}
+
+#fe-tinder-panel .fe-tpanel-tips-title {
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    background: linear-gradient(135deg, #ff6b6b, #fd297b) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+}
+
+#fe-tinder-panel .fe-tpanel-tip-item {
+    font-size: 13px !important;
+    color: rgba(255,255,255,0.6) !important;
+    line-height: 1.5 !important;
+    display: flex !important;
+    gap: 8px !important;
+    align-items: flex-start !important;
+    font-weight: 500 !important;
+}
+
+#fe-tinder-panel .fe-tpanel-tip-item::before {
+    content: '→' !important;
+    color: #fd297b !important;
+    flex-shrink: 0 !important;
+    font-weight: 700 !important;
+}

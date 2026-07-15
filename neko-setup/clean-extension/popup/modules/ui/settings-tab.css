@@ -1,0 +1,1213 @@
+/* ══════════════════════════════════════════════
+   Settings Tab – Premium White Theme
+   ══════════════════════════════════════════════ */
+
+/* ── 1. Tab container ── */
+#settingsTab {
+  background: #f3f4f6;
+  padding: 12px 10px 16px !important;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── 2. Category label ── */
+.st-category-label {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 10px 4px 4px;
+}
+
+.st-category-label:first-child { padding-top: 2px; }
+
+/* ── 3. White card wrapper ── */
+.st-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+/* ── 4. Reset legacy .section styles ── */
+#settingsTab .section {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ── 5. Section header row ── */
+#settingsTab .section-header {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 52px !important;
+  padding: 0 16px !important;
+  gap: 0 !important;
+  margin-bottom: 0 !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+#settingsTab .section-icon   { display: none !important; }
+#settingsTab .collapse-arrow { display: none !important; }
+
+#settingsTab .section-header h2 {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: #1f2937 !important;
+  letter-spacing: -0.01em !important;
+  margin: 0 !important;
+}
+
+/* ── 6. Safety toggle – exact automation v2 style (36×22px) ── */
+#settingsTab #safetyModeToggleLabel {
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  max-height: 22px !important;
+  display: inline-block !important;
+  position: relative !important;
+  padding: 0 !important;
+  flex: 0 0 36px !important;
+  line-height: 0 !important;
+}
+
+#settingsTab #safetyModeToggleLabel .toggle-slider {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 36px !important;
+  height: 22px !important;
+  border-radius: 999px !important;
+  border: 0 !important;
+  background: #d1d5db !important;
+  box-shadow: none !important;
+  transition: background-color 0.2s ease !important;
+  transform: none !important;
+}
+
+#settingsTab #safetyModeToggleLabel .toggle-slider::before {
+  width: 16px !important;
+  height: 16px !important;
+  top: 3px !important;
+  left: 3px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+  transition: transform 0.2s ease !important;
+}
+
+#settingsTab #safetyModeToggleLabel input:checked + .toggle-slider {
+  background: #f43f5e !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+#settingsTab #safetyModeToggleLabel input:checked + .toggle-slider::before {
+  transform: translateX(14px) !important;
+  background: #ffffff !important;
+}
+
+/* ── 7. Section content wrapper ── */
+#settingsTab .section-content-wrapper {
+  padding: 0 !important;
+}
+
+/* ══════════════════════════════════════════════
+   Safety Mode – compact card redesign
+   ══════════════════════════════════════════════ */
+
+/* State card – DO NOT set display here; JS controls show/hide */
+#settingsTab .safety-state-card {
+  padding: 0 !important;
+  border-radius: 10px !important;
+  margin: 0 12px 12px !important;
+  overflow: visible !important;
+}
+
+/* Hide first chip ("50 likes/50 msgs..." / "No rate limits...") in both states */
+#settingsTab .safety-state--on .safety-feature-chip:first-child,
+#settingsTab .safety-state--off .safety-feature-chip:first-child {
+  display: none !important;
+}
+
+#settingsTab .safety-state--on {
+  background: transparent !important;
+  border: none !important;
+}
+
+#settingsTab .safety-state--off {
+  background: transparent !important;
+  border: none !important;
+}
+
+#settingsTab .safety-status-header { display: none !important; }
+
+/* ── Metric container – transparent wrapper ── */
+#settingsTab .safety-usage-card,
+#settingsTab .safety-usage-card--danger {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+
+#settingsTab .safety-usage-header,
+#settingsTab .safety-usage-header--danger { display: none !important; }
+
+/* Two INDEPENDENT boxes side by side with gap */
+#settingsTab .safety-usage-meters {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+}
+
+/* Each meter: its own white box */
+#settingsTab .safety-meter {
+  flex: 1 !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  padding: 0 !important;
+}
+
+/* Label LEFT, value RIGHT */
+#settingsTab .safety-meter-label {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 10px 12px !important;
+  gap: 8px !important;
+}
+
+#settingsTab .safety-meter-label > span:first-child {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #6b7280 !important;
+}
+
+#settingsTab .safety-meter-value {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #1f2937 !important;
+}
+
+#settingsTab .safety-meter-value--danger { color: #ef4444 !important; }
+
+#settingsTab .safety-meter-track  { display: none !important; }
+#settingsTab .safety-reset-timer  { display: none !important; }
+
+/* ── Badges row (✓ Auto-managed  ✓ Shadowban secure) ── */
+#settingsTab .safety-features,
+#settingsTab .safety-features--danger {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  padding: 10px 12px !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+#settingsTab .safety-feature-chip:first-child { display: none !important; }
+
+#settingsTab .safety-feature-chip {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #16a34a !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+#settingsTab .safety-feature-chip--danger { color: #ef4444 !important; }
+
+/* Hide danger card meters+chips (OFF) and green card meters+chips (ON) */
+#settingsTab #safetyModeHintOff .safety-usage-card--danger,
+#settingsTab #safetyModeHintOff .safety-features--danger,
+#settingsTab #safetyModeHintOn .safety-usage-card,
+#settingsTab #safetyModeHintOn .safety-features {
+  display: none !important;
+}
+
+/* ── Manual controls block (Safety Mode OFF) ── */
+#settingsTab .st-manual-controls {
+  padding: 10px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+}
+
+#settingsTab .st-manual-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#settingsTab .st-manual-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9ca3af;
+  display: block;
+}
+
+#settingsTab .st-preset-group {
+  display: flex;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
+
+#settingsTab .st-preset-btn {
+  flex: 1;
+  padding: 7px 4px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#settingsTab .st-preset-btn--active {
+  background: #ffffff;
+  color: #1f2937;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Locked state (Safety Mode ON) */
+#settingsTab .st-manual-controls--locked {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════
+   AI Profile section
+   ══════════════════════════════════════════════ */
+
+.st-bio-card {
+  padding: 16px 16px 12px;
+}
+
+.st-bio-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 14px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  user-select: none;
+}
+
+/* Segmented control */
+.st-seg {
+  display: flex;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+  margin-bottom: 12px;
+}
+
+.st-seg-btn {
+  flex: 1;
+  padding: 7px 4px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-seg-btn--active {
+  background: #ffffff;
+  color: #1f2937;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.st-bio-hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0 0 4px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-bio-sync-link {
+  font-size: 12px;
+  font-weight: 500;
+  color: #16a34a;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  display: block;
+}
+
+.st-bio-sync-link--loading {
+  color: #9ca3af !important;
+  animation: st-pulse 1s ease-in-out infinite;
+}
+
+@keyframes st-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.st-bio-panels-wrap {
+  position: relative;
+  overflow: visible;
+  margin-top: 4px;
+}
+
+.st-bio-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(30px);
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+}
+
+.st-bio-panel.is-active {
+  position: relative;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.st-bio-sync-btn {
+  display: block;
+  width: 100%;
+  padding: 9px 14px;
+  margin: 8px 0 8px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: all 0.15s ease;
+}
+
+.st-bio-sync-btn:hover {
+  border-color: #f43f5e;
+  color: #f43f5e;
+  background: #fff1f2;
+}
+
+.st-bio-sync-btn:active { transform: scale(0.98); }
+
+.st-bio-sync-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.st-sync-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(233, 30, 140, 0.2);
+  border-top-color: #e91e8c;
+  border-radius: 50%;
+  animation: stSpinnerSpin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes stSpinnerSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Sync status pill row ── */
+.st-sync-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1.5px solid #e8eaed;
+  border-radius: 50px;
+  padding: 6px 6px 6px 14px;
+  margin-top: 2px;
+  gap: 8px;
+}
+
+.st-sync-status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.st-sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+  flex-shrink: 0;
+}
+
+.st-sync-status-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.st-sync-ago {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.st-sync-eye-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #fff0f6;
+  color: #e91e8c;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.st-sync-eye-btn:hover {
+  background: #e91e8c;
+  color: #ffffff;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(233, 30, 140, 0.3);
+}
+
+/* ── Profile preview bottom sheet ── */
+.st-preview-sheet-wrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 440px;
+  height: 600px;
+  z-index: 99999;
+  pointer-events: none;
+}
+
+.st-preview-sheet-wrap.is-open {
+  pointer-events: auto;
+}
+
+.st-preview-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.st-preview-sheet-wrap.is-open .st-preview-backdrop {
+  opacity: 1;
+}
+
+.st-preview-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  max-height: 88%;
+  transform: translateY(100%);
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  border-top: 1px solid #f1f5f9;
+}
+
+.st-preview-sheet-wrap.is-open .st-preview-sheet {
+  transform: translateY(0);
+}
+
+.st-preview-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 20px 20px 0 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.st-preview-sheet-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+  letter-spacing: -0.01em;
+}
+
+.st-preview-sheet-sub {
+  font-size: 9px;
+  font-weight: 800;
+  color: #e91e8c;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.st-preview-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.st-preview-close-btn:hover {
+  background: #fff0f6;
+  color: #e91e8c;
+  transform: rotate(90deg);
+}
+
+.st-preview-sheet-body {
+  padding: 12px 14px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.st-preview-sheet-body::-webkit-scrollbar { width: 4px; }
+.st-preview-sheet-body::-webkit-scrollbar-track { background: transparent; }
+.st-preview-sheet-body::-webkit-scrollbar-thumb { background: #fbcfe8; border-radius: 4px; }
+
+.st-preview-field {
+  position: relative;
+  background: #f8fafc;
+  border: 1px solid #e8eaed;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+  opacity: 0;
+  animation: stFieldSlideUp 0.35s ease-out forwards;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.st-preview-field::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #e91e8c;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  border-radius: 0 2px 2px 0;
+}
+
+.st-preview-field:hover {
+  border-color: #fbcfe8;
+  box-shadow: 0 2px 8px rgba(233, 30, 140, 0.08);
+}
+
+.st-preview-field:hover::before {
+  transform: translateX(0);
+}
+
+.st-preview-field-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.2s ease;
+}
+
+.st-preview-field:hover .st-preview-field-label {
+  color: #e91e8c;
+}
+
+.st-preview-field-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.st-preview-empty {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  padding: 48px 16px;
+}
+
+@keyframes stFieldSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.st-bio-textarea {
+  width: 100%;
+  min-height: 80px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #1f2937;
+  background: #f9fafb;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+  margin-bottom: 8px;
+}
+
+.st-bio-textarea:focus {
+  border-color: #f43f5e;
+  background: #ffffff;
+}
+
+.st-bio-textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* ══════════════════════════════════════════════
+   Generate Bio — 4-step flow
+   ══════════════════════════════════════════════ */
+
+/* Step 0 — idle */
+.st-gen-icon-wrap {
+  width: 48px;
+  height: 48px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f43f5e;
+  margin: 8px auto 10px;
+}
+
+.st-gen-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  text-align: center;
+  margin-bottom: 6px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-gen-desc {
+  font-size: 11px;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.5;
+  margin: 0 0 14px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-gen-cta {
+  width: 100%;
+  padding: 10px;
+  background: #f43f5e;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 4px 12px rgba(244, 63, 94, 0.3);
+  transition: background 0.15s ease, transform 0.1s ease;
+  margin-bottom: 4px;
+}
+
+.st-gen-cta:hover { background: #e91e8c; }
+.st-gen-cta:active { transform: scale(0.98); }
+
+/* Step 1 — loading */
+.st-gen-banner {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #f43f5e;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+@keyframes st-gen-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.st-gen-spin {
+  animation: st-gen-spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+
+.st-gen-skeleton {
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+@keyframes st-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.st-skel-line {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: st-shimmer 1.4s ease-in-out infinite;
+}
+
+.st-gen-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+@keyframes st-bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40%           { transform: translateY(-5px); }
+}
+
+.st-dot {
+  width: 6px;
+  height: 6px;
+  background: #f43f5e;
+  border-radius: 50%;
+  animation: st-bounce 1.2s ease-in-out infinite;
+}
+
+.st-dot-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-left: 4px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Step 2 — result */
+.st-gen-score-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.st-gen-ring {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.st-gen-ring-svg {
+  width: 44px;
+  height: 44px;
+  transform: rotate(-90deg);
+}
+
+.st-gen-ring-fill {
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+.st-gen-score-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  color: #1f2937;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-gen-score-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.st-gen-score-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 3px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-gen-score-badge {
+  background: #fff1f2;
+  color: #f43f5e;
+  font-size: 7px;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.st-gen-score-sub {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 500;
+  line-height: 1.4;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-gen-bio-box {
+  display: flex;
+  background: #f9fafb;
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.st-gen-bio-bar {
+  width: 3px;
+  background: #f43f5e;
+  flex-shrink: 0;
+}
+
+.st-gen-bio-text {
+  font-size: 11px;
+  color: #374151;
+  font-weight: 500;
+  line-height: 1.6;
+  padding: 10px 12px;
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-gen-ready-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  text-align: center;
+  margin-bottom: 8px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-gen-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.st-gen-sec-btn {
+  flex: 0.8;
+  padding: 8px 4px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: background 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.st-gen-sec-btn:hover { background: #f9fafb; }
+
+.st-gen-push-btn {
+  flex: 1.5;
+  padding: 8px 4px;
+  background: #f43f5e;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 4px 10px rgba(244, 63, 94, 0.25);
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.st-gen-push-btn:hover { background: #e91e8c; }
+.st-gen-push-btn:active { transform: scale(0.97); }
+.st-gen-push-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Step 3 — success */
+.st-gen-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0 4px;
+}
+
+.st-gen-check-wrap {
+  width: 52px;
+  height: 52px;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #16a34a;
+  margin-bottom: 10px;
+}
+
+.st-gen-success-title {
+  font-size: 16px;
+  font-weight: 900;
+  color: #1f2937;
+  margin-bottom: 4px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-gen-success-sub {
+  font-size: 11px;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.5;
+  margin: 0 0 14px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-gen-done-btn {
+  padding: 7px 28px;
+  background: #f3f4f6;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4b5563;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: background 0.15s ease;
+}
+
+.st-gen-done-btn:hover { background: #e5e7eb; }
+
+/* ══════════════════════════════════════════════
+   Account section
+   ══════════════════════════════════════════════ */
+
+.st-account-card {
+  padding: 16px;
+}
+
+.st-account-row-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 12px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-platform-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.st-platform-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: #f9fafb;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: all 0.15s ease;
+}
+
+.st-platform-chip--active {
+  border-color: #f43f5e;
+  background: #fff1f2;
+  color: #f43f5e;
+}
+
+.st-platform-chip--active[data-platform="bumble"] {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.st-platform-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.st-account-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 14px 0;
+}
+
+.st-account-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.st-account-sub-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.st-account-sub-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Premium / Trial Hover Reveal Animation - Crossfade Morph */
+.st-sub-reveal-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 28px;
+  min-width: 150px;
+  cursor: default;
+}
+
+.st-sub-front,
+.st-sub-back {
+  position: absolute;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: right center;
+}
+
+.st-sub-front {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+.st-sub-back {
+  opacity: 0;
+  transform: translateX(-16px) scale(0.95);
+  color: #f43f5e; /* Matching template color flirt-500 */
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.st-sub-reveal-wrap:hover .st-sub-front {
+  opacity: 0;
+  transform: translateX(16px) scale(0.95);
+}
+
+.st-sub-reveal-wrap:hover .st-sub-back {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+.st-sub-premium {
+  color: #f43f5e;
+  font-weight: 600;
+}
+
+.st-sub-trial {
+  color: #9d2383;
+  font-weight: 600;
+}

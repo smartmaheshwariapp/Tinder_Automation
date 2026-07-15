@@ -1,0 +1,132 @@
+{
+  "manifest_version": 3,
+  "name": "FlirtEasy – Tinder & Bumble Auto Swiper + AI Messages",
+  "version": "1.5.5",
+  "description": "Your AI Wingman for Tinder & Bumble. Effortless auto-swiping, intelligent messaging, and real-time activity tracking.",
+  "icons": {
+    "16": "icons/icon_16.png",
+    "48": "icons/icon_48.png",
+    "128": "icons/icon_128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon_16.png",
+      "48": "icons/icon_48.png",
+      "128": "icons/icon_128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://tinder.com/*"
+      ],
+      "css": [
+        "content/status-bar.css"
+      ],
+      "js": [
+        "debug-config.js",
+        "config.js",
+        "utils/stop-conditions.js",
+        "utils/language-detect.js",
+        "content/ui-alerts.js",
+        "content/tinder-dom.js",
+        "content/profile-parser.js",
+        "content/message-sender.js",
+        "content/status-bar.js",
+        "content/content.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://bumble.com/*",
+        "https://*.bumble.com/*"
+      ],
+      "css": [
+        "content/status-bar.css"
+      ],
+      "js": [
+        "debug-config.js",
+        "config.js",
+        "utils/stop-conditions.js",
+        "utils/language-detect.js",
+        "content/ui-alerts.js",
+        "platforms/bumble/bumble-config.js",
+        "platforms/bumble/bumble-dom.js",
+        "platforms/bumble/bumble-profile.js",
+        "platforms/bumble/bumble-own-profile.js",
+        "platforms/bumble/bumble-message-sender.js",
+        "platforms/bumble/bumble-manager.js",
+        "content/status-bar.js",
+        "platforms/bumble/bumble-content.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/keyboard-bridge.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "alarms",
+    "webRequest",
+    "debugger",
+    "scripting",
+    "tabs",
+    "windows"
+  ],
+  "host_permissions": [
+    "https://tinder.com/*",
+    "https://api.gotinder.com/*",
+    "https://bumble.com/*",
+    "https://*.bumble.com/*",
+    "https://*.bumbcdn.com/*",
+    "https://api.openai.com/*",
+    "https://flirteasy-auth.shnaiderdm.workers.dev/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "http://host.docker.internal/*",
+    "http://10.252.121.154/*",
+    "http://172.17.0.1/*",
+    "http://172.18.0.1/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "debug-config.js",
+        "config/selectors.json",
+        "content/api-interceptor.js",
+        "features/achievements/achievements-core.js",
+        "features/achievements/achievements-tracker.js",
+        "features/achievements/achievements-tinder.js",
+        "features/achievements/achievements-bumble.js",
+        "features/achievements/achievements-styles.css",
+        "platforms/bumble/bumble-api.js",
+        "platforms/bumble/bumble-selectors.json",
+        "icons/icon_128.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "*://*.flirteasy.io/*"
+    ]
+  }
+}

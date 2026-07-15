@@ -1,0 +1,236 @@
+{
+    "_comment": "Bumble DOM Selectors - VALIDATED from live site",
+    "_lastUpdated": "2026-02-05",
+    "_status": "VALIDATED - Swiping page selectors confirmed",
+    "buttons": {
+        "like": [
+            "[data-qa-role='encounters-action-like']",
+            ".encounters-action--like",
+            "[aria-label='Like']",
+            ".encounters-action[aria-label='Like']"
+        ],
+        "pass": [
+            "[data-qa-role='encounters-action-dislike']",
+            ".encounters-action--dislike",
+            "[aria-label='Pass']",
+            ".encounters-action[aria-label='Pass']"
+        ],
+        "superswipe": [
+            "[data-qa-role='encounters-action-superswipe']",
+            ".encounters-action--superswipe",
+            "[aria-label='SuperSwipe']"
+        ],
+        "report": [
+            ".encounters-controls__report",
+            "[aria-label='Block and report']"
+        ],
+        "closePopup": [
+            "button[aria-label='Close']",
+            "[data-qa-role='close']",
+            ".close-button"
+        ]
+    },
+    "icons": {
+        "likeIcon": "[data-qa-icon-name='floating-action-yes']",
+        "passIcon": "[data-qa-icon-name='floating-action-no']",
+        "superswipeIcon": "[data-qa-icon-name='floating-action-superswipe']"
+    },
+    "profile": {
+        "card": [
+            "[data-qa-role='encounters-user']",
+            ".encounters-user",
+            ".encounters-album"
+        ],
+        "story": [
+            "[data-qa-role='encounters-story']",
+            ".encounters-story"
+        ],
+        "name": [
+            ".messages-header__name",
+            ".conversation-header__item-name",
+            "[data-qa-role='connection-name']",
+            ".encounters-story-profile__name",
+            ".encounters-story-profile__user .encounters-story-profile__name"
+        ],
+        "age": [
+            ".encounters-story-profile__age"
+        ],
+        "userHeader": [
+            ".encounters-story-profile__user",
+            "h1.encounters-story-profile__user"
+        ],
+        "photo": [
+            "[data-qa-role='encounters-story-profile-image'] img",
+            ".encounters-story-profile-image img",
+            ".media-box__picture-image"
+        ],
+        "photoVerified": [
+            ".encounters-story-profile__verification-badge",
+            "[data-qa-icon-name='badge-feature-verification']"
+        ]
+    },
+    "about": {
+        "section": [
+            ".encounters-story-section--about",
+            "section.encounters-story-section--about"
+        ],
+        "badges": [
+            ".encounters-story-about__badges",
+            "ul.encounters-story-about__badges"
+        ],
+        "badgeItem": [
+            ".encounters-story-about__badge",
+            "li.encounters-story-about__badge"
+        ],
+        "pill": [
+            "[data-qa-role='pill']",
+            ".pill"
+        ],
+        "pillTitle": [
+            ".pill__title",
+            ".pill__title div"
+        ],
+        "questionText": [
+            ".encounters-story-about__text",
+            "p.encounters-story-about__text"
+        ],
+        "questionTitle": [
+            ".encounters-story-section__heading-title h2",
+            ".encounters-story-section__heading-title"
+        ]
+    },
+    "location": {
+        "section": [
+            ".encounters-story-section--location",
+            "section.encounters-story-section--location"
+        ],
+        "town": [
+            ".location-widget__town",
+            ".location-widget__town span"
+        ],
+        "distance": [
+            ".location-widget__distance",
+            ".location-widget__distance span"
+        ]
+    },
+    "controls": {
+        "container": [
+            ".encounters-user__controls",
+            ".encounters-controls"
+        ],
+        "actions": [
+            ".encounters-controls__actions"
+        ],
+        "actionItem": [
+            ".encounters-controls__action"
+        ],
+        "hotkeys": [
+            ".encounters-controls__hotkeys"
+        ]
+    },
+    "album": {
+        "container": [
+            ".encounters-album",
+            "article.encounters-album"
+        ],
+        "storiesContainer": [
+            ".encounters-album__stories-container"
+        ],
+        "storyItem": [
+            ".encounters-album__story"
+        ],
+        "navPrev": [
+            ".encounters-album__nav-item--prev"
+        ],
+        "navNext": [
+            ".encounters-album__nav-item--next"
+        ],
+        "progress": [
+            ".encounters-album__progress",
+            ".line-progress"
+        ]
+    },
+    "navigation": {
+        "encounters": [
+            "a[href='/app']",
+            "[data-qa-role='nav-encounters']"
+        ],
+        "messages": [
+            "a[href='/app/connections']",
+            "[data-qa-role='nav-connections']"
+        ],
+        "profile": [
+            "a[href='/app/profile']",
+            "[data-qa-role='nav-profile']"
+        ]
+    },
+    "messaging": {
+        "_comment": "NEEDS VALIDATION - Go to chat page to capture these",
+        "input": [
+            "textarea[data-qa-role='chat-input']",
+            "textarea.chat-input",
+            "[contenteditable='true']",
+            "textarea[placeholder*='message' i]"
+        ],
+        "sendButton": [
+            "[data-qa-role='chat-send']",
+            "button.send-button",
+            "button[type='submit']"
+        ],
+        "chatList": [
+            ".connections-list",
+            "[data-qa-role='connections-list']"
+        ],
+        "chatItem": [
+            ".connection-card",
+            "[data-qa-role='connection-item']",
+            "a[href*='/app/connections/']"
+        ],
+        "unreadBadge": [
+            ".unread-badge",
+            "[data-qa-role='unread-count']"
+        ],
+        "messageContainer": [
+            ".messages-list",
+            "[data-qa-role='messages']"
+        ],
+        "messageBubble": [
+            ".message-bubble",
+            "[data-qa-role='message']"
+        ],
+        "messageSent": [
+            ".message--outgoing",
+            ".message-bubble--sent"
+        ],
+        "messageReceived": [
+            ".message--incoming",
+            ".message-bubble--received"
+        ]
+    },
+    "overlays": {
+        "matchModal": [
+            ".encounters-match",
+            "[data-qa-role='encounters-match']",
+            ".match-popup",
+            "[data-qa-role='match-popup']",
+            ".its-a-match"
+        ],
+        "limitPopup": [
+            ".paywall",
+            "[data-qa-role='paywall']"
+        ],
+        "premiumPopup": [
+            ".boost-popup",
+            "[data-qa-role='premium-popup']"
+        ],
+        "complimentPopup": [
+            ".compliment-popup",
+            "[data-qa-role='compliment-modal']",
+            ".encounters-compliment-prompt"
+        ],
+        "extendPopup": [
+            ".extend-popup",
+            "[data-qa-role='extend-modal']"
+        ]
+    }
+}

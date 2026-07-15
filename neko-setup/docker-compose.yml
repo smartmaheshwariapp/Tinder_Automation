@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  neko:
+    image: "custom-neko-chrome:latest"
+    container_name: neko
+    restart: unless-stopped
+    shm_size: "2gb" # Prevent browser crashes from heavy pages (e.g. streaming sites)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    cap_add:
+      - SYS_ADMIN # Required for browser sandbox security
+    ports:
+      - "8080:8080" # Web interface port
+      - "8088:8088/tcp" # WebRTC TCP Multiplexer port (Reliable for local Windows WSL2 forwarding)
+    environment:
+      # --- General Settings ---
+      NEKO_DESKTOP_SCREEN: "416x912@30"
+      NEKO_START_URL: ${NEKO_START_URL:-https://tinder.com}
+      NEKO_MEMBER_MULTIUSER_USER_PASSWORD: "neko"
+      NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD: "admin"
+      NEKO_CAPTURE_VIDEO_SHOW_POINTER: "false"
+      # --- WebRTC Configuration ---
+      NEKO_WEBRTC_NAT1TO1: "10.252.121.154"
+      NEKO_WEBRTC_TCPMUX: 8088
+      NEKO_WEBRTC_ICELITE: "true"
+      NEKO_SESSION_IMPLICIT_HOSTING: "true"
+    volumes:
+      # Persists bookmarks, history, and cookies across restarts using local session folder
+      - ${NEKO_SESSION_DIR:-./sessions/default}:/home/neko/.config/google-chrome
+      - ./chromium.conf:/etc/neko/supervisord/google-chrome.conf:ro
+      - ./policies.json:/etc/opt/chrome/policies/managed/policies.json:ro
+      - ./clean-extension:/src/extension:ro

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlirtEasy — Welcome</title>
+  <link rel="stylesheet" href="onboarding.css">
+  <link rel="stylesheet" href="animations.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Ambient background orbs -->
+  <div class="ob-bg-orb ob-bg-orb-1"></div>
+  <div class="ob-bg-orb ob-bg-orb-2"></div>
+
+  <!-- Splash Intro -->
+  <div class="ob-splash" id="obSplash">
+    <div class="ob-splash-content">
+      <div class="ob-splash-logo-box">
+        <img src="../icons/icon_128.png" alt="FlirtEasy Logo" class="ob-splash-logo">
+      </div>
+      <img src="../icons/Text_logo.png" alt="FlirtEasy" class="ob-splash-title-img">
+    </div>
+  </div>
+
+  <div class="ob-reveal-overlay" id="obRevealOverlay"></div>
+
+  <div class="onboarding-app blurred" id="onboardingApp">
+    <!-- Navigation Header -->
+    <div class="ob-header">
+      <button class="ob-back-btn hidden" id="obBackBtn" aria-label="Go back">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5"></path>
+          <path d="M12 19l-7-7 7-7"></path>
+        </svg>
+      </button>
+      <span class="ob-step-counter" id="obStepCounter">1 of 5</span>
+      <div class="ob-header-spacer"></div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="ob-progress-wrapper">
+      <div class="ob-progress-bar">
+        <div class="ob-progress-fill" id="obProgressFill"></div>
+      </div>
+    </div>
+
+    <!-- Steps Viewport (all steps live here) -->
+    <div class="ob-steps-viewport" id="obStepsViewport">
+      <div class="ob-step active" id="step-1"></div>
+      <div class="ob-step" id="step-2"></div>
+      <div class="ob-step" id="step-3"></div>
+      <div class="ob-step" id="step-4"></div>
+      <div class="ob-step" id="step-5"></div>
+      <div class="ob-step" id="step-6"></div>
+    </div>
+
+    <!-- Sticky Footer with CTA -->
+    <div class="ob-footer">
+      <button class="ob-back-btn-bottom hidden" id="obBackBtnBottom">Back</button>
+      <button class="ob-continue-btn" id="obContinueBtn">
+        <span class="ob-continue-text" id="obContinueBtnText">Continue</span>
+        <svg class="ob-continue-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14"></path>
+          <path d="M12 5l7 7-7 7"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Step modules (loaded in order) -->
+  <script src="steps/step-welcome.js"></script>
+  <script src="steps/step-platform.js"></script>
+  <script src="steps/step-location.js"></script>
+  <script src="steps/step-goals.js"></script>
+  <script src="steps/step-limits.js"></script>
+  <script src="steps/step-complete.js"></script>
+  <!-- Main controller (must load last) -->
+  <script src="onboarding.js"></script>
+</body>
+</html>

@@ -1,0 +1,1724 @@
+/**
+ * chat-style-training.css
+ * Industry-grade chat UI for "Your Chat Style" training card.
+ * Inspired by iMessage + Tinder's chat aesthetic.
+ * Scoped to #automationV2Shell.
+ */
+
+/* ── Card body ────────────────────────────────────────────────────── */
+#automationV2Shell .automation-v2-card[data-automation-card="style"].is-open .automation-v2-card-body {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0 0 16px 16px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   INTRO SCREEN
+══════════════════════════════════════════════════════════════════ */
+#automationV2Shell .cst-intro {
+  padding: 28px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  background: linear-gradient(160deg, #fff5f7 0%, #ffffff 60%);
+}
+
+#automationV2Shell .cst-intro-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f43f5e 0%, #e91e8c 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(244, 63, 94, 0.35);
+  margin-bottom: 4px;
+}
+
+#automationV2Shell .cst-intro-icon svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#automationV2Shell .cst-intro-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.3px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-intro-desc {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 270px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LANGUAGE PILL DROPDOWN  (chat header + intro screen)
+══════════════════════════════════════════════════════════════════ */
+
+/* Remove old native-select styles */
+#automationV2Shell .cst-header-lang-wrap,
+#automationV2Shell .cst-header-lang-select,
+#automationV2Shell .cst-lang-select-wrap,
+#automationV2Shell .cst-lang-select,
+#automationV2Shell .cst-lang-arrow { all: unset; }
+
+/* Shared pill trigger */
+#automationV2Shell .cst-lang-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border-radius: 99px;
+  background: #f3f4f6;
+  border: 1.5px solid #e5e7eb;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #374151;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  white-space: nowrap;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  outline: none;
+}
+
+#automationV2Shell .cst-lang-pill:hover {
+  background: #fff;
+  border-color: #f43f5e;
+  box-shadow: 0 2px 8px rgba(244,63,94,0.15);
+}
+
+#automationV2Shell .cst-lang-pill:active {
+  transform: scale(0.96);
+}
+
+#automationV2Shell .cst-lang-pill.is-open {
+  background: #fff;
+  border-color: #f43f5e;
+  box-shadow: 0 2px 12px rgba(244,63,94,0.2);
+  color: #f43f5e;
+}
+
+/* Globe icon inside pill */
+#automationV2Shell .cst-lang-pill-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+#automationV2Shell .cst-lang-pill.is-open .cst-lang-pill-icon,
+#automationV2Shell .cst-lang-pill:hover .cst-lang-pill-icon {
+  opacity: 1;
+}
+
+/* Chevron */
+#automationV2Shell .cst-lang-pill-chevron {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: transform 0.2s cubic-bezier(0.4,0,0.2,1), opacity 0.15s;
+}
+#automationV2Shell .cst-lang-pill.is-open .cst-lang-pill-chevron {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+/* Dropdown panel */
+#automationV2Shell .cst-lang-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 9999;
+  width: 160px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  padding: 3px;
+
+  /* Animation */
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
+  transform-origin: top right;
+  transition: opacity 0.18s cubic-bezier(0.4,0,0.2,1),
+              transform 0.18s cubic-bezier(0.4,0,0.2,1);
+  pointer-events: none;
+}
+
+#automationV2Shell .cst-lang-dropdown.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* Scrollbar styling — matches plugin's automation tab dropdown pattern */
+#automationV2Shell .cst-lang-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+#automationV2Shell .cst-lang-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+#automationV2Shell .cst-lang-dropdown::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #f43f5e, #e91e8c);
+  border-radius: 10px;
+}
+#automationV2Shell .cst-lang-dropdown::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #fb7185, #f43f5e);
+}
+
+/* Each option */
+#automationV2Shell .cst-lang-option {
+  display: flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  user-select: none;
+}
+
+#automationV2Shell .cst-lang-option:hover {
+  background: #fdf2f4;
+  color: #f43f5e;
+}
+
+#automationV2Shell .cst-lang-option.is-selected {
+  background: linear-gradient(135deg, #f43f5e 0%, #e91e8c 100%);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+#automationV2Shell .cst-lang-option.is-selected:hover {
+  background: linear-gradient(135deg, #e0304e 0%, #d1197d 100%);
+  color: #ffffff;
+}
+
+/* Intro-screen lang row */
+#automationV2Shell .cst-lang-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#automationV2Shell .cst-lang-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  white-space: nowrap;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-lang-hint {
+  font-size: 11px;
+  color: #f43f5e;
+  font-weight: 500;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height: 14px;
+  transition: opacity 0.2s;
+}
+
+/* Intro pill is slightly larger */
+#automationV2Shell .cst-lang-row .cst-lang-pill {
+  height: 30px;
+  font-size: 12.5px;
+  padding: 0 12px 0 9px;
+}
+
+/* Header pill wrapper needs relative positioning for dropdown */
+#automationV2Shell .cst-header-lang-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Header lang dropdown opens downward but slightly left-anchored */
+#automationV2Shell .cst-header-lang-container .cst-lang-dropdown {
+  right: 0;
+  top: calc(100% + 5px);
+}
+
+/* Footer lang row */
+#automationV2Shell .cst-lang-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 14px 4px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+
+/* Pill in footer — visible, styled, matches the UI */
+#automationV2Shell .cst-lang-footer-row .cst-lang-pill {
+  height: 28px;
+  font-size: 12px;
+  padding: 0 10px 0 8px;
+  gap: 5px;
+  background: #fff0f3;
+  border: 1.5px solid #fda4b8;
+  color: #e11d5a;
+  border-radius: 99px;
+}
+
+#automationV2Shell .cst-lang-footer-row .cst-lang-pill .cst-lang-pill-icon {
+  opacity: 0.8;
+}
+
+#automationV2Shell .cst-lang-footer-row .cst-lang-pill:hover {
+  background: #ffe4ea;
+  border-color: #f43f5e;
+  color: #f43f5e;
+  box-shadow: 0 2px 8px rgba(244,63,94,0.18);
+}
+
+#automationV2Shell .cst-lang-footer-row .cst-lang-pill.is-open {
+  background: #ffe4ea;
+  border-color: #f43f5e;
+  color: #f43f5e;
+  box-shadow: 0 2px 8px rgba(244,63,94,0.18);
+}
+
+/* Pill inside footer action row */
+#automationV2Shell .cst-footer-action-row .cst-lang-pill {
+  background: #fff0f3;
+  border: 1.5px solid #fda4b8;
+  color: #e11d5a;
+  height: 28px;
+  font-size: 12px;
+  padding: 0 10px 0 8px;
+}
+
+#automationV2Shell .cst-footer-action-row .cst-lang-pill:hover {
+  background: #ffe4ea;
+  border-color: #f43f5e;
+  color: #f43f5e;
+  box-shadow: 0 2px 8px rgba(244,63,94,0.18);
+}
+
+#automationV2Shell .cst-footer-action-row .cst-lang-pill.is-open {
+  background: #ffe4ea;
+  border-color: #f43f5e;
+  color: #f43f5e;
+  box-shadow: 0 2px 8px rgba(244,63,94,0.18);
+}
+
+/* Dropdown in footer opens UPWARD from right */
+#automationV2Shell .cst-footer-action-row .cst-lang-dropdown {
+  top: auto;
+  bottom: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  transform-origin: bottom right;
+  transform: translateY(6px) scale(0.97);
+  max-height: 128px; /* 4 options × ~32px each */
+  width: 140px;
+}
+
+#automationV2Shell .cst-footer-action-row .cst-lang-dropdown.is-open {
+  transform: translateY(0) scale(1);
+}
+
+/* Keep old selector working as fallback */
+#automationV2Shell .cst-lang-footer-row .cst-lang-dropdown {
+  top: auto;
+  bottom: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  transform-origin: bottom right;
+  transform: translateY(6px) scale(0.97);
+}
+
+#automationV2Shell .cst-lang-footer-row .cst-lang-dropdown.is-open {
+  transform: translateY(0) scale(1);
+}
+
+#automationV2Shell .cst-start-btn {
+  margin-top: 4px;
+  height: 46px;
+  padding: 0 36px;
+  border-radius: 23px;
+  border: none;
+  background: linear-gradient(135deg, #f43f5e 0%, #e91e8c 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.2px;
+  box-shadow: 0 6px 20px rgba(244, 63, 94, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#automationV2Shell .cst-start-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(244, 63, 94, 0.5);
+}
+
+#automationV2Shell .cst-start-btn:active {
+  transform: scale(0.97) translateY(0);
+  box-shadow: 0 3px 12px rgba(244, 63, 94, 0.35);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CHAT SCREEN
+══════════════════════════════════════════════════════════════════ */
+#automationV2Shell .cst-chat-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 260px;
+  background: #ffffff;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+#automationV2Shell .cst-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 10px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  flex-shrink: 0;
+}
+
+#automationV2Shell .cst-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Online indicator ring around avatar */
+#automationV2Shell .cst-header-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+#automationV2Shell .cst-header-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f43f5e, #e91e8c);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.5px;
+}
+
+#automationV2Shell .cst-online-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid #ffffff;
+}
+
+#automationV2Shell .cst-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+#automationV2Shell .cst-chat-persona-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-header-status {
+  font-size: 11px;
+  color: #22c55e;
+  font-weight: 500;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Progress */
+#automationV2Shell .cst-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#automationV2Shell .cst-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#automationV2Shell .cst-progress-bar {
+  width: 64px;
+  height: 3px;
+  background: #f3f4f6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+#automationV2Shell .cst-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f43f5e, #e91e8c);
+  border-radius: 999px;
+  width: 0%;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#automationV2Shell .cst-progress-label {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
+}
+
+#automationV2Shell .cst-restart-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 17px;
+  color: #9ca3af;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s ease, transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#automationV2Shell .cst-restart-btn:hover {
+  color: #6b7280;
+  transform: rotate(-30deg);
+}
+
+/* ── Messages list ────────────────────────────────────────────────── */
+#automationV2Shell .cst-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scroll-behavior: smooth;
+  background: #fafafa;
+  min-height: 140px;
+}
+
+#automationV2Shell .cst-messages::-webkit-scrollbar { width: 0px; }
+
+/* Date separator */
+#automationV2Shell .cst-date-sep {
+  text-align: center;
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin: 4px 0 8px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ── Bubble base ──────────────────────────────────────────────────── */
+#automationV2Shell .cst-bubble {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 80%;
+  animation: cst-slide-up 0.22s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+@keyframes cst-slide-up {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+/* ── Match bubble (left) ──────────────────────────────────────────── */
+#automationV2Shell .cst-bubble--match {
+  align-self: flex-start;
+}
+
+#automationV2Shell .cst-bubble--match .cst-bubble-text {
+  background: #ffffff;
+  color: #111827;
+  border-radius: 18px 18px 18px 5px;
+  padding: 10px 13px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+  word-break: break-word;
+}
+
+/* ── Avatar (bubble) ──────────────────────────────────────────────── */
+#automationV2Shell .cst-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f43f5e, #e91e8c);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 1px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.5px;
+}
+
+/* ── Typing indicator ─────────────────────────────────────────────── */
+#automationV2Shell .cst-typing .cst-bubble-text {
+  padding: 12px 16px;
+  min-width: 54px;
+}
+
+#automationV2Shell .cst-typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#automationV2Shell .cst-typing-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d1d5db;
+  animation: cst-dot 1.4s infinite ease-in-out;
+}
+
+#automationV2Shell .cst-typing-dots span:nth-child(1) { animation-delay: 0s; }
+#automationV2Shell .cst-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+#automationV2Shell .cst-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes cst-dot {
+  0%, 60%, 100% { transform: translateY(0);    opacity: 0.4; background: #d1d5db; }
+  30%            { transform: translateY(-5px); opacity: 1;   background: #9ca3af; }
+}
+
+/* ── User bubble (right) ──────────────────────────────────────────── */
+#automationV2Shell .cst-bubble--user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+#automationV2Shell .cst-bubble--user .cst-bubble-text {
+  background: linear-gradient(135deg, #f43f5e 0%, #e91e8c 100%);
+  color: #ffffff;
+  border-radius: 18px 18px 5px 18px;
+  padding: 10px 13px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.3);
+  word-break: break-word;
+}
+
+/* Consecutive bubbles — tighter gap, remove tail on non-last */
+#automationV2Shell .cst-bubble--user + .cst-bubble--user {
+  margin-top: -2px;
+}
+#automationV2Shell .cst-bubble--match + .cst-bubble--match {
+  margin-top: -2px;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────── */
+#automationV2Shell .cst-footer {
+  flex-shrink: 0;
+  background: #ffffff;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+#automationV2Shell .cst-save-early-wrap {
+  padding: 6px 16px 0;
+  text-align: center;
+}
+
+#automationV2Shell .cst-save-early-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f43f5e;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+
+#automationV2Shell .cst-save-early-btn:hover { opacity: 1; }
+
+/* System hint — shown below garbage messages */
+#automationV2Shell .cst-system-hint {
+  align-self: center;
+  font-size: 11.5px;
+  color: #f59e0b;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 5px 12px;
+  max-width: 85%;
+  text-align: center;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
+  animation: cst-slide-up 0.2s ease both;
+}
+
+/* ── Input hint ───────────────────────────────────────────────────── */
+#automationV2Shell .cst-input-hint {
+  font-size: 11.5px;
+  color: #f59e0b;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
+  padding: 0 16px 8px;
+  min-height: 0;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease, max-height 0.2s ease, padding 0.2s ease;
+}
+
+#automationV2Shell .cst-input-hint--visible {
+  opacity: 1;
+  max-height: 30px;
+  padding: 2px 16px 8px;
+}
+
+/* ── Input row ────────────────────────────────────────────────────── */
+#automationV2Shell .cst-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+#automationV2Shell .cst-input {
+  flex: 1;
+  height: 40px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 22px;
+  padding: 0 16px;
+  font-size: 14px;
+  color: #111827;
+  background: #f9fafb;
+  outline: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+#automationV2Shell .cst-input:focus {
+  border-color: #f43f5e;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.1);
+}
+
+#automationV2Shell .cst-input--shake {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+  animation: cst-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes cst-shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-5px); }
+  40%       { transform: translateX(5px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+
+#automationV2Shell .cst-input::placeholder { color: #9ca3af; }
+
+#automationV2Shell .cst-send-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f43f5e, #e91e8c);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(244, 63, 94, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#automationV2Shell .cst-send-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 4px 14px rgba(244, 63, 94, 0.5);
+}
+
+#automationV2Shell .cst-send-btn:active {
+  transform: scale(0.93);
+  box-shadow: 0 2px 6px rgba(244, 63, 94, 0.3);
+}
+
+/* Paper plane icon — hand-crafted, not generic */
+#automationV2Shell .cst-send-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+#automationV2Shell .cst-send-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  transform: none;
+}
+
+/* ── Finish banner ────────────────────────────────────────────────── */
+#automationV2Shell .cst-finish-banner {
+  margin: 12px 8px 8px;
+  animation: cst-slide-up 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+#automationV2Shell .cst-finish-banner-inner {
+  background: linear-gradient(135deg, #fff0f3 0%, #fdf2ff 100%);
+  border: 1px solid #fce7f3;
+  border-radius: 16px;
+  padding: 18px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+
+#automationV2Shell .cst-finish-icon {
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+#automationV2Shell .cst-finish-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.2px;
+}
+
+#automationV2Shell .cst-finish-sub {
+  font-size: 12.5px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-finish-btn {
+  margin-top: 8px;
+  height: 40px;
+  padding: 0 28px;
+  border-radius: 20px;
+  border: none;
+  background: linear-gradient(135deg, #f43f5e, #e91e8c);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 4px 14px rgba(244, 63, 94, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#automationV2Shell .cst-finish-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(244, 63, 94, 0.45);
+}
+
+#automationV2Shell .cst-finish-btn:active {
+  transform: scale(0.97);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   COMPLETION SCREEN
+══════════════════════════════════════════════════════════════════ */
+#automationV2Shell .cst-complete {
+  padding: 28px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+  background: #ffffff;
+}
+
+#automationV2Shell .cst-complete-check {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f43f5e, #e91e8c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.35), 0 0 0 8px rgba(244, 63, 94, 0.08);
+  margin-bottom: 14px;
+  animation: cst-pop-in 0.45s cubic-bezier(0.34, 1.6, 0.64, 1) both;
+}
+
+#automationV2Shell .cst-complete-check--warn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35), 0 0 0 8px rgba(245, 158, 11, 0.08);
+}
+
+#automationV2Shell .cst-complete-check--warn svg {
+  width: 26px;
+  height: 26px;
+  stroke: #ffffff;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  animation: none;
+  stroke-dasharray: unset;
+  stroke-dashoffset: unset;
+}
+
+#automationV2Shell .cst-complete-check svg {
+  width: 24px;
+  height: 24px;
+  stroke: #ffffff;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  /* Animated draw */
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: cst-check-draw 0.4s cubic-bezier(0.65, 0, 0.35, 1) 0.3s forwards;
+}
+
+@keyframes cst-check-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes cst-pop-in {
+  from { transform: scale(0.4) rotate(-12deg); opacity: 0; }
+  to   { transform: scale(1)   rotate(0deg);   opacity: 1; }
+}
+
+#automationV2Shell .cst-complete-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-complete-date {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0 0 18px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Traits — icon + label cards, not plain pills */
+#automationV2Shell .cst-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+#automationV2Shell .cst-trait-chip {
+  background: #fff0f3;
+  color: #be185d;
+  border: 1px solid #fce7f3;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  animation: cst-slide-up 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+/* Remove the left-bar pseudo element */
+#automationV2Shell .cst-trait-chip::before {
+  display: none;
+}
+
+#automationV2Shell .cst-trait-chip:nth-child(1) { animation-delay: 0.08s; }
+#automationV2Shell .cst-trait-chip:nth-child(2) { animation-delay: 0.14s; }
+#automationV2Shell .cst-trait-chip:nth-child(3) { animation-delay: 0.20s; }
+#automationV2Shell .cst-trait-chip:nth-child(4) { animation-delay: 0.26s; }
+
+#automationV2Shell .cst-complete-sub {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 16px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.4;
+}
+
+/* AI summary section */
+#automationV2Shell .cst-ai-summary-wrap {
+  width: 100%;
+  background: #f9fafb;
+  border: 1px solid #f3f4f6;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+#automationV2Shell .cst-ai-summary-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 6px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-ai-summary {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.55;
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height: 20px;
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+#automationV2Shell .cst-ai-summary--loaded {
+  opacity: 1;
+}
+
+/* Loading dots inside summary */
+#automationV2Shell .cst-ai-summary-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#automationV2Shell .cst-ai-summary-loading span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d1d5db;
+  animation: cst-dot 1.4s infinite ease-in-out;
+}
+
+#automationV2Shell .cst-ai-summary-loading span:nth-child(1) { animation-delay: 0s; }
+#automationV2Shell .cst-ai-summary-loading span:nth-child(2) { animation-delay: 0.2s; }
+#automationV2Shell .cst-ai-summary-loading span:nth-child(3) { animation-delay: 0.4s; }
+
+/* Retrain button — V2 pink theme, matches Start Training */
+#automationV2Shell .cst-retrain-btn {
+  height: 42px;
+  padding: 0 28px;
+  border-radius: 21px;
+  border: none;
+  background: linear-gradient(135deg, #f43f5e, #e91e8c);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.1px;
+  box-shadow: 0 4px 14px rgba(244, 63, 94, 0.35);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+#automationV2Shell .cst-retrain-btn:hover {
+  box-shadow: 0 6px 20px rgba(244, 63, 94, 0.45);
+  transform: translateY(-1px);
+}
+
+#automationV2Shell .cst-retrain-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.3);
+}
+
+/* ── View chat button ─────────────────────────────────────────────── */
+#automationV2Shell .cst-view-chat-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  margin-top: 2px;
+  padding: 4px 0;
+  transition: color 0.15s ease;
+}
+
+#automationV2Shell .cst-view-chat-btn:hover { color: #6b7280; }
+
+/* ── Replay view ──────────────────────────────────────────────────── */
+#automationV2Shell .cst-replay-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 320px;
+  max-height: 460px;
+  background: #ffffff;
+}
+
+#automationV2Shell .cst-replay-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  flex-shrink: 0;
+}
+
+#automationV2Shell .cst-replay-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: color 0.15s ease;
+}
+
+#automationV2Shell .cst-replay-back:hover { color: #111827; }
+
+#automationV2Shell .cst-replay-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-messages--replay {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fafafa;
+}
+
+/* Garbage messages shown greyed out in replay */
+#automationV2Shell .cst-bubble--garbage .cst-bubble-text {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   COLLAPSED CHIP
+══════════════════════════════════════════════════════════════════ */
+#automationV2Shell .automation-v2-card[data-automation-card="style"] .automation-v2-chip {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+#automationV2Shell .automation-v2-card[data-automation-card="style"] .cst-chip--trained {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+#automationV2Shell .automation-v2-card[data-automation-card="style"] .cst-chip--in-progress {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   PER-LANGUAGE MULTI-PROFILE UI
+══════════════════════════════════════════════════════════════════ */
+
+/* Trained languages summary bar on intro screen */
+#automationV2Shell .cst-trained-langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin: 4px 0 2px;
+}
+
+#automationV2Shell .cst-trained-lang-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1.5px solid #e5e7eb;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+#automationV2Shell .cst-trained-lang-chip:hover {
+  background: #fdf2f4;
+  color: #f43f5e;
+  border-color: #fda4b8;
+}
+
+#automationV2Shell .cst-trained-lang-chip--active {
+  background: linear-gradient(135deg, #f43f5e 0%, #e91e8c 100%);
+  color: #fff;
+  border-color: transparent;
+}
+
+#automationV2Shell .cst-trained-lang-chip--active:hover {
+  background: linear-gradient(135deg, #e0304e 0%, #d1197d 100%);
+  color: #fff;
+}
+
+/* Language badge on completion screen */
+#automationV2Shell .cst-complete-lang-badge {
+  display: inline-block;
+  margin: 2px auto 0;
+  padding: 3px 12px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #f43f5e 0%, #e91e8c 100%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Actions row on completion screen */
+#automationV2Shell .cst-complete-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* "Train Another Language" button */
+#automationV2Shell .cst-train-another-btn {
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 18px;
+  border: 1.5px solid #f43f5e;
+  background: transparent;
+  color: #f43f5e;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: background 0.15s, color 0.15s;
+}
+
+#automationV2Shell .cst-train-another-btn:hover {
+  background: #fff0f3;
+}
+
+/* "View trained style" link on intro screen */
+#automationV2Shell .cst-view-trained-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+
+#automationV2Shell .cst-view-trained-btn:hover {
+  color: #f43f5e;
+}
+
+/* Trained language chips in chat header */
+#automationV2Shell #cstTrainedLangsMount {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  max-width: 140px;
+}
+
+#automationV2Shell .cst-header-trained-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 99px;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1.5px solid #e5e7eb;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+#automationV2Shell .cst-header-trained-chip:hover {
+  background: #fdf2f4;
+  color: #f43f5e;
+  border-color: #fda4b8;
+}
+
+#automationV2Shell .cst-header-trained-chip--active {
+  background: linear-gradient(135deg, #f43f5e 0%, #e91e8c 100%);
+  color: #fff;
+  border-color: transparent;
+}
+
+#automationV2Shell .cst-header-trained-chip--active:hover {
+  background: linear-gradient(135deg, #e0304e 0%, #d1197d 100%);
+  color: #fff;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FOOTER ACTION ROW  (profiles btn + lang pill + save btn)
+══════════════════════════════════════════════════════════════════ */
+
+#automationV2Shell .cst-footer-action-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px 3px;
+  justify-content: flex-end;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  min-height: 40px;
+}
+
+/* Profiles button */
+#automationV2Shell .cst-profiles-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 99px;
+  background: #f3f4f6;
+  border: 1.5px solid #e5e7eb;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+  margin-right: auto; /* push lang + save to the right */
+}
+
+#automationV2Shell .cst-profiles-btn:hover {
+  background: #fdf2f4;
+  border-color: #fda4b8;
+  color: #f43f5e;
+}
+
+#automationV2Shell .cst-profiles-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f43f5e;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+/* Save style now — inline in footer */
+#automationV2Shell .cst-save-inline-btn {
+  display: none; /* shown via JS after MIN_MESSAGES */
+  align-items: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 99px;
+  border: 1.5px solid #f43f5e;
+  background: transparent;
+  color: #f43f5e;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+  animation: cst-pop-in 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+#automationV2Shell .cst-save-inline-btn:hover {
+  background: #fff0f3;
+}
+
+#automationV2Shell .cst-save-inline-btn:active {
+  transform: scale(0.96);
+}
+
+#automationV2Shell .cst-save-inline-btn--saved {
+  background: #f0fdf4;
+  border-color: #22c55e;
+  color: #16a34a;
+  cursor: default;
+}
+
+#automationV2Shell .cst-save-inline-btn:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+
+@keyframes cst-pop-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   PROFILES PANEL  (slide-up overlay inside chat wrap)
+══════════════════════════════════════════════════════════════════ */
+
+#automationV2Shell .cst-profiles-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 1.5px solid #f3f4f6;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.1);
+  z-index: 100;
+  max-height: 80%;
+  overflow-y: auto;
+  padding: 0 0 8px;
+
+  transform: translateY(100%);
+  transition: transform 0.22s cubic-bezier(0.4,0,0.2,1);
+}
+
+#automationV2Shell .cst-profiles-panel.is-open {
+  transform: translateY(0);
+}
+
+/* Panel needs position context */
+#automationV2Shell .cst-chat-wrap {
+  position: relative;
+}
+
+#automationV2Shell .cst-pp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #f3f4f6;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+#automationV2Shell .cst-pp-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #111827;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-pp-close {
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+#automationV2Shell .cst-pp-close:hover { color: #374151; }
+
+#automationV2Shell .cst-pp-list {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#automationV2Shell .cst-pp-item {
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+#automationV2Shell .cst-pp-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+#automationV2Shell .cst-pp-lang {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-pp-meta {
+  font-size: 10px;
+  color: #9ca3af;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-pp-summary {
+  font-size: 11.5px;
+  color: #6b7280;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+
+#automationV2Shell .cst-pp-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#automationV2Shell .cst-pp-view-btn {
+  height: 26px;
+  padding: 0 14px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #f43f5e 0%, #e91e8c 100%);
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: opacity 0.15s;
+}
+#automationV2Shell .cst-pp-view-btn:hover { opacity: 0.88; }
+
+#automationV2Shell .cst-pp-delete-btn {
+  background: none;
+  border: none;
+  color: #d1d5db;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+  margin-left: auto;
+  transition: color 0.15s;
+}
+#automationV2Shell .cst-pp-delete-btn:hover { color: #ef4444; }
+
+#automationV2Shell .cst-pp-train-another {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 4px 12px 0;
+  height: 36px;
+  border-radius: 10px;
+  border: 1.5px dashed #fda4b8;
+  background: transparent;
+  color: #f43f5e;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: background 0.15s;
+}
+#automationV2Shell .cst-pp-train-another:hover { background: #fff0f3; }
+
+/* Disabled start button when profile cap is reached */
+#automationV2Shell .cst-start-btn--disabled,
+#automationV2Shell .cst-start-btn:disabled {
+  background: #d1d5db;
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CUSTOM CONFIRM DIALOG
+══════════════════════════════════════════════════════════════════ */
+
+#automationV2Shell .cst-confirm-overlay,
+.cst-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+#automationV2Shell .cst-confirm-overlay.is-open,
+.cst-confirm-overlay.is-open {
+  opacity: 1;
+}
+
+#automationV2Shell .cst-confirm-panel,
+.cst-confirm-panel {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px 20px 16px;
+  width: calc(100% - 48px);
+  max-width: 280px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.04);
+  transform: translateY(8px) scale(0.97);
+  transition: transform 0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+#automationV2Shell .cst-confirm-overlay.is-open .cst-confirm-panel,
+.cst-confirm-overlay.is-open .cst-confirm-panel {
+  transform: translateY(0) scale(1);
+}
+
+#automationV2Shell .cst-confirm-title,
+.cst-confirm-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 8px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.2px;
+}
+
+#automationV2Shell .cst-confirm-msg,
+.cst-confirm-msg {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 18px;
+  line-height: 1.55;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#automationV2Shell .cst-confirm-actions,
+.cst-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+#automationV2Shell .cst-confirm-cancel,
+.cst-confirm-cancel {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1.5px solid #e5e7eb;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+#automationV2Shell .cst-confirm-cancel:hover,
+.cst-confirm-cancel:hover {
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+#automationV2Shell .cst-confirm-ok,
+.cst-confirm-ok {
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 3px 10px rgba(239,68,68,0.35);
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+#automationV2Shell .cst-confirm-ok:hover,
+.cst-confirm-ok:hover {
+  opacity: 0.9;
+}
+
+#automationV2Shell .cst-confirm-ok:active,
+.cst-confirm-ok:active {
+  transform: scale(0.97);
+}
+
+#automationV2Shell .cst-complete-check--partial {
+  background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
+  box-shadow: 0 8px 24px rgba(249,115,22,0.35), 0 0 0 8px rgba(249,115,22,0.08);
+  overflow: visible;
+}
+
+#automationV2Shell .cst-complete-check--partial svg {
+  stroke: #ffffff;
+  width: 30px;
+  height: 30px;
+  overflow: visible;
+}
+
+/* Spinning clock animation — whole SVG rotates */
+#automationV2Shell .cst-clock-spin {
+  animation: cst-clock-rotate 2s linear infinite;
+  transform-origin: center;
+}
+
+#automationV2Shell .cst-clock-spin polyline {
+  transform: none;
+  animation: none;
+}
+
+@keyframes cst-clock-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

@@ -1,0 +1,343 @@
+/* ================================================================
+   FlirtEasy Onboarding — Animations
+   iOS-like spring transitions, stagger effects, and micro-animations
+   ================================================================ */
+
+/* ===== PAGE TRANSITIONS ===== */
+/* Forward: current slides left, next slides in from right */
+.ob-step.slide-out-left {
+  animation: slideOutLeft var(--ob-duration-page) var(--ob-spring) forwards;
+  z-index: 0;
+}
+
+.ob-step.slide-in-right {
+  animation: slideInRight var(--ob-duration-page) var(--ob-spring) forwards;
+  z-index: 1;
+}
+
+/* Backward: current slides right, previous slides in from left */
+.ob-step.slide-out-right {
+  animation: slideOutRight var(--ob-duration-page) var(--ob-spring) forwards;
+  z-index: 0;
+}
+
+.ob-step.slide-in-left {
+  animation: slideInLeft var(--ob-duration-page) var(--ob-spring) forwards;
+  z-index: 1;
+}
+
+@keyframes slideOutLeft {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-25%);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInRight {
+  0% {
+    transform: translateX(50%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(25%);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInLeft {
+  0% {
+    transform: translateX(-50%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+
+/* ===== STAGGER ENTRANCE ===== */
+.ob-stagger-item {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.ob-stagger-item.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+
+/* ===== SCALE ENTRANCE ===== */
+.ob-scale-in {
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity var(--ob-duration-normal) var(--ob-ease-out),
+              transform var(--ob-duration-slow) var(--ob-spring);
+}
+
+.ob-scale-in.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+
+/* ===== FADE ENTRANCE ===== */
+.ob-fade-in {
+  opacity: 0;
+  transition: opacity var(--ob-duration-normal) var(--ob-ease-out);
+}
+
+.ob-fade-in.visible {
+  opacity: 1;
+}
+
+
+/* ===== AMBIENT ANIMATIONS ===== */
+@keyframes orbDrift {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -20px) scale(1.05);
+  }
+  50% {
+    transform: translate(-15px, 25px) scale(0.95);
+  }
+  75% {
+    transform: translate(20px, 10px) scale(1.02);
+  }
+}
+
+@keyframes glowBreath {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes btnShimmer {
+  0% {
+    left: -100%;
+  }
+  40%, 100% {
+    left: 150%;
+  }
+}
+
+
+/* ===== ICON FLOAT (Step 1 icon) ===== */
+@keyframes iconFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.ob-float {
+  animation: iconFloat 3s ease-in-out infinite;
+}
+
+
+/* ===== CHECKMARK DRAW (Step 5) ===== */
+@keyframes checkmarkDraw {
+  0% {
+    stroke-dashoffset: 50;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes checkCircleScale {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.ob-checkmark-animate .ob-checkmark-circle {
+  animation: checkCircleScale 0.7s var(--ob-spring) forwards;
+}
+
+.ob-checkmark-animate .ob-checkmark-svg path {
+  animation: checkmarkDraw 0.5s ease-out 0.4s forwards;
+}
+
+
+/* ===== CONFETTI ===== */
+@keyframes confettiBurst1 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(-80px, -110px) rotate(340deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst2 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(70px, -120px) rotate(280deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst3 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(-100px, -60px) rotate(200deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst4 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(90px, -70px) rotate(300deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst5 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(-50px, -130px) rotate(180deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst6 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(110px, -40px) rotate(260deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst7 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(-30px, -90px) rotate(400deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst8 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(60px, -100px) rotate(320deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst9 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(-90px, -30px) rotate(220deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst10 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(40px, -140px) rotate(360deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst11 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(-120px, -80px) rotate(290deg) scale(1); opacity: 0; }
+}
+@keyframes confettiBurst12 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0); opacity: 1; }
+  100% { transform: translate(100px, -20px) rotate(240deg) scale(1); opacity: 0; }
+}
+
+.ob-confetti-piece:nth-child(1)  { background: #C2008B; animation: confettiBurst1  1s ease-out 0.5s forwards; }
+.ob-confetti-piece:nth-child(2)  { background: #EC4899; animation: confettiBurst2  1s ease-out 0.55s forwards; width: 6px; height: 10px; }
+.ob-confetti-piece:nth-child(3)  { background: #FFC629; animation: confettiBurst3  1s ease-out 0.6s forwards; }
+.ob-confetti-piece:nth-child(4)  { background: #10B981; animation: confettiBurst4  1s ease-out 0.65s forwards; width: 10px; height: 6px; }
+.ob-confetti-piece:nth-child(5)  { background: #F59E0B; animation: confettiBurst5  1s ease-out 0.5s forwards; border-radius: 50%; }
+.ob-confetti-piece:nth-child(6)  { background: #C2008B; animation: confettiBurst6  1s ease-out 0.7s forwards; width: 6px; height: 10px; }
+.ob-confetti-piece:nth-child(7)  { background: #EC4899; animation: confettiBurst7  1s ease-out 0.55s forwards; }
+.ob-confetti-piece:nth-child(8)  { background: #FE3C72; animation: confettiBurst8  1s ease-out 0.6s forwards; width: 10px; height: 6px; border-radius: 50%; }
+.ob-confetti-piece:nth-child(9)  { background: #D946EF; animation: confettiBurst9  1s ease-out 0.65s forwards; }
+.ob-confetti-piece:nth-child(10) { background: #34D399; animation: confettiBurst10 1s ease-out 0.7s forwards; width: 6px; height: 10px; }
+.ob-confetti-piece:nth-child(11) { background: #F472B6; animation: confettiBurst11 1s ease-out 0.55s forwards; border-radius: 50%; }
+.ob-confetti-piece:nth-child(12) { background: #FFC629; animation: confettiBurst12 1s ease-out 0.6s forwards; }
+
+
+/* ===== SLIDER FILL ANIMATION ===== */
+@keyframes sliderFillIn {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ob-limit-animate {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.ob-limit-animate.visible {
+  animation: sliderFillIn var(--ob-duration-normal) var(--ob-spring) forwards;
+}
+
+
+/* ===== PILL CASCADE ===== */
+@keyframes pillCascade {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ob-pill-cascade {
+  opacity: 1;
+}
+
+.ob-pill-cascade.visible {
+  opacity: 1;
+}
+
+
+/* ===== SELECTION RIPPLE ===== */
+@keyframes selectionPop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.ob-selection-pop {
+  animation: selectionPop 0.3s var(--ob-spring);
+}
+
+
+/* ===== SUMMARY ITEM STAGGER ===== */
+@keyframes summarySlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ob-summary-animate {
+  opacity: 0;
+}
+
+.ob-summary-animate.visible {
+  animation: summarySlideIn var(--ob-duration-normal) var(--ob-spring) forwards;
+}

@@ -1,0 +1,25 @@
+/* Stop Agent Modular Guide - Standard Dashboard Theme Integration */
+
+/* Tightening the injection container */
+.stop-agent-guide-panel.achievements-guide-panel {
+  /* Override any excessive specific styles if needed */
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+/* Specific overrides for the Stop Agent highlight color (using dash violet) */
+.stop-agent-guide-panel .guide-section h4 {
+  color: #8b5cf6 !important;
+  text-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+}
+
+/* Micro-copy optimization */
+.stop-agent-guide-panel .guide-section p {
+  color: #94a3b8;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+/* Icon specific glow */
+.stop-agent-guide-panel .guide-icon {
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.4));
+}

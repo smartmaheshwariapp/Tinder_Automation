@@ -1,0 +1,930 @@
+/**
+ * Activity Tab – Neumorphic 7-State Orb
+ * Soft-UI state machine with phase-aware color theming.
+ */
+
+/* ── Hero Section ── */
+.hero-start-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px 0 16px;
+    position: relative;
+    min-height: 240px;
+    overflow: hidden;
+    background: #f3f4f6; /* match .content background — no visual seam */
+}
+
+/* ── Concentric Decorative Rings ── */
+.orb-rings {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1px solid;
+    transition: border-color 0.6s ease, opacity 0.6s ease;
+}
+
+.ring-inner { width: 202px; height: 202px; border-color: rgba(148, 163, 184, 0.15); }
+.ring-mid   { width: 242px; height: 242px; border-color: rgba(148, 163, 184, 0.10); }
+.ring-outer { width: 290px; height: 290px; border-color: rgba(148, 163, 184, 0.05); }
+
+/* ── iOS-grade pulse rings — box-shadow glow technique ──────────────────────
+   Each ring is a solid circle matching the orb size.
+   The box-shadow creates the luminous halo — multiple layered shadows give
+   the soft, multi-stop glow falloff that iOS uses (not a gradient blur).
+   On animation: ring scales outward while opacity fades → water ripple.
+   The ring's fill color is set per-state to match; shadow uses same color.
+   ──────────────────────────────────────────────────────────────────────── */
+.orb-pulse-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 160px;
+    height: 160px;
+    margin-left: -80px;
+    margin-top: -80px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    opacity: 0;
+    pointer-events: none;
+    transform-origin: center center;
+    z-index: 5;
+    /* box-shadow set per-state */
+}
+
+/* Stagger: each ring offset by 1.2s for a slow, calm water-ripple feel */
+.orb-pulse-ring--2 { animation-delay: 1.2s !important; }
+.orb-pulse-ring--3 { animation-delay: 2.4s !important; }
+
+/* ── Radar Sweep (scanning state) ── */
+.orb-radar {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 182px;
+    height: 182px;
+    margin-left: -91px;
+    margin-top: -91px;
+    border-radius: 50%;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+}
+
+.orb-radar::after {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: conic-gradient(from 0deg, transparent 60%, rgba(59, 130, 246, 0.4) 100%);
+    border-radius: 50%;
+    animation: neu-radar-spin 2s linear infinite;
+}
+
+/* ══════════════════════════════════════════
+   THE ORB BUTTON
+   ══════════════════════════════════════════ */
+.master-orb {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: #F1F5F9;
+    border: none;
+    position: relative;
+    cursor: pointer;
+    outline: none !important;
+    z-index: 10;
+    box-shadow: 10px 10px 20px #cbd5e1, -10px -10px 20px #ffffff;
+    transition: box-shadow 0.5s ease, background 0.5s ease,
+                transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.master-orb:hover  { transform: scale(1.05); }
+.master-orb:active { transform: scale(0.95); transition: transform 0.1s ease; }
+
+.orb-content {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── State Layers ── */
+.state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: scale(0.88);
+}
+
+/* ── Shared Icon / Label Styles ── */
+.orb-icon {
+    width: 38px;
+    height: 38px;
+    transition: color 0.4s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.orb-icon svg {
+    width: 38px;
+    height: 38px;
+}
+
+.orb-label {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: color 0.4s ease;
+}
+
+.orb-label-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    line-height: 1.2;
+}
+
+.orb-sublabel {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    transition: color 0.4s ease;
+}
+
+.orb-timer {
+    font-family: 'Outfit', 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+}
+
+/* ── Icon Animations ── */
+.orb-icon-spin  { animation: neu-icon-spin 1.2s linear infinite; }
+.orb-icon-heartbeat { animation: neu-heartbeat 1.5s ease-in-out infinite; }
+.fe-orb-spin  { animation: neu-icon-spin 1.2s linear infinite; }
+.fe-orb-pulse { animation: neu-heartbeat 1.8s ease-in-out infinite; }
+
+/* ── Typing Dots (Messaging) ── */
+.orb-chat-icon { position: relative; }
+
+.typing-dots {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -60%);
+    display: flex;
+    gap: 3px;
+}
+
+.typing-dot {
+    width: 5px;
+    height: 5px;
+    background: #ffffff;
+    border-radius: 50%;
+    animation: neu-bounce-typing 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+/* ══════════════════════════════════════════
+   STATE 1 – IDLE
+   ══════════════════════════════════════════ */
+.control-center.is-idle .state-idle { opacity: 1; transform: scale(1); }
+.control-center.is-idle .state-idle .orb-icon  { color: #475569; }
+.control-center.is-idle .state-idle .orb-label { color: #475569; }
+
+/* ══════════════════════════════════════════
+   STATE 2 – INITIALIZING
+   ══════════════════════════════════════════ */
+.control-center.is-initializing .state-initializing { opacity: 1; transform: scale(1); }
+.control-center.is-initializing .state-initializing .orb-icon  { color: #94A3B8; }
+.control-center.is-initializing .state-initializing .orb-label { color: #64748B; }
+
+.control-center.is-initializing .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(148,163,184,0.30), 0 0 8px 3px rgba(148,163,184,0.22), 0 0 18px 7px rgba(148,163,184,0.10);
+    opacity: 1;
+    animation: neu-pulse-slow 3.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+/* ══════════════════════════════════════════
+   STATE 3 – SWIPING
+   ══════════════════════════════════════════ */
+.control-center.is-swiping .state-swiping { opacity: 1; transform: scale(1); }
+
+.control-center.is-swiping .master-orb {
+    background: #FDF2F8;
+    box-shadow: 10px 10px 20px #fbcfe8, -10px -10px 20px #ffffff;
+}
+
+.control-center.is-swiping .state-swiping .orb-icon     { color: #EC4899; }
+.control-center.is-swiping .state-swiping .orb-label    { color: #DB2777; }
+.control-center.is-swiping .state-swiping .orb-sublabel { color: rgba(236, 72, 153, 0.8); }
+
+.control-center.is-swiping .ring-inner { border-color: rgba(236, 72, 153, 0.12); }
+.control-center.is-swiping .ring-mid   { border-color: rgba(236, 72, 153, 0.08); }
+.control-center.is-swiping .ring-outer { opacity: 0; }
+
+.control-center.is-swiping .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(236,72,153,0.35), 0 0 8px 3px rgba(236,72,153,0.24), 0 0 18px 7px rgba(236,72,153,0.10);
+    opacity: 1;
+    animation: neu-pulse 3.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+/* ══════════════════════════════════════════
+   STATE 4 – MESSAGING
+   ══════════════════════════════════════════ */
+.control-center.is-messaging .state-messaging { opacity: 1; transform: scale(1); }
+
+.control-center.is-messaging .master-orb {
+    background: #FDF4FF;
+    box-shadow: 10px 10px 20px #fae8ff, -10px -10px 20px #ffffff;
+}
+
+.control-center.is-messaging .state-messaging .orb-icon     { color: #A855F7; }
+.control-center.is-messaging .state-messaging .orb-label    { color: #9333EA; }
+.control-center.is-messaging .state-messaging .orb-sublabel { color: rgba(168, 85, 247, 0.8); }
+
+.control-center.is-messaging .ring-inner { border-color: rgba(168, 85, 247, 0.12); }
+
+
+/* ══════════════════════════════════════════
+   STATE 4.5 – TRANSITIONING (Buffering)
+   ══════════════════════════════════════════ */
+.control-center.is-transitioning .state-transitioning { opacity: 1; transform: scale(1); }
+
+.control-center.is-transitioning .master-orb {
+    background: #F0FDF4; /* Mint/Green base for success transitioning */
+    box-shadow: 10px 10px 20px #dcfce7, -10px -10px 20px #ffffff;
+}
+
+.control-center.is-transitioning .state-transitioning .orb-icon     { color: #10B981; }
+.control-center.is-transitioning .state-transitioning .orb-label    { color: #059669; }
+.control-center.is-transitioning .state-transitioning .orb-timer    { color: #059669; }
+
+.control-center.is-transitioning .ring-inner { border-color: rgba(16, 185, 129, 0.12); }
+
+.control-center.is-transitioning .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(16,185,129,0.30), 0 0 8px 3px rgba(16,185,129,0.20), 0 0 18px 7px rgba(16,185,129,0.08);
+    opacity: 1;
+    animation: neu-pulse-slow 3.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+/* ══════════════════════════════════════════
+   STATE 8 – LOCKED (Safety Protection)
+   ══════════════════════════════════════════ */
+.control-center.is-locked .state-locked { opacity: 1; transform: scale(1); }
+
+.control-center.is-locked .master-orb {
+    background: #FFFBEB; /* Amber/Yellow base */
+    box-shadow: 10px 10px 20px #fde68a, -10px -10px 20px #ffffff;
+    cursor: not-allowed;
+}
+
+.control-center.is-locked .state-locked .orb-icon     { color: #D97706; }
+.control-center.is-locked .state-locked .orb-label    { color: #B45309; }
+.control-center.is-locked .state-locked .orb-sublabel { color: rgba(217, 119, 6, 0.8); font-size: 11px; }
+.control-center.is-locked .state-locked .orb-timer    { color: #D97706; font-size: 15px; font-weight: 700; letter-spacing: 0.01em; }
+
+.control-center.is-locked .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(217,119,6,0.30), 0 0 8px 3px rgba(217,119,6,0.20), 0 0 18px 7px rgba(217,119,6,0.08);
+    opacity: 1;
+    animation: neu-pulse-locked 4.0s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+@keyframes neu-pulse-locked {
+    0%   { transform: scale(1.0);  opacity: 0.75; }
+    100% { transform: scale(1.32); opacity: 0;    }
+}
+
+@keyframes radar-ping {
+    0%   { width: 10px; height: 10px; opacity: 1; }
+    100% { width: 120px; height: 120px; opacity: 0; }
+}
+.control-center.is-messaging .ring-mid   { border-color: rgba(168, 85, 247, 0.08); }
+.control-center.is-messaging .ring-outer { opacity: 0; }
+
+.control-center.is-messaging .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(168,85,247,0.35), 0 0 8px 3px rgba(168,85,247,0.24), 0 0 18px 7px rgba(168,85,247,0.10);
+    opacity: 1;
+    animation: neu-pulse 3.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+/* ══════════════════════════════════════════
+   STATE 4.5 – LEAD SCAN (messaging → scanning for dates)
+   ══════════════════════════════════════════ */
+.control-center.is-lead-scan .state-lead-scan { opacity: 1; transform: scale(1); }
+
+.control-center.is-lead-scan .master-orb {
+    background: #FFF0F6;
+    box-shadow: 10px 10px 20px #ffd6e9, -10px -10px 20px #ffffff;
+}
+
+.control-center.is-lead-scan .state-lead-scan .orb-icon     { color: #EC4899; }
+.control-center.is-lead-scan .state-lead-scan .orb-label    { color: #DB2777; }
+.control-center.is-lead-scan .state-lead-scan .orb-sublabel { color: rgba(236, 72, 153, 0.75); }
+
+.control-center.is-lead-scan .ring-inner { border-color: rgba(236, 72, 153, 0.12); }
+.control-center.is-lead-scan .ring-mid   { border-color: rgba(236, 72, 153, 0.08); }
+.control-center.is-lead-scan .ring-outer { opacity: 0; }
+
+.control-center.is-lead-scan .orb-radar { opacity: 0.5; filter: hue-rotate(300deg); }
+
+.control-center.is-lead-scan .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(236,72,153,0.35), 0 0 8px 3px rgba(236,72,153,0.24), 0 0 18px 7px rgba(236,72,153,0.10);
+    opacity: 1;
+    animation: neu-pulse 3.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+/* ══════════════════════════════════════════
+   STATE 5 – SCANNING (Processing)
+   ══════════════════════════════════════════ */
+.control-center.is-scanning .state-scanning { opacity: 1; transform: scale(1); }
+
+.control-center.is-scanning .master-orb {
+    background: #EFF6FF;
+    box-shadow: 10px 10px 20px #bfdbfe, -10px -10px 20px #ffffff;
+}
+
+.control-center.is-scanning .state-scanning .orb-icon     { color: #3B82F6; }
+.control-center.is-scanning .state-scanning .orb-label    { color: #2563EB; }
+.control-center.is-scanning .state-scanning .orb-sublabel { color: rgba(59, 130, 246, 0.8); }
+
+.control-center.is-scanning .ring-inner { border-color: rgba(59, 130, 246, 0.12); }
+.control-center.is-scanning .ring-mid   { border-color: rgba(59, 130, 246, 0.08); }
+.control-center.is-scanning .ring-outer { opacity: 0; }
+
+.control-center.is-scanning .orb-radar { opacity: 0.6; }
+
+/* ══════════════════════════════════════════
+   STATE 6 – WAITING (Cooldown)
+   ══════════════════════════════════════════ */
+.control-center.is-waiting .state-waiting { opacity: 1; transform: scale(1); }
+
+.control-center.is-waiting .master-orb {
+    background: #F1F5F9;
+    box-shadow: inset 6px 6px 12px #cbd5e1, inset -6px -6px 12px #ffffff;
+}
+
+.control-center.is-waiting .state-waiting .orb-icon     { color: #94A3B8; }
+.control-center.is-waiting .state-waiting .orb-label    { color: #94A3B8; }
+.control-center.is-waiting .state-waiting .orb-sublabel { color: #64748B; }
+
+.control-center.is-waiting .ring-inner,
+.control-center.is-waiting .ring-mid,
+.control-center.is-waiting .ring-outer { opacity: 0; }
+
+/* ══════════════════════════════════════════
+   STATE 6.5 – POLLING (Aggressive Watchdog)
+   ══════════════════════════════════════════ */
+.control-center.is-polling .state-polling { opacity: 1; transform: scale(1); }
+
+.control-center.is-polling .master-orb {
+    background: #ECFEFF;
+    box-shadow: 10px 10px 20px #cffafe, -10px -10px 20px #ffffff;
+}
+
+.control-center.is-polling .state-polling .orb-icon     { color: #0891B2; }
+.control-center.is-polling .state-polling .orb-label    { color: #0891B2; font-weight: 700; transition: opacity 0.3s ease; }
+.control-center.is-polling .state-polling .orb-sublabel { color: rgba(8, 145, 178, 0.8); font-weight: 600; font-size: 11px; }
+
+.control-center.is-polling .ring-inner { border-color: rgba(6, 182, 212, 0.12); }
+.control-center.is-polling .ring-mid   { border-color: rgba(6, 182, 212, 0.08); }
+.control-center.is-polling .ring-outer { opacity: 0; }
+
+.control-center.is-polling .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(6,182,212,0.30), 0 0 8px 3px rgba(6,182,212,0.20), 0 0 18px 7px rgba(6,182,212,0.08);
+    opacity: 1;
+    animation: neu-pulse 3.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+.state-polling .radar-ring {
+    position: absolute;
+    border: 1.5px solid rgba(6, 182, 212, 0.4);
+    border-radius: 50%;
+    animation: radar-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+    pointer-events: none;
+}
+.state-polling .radar-ring:nth-child(2) { animation-delay: 0.6s; }
+.state-polling .radar-ring:nth-child(3) { animation-delay: 1.2s; }
+
+
+/* ══════════════════════════════════════════
+   HOVER → STOP OVERLAY (all running phases)
+   ══════════════════════════════════════════ */
+.state-stop .orb-icon {
+    color: #EF4444;
+}
+
+.state-stop .orb-label {
+    color: #DC2626;
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* ══════════════════════════════════════════
+   STATE 7.5 – EXHAUSTED (3s flash)
+   ══════════════════════════════════════════ */
+.control-center.is-exhausted .state-exhausted { opacity: 1; transform: scale(1); }
+
+.control-center.is-exhausted .master-orb {
+    background: #FFFBEB;
+    box-shadow: 10px 10px 20px #fde68a, -10px -10px 20px #ffffff;
+    cursor: default;
+}
+
+.control-center.is-exhausted .state-exhausted .orb-icon {
+    color: #D97706;
+    animation: orb-swap-spin 0.6s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+.control-center.is-exhausted .state-exhausted .orb-label    { color: #92400E; }
+.control-center.is-exhausted .state-exhausted .orb-sublabel { color: rgba(180, 83, 9, 0.8); font-weight: 600; }
+
+.control-center.is-exhausted .ring-inner { border-color: rgba(217, 119, 6, 0.12); }
+.control-center.is-exhausted .ring-mid   { border-color: rgba(217, 119, 6, 0.08); }
+.control-center.is-exhausted .ring-outer { opacity: 0; }
+
+.control-center.is-exhausted .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(217,119,6,0.30), 0 0 8px 3px rgba(217,119,6,0.20), 0 0 18px 7px rgba(217,119,6,0.08);
+    opacity: 1;
+    animation: neu-pulse 3.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+@keyframes orb-swap-spin {
+    from { transform: rotate(-45deg) scale(0.8); opacity: 0; }
+    to   { transform: rotate(0deg)   scale(1);   opacity: 1; }
+}
+
+/* ══════════════════════════════════════════
+   STATE 7.6 – CONTINUING MESSAGES (like_limit resolved)
+   ══════════════════════════════════════════ */
+.control-center.is-continuing-messages .state-continuing-messages { opacity: 1; transform: scale(1); }
+
+.control-center.is-continuing-messages .master-orb {
+    background: #FAF5FF;
+    box-shadow: 10px 10px 20px #e9d5ff, -10px -10px 20px #ffffff;
+}
+
+.control-center.is-continuing-messages .state-continuing-messages .orb-icon     { color: #A855F7; }
+.control-center.is-continuing-messages .state-continuing-messages .orb-label    { color: #9333EA; }
+.control-center.is-continuing-messages .state-continuing-messages .orb-sublabel { color: rgba(168, 85, 247, 0.8); font-weight: 600; }
+
+.control-center.is-continuing-messages .ring-inner { border-color: rgba(168, 85, 247, 0.12); }
+.control-center.is-continuing-messages .ring-mid   { border-color: rgba(168, 85, 247, 0.08); }
+.control-center.is-continuing-messages .ring-outer { opacity: 0; }
+
+.control-center.is-continuing-messages .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(168,85,247,0.35), 0 0 8px 3px rgba(168,85,247,0.24), 0 0 18px 7px rgba(168,85,247,0.10);
+    opacity: 1;
+    animation: neu-pulse 3.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+/* ══════════════════════════════════════════
+   STATE 7.7 – CONTINUING SWIPES (message_limit resolved)
+   ══════════════════════════════════════════ */
+.control-center.is-continuing-swipes .state-continuing-swipes { opacity: 1; transform: scale(1); }
+
+.control-center.is-continuing-swipes .master-orb {
+    background: #FFF1F2;
+    box-shadow: 10px 10px 20px #fecdd3, -10px -10px 20px #ffffff;
+}
+
+.control-center.is-continuing-swipes .state-continuing-swipes .orb-icon     { color: #EC4899; }
+.control-center.is-continuing-swipes .state-continuing-swipes .orb-label    { color: #DB2777; }
+.control-center.is-continuing-swipes .state-continuing-swipes .orb-sublabel { color: rgba(236, 72, 153, 0.8); font-weight: 600; }
+
+.control-center.is-continuing-swipes .ring-inner { border-color: rgba(236, 72, 153, 0.12); }
+.control-center.is-continuing-swipes .ring-mid   { border-color: rgba(236, 72, 153, 0.08); }
+.control-center.is-continuing-swipes .ring-outer { opacity: 0; }
+
+.control-center.is-continuing-swipes .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(236,72,153,0.35), 0 0 8px 3px rgba(236,72,153,0.24), 0 0 18px 7px rgba(236,72,153,0.10);
+    opacity: 1;
+    animation: neu-pulse 3.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+/* ══════════════════════════════════════════
+   STATE 7.8 – NETWORK WAIT (offline, retrying)
+   ══════════════════════════════════════════ */
+.control-center.is-network-wait .state-network-wait { opacity: 1; transform: scale(1); }
+
+.control-center.is-network-wait .master-orb {
+    background: #FFF7ED;
+    box-shadow: 10px 10px 20px #fed7aa, -10px -10px 20px #ffffff;
+    cursor: default;
+}
+
+.control-center.is-network-wait .state-network-wait .orb-icon {
+    color: #EA580C;
+    animation: orb-wifi-blink 1.4s ease-in-out infinite;
+}
+.control-center.is-network-wait .state-network-wait .orb-label    { color: #C2410C; }
+.control-center.is-network-wait .state-network-wait .orb-sublabel { color: rgba(234, 88, 12, 0.75); }
+
+.control-center.is-network-wait .ring-inner { border-color: rgba(234, 88, 12, 0.12); }
+.control-center.is-network-wait .ring-mid   { border-color: rgba(234, 88, 12, 0.08); }
+.control-center.is-network-wait .ring-outer { opacity: 0; }
+
+.control-center.is-network-wait .orb-pulse-ring {
+    box-shadow: 0 0 0 1px rgba(234,88,12,0.35), 0 0 8px 3px rgba(234,88,12,0.24), 0 0 18px 7px rgba(234,88,12,0.10);
+    opacity: 1;
+    animation: neu-pulse-fast 2.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+@keyframes orb-wifi-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+}
+
+/* Active phases: when orb is hovered, morph to red stop */
+.control-center.is-initializing .master-orb:hover,
+.control-center.is-swiping .master-orb:hover,
+.control-center.is-messaging .master-orb:hover,
+.control-center.is-lead-scan .master-orb:hover,
+.control-center.is-scanning .master-orb:hover,
+.control-center.is-polling .master-orb:hover,
+.control-center.is-waiting .master-orb:hover,
+.control-center.is-transitioning .master-orb:hover,
+.control-center.is-network-wait .master-orb:hover,
+.control-center.is-exhausted .master-orb:hover,
+.control-center.is-continuing-messages .master-orb:hover,
+.control-center.is-continuing-swipes .master-orb:hover {
+    background: #FEF2F2 !important;
+    box-shadow: 10px 10px 20px #fecaca, -10px -10px 20px #ffffff !important;
+}
+
+/* Hide current phase state on hover */
+.control-center.is-initializing .master-orb:hover .state-initializing,
+.control-center.is-swiping .master-orb:hover .state-swiping,
+.control-center.is-messaging .master-orb:hover .state-messaging,
+.control-center.is-lead-scan .master-orb:hover .state-lead-scan,
+.control-center.is-scanning .master-orb:hover .state-scanning,
+.control-center.is-polling .master-orb:hover .state-polling,
+.control-center.is-waiting .master-orb:hover .state-waiting,
+.control-center.is-transitioning .master-orb:hover .state-transitioning,
+.control-center.is-network-wait .master-orb:hover .state-network-wait,
+.control-center.is-exhausted .master-orb:hover .state-exhausted,
+.control-center.is-continuing-messages .master-orb:hover .state-continuing-messages,
+.control-center.is-continuing-swipes .master-orb:hover .state-continuing-swipes {
+    opacity: 0 !important;
+    transform: scale(0.8);
+}
+
+/* Reveal stop state on hover */
+.control-center.is-initializing .master-orb:hover .state-stop,
+.control-center.is-swiping .master-orb:hover .state-stop,
+.control-center.is-messaging .master-orb:hover .state-stop,
+.control-center.is-lead-scan .master-orb:hover .state-stop,
+.control-center.is-scanning .master-orb:hover .state-stop,
+.control-center.is-polling .master-orb:hover .state-stop,
+.control-center.is-waiting .master-orb:hover .state-stop,
+.control-center.is-transitioning .master-orb:hover .state-stop,
+.control-center.is-network-wait .master-orb:hover .state-stop,
+.control-center.is-exhausted .master-orb:hover .state-stop,
+.control-center.is-continuing-messages .master-orb:hover .state-stop,
+.control-center.is-continuing-swipes .master-orb:hover .state-stop {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* ── Trial Ended State (premium purple — exclusive to pro-trial users) ── */
+.control-center.is-trial-ended .state-trial-ended { opacity: 1; transform: scale(1); }
+
+.control-center.is-trial-ended .master-orb {
+    background: #F5F3FF;
+    box-shadow: 10px 10px 22px #ddd6fe, -10px -10px 22px #ffffff;
+    cursor: pointer;
+}
+
+.control-center.is-trial-ended .state-trial-ended .orb-icon {
+    color: #7C3AED;
+    filter: drop-shadow(0 1px 3px rgba(124, 58, 237, 0.35));
+}
+.control-center.is-trial-ended .state-trial-ended .orb-label {
+    color: #4C1D95;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+.control-center.is-trial-ended .state-trial-ended .orb-sublabel {
+    color: rgba(109, 40, 217, 0.7);
+    font-size: 10px;
+    letter-spacing: 0.03em;
+}
+
+.control-center.is-trial-ended .ring-inner { border-color: rgba(124, 58, 237, 0.14); }
+.control-center.is-trial-ended .ring-mid   { border-color: rgba(124, 58, 237, 0.09); }
+.control-center.is-trial-ended .ring-outer { border-color: rgba(124, 58, 237, 0.05); opacity: 1; }
+
+.control-center.is-trial-ended .orb-pulse-ring {
+    box-shadow: 0 0 12px 8px rgba(124,58,237,0.20), 0 0 30px 20px rgba(124,58,237,0.12), 0 0 55px 38px rgba(124,58,237,0.05);
+    opacity: 1;
+    animation: neu-pulse-slow 3.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+/* Hover: deepen to invite click (upgrade) — no stop state overlay */
+.control-center.is-trial-ended .master-orb:hover {
+    background: #EDE9FE !important;
+    box-shadow: 10px 10px 22px #c4b5fd, -10px -10px 22px #ffffff !important;
+}
+
+/* Turn concentric rings subtle red on hover */
+.control-center:not(.is-idle):has(.master-orb:hover) .ring-inner { border-color: rgba(239, 68, 68, 0.08) !important; }
+.control-center:not(.is-idle):has(.master-orb:hover) .ring-mid   { border-color: rgba(239, 68, 68, 0.05) !important; opacity: 1 !important; }
+
+/* Pulse rings — calm red glow on hover, stagger preserved per ring */
+.control-center:not(.is-idle):has(.master-orb:hover) .orb-pulse-ring--1 {
+    box-shadow: 0 0 0 1px rgba(239,68,68,0.32), 0 0 8px 3px rgba(239,68,68,0.22), 0 0 18px 7px rgba(239,68,68,0.10) !important;
+    opacity: 1 !important;
+    animation: neu-pulse-fast 2.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite !important;
+    animation-delay: 0s !important;
+}
+.control-center:not(.is-idle):has(.master-orb:hover) .orb-pulse-ring--2 {
+    box-shadow: 0 0 0 1px rgba(239,68,68,0.32), 0 0 8px 3px rgba(239,68,68,0.22), 0 0 18px 7px rgba(239,68,68,0.10) !important;
+    opacity: 1 !important;
+    animation: neu-pulse-fast 2.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite !important;
+    animation-delay: 0.93s !important;
+}
+.control-center:not(.is-idle):has(.master-orb:hover) .orb-pulse-ring--3 {
+    box-shadow: 0 0 0 1px rgba(239,68,68,0.32), 0 0 8px 3px rgba(239,68,68,0.22), 0 0 18px 7px rgba(239,68,68,0.10) !important;
+    opacity: 1 !important;
+    animation: neu-pulse-fast 2.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite !important;
+    animation-delay: 1.86s !important;
+}
+
+/* Hide radar on hover */
+.control-center.is-scanning:has(.master-orb:hover) .orb-radar { opacity: 0 !important; }
+.control-center.is-lead-scan:has(.master-orb:hover) .orb-radar { opacity: 0 !important; }
+.control-center.is-polling:has(.master-orb:hover) .radar-ring { border-color: rgba(239, 68, 68, 0.4) !important; animation-duration: 1s !important; }
+
+
+/* ══════════════════════════════════════════
+   ANIMATIONS
+   ══════════════════════════════════════════ */
+@keyframes neu-pulse {
+    0%   { transform: scale(1.0);  opacity: 0.9; }
+    100% { transform: scale(1.4);  opacity: 0;   }
+}
+
+@keyframes neu-pulse-slow {
+    0%   { transform: scale(1.0);  opacity: 0.75; }
+    100% { transform: scale(1.35); opacity: 0;    }
+}
+
+@keyframes neu-pulse-fast {
+    0%   { transform: scale(1.0);  opacity: 0.9; }
+    100% { transform: scale(1.38); opacity: 0;   }
+}
+
+@keyframes neu-heartbeat {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.15); }
+}
+
+@keyframes neu-icon-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+@keyframes neu-radar-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+@keyframes neu-bounce-typing {
+    0%, 100% { transform: translateY(0);    opacity: 0.5; }
+    50%      { transform: translateY(-3px); opacity: 1; }
+}
+
+
+/* ══════════════════════════════════════════
+   INFO STRIP + ACTIVITY CARDS (unchanged)
+   ══════════════════════════════════════════ */
+
+/* ── Info Strip ── */
+.info-strip {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+    margin: 0 12px 0;
+    background: #FFFFFF;
+    border-radius: 18px;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.info-strip-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.info-strip-item:nth-child(1) { align-items: flex-start; text-align: left; }
+.info-strip-item:nth-child(2) { align-items: center; text-align: center; }
+.info-strip-item:nth-child(3) { align-items: flex-end; text-align: right; }
+
+.info-strip-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #94A3B8;
+    text-transform: uppercase;
+}
+
+.info-strip-value {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0F172A;
+}
+
+/* ── Activity Cards Row ── */
+.activity-cards-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 8px 12px 4px;
+}
+
+.activity-stats-mode-row {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 14px 6px;
+}
+
+.activity-stats-mode-link {
+    border: none;
+    background: transparent;
+    color: #64748B;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.activity-stats-mode-link:hover { color: #475569; }
+
+.activity-stats-mode-link:focus-visible {
+    outline: 2px solid rgba(71, 85, 105, 0.35);
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+.activity-card {
+    background: #FFFFFF;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 12px 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.activity-card:hover {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+    transform: translateY(-2px);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+.activity-card-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.activity-card--orange .activity-card-label { color: #F97316; }
+.activity-card--teal .activity-card-label   { color: #0D9488; }
+.activity-card--purple .activity-card-label { color: #7C3AED; }
+
+.activity-card-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 30px;
+    font-weight: 800;
+    color: #0F172A;
+    line-height: 1;
+}
+
+.activity-card-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    color: #94A3B8;
+}
+
+.activity-card--cta {
+    background: #ffffff !important;
+    border-color: rgba(100, 116, 139, 0.12) !important;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.03) !important;
+}
+
+@keyframes ctaBtnRipple {
+    from { transform: scale(0); opacity: 1; }
+    to   { transform: scale(5); opacity: 0; }
+}
+
+@keyframes shimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+@keyframes pulseGlow {
+    0%   { box-shadow: 0 0 0 0px rgba(236, 72, 153, 0.7),  0 0 0 0px  rgba(236, 72, 153, 0.4); }
+    100% { box-shadow: 0 0 0 8px  rgba(236, 72, 153, 0),   0 0 0 16px rgba(236, 72, 153, 0);   }
+}
+
+.activity-card-cta-btn {
+    display: block;
+    width: 100%;
+    padding: 5px 0;
+    border: none;
+    border-radius: 20px;
+    background: linear-gradient(to right, #ec4899, #fb7185);
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    animation: pulseGlow 2s ease-in-out infinite;
+    transition: transform 0.15s;
+}
+
+.activity-card-cta-btn:hover {
+    transform: translateY(-1px);
+    animation: none;
+    box-shadow: 0 4px 18px rgba(244, 63, 94, 0.65);
+}
+
+.activity-card-cta-btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: shimmer 2s infinite;
+    border-radius: 20px;
+    pointer-events: none;
+}
+
+.activity-card-cta-btn .ripple {
+    position: absolute;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.5);
+    animation: ctaBtnRipple 0.6s ease-out forwards;
+    pointer-events: none;
+    transform-origin: center;
+    margin-left: -12px;
+    margin-top: -12px;
+}
+
+/* ── Layout Background ── */
+#activityTab {
+    background: #F1F5F9 !important;
+    padding-bottom: 8px !important;
+}
