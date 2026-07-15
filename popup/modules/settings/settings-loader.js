@@ -218,33 +218,6 @@ async function loadSettingsExtended() {
     AutomationViews._syncMoveOffAppConfigVisibility();
   }
 
-  // Load Geolocation settings
-  const geo = settings.geolocation || { enabled: false, latitude: '', longitude: '', country: '', city: '' };
-  const geoEnabledEl = document.getElementById('geolocationEnabled');
-  const geoLatEl = document.getElementById('geolocationLatitude');
-  const geoLngEl = document.getElementById('geolocationLongitude');
-  if (geoEnabledEl) geoEnabledEl.checked = geo.enabled === true;
-  if (geoLatEl) geoLatEl.value = geo.latitude || '';
-  if (geoLngEl) geoLngEl.value = geo.longitude || '';
-  if (typeof selectCityByCoords === 'function') {
-    if (geo.country && geo.city) {
-      const countrySelect = document.getElementById('geolocationCountry');
-      const citySelect = document.getElementById('geolocationCity');
-      if (countrySelect && citySelect) {
-        countrySelect.value = geo.country;
-        if (typeof window.populateCities === 'function') {
-          window.populateCities(geo.country);
-        }
-        citySelect.value = geo.city;
-      }
-    } else if (geo.latitude && geo.longitude) {
-      selectCityByCoords(parseFloat(geo.latitude), parseFloat(geo.longitude));
-    }
-  }
-  if (typeof updateGeolocationUI === 'function') {
-    updateGeolocationUI();
-  }
-
   updateSafetyModeState();
   updateGeneratedPromptPreview();
 }

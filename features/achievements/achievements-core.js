@@ -1,8 +1,8 @@
 // Achievement Badge System - Core Logic
 // Defines all badges, requirements, and unlock logic
 
-window.__reactInitProps = window.__reactInitProps || {};
-const BADGE_CATALOG = window.__reactInitProps.BADGE_CATALOG = window.__reactInitProps.BADGE_CATALOG || {
+// Use window assignments to prevent "already declared" errors on re-injection
+window.BADGE_CATALOG = window.BADGE_CATALOG || {
   // ===== COMMON BADGES (8) =====
   theAwakening: {
     id: 'theAwakening',
@@ -175,7 +175,7 @@ const BADGE_CATALOG = window.__reactInitProps.BADGE_CATALOG = window.__reactInit
 };
 
 // Premium Vector Icons Map - HYPER LUXURY EDITION
-const BADGE_ICONS = window.__reactInitProps.BADGE_ICONS = window.__reactInitProps.BADGE_ICONS || {
+window.BADGE_ICONS = window.BADGE_ICONS || {
   // LEGENDARY (The Awakening)
   theAwakening: `
     <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -457,15 +457,15 @@ const BADGE_ICONS = window.__reactInitProps.BADGE_ICONS = window.__reactInitProp
     </svg>`,
 };
 
-const RARITY_CONFIG = window.__reactInitProps.RARITY_CONFIG = window.__reactInitProps.RARITY_CONFIG || {
+window.RARITY_CONFIG = window.RARITY_CONFIG || {
   common: { color1: '#00A3FF', color2: '#3B82F6', effect: 'confetti', duration: 8000 },
   rare: { color1: '#4338ca', color2: '#818cf8', effect: 'sparkles', duration: 10000 },
   epic: { color1: '#A855F7', color2: '#7C3AED', effect: 'explosion', duration: 12000 },
   legendary: { color1: '#FF1F66', color2: '#FFA000', effect: 'explosion', duration: 15000 }
 };
 
-const LEVEL_THRESHOLDS = window.__reactInitProps.LEVEL_THRESHOLDS = window.__reactInitProps.LEVEL_THRESHOLDS || [0, 100, 250, 500, 1000, 2000, 3500, 5500, 8000, 12000];
-const LEVEL_NAMES = window.__reactInitProps.LEVEL_NAMES = window.__reactInitProps.LEVEL_NAMES || [
+window.LEVEL_THRESHOLDS = window.LEVEL_THRESHOLDS || [0, 100, 250, 500, 1000, 2000, 3500, 5500, 8000, 12000];
+window.LEVEL_NAMES = window.LEVEL_NAMES || [
   "Newbie",
   "Beginner",
   "Amateur",
@@ -480,50 +480,50 @@ const LEVEL_NAMES = window.__reactInitProps.LEVEL_NAMES = window.__reactInitProp
 
 
 
-const calculateLevel = function (xp) {
-  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
-    if (xp >= LEVEL_THRESHOLDS[i]) {
+window.calculateLevel = function (xp) {
+  for (let i = window.LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (xp >= window.LEVEL_THRESHOLDS[i]) {
       return {
         number: i + 1,
-        name: LEVEL_NAMES[i] || "ALPHA"
+        name: window.LEVEL_NAMES[i] || "ALPHA"
       };
     }
   }
-  return { number: 1, name: LEVEL_NAMES[0] };
+  return { number: 1, name: window.LEVEL_NAMES[0] };
 }
 
-const getXPForNextLevel = function (currentXP) {
-  const levelInfo = calculateLevel(currentXP);
+window.getXPForNextLevel = function (currentXP) {
+  const levelInfo = window.calculateLevel(currentXP);
   const currentLevel = levelInfo.number;
-  if (currentLevel >= LEVEL_THRESHOLDS.length) {
+  if (currentLevel >= window.LEVEL_THRESHOLDS.length) {
     return { current: currentXP, required: currentXP, progress: 100 };
   }
-  const required = LEVEL_THRESHOLDS[currentLevel];
-  const previous = LEVEL_THRESHOLDS[currentLevel - 1];
+  const required = window.LEVEL_THRESHOLDS[currentLevel];
+  const previous = window.LEVEL_THRESHOLDS[currentLevel - 1];
   const progress = ((currentXP - previous) / (required - previous)) * 100;
   return { current: currentXP, required, progress: Math.min(progress, 100) };
 }
 
-const checkBadgeUnlock = function (badgeId, userStats) {
-  const badge = BADGE_CATALOG[badgeId];
+window.checkBadgeUnlock = function (badgeId, userStats) {
+  const badge = window.BADGE_CATALOG[badgeId];
   if (!badge) return false;
 
   const req = badge.requirement;
   return Object.keys(req).every(key => (userStats[key] || 0) >= req[key]);
 }
 
-const getAllUnlockedBadges = function (userStats, unlockedBadges) {
-  return Object.keys(BADGE_CATALOG).filter(id => unlockedBadges.includes(id));
+window.getAllUnlockedBadges = function (userStats, unlockedBadges) {
+  return Object.keys(window.BADGE_CATALOG).filter(id => unlockedBadges.includes(id));
 }
 
-const getNextBadgeProgress = function (userStats, unlockedBadges) {
-  const locked = Object.keys(BADGE_CATALOG).filter(id => !unlockedBadges.includes(id) && !BADGE_CATALOG[id].hidden);
+window.getNextBadgeProgress = function (userStats, unlockedBadges) {
+  const locked = Object.keys(window.BADGE_CATALOG).filter(id => !unlockedBadges.includes(id) && !window.BADGE_CATALOG[id].hidden);
 
   let closest = null;
   let closestProgress = 0;
 
   locked.forEach(id => {
-    const badge = BADGE_CATALOG[id];
+    const badge = window.BADGE_CATALOG[id];
     const req = badge.requirement;
     const keys = Object.keys(req);
     const progress = keys.reduce((sum, key) => sum + Math.min((userStats[key] || 0) / req[key], 1), 0) / keys.length * 100;
@@ -539,14 +539,14 @@ const getNextBadgeProgress = function (userStats, unlockedBadges) {
 
 // Expose to window for other scripts (tracker, overlay)
 if (typeof window !== 'undefined') {
-  window.__reactInitProps.BADGE_CATALOG = BADGE_CATALOG;
-  window.__reactInitProps.RARITY_CONFIG = RARITY_CONFIG;
-  window.__reactInitProps.LEVEL_THRESHOLDS = LEVEL_THRESHOLDS;
-  window.__reactInitProps.calculateLevel = calculateLevel;
-  window.__reactInitProps.getXPForNextLevel = getXPForNextLevel;
-  window.__reactInitProps.checkBadgeUnlock = checkBadgeUnlock;
-  window.__reactInitProps.getAllUnlockedBadges = getAllUnlockedBadges;
-  window.__reactInitProps.getNextBadgeProgress = getNextBadgeProgress;
+  window.BADGE_CATALOG = BADGE_CATALOG;
+  window.RARITY_CONFIG = RARITY_CONFIG;
+  window.LEVEL_THRESHOLDS = LEVEL_THRESHOLDS;
+  window.calculateLevel = calculateLevel;
+  window.getXPForNextLevel = getXPForNextLevel;
+  window.checkBadgeUnlock = checkBadgeUnlock;
+  window.getAllUnlockedBadges = getAllUnlockedBadges;
+  window.getNextBadgeProgress = getNextBadgeProgress;
   const DEBUG_ENABLED = false;
-  if (DEBUG_ENABLED) console.log('[AchievementCore] Exposed globals to window.__reactInitProps');
+  if (DEBUG_ENABLED) console.log('[AchievementCore] Exposed globals to window');
 }

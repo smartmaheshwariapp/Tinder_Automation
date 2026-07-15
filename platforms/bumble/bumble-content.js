@@ -28,21 +28,6 @@ let userSettings = {};
 let bumbleNetworkOfflineReported = false;
 let bumbleCurrentResolvedId = null; // Pinned per-navigation; prevents stale DOM ID reads after name-match nav
 
-const reportBumbleSwipe = (name, age, action, photoUrl) => {
-    if (!chrome.runtime?.id) return;
-    chrome.runtime.sendMessage({
-        action: 'logSwipe',
-        payload: {
-            name: name || 'Someone',
-            age: age || '',
-            action: action || 'like',
-            photoUrl: photoUrl || '',
-            platform: 'bumble',
-            userId: 'dev_user_1'
-        }
-    });
-};
-
 // Load settings immediately
 chrome.storage.local.get('userSettings', (data) => {
     userSettings = data.userSettings || {};
@@ -69,15 +54,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // ========== INITIALIZATION ==========
 
 // Inject API interceptor into page context
-function injectBumbleApiInterceptor(geo) {
+function injectBumbleApiInterceptor() {
     const script = document.createElement('script');
     script.src = chrome.runtime.getURL('platforms/bumble/bumble-api.js');
-    script.setAttribute('data-flirteasy-interceptor', 'true');
-    if (geo && geo.enabled) {
-        script.setAttribute('data-geo-enabled', 'true');
-        script.setAttribute('data-geo-lat', geo.latitude || '');
-        script.setAttribute('data-geo-lng', geo.longitude || '');
-    }
     script.onload = () => {
         console.log('[Bumble] API interceptor injected');
         script.remove();
@@ -96,31 +75,11 @@ async function initializeBumble() {
     if (!chrome.runtime?.id) return; // Immediate exit if orphaned
     console.log('[Bumble] Initializing hardened context...');
 
-    // Notify local Cloud Worker of successful login (to trigger redirection)
-    const reportLogin = () => {
-        chrome.runtime.sendMessage({
-            action: 'notifyLogin',
-            payload: { platform: 'bumble', userId: 'dev_user_1' }
-        });
-    };
-
-    // Start background login checks immediately to handle redirects or pre-authed sessions
-    setInterval(() => {
-        if (isBumbleLoggedIn()) {
-            reportLogin();
-        }
-    }, 4000);
-
-    // Initial check on startup
-    if (isBumbleLoggedIn()) {
-        reportLogin();
-    }
-
     // Load selectors
     await loadBumbleSelectors();
 
     // Inject API interceptor
-    injectBumbleApiInterceptor(userSettings.geolocation);
+    injectBumbleApiInterceptor();
 
     // Wait for page to fully load
     await bumbleWaitRandom(1000, 2000);
@@ -269,13 +228,6 @@ async function initializeBumble() {
             }
         }
     }, 2000); // 2 seconds is enough for the monitor
-
-    // Auto-start swiping loop once user is logged in
-    if (isBumbleLoggedIn()) {
-        console.log('[Bumble] Logged in. Triggering auto-like cycle...');
-        bumbleIsAutoLiking = true;
-        bumbleAutoLike(100).catch(err => console.error('[Bumble] Auto-swipe launch error:', err));
-    }
 }
 
 // ========== ACHIEVEMENT BRIDGE ==========
@@ -1269,9 +1221,6 @@ async function bumbleAutoLike(count) {
 
                 if (age === null || age < ageFilter.minAge || age > ageFilter.maxAge) {
                     console.log(`[Bumble] 🔞 Age ${age || 'unknown'} OUTSIDE range. PASSING.`);
-                    const targetName = document.querySelector('.encounters-story-profile__name')?.textContent || 'Someone';
-                    const photoUrl = typeof extractBumbleProfilePhotoUrl === 'function' ? extractBumbleProfilePhotoUrl() : '';
-                    reportBumbleSwipe(targetName, age, 'pass', photoUrl);
                     await clickBumblePassButton();
 
                     // Verification of pass
@@ -1314,10 +1263,6 @@ async function bumbleAutoLike(count) {
 
                     if (matchResult && matchResult.score < (visualPrefs.threshold || 75) && matchResult.score > 0) {
                         console.log(`[Bumble] 🤖 Visual DISLIKE: Score ${matchResult.score}% < Threshold ${visualPrefs.threshold || 75}%. PASSING.`);
-                        const targetName = document.querySelector('.encounters-story-profile__name')?.textContent || 'Someone';
-                        const age = typeof getBumbleProfileAge === 'function' ? getBumbleProfileAge() : '';
-                        const cleanPhotoUrl = typeof extractBumbleProfilePhotoUrl === 'function' ? extractBumbleProfilePhotoUrl() : '';
-                        reportBumbleSwipe(targetName, age, 'pass', cleanPhotoUrl);
                         await clickBumblePassButton();
 
                         // Verification of pass
@@ -1338,38 +1283,6 @@ async function bumbleAutoLike(count) {
                 }
             } else if (visualPrefs.enabled) {
                 console.log(`[Bumble] Visual Preferences enabled but need more training data (${(visualPrefs.likedPhotos?.length || 0)}/${minLikesRequired})`);
-            }
-
-            // --- Stealth Humanized Micro-Interactions ---
-            const microRand = Math.random();
-            if (microRand < 0.25) {
-                // Photo view carousel check
-                console.log('[Bumble] Stealth: Viewing next profile photo in carousel');
-                const nextBtn = document.querySelector('.encounters-album__nav-item--next, [data-qa-role="encounters-album-nav-next"]');
-                if (nextBtn) {
-                    nextBtn.click();
-                    await bumbleWaitRandom(1200, 2500);
-                }
-            } else if (microRand < 0.45) {
-                // Scroll down the profile bio card and scroll back up
-                console.log('[Bumble] Stealth: Smoothly scrolling profile card to read bio');
-                const story = document.querySelector('[data-qa-role="encounters-story"], .encounters-story, .encounters-album');
-                if (story) {
-                    story.scrollBy({ top: 350, behavior: 'smooth' });
-                    await bumbleWaitRandom(2000, 4000);
-                    story.scrollTo({ top: 0, behavior: 'smooth' });
-                    await bumbleWaitRandom(1000, 1800);
-                }
-            } else if (microRand < 0.60) {
-                // Hover details card
-                console.log('[Bumble] Stealth: Simulating mouse hover over profile name');
-                const nameHeader = document.querySelector('.encounters-story-profile__name, .encounters-story-profile__user');
-                if (nameHeader) {
-                    nameHeader.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-                    nameHeader.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-                    await bumbleWaitRandom(800, 1500);
-                    nameHeader.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
-                }
             }
 
             // 6. High-Fidelity Like Action
@@ -1406,9 +1319,6 @@ async function bumbleAutoLike(count) {
                 // Real-time Stat Sync (Unified source for Achievement + Trial + Dashboard)
                 // STREAMING: Get name for personalized feed
                 const targetName = document.querySelector('.encounters-story-profile__name')?.textContent || 'Someone';
-                const age = typeof getBumbleProfileAge === 'function' ? getBumbleProfileAge() : '';
-                const photoUrl = typeof extractBumbleProfilePhotoUrl === 'function' ? extractBumbleProfilePhotoUrl() : '';
-                reportBumbleSwipe(targetName, age, 'like', photoUrl);
 
                 safeSendMessage({
                     action: 'updateCycleStats',
@@ -1425,23 +1335,11 @@ async function bumbleAutoLike(count) {
                 await bumbleWait(500);
             }
 
-            // 7. Human-like Delay (Multi-modal Timing Pauses)
-            const delayRand = Math.random();
-            let delayMs = 0;
-            if (delayRand < 0.8) {
-                // 80% normal delay: 2.0s to 4.5s
-                delayMs = Math.floor(Math.random() * 2500) + 2000;
-                console.log(`[Bumble] Delay: Normal pause of ${delayMs}ms`);
-            } else if (delayRand < 0.95) {
-                // 15% reading/thinking delay: 6.0s to 12.0s
-                delayMs = Math.floor(Math.random() * 6000) + 6000;
-                console.log(`[Bumble] Delay: Thinking pause of ${delayMs}ms`);
-            } else {
-                // 5% distraction/long delay: 15.0s to 30.0s
-                delayMs = Math.floor(Math.random() * 15000) + 15000;
-                console.log(`[Bumble] Delay: Distraction pause of ${delayMs}ms`);
-            }
-            await bumbleWait(delayMs);
+            // 7. Human-like Delay
+            await bumbleWaitRandom(
+                BUMBLE_CONFIG.DEFAULTS.MIN_DELAY_MS,
+                BUMBLE_CONFIG.DEFAULTS.MAX_DELAY_MS
+            );
         }
     } catch (err) {
         console.error('[Bumble] Error in auto-like loop:', err);
@@ -4355,6 +4253,14 @@ window.addEventListener('message', (event) => {
         const { matchId } = event.data;
         safeSendMessage({ action: 'isChatStopped', matchId }, (res) => {
             respond({ isStopped: res?.isStopped ?? false });
+        });
+    } else if (action === 'startAgent') {
+        safeSendMessage({ action: 'startAgent', platform: PLATFORM_ID }, (res) => {
+            respond({ success: res?.success ?? true });
+        });
+    } else if (action === 'stopAgent') {
+        safeSendMessage({ action: 'stopAgent' }, (res) => {
+            respond({ success: res?.success ?? true });
         });
     } else {
         respond({ success: false, error: `Unknown action: ${action}` });

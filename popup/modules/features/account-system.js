@@ -10,6 +10,12 @@ function initializeAccountButton() {
  * Automatically handles Pro upgrades post-payment.
  */
 async function syncUserStatus() {
+  // DEV MODE: skip all server round-trips — dev user is always valid
+  if (typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE) {
+    console.log('[AccountSystem] DEV_MODE active — server sync skipped.');
+    return;
+  }
+
   const userData = await chrome.storage.local.get('user');
   const user = userData.user;
 

@@ -311,73 +311,39 @@ async function clickBumbleLikeButton() {
     // Small delay after focus
     await bumbleWait(50);
 
-    const rand = Math.random();
-    if (rand < 0.4) {
-        // Method A: Keyboard Swipe
-        console.log('[Bumble] Stealth: Swiping Like via Keyboard');
-        await bumbleLikeWithKeyboard();
-    } else if (rand < 0.8) {
-        // Method B: Button Click
-        console.log('[Bumble] Stealth: Swiping Like via Button Click');
-        const likeBtn = findBumbleLikeButton();
-        if (likeBtn && !likeBtn.classList.contains('is-disabled')) {
-            await bumbleSimulateClick(likeBtn);
-        } else {
-            // Fallback to keyboard
-            await bumbleLikeWithKeyboard();
-        }
-    } else {
-        // Method C: Drag Swipe
-        console.log('[Bumble] Stealth: Swiping Like via Card Drag');
-        const success = bumbleSimulateSwipe('right');
-        if (!success) {
-            // Fallback to button click
-            const likeBtn = findBumbleLikeButton();
-            if (likeBtn && !likeBtn.classList.contains('is-disabled')) {
-                await bumbleSimulateClick(likeBtn);
-            }
-        }
+    // 2. Keyboard Action
+    await bumbleLikeWithKeyboard();
+
+    // 3. DOM Click
+    const likeBtn = findBumbleLikeButton();
+    if (likeBtn && !likeBtn.classList.contains('is-disabled')) {
+        await bumbleSimulateClick(likeBtn);
     }
 
+    // 4. Physical Swipe Fallback (Sequential)
+    // Only if we haven't succeeded yet (Wait loop in content script handles most, 
+    // but we add a small wait here for state stability)
     await bumbleWait(150);
+
     return true;
 }
 
 async function clickBumblePassButton() {
-    // 1. Target Focus
+    // 1. Keyboard
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     document.body.focus();
-    await bumbleWait(50);
+    await bumblePassWithKeyboard();
 
-    const rand = Math.random();
-    if (rand < 0.4) {
-        // Method A: Keyboard Swipe
-        console.log('[Bumble] Stealth: Swiping Pass via Keyboard');
-        await bumblePassWithKeyboard();
-    } else if (rand < 0.8) {
-        // Method B: Button Click
-        console.log('[Bumble] Stealth: Swiping Pass via Button Click');
-        const passBtn = findBumblePassButton();
-        if (passBtn) {
-            await bumbleSimulateClick(passBtn);
-        } else {
-            // Fallback to keyboard
-            await bumblePassWithKeyboard();
-        }
-    } else {
-        // Method C: Drag Swipe
-        console.log('[Bumble] Stealth: Swiping Pass via Card Drag');
-        const success = bumbleSimulateSwipe('left');
-        if (!success) {
-            // Fallback to button click
-            const passBtn = findBumblePassButton();
-            if (passBtn) {
-                await bumbleSimulateClick(passBtn);
-            }
-        }
+    // 2. DOM Click
+    const passBtn = findBumblePassButton();
+    if (passBtn) {
+        await bumbleSimulateClick(passBtn);
     }
 
-    await bumbleWait(150);
+    // 3. Physical Swipe Fallback (Sequential)
+    await bumbleWait(200);
+    bumbleSimulateSwipe('left');
+
     return true;
 }
 
@@ -585,13 +551,7 @@ function isBumbleLoggedIn() {
     // Also check for the app container and navigation bar
     const hasAppContainer = !!document.querySelector('.page__content, .page__header');
 
-    // Check for "Filters" text on the screen (extremely reliable on feed/matches)
-    const hasFiltersText = Array.from(document.querySelectorAll('span')).some(span => {
-        const text = span.textContent || '';
-        return text.toLowerCase().includes('filters');
-    });
-
-    return !!navElement || isOnApp || hasEncounters || hasAppContainer || hasFiltersText;
+    return !!navElement || isOnApp || hasEncounters || hasAppContainer;
 }
 
 function isOnBumbleEncounters() {

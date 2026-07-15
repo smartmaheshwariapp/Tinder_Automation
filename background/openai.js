@@ -4,6 +4,12 @@ const RETRY_DELAYS = [2000, 4000, 8000];
 let _lastAiModelUsed = null;
 
 async function tryRefreshToken() {
+  // DEV MODE: the dev token never expires — always report success
+  if (typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE) {
+    console.log('[openai] DEV_MODE active — token refresh skipped, returning success.');
+    return true;
+  }
+
   try {
     const local = await chrome.storage.local.get('refreshToken');
     let refreshToken = local.refreshToken;
@@ -483,9 +489,12 @@ async function generateMessage(matchData, settings, isFollowUp = false) {
       if (typeof pushProgressFeedEvent === 'function') {
         pushProgressFeedEvent('error', 'Session expired — please log out and back in to enable AI messaging', null, 0);
       }
-      chrome.storage.local.remove(['user', 'trial_v3', 'refreshToken']).catch(() => {});
-      chrome.storage.sync.remove(['userBackup', 'refreshTokenBackup']).catch(() => {});
-      chrome.storage.local.set({ sessionExpired: true }).catch(() => {});
+      // DEV MODE: never wipe the dev user or set the session-expired flag
+      if (!(typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE)) {
+        chrome.storage.local.remove(['user', 'trial_v3', 'refreshToken']).catch(() => {});
+        chrome.storage.sync.remove(['userBackup', 'refreshTokenBackup']).catch(() => {});
+        chrome.storage.local.set({ sessionExpired: true }).catch(() => {});
+      }
       return { success: false, error: err.message, isAuthError: true };
     }
     if (isAccessError) {
@@ -1559,8 +1568,14 @@ async function callOpenAI(systemPrompt, userPrompt, apiKey, settings, options = 
       authToken = storage.user?.token;
 
       if (!authToken) {
-        if (typeof error === 'function') error('Authentication required', 'Please log in to use AI features');
-        throw new Error('Please log in to use AI features');
+        // DEV MODE: fall back to the dev bypass token so AI calls still work
+        if (typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE) {
+          authToken = CONFIG.DEV_USER.token;
+          console.log('[openai] DEV_MODE — using dev bypass token for AI proxy call.');
+        } else {
+          if (typeof error === 'function') error('Authentication required', 'Please log in to use AI features');
+          throw new Error('Please log in to use AI features');
+        }
       }
     }
 

@@ -5,7 +5,7 @@
  * Set to false before distributing to users to disable all console logs
  */
 
-const DEBUG_ENABLED = true;
+const DEBUG_ENABLED = false;
 
 
 const getGlobal = () => {

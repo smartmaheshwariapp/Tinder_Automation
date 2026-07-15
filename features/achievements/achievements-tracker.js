@@ -1,11 +1,5 @@
 // Achievement Tracker - Progress monitoring and unlock detection
 if (typeof window.AchievementTracker === 'undefined') {
-  const BADGE_CATALOG = window.__reactInitProps?.BADGE_CATALOG || window.BADGE_CATALOG || {};
-  const checkBadgeUnlock = window.__reactInitProps?.checkBadgeUnlock || window.checkBadgeUnlock || (() => false);
-  const calculateLevel = window.__reactInitProps?.calculateLevel || window.calculateLevel || (() => ({ number: 1, name: 'Newbie' }));
-  const getXPForNextLevel = window.__reactInitProps?.getXPForNextLevel || window.getXPForNextLevel || (() => ({ current: 0, required: 100, progress: 0 }));
-  const getNextBadgeProgress = window.__reactInitProps?.getNextBadgeProgress || window.getNextBadgeProgress || (() => null);
-
   window.AchievementTracker = class AchievementTracker {
     constructor() {
       this.DEBUG_ENABLED = false;

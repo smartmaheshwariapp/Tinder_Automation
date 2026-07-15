@@ -78,13 +78,6 @@ async function handleSaveExtended() {
       enabled: document.getElementById('visualPreferencesEnabled').checked,
       threshold: parseInt(document.getElementById('visualThreshold').value) || 75,
       likedPhotos: existingSettings.visualPreferences?.likedPhotos || []
-    },
-    geolocation: {
-      enabled: document.getElementById('geolocationEnabled')?.checked === true,
-      latitude: parseFloat(document.getElementById('geolocationLatitude')?.value) || 0,
-      longitude: parseFloat(document.getElementById('geolocationLongitude')?.value) || 0,
-      country: document.getElementById('geolocationCountry')?.value || '',
-      city: document.getElementById('geolocationCity')?.value || ''
     }
   };
 

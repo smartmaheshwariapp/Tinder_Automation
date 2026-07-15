@@ -123,8 +123,8 @@ export default function BrowserScreen({ route, navigation }) {
           // 1. Keep Neko running in the background as the active automation engine
           console.log('[Browser] Neko will stay active in the background.');
 
-          // 2. Redirect user to the Native Active Dashboard (Disabled for now)
-          // navigation.replace('PlatformActive', { platform, vpsUrl });
+          // 2. Redirect user to the Native Active Dashboard
+          navigation.replace('PlatformActive', { platform, vpsUrl });
         }
       } catch (err) {
         // Silently ignore connection errors during Neko boot/login

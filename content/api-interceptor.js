@@ -16,47 +16,6 @@
   window.__flirtEasyInterceptorLoaded = true;
   log('[FlirtEasy] API Interceptor loaded');
 
-  // Geolocation Spoofing Injection (Method 1)
-  try {
-    const scriptEl = document.querySelector('script[data-flirteasy-interceptor]');
-    if (scriptEl) {
-      const geoEnabled = scriptEl.getAttribute('data-geo-enabled') === 'true';
-      if (geoEnabled) {
-        const lat = parseFloat(scriptEl.getAttribute('data-geo-lat'));
-        const lng = parseFloat(scriptEl.getAttribute('data-geo-lng'));
-        if (!isNaN(lat) && !isNaN(lng)) {
-          const spoofedCoordinates = {
-            latitude: lat,
-            longitude: lng,
-            accuracy: 15,
-            altitude: null,
-            altitudeAccuracy: null,
-            heading: null,
-            speed: null
-          };
-
-          navigator.geolocation.getCurrentPosition = function (success, error, options) {
-            success({
-              coords: spoofedCoordinates,
-              timestamp: Date.now()
-            });
-          };
-
-          navigator.geolocation.watchPosition = function (success, error, options) {
-            success({
-              coords: spoofedCoordinates,
-              timestamp: Date.now()
-            });
-            return 1; // Dummy watch ID
-          };
-          log(`[FlirtEasy] Geolocation spoofed to: ${lat}, ${lng}`);
-        }
-      }
-    }
-  } catch (err) {
-    error('[FlirtEasy] Error setting up Geolocation spoofing:', err);
-  }
-
   const messageCache = new Map();
   let globalBotId = null;
 
@@ -94,31 +53,10 @@
     return globalBotId;
   }
 
-  // Helper to safely extract string URL from fetch arguments
-  function getUrlString(urlInput) {
-    if (typeof urlInput === 'string') return urlInput;
-    if (urlInput instanceof URL) return urlInput.href;
-    if (urlInput && typeof urlInput === 'object') {
-      const nestedUrl = urlInput.url;
-      if (typeof nestedUrl === 'string') return nestedUrl;
-      if (nestedUrl instanceof URL) return nestedUrl.href;
-    }
-    return '';
-  }
-
   // Intercept fetch
   const originalFetch = window.fetch;
   window.fetch = function (...args) {
-    const url = getUrlString(args[0]);
-
-    // Optimization: Only process Tinder APIs.
-    // Return original fetch immediately for third-party tracking/ads (like LinkedIn)
-    // to avoid our interceptor appearing in stack traces for unrelated CSP/Network errors.
-    const isTinder = url.includes('tinder.com') || url.includes('gotinder.com') || (!url.startsWith('http') && !url.startsWith('//'));
-    if (!isTinder) {
-      return originalFetch(...args);
-    }
-
+    let url = args[0];
     const method = (args[1] && args[1].method) ? args[1].method.toUpperCase() : 'GET';
 
     // Dispatch like event at request time so training overlay can capture photo before profile changes

@@ -16,11 +16,8 @@ if (!window.hasInitializedAchievementsTinder) {
 
     isBadgeShowing = true;
 
-    const BADGE_ICONS = window.__reactInitProps?.BADGE_ICONS || window.BADGE_ICONS || {};
-    const RARITY_CONFIG = window.__reactInitProps?.RARITY_CONFIG || window.RARITY_CONFIG || {};
-
     // Use global BADGE_ICONS if available, fallback to theAwakening icon
-    let badgeSvg = BADGE_ICONS[badge.id] || BADGE_ICONS.theAwakening;
+    let badgeSvg = (window.BADGE_ICONS && window.BADGE_ICONS[badge.id]) || (window.BADGE_ICONS && window.BADGE_ICONS.theAwakening);
 
     if (!badgeSvg) {
       // Ultimate fallback just in case
@@ -29,7 +26,7 @@ if (!window.hasInitializedAchievementsTinder) {
 
     // Get Rarity Configuration (with safe fallbacks)
     const rarityKey = badge.rarity || 'common';
-    const config = RARITY_CONFIG[rarityKey] || { color1: '#FFD700', color2: '#FFA000', effect: 'sparkles' };
+    const config = (window.RARITY_CONFIG && window.RARITY_CONFIG[rarityKey]) || { color1: '#FFD700', color2: '#FFA000', effect: 'sparkles' };
     const c1 = config.color1;
     const c2 = config.color2;
     const rarityTitle = rarityKey.toUpperCase();
