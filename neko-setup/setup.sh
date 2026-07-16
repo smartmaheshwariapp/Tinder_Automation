@@ -76,6 +76,18 @@ else
   echo "[!] No standard firewall (UFW/Firewalld) detected. Please ensure ports 3000/tcp, 8080/tcp, 8088/tcp, and 52000-52100/udp are open in your Cloud Provider's console (Security Groups)."
 fi
 
+# 5.5 Detect VPS Public IP and write to .env
+echo "[-] Detecting VPS Public IP address..."
+PUBLIC_IP=$(curl -s https://api.ipify.org || wget -qO- https://api.ipify.org || echo "")
+
+if [ -n "$PUBLIC_IP" ]; then
+  echo "[+] Detected VPS Public IP: $PUBLIC_IP"
+  echo "NEKO_WEBRTC_NAT1TO1=$PUBLIC_IP" > .env
+  echo "[+] Saved NAT IP configuration to .env"
+else
+  echo "[!] Failed to auto-detect public IP. WebRTC NAT config will fall back to default settings."
+fi
+
 # 6. Setup systemd service for Neko Orchestrator
 echo "[-] Setting up neko-orchestrator systemd service..."
 CURRENT_DIR=$(pwd)

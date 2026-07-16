@@ -1,3 +1,2 @@
-2026/07/15-07:00:54.550 48 Reusing MANIFEST /home/neko/.config/chromium/Default/GCM Store/MANIFEST-000001
-2026/07/15-07:00:54.560 48 Recovering log #3
-2026/07/15-07:00:54.563 48 Reusing old log /home/neko/.config/chromium/Default/GCM Store/000003.log 
+2026/07/16-07:32:15.467 40 Creating DB /home/neko/.config/google-chrome/Default/GCM Store since it was missing.
+2026/07/16-07:32:15.492 40 Reusing MANIFEST /home/neko/.config/google-chrome/Default/GCM Store/MANIFEST-000001
