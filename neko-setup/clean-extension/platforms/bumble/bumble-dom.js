@@ -539,6 +539,11 @@ function closeBumblePopup() {
 // ========== NAVIGATION ==========
 
 function isBumbleLoggedIn() {
+    // Force false if not on the main /app subpath (login pages are under /get-started or /login)
+    if (!window.location.pathname.includes('/app')) {
+        return false;
+    }
+
     // Check for navigation elements that only appear when logged in
     const navElement = bumbleFindElement(window.BUMBLE_SELECTORS?.navigation?.encounters);
 
