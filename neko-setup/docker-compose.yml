@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   neko:
-    image: "custom-neko-chrome:latest"
+    image: "ghcr.io/m1k1o/neko/google-chrome:latest"
     container_name: neko
     restart: unless-stopped
     shm_size: "2gb" # Prevent browser crashes from heavy pages (e.g. streaming sites)
