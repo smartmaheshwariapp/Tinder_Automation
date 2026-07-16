@@ -10,6 +10,22 @@ if (typeof CONFIG !== 'undefined') { /* Already loaded — skip re-declaration *
 
 var CONFIG = {
   // ========================================
+  // DEV MODE — Local bypass (no login/signup required)
+  // ========================================
+  // Set to true  → full pro access with no server calls (for local dev & team testing)
+  // Set to false → normal production auth flow
+  DEV_MODE: true,
+
+  // Identity shown in the UI while DEV_MODE is active
+  DEV_USER: {
+    email: 'dev@local.dev',
+    token: 'dev-bypass-token',
+    signedIn: true,
+    plan: 'pro',
+    lastAuth: 0   // written at runtime so it is always "fresh"
+  },
+
+  // ========================================
   // System Configuration (PHASE 2)
   // ========================================
   API_BASE_URL: 'https://flirteasy-auth.shnaiderdm.workers.dev',

@@ -12,8 +12,10 @@ async function handleStart() {
   console.log('[Startup] ═══════════════════════════════════════════');
 
   // Check login status before starting
+  // DEV MODE: bypass auth check — dev user is always signed in via storage
+  const _isDevMode = typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE;
   const userStore = await chrome.storage.local.get('user');
-  if (!userStore.user || !userStore.user.signedIn) {
+  if (!_isDevMode && (!userStore.user || !userStore.user.signedIn)) {
     console.warn('[Startup] ❌ Blocked — user not signed in');
     window.startAgentPending = false;
     if (typeof openAuthModal === 'function') {
@@ -24,7 +26,7 @@ async function handleStart() {
     }
     return;
   }
-  console.log('[Startup] ✅ Auth check passed — user:', userStore.user.email || userStore.user.name || 'signed in');
+  console.log('[Startup] ✅ Auth check passed — user:', userStore.user?.email || (_isDevMode ? 'dev@local.dev' : 'signed in'));
 
   if (!window.CURRENT_PLATFORM) {
     console.warn('[Startup] ❌ Blocked — no dating platform tab detected');

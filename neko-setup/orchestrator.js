@@ -80,22 +80,6 @@ const server = http.createServer((req, res) => {
           console.error('[Orchestrator] Failed to copy extension files:', copyErr);
         }
 
-        // Thoroughly force delete any stale Chromium SingletonLock files and GCM Store directories (which crash on host-mounts)
-        try {
-          const cleanSessionPath = sessionDir.replace(/\//g, '\\');
-          require('child_process').execSync(
-            `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter '*SingletonLock*' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force"`,
-            { stdio: 'ignore' }
-          );
-          require('child_process').execSync(
-            `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'GCM Store' -Directory -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force"`,
-            { stdio: 'ignore' }
-          );
-          console.log(`[Orchestrator] Cleared all stale profile locks and GCM Store directories in ${sessionDir}`);
-        } catch (e) {
-          console.warn(`[Orchestrator] Profile directory cleaning warning:`, e.message);
-        }
-
         console.log(`[Orchestrator] Request received for: ${data.platform} (User: ${userId}, URL: ${startUrl})`);
 
         // Stop any running container to reload the configuration
@@ -103,6 +87,50 @@ const server = http.createServer((req, res) => {
         exec('docker compose down', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
           if (downErr) {
             console.error('[Orchestrator] Error stopping container:', downStderr);
+          }
+
+          // Thoroughly force delete any stale Chromium SingletonLock files and GCM Store directories (which crash on host-mounts)
+          try {
+            const cleanSessionPath = sessionDir.replace(/\//g, '\\');
+            require('child_process').execSync(
+              `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter '*SingletonLock*' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force"`,
+              { stdio: 'ignore' }
+            );
+            require('child_process').execSync(
+              `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'LOCK' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force"`,
+              { stdio: 'ignore' }
+            );
+            require('child_process').execSync(
+              `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'GCM Store' -Directory -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force"`,
+              { stdio: 'ignore' }
+            );
+            console.log(`[Orchestrator] Cleared all stale profile locks, LevelDB LOCK files, and GCM Store directories in ${sessionDir}`);
+          } catch (e) {
+            console.warn(`[Orchestrator] Profile directory cleaning warning:`, e.message);
+          }
+
+          // Auto-enable Developer Mode inside Chromium Preferences file
+          try {
+            const prefsPath = path.join(sessionDir, 'Default', 'Preferences');
+            if (fs.existsSync(prefsPath)) {
+              const content = fs.readFileSync(prefsPath, 'utf8');
+              const prefs = JSON.parse(content);
+              
+              prefs.extensions = prefs.extensions || {};
+              prefs.extensions.ui = prefs.extensions.ui || {};
+              prefs.extensions.ui.developer_mode = true;
+              
+              // Force enable the extension kpmmkcndeankkhfljfbaflhiogkfmhnk
+              prefs.extensions.settings = prefs.extensions.settings || {};
+              prefs.extensions.settings.kpmmkcndeankkhfljfbaflhiogkfmhnk = prefs.extensions.settings.kpmmkcndeankkhfljfbaflhiogkfmhnk || {};
+              prefs.extensions.settings.kpmmkcndeankkhfljfbaflhiogkfmhnk.state = 1;
+              prefs.extensions.settings.kpmmkcndeankkhfljfbaflhiogkfmhnk.disable_reasons = [];
+              
+              fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf8');
+              console.log('[Orchestrator] Automatically enabled Developer Mode and FlirtEasy extension inside Preferences file.');
+            }
+          } catch (prefErr) {
+            console.warn('[Orchestrator] Preferences patching warning:', prefErr.message);
           }
 
           // Start the container with the correct NEKO_START_URL and dynamic session directory
@@ -148,6 +176,50 @@ const server = http.createServer((req, res) => {
         return;
       }
       console.log('[Orchestrator] Container stopped successfully.');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    });
+  } else if (req.method === 'POST' && req.url === '/type-text') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        const text = data.text;
+        if (typeof text !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Text must be a string' }));
+          return;
+        }
+        
+        console.log(`[Orchestrator] Typing text: ${text}`);
+        // Escape shell characters in the text to prevent command injection
+        const escapedText = text.replace(/["'$`\\]/g, '\\$&');
+        
+        exec(`docker exec neko xdotool type --delay 100 "${escapedText}"`, (err, stdout, stderr) => {
+          if (err) {
+            console.error('[Orchestrator] xdotool typing error:', stderr);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: stderr }));
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        });
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Invalid JSON request' }));
+      }
+    });
+  } else if (req.method === 'POST' && req.url === '/press-enter') {
+    console.log('[Orchestrator] Pressing Enter key via xdotool...');
+    exec('docker exec neko xdotool key Return', (err, stdout, stderr) => {
+      if (err) {
+        console.error('[Orchestrator] xdotool enter error:', stderr);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: stderr }));
+        return;
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
     });

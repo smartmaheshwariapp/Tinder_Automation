@@ -28,6 +28,22 @@ async function initializeTrial(force = false) {
         const user = userStore.user;
         if (!user || (!user.signedIn && !user.token)) return null;
 
+        // ── DEV MODE: skip all server calls, return permanent pro trial ──
+        if (typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE) {
+            const devTrial = {
+                startTime: Date.now(),
+                likesUsed: 0,
+                messagesUsed: 0,
+                isPro: true,
+                activated: true,
+                _devMode: true
+            };
+            await chrome.storage.local.set({ [TRIAL_KEY]: devTrial });
+            lastServerSync = Date.now();
+            console.log('[TrialManager] DEV_MODE active — pro trial injected, server sync skipped.');
+            return devTrial;
+        }
+
         // Throttling: Return existing if synced very recently (skip if force=true)
         const existing = await getTrialData();
         if (!force && existing && (Date.now() - lastServerSync < SYNC_COOLDOWN)) {
@@ -105,6 +121,19 @@ async function initializeTrial(force = false) {
 async function checkTrialStatus(_retried = false) {
     const userData = await chrome.storage.local.get('user');
     const user = userData.user;
+
+    // ── DEV MODE: always return permanent pro status ──
+    if (typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE) {
+        return {
+            status: 'pro',
+            timeLeft: 0,
+            likesRemaining: Infinity,
+            messagesRemaining: Infinity,
+            startTime: Date.now(),
+            isPro: true,
+            _devMode: true
+        };
+    }
 
     // IF NOT SIGNED IN: Always Guest
     if (!user || (!user.signedIn && !user.token)) {
@@ -269,6 +298,9 @@ async function incrementMessages(count = 1) {
  * Sync usage to Cloudflare Worker
  */
 async function syncUsageToServer(type, count) {
+    // DEV MODE: never sync fake usage to the real server
+    if (typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE) return;
+
     try {
         const userStore = await chrome.storage.local.get('user');
         const user = userStore.user;

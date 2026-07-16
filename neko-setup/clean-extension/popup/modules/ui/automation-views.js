@@ -16,6 +16,27 @@ const AutomationViews = {
   getShellTemplate() {
     return `
       <div class="automation-v2-shell">
+
+        <div class="automation-v2-card automation-v2-card--cloud" id="cloudModeCard" data-automation-card="cloud" style="display:none;">
+          <div class="automation-v2-cloud-header">
+            <div class="automation-v2-cloud-left">
+              <span class="automation-v2-cloud-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <div class="automation-v2-cloud-text">
+                <span class="automation-v2-card-title">Cloud Mode</span>
+                <span class="automation-v2-cloud-sub" data-status="">Run 24/7 — no computer needed</span>
+              </div>
+            </div>
+            <label class="automation-v2-cloud-switch" aria-label="Enable Cloud Mode">
+              <input type="checkbox" id="cloudModeToggle">
+              <span class="automation-v2-cloud-switch-slider"></span>
+            </label>
+          </div>
+        </div>
+
         <div class="automation-v2-card" data-automation-card="goal">
           <button class="automation-v2-card-header" type="button" aria-expanded="false">
             <span class="automation-v2-card-title">Your Dating Goal</span>
@@ -1790,6 +1811,13 @@ const AutomationViews = {
     if (window.ChatStyleTraining) ChatStyleTraining.init();
   },
 
+  _initCloudModeCard() {
+    // Show the card unconditionally — CloudMode.init() handles guest-gating internally
+    const card = document.getElementById('cloudModeCard');
+    if (card) card.style.display = 'block';
+    if (window.CloudMode) CloudMode.init();
+  },
+
   _initActiveTimeCard() {
     const body = document.getElementById('atCardBody');
     if (!body) return;
@@ -2010,6 +2038,7 @@ const AutomationViews = {
     this._initSwipingVisualPreferenceUI();
     this._initMessagingTogglesUI();
     this._initStyleTrainingCard();
+    this._initCloudModeCard();
     this._initActiveTimeCard();
     this._initTooltips();
     this.refreshCollapsedChips();

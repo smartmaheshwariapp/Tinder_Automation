@@ -1,16 +1,64 @@
-import React, { useRef, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Animated, Dimensions, AppState, TextInput } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Dimensions, AppState, TextInput } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 export default function BrowserScreen({ route, navigation }) {
-  const { platform, vpsUrl, proxyIp, extensionSettings, cloudApiUrl } = route.params;
+  const { platform, vpsUrl, proxyIp, extensionSettings } = route.params;
   const webViewRef = useRef(null);
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [loginStep, setLoginStep] = useState('phone'); // 'phone', 'otp', 'done'
+  const [inputText, setInputText] = useState('');
+  const [sendingText, setSendingText] = useState(false);
   const [dummyText, setDummyText] = useState('');
-  const slideAnim = useRef(new Animated.Value(300)).current; // Bottom sheet initial offset
   const appState = useRef(AppState.currentState);
+
+  const getOrchestratorUrl = (nekoUrl) => {
+    try {
+      const urlObj = new URL(nekoUrl.split('/?')[0]);
+      urlObj.port = '3000';
+      return urlObj.origin;
+    } catch (e) {
+      let base = nekoUrl.split('/?')[0];
+      if (base.includes(':8080')) {
+        return base.replace(/:8080/, ':3000');
+      }
+      return base + ':3000';
+    }
+  };
+
+  const handleSendText = async () => {
+    if (!inputText.trim()) return;
+    setSendingText(true);
+    try {
+      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+      const response = await fetch(`${orchestratorUrl}/type-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: inputText }),
+      });
+      if (response.ok) {
+        setInputText(''); // Clear input on success
+      } else {
+        console.error('Failed to send text to virtual browser');
+      }
+    } catch (e) {
+      console.error('Network error sending text:', e);
+    } finally {
+      setSendingText(false);
+    }
+  };
+
+  const handlePressEnter = async () => {
+    try {
+      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+      await fetch(`${orchestratorUrl}/press-enter`, {
+        method: 'POST',
+      });
+    } catch (e) {
+      console.error('Network error pressing Enter:', e);
+    }
+  };
 
   const injectKeyEvent = (key) => {
     let normalizedKey = key;
@@ -21,7 +69,6 @@ export default function BrowserScreen({ route, navigation }) {
     if (normalizedKey === 'Backspace') keyCode = 8;
     if (normalizedKey === 'Enter') keyCode = 13;
 
-    // Inject event to active element so Neko WebRTC player captures it
     const jsCode = `
       (function() {
         const target = document.activeElement || document.body;
@@ -47,10 +94,8 @@ export default function BrowserScreen({ route, navigation }) {
 
   const handleTextChange = (text) => {
     if (text.length < dummyText.length) {
-      // User pressed backspace
       injectKeyEvent('Backspace');
     } else {
-      // Get the last added character
       const addedChar = text.slice(dummyText.length);
       for (let i = 0; i < addedChar.length; i++) {
         injectKeyEvent(addedChar[i]);
@@ -78,85 +123,8 @@ export default function BrowserScreen({ route, navigation }) {
     };
   }, []);
 
-  React.useEffect(() => {
-    const { width, height } = Dimensions.get('window');
-    const scale = Dimensions.get('window').scale;
-    const pixelWidth = Math.round(width * scale);
-    const pixelHeight = Math.round(height * scale);
-    
-    // Calculate nearest dimensions divisible by 16 for GStreamer encoder stability
-    const safeNekoWidth = Math.round(width / 16) * 16;
-    const safeNekoHeight = Math.round(height / 16) * 16;
-
-    console.log(`\n======================================================`);
-    console.log(`📱 DEVICE SCREEN METRICS (Use these to match Neko!):`);
-    console.log(`------------------------------------------------------`);
-    console.log(`- Logical Screen Size: ${width}x${height} pt`);
-    console.log(`- Screen Scale / Density: ${scale}x`);
-    console.log(`- Physical Resolution: ${pixelWidth}x${pixelHeight} px`);
-    console.log(`- Divisible-by-16 Size (GStreamer safe): ${safeNekoWidth}x${safeNekoHeight}`);
-    console.log(`- Suggested Neko config: NEKO_DESKTOP_SCREEN="${safeNekoWidth}x${safeNekoHeight}@30"`);
-    console.log(`======================================================\n`);
-  }, []);
-
-  // Extract host dynamically
-  let host = '127.0.0.1';
-  try {
-    const cleanUrl = vpsUrl.includes('://') ? vpsUrl : 'http://' + vpsUrl;
-    const match = cleanUrl.match(/\/\/([^:/]+)/);
-    if (match) host = match[1];
-  } catch (e) {}
-
-  const cloudApiBase = `http://${host}:3001/cloud/sessions/dev_user_1_session`;
-
-  React.useEffect(() => {
-    let activePoll = setInterval(async () => {
-      try {
-        const response = await fetch(cloudApiBase, {
-          headers: { 'Authorization': 'Bearer dev_testing_token' }
-        });
-        const data = await response.json();
-        if (data.success && data.state === 'active') {
-          console.log('[Browser] Login detected as ACTIVE in Cloud Worker!');
-          clearInterval(activePoll);
-
-          // 1. Keep Neko running in the background as the active automation engine
-          console.log('[Browser] Neko will stay active in the background.');
-
-          // 2. Redirect user to the Native Active Dashboard
-          navigation.replace('PlatformActive', { platform, vpsUrl });
-        }
-      } catch (err) {
-        // Silently ignore connection errors during Neko boot/login
-      }
-    }, 3000);
-
-    return () => clearInterval(activePoll);
-  }, [vpsUrl]);
-
-  const toggleMenu = () => {
-    if (menuOpen) {
-      // Close sheet
-      Animated.timing(slideAnim, {
-        toValue: 300,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(() => setMenuOpen(false));
-    } else {
-      // Open sheet
-      setMenuOpen(true);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
-
   const injectConfigScript = () => {
     const settingsJson = JSON.stringify(extensionSettings || {});
-    
-    // CSS to force Neko player elements to fit mobile screens perfectly without scrollbars
     const cssCode = `
       html, body, #neko, .neko-main, .video-container, .neko-video, video, canvas {
         width: 100% !important;
@@ -176,55 +144,15 @@ export default function BrowserScreen({ route, navigation }) {
     const jsCode = `
       (function() {
         try {
-          // 1. Sync settings
           localStorage.setItem('flirteasy_settings_sync', '${settingsJson}');
-          
-          // 2. Inject mobile layout styling
           const style = document.createElement('style');
           style.id = 'flirteasy-mobile-layout';
           style.innerHTML = \`${cssCode}\`;
           document.head.appendChild(style);
-          
-          console.log('FlirtEasy Mobile: Synced settings and forced full-viewport scaling.');
-        } catch(e) {
-          console.error('FlirtEasy Mobile: Injection error', e);
-        }
+        } catch(e) {}
       })();
     `;
     webViewRef.current.injectJavaScript(jsCode);
-  };
-
-  const sendExtensionInstruction = async (action) => {
-    let endpoint = '';
-    let body = {};
-    if (action === 'START_AUTO_SWIPE') {
-      endpoint = 'start';
-      body = { platform };
-    } else if (action === 'STOP_AUTO_SWIPE') {
-      endpoint = 'stop';
-    } else if (action === 'SEND_AI_INTRO') {
-      endpoint = 'run-now';
-      body = { platform };
-    }
-
-    if (endpoint) {
-      try {
-        console.log(`[Browser] Dispatching action ${action} to cloud worker API...`);
-        const res = await fetch(`http://${host}:3001/cloud/sessions/dev_user_1/${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer dev_testing_token'
-          },
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        console.log(`[Browser] Action dispatch response:`, data);
-      } catch (err) {
-        console.warn(`[Browser] Action dispatch failed:`, err);
-      }
-    }
-    toggleMenu();
   };
 
   const finalUrl = React.useMemo(() => {
@@ -233,7 +161,6 @@ export default function BrowserScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header bar */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>✕ Close</Text>
@@ -242,19 +169,21 @@ export default function BrowserScreen({ route, navigation }) {
           <Text style={styles.title}>{platform} Session</Text>
           <Text style={styles.subtitle} numberOfLines={1}>IP: {proxyIp}</Text>
         </View>
-        <TouchableOpacity 
-          style={[styles.menuBtn, { marginRight: 8, backgroundColor: '#3A3A4A15', borderColor: '#3A3A4A40' }]} 
-          onPress={() => inputRef.current.focus()}
-        >
-          <Text style={[styles.menuBtnText, { color: '#FFF' }]}>⌨️ Keyboard</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuBtn} onPress={toggleMenu}>
-          <Text style={styles.menuBtnText}>⚙️ Control</Text>
-        </TouchableOpacity>
+        {loginStep !== 'done' ? (
+          <TouchableOpacity style={styles.skipBtn} onPress={() => setLoginStep('done')}>
+            <Text style={styles.skipBtnText}>Skip Wizard ➔</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            style={[styles.menuBtn, { marginRight: 8, backgroundColor: '#3A3A4A15', borderColor: '#3A3A4A40' }]} 
+            onPress={() => inputRef.current.focus()}
+          >
+            <Text style={[styles.menuBtnText, { color: '#FFF' }]}>⌨️ Keyboard</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* WebView Container */}
-      <View style={styles.webviewContainer}>
+      <View style={[styles.webviewContainer, loginStep !== 'done' && styles.webviewContainerSplit]}>
         <WebView
           ref={webViewRef}
           source={{ uri: finalUrl }}
@@ -265,7 +194,6 @@ export default function BrowserScreen({ route, navigation }) {
             injectConfigScript();
           }}
           onError={() => {
-            // Neko might not be ready yet — retry after 3 seconds
             setTimeout(() => {
               if (webViewRef.current) webViewRef.current.reload();
             }, 3000);
@@ -288,7 +216,112 @@ export default function BrowserScreen({ route, navigation }) {
         )}
       </View>
 
-      {/* Hidden Native Input Bridge for mobile soft keyboard triggers */}
+      {loginStep !== 'done' && (
+        <View style={styles.wizardPanel}>
+          {loginStep === 'phone' && (
+            <View style={styles.wizardStep}>
+              <Text style={styles.wizardTitle}>Guided Login - Step 1</Text>
+              <Text style={styles.wizardDesc}>Enter your mobile number to log into your {platform} account in Neko.</Text>
+              <TextInput
+                style={styles.wizardInput}
+                placeholder="e.g. +12345678900"
+                placeholderTextColor="#6E6E7F"
+                value={inputText}
+                onChangeText={setInputText}
+                keyboardType="phone-pad"
+                autoComplete="tel"
+              />
+              <TouchableOpacity 
+                style={styles.wizardBtn}
+                disabled={sendingText}
+                onPress={async () => {
+                  if (!inputText.trim()) return;
+                  await handleSendText();
+                  await handlePressEnter();
+                  setLoginStep('otp');
+                }}
+              >
+                {sendingText ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.wizardBtnText}>Send & Continue ➔</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {loginStep === 'otp' && (
+            <View style={styles.wizardStep}>
+              <Text style={styles.wizardTitle}>Guided Login - Step 2</Text>
+              <Text style={styles.wizardDesc}>Enter the verification code (OTP) sent to your mobile device.</Text>
+              <TextInput
+                style={styles.wizardInput}
+                placeholder="Enter OTP..."
+                placeholderTextColor="#6E6E7F"
+                value={inputText}
+                onChangeText={setInputText}
+                keyboardType="number-pad"
+              />
+              <View style={styles.wizardBtnRow}>
+                <TouchableOpacity 
+                  style={[styles.wizardBtnSecondary, { marginRight: 8 }]}
+                  onPress={() => {
+                    setInputText('');
+                    setLoginStep('phone');
+                  }}
+                >
+                  <Text style={styles.wizardBtnSecondaryText}>↩ Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.wizardBtn, { flex: 1 }]}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    if (!inputText.trim()) return;
+                    await handleSendText();
+                    await handlePressEnter();
+                    setLoginStep('done');
+                  }}
+                >
+                  {sendingText ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.wizardBtnText}>Verify & Log In ✓</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+
+      {loginStep === 'done' && (
+        <View style={styles.inputPanel}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Paste Phone No. or OTP code here..."
+            placeholderTextColor="#8E8E9F"
+            value={inputText}
+            onChangeText={setInputText}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <TouchableOpacity 
+            style={styles.sendBtn} 
+            onPress={handleSendText}
+            disabled={sendingText}
+          >
+            {sendingText ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <Text style={styles.sendBtnText}>Send</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
+            <Text style={styles.enterBtnText}>⏎ Enter</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <TextInput
         ref={inputRef}
         style={styles.hiddenInput}
@@ -299,49 +332,6 @@ export default function BrowserScreen({ route, navigation }) {
         blurOnSubmit={false}
         onSubmitEditing={() => injectKeyEvent('\n')}
       />
-
-      {/* Extension Automation Sheet */}
-      {menuOpen && (
-        <View style={styles.overlay}>
-          <TouchableOpacity style={styles.overlayTap} activeOpacity={1} onPress={toggleMenu} />
-          <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.sheetHeader}>
-              <View style={styles.sheetKnob} />
-              <Text style={styles.sheetTitle}>FlirtEasy Automation Agent</Text>
-            </View>
-
-            <View style={styles.sheetContent}>
-              <TouchableOpacity 
-                style={[styles.actionBtn, { backgroundColor: '#FE3C72' }]} 
-                onPress={() => sendExtensionInstruction('START_AUTO_SWIPE')}
-              >
-                <Text style={styles.actionBtnText}>▶ Start Auto-Swiper</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.actionBtn, { backgroundColor: '#2A2A35' }]} 
-                onPress={() => sendExtensionInstruction('STOP_AUTO_SWIPE')}
-              >
-                <Text style={styles.actionBtnText}>⏸ Stop Auto-Swiper</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.actionBtn, { backgroundColor: '#8E2DE2' }]} 
-                onPress={() => sendExtensionInstruction('SEND_AI_INTRO')}
-              >
-                <Text style={styles.actionBtnText}>💬 Send AI Introductions</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.cancelBtn} 
-                onPress={toggleMenu}
-              >
-                <Text style={styles.cancelBtnText}>Dismiss</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -420,60 +410,54 @@ const styles = StyleSheet.create({
     marginTop: 15,
     fontSize: 14,
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-    zIndex: 999,
-  },
-  overlayTap: {
-    flex: 1,
-  },
-  bottomSheet: {
-    backgroundColor: '#181820',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    borderWidth: 1,
+  inputPanel: {
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    borderTopWidth: 1,
     borderColor: '#2A2A35',
+    backgroundColor: '#181820',
   },
-  sheetHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  sheetKnob: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#3A3A4A',
-    borderRadius: 2,
-    marginBottom: 12,
-  },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  textInput: {
+    flex: 1,
+    height: 40,
+    backgroundColor: '#0F0F13',
+    borderRadius: 8,
+    paddingHorizontal: 12,
     color: '#FFF',
-  },
-  sheetContent: {
-    gap: 12,
-  },
-  actionBtn: {
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  actionBtnText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  cancelBtn: {
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  cancelBtnText: {
-    color: '#8E8E9F',
     fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#3A3A4A',
+    marginRight: 8,
+  },
+  sendBtn: {
+    height: 40,
+    paddingHorizontal: 14,
+    backgroundColor: '#FE3C72',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  sendBtnText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  enterBtn: {
+    height: 40,
+    paddingHorizontal: 12,
+    backgroundColor: '#2A2A35',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3A3A4A',
+  },
+  enterBtnText: {
+    color: '#FFF',
+    fontSize: 13,
     fontWeight: 'bold',
   },
   hiddenInput: {
@@ -481,5 +465,86 @@ const styles = StyleSheet.create({
     width: 0,
     height: 0,
     opacity: 0,
+  },
+  webviewContainerSplit: {
+    flex: 0.45,
+    borderBottomWidth: 1,
+    borderColor: '#2A2A35',
+  },
+  wizardPanel: {
+    flex: 0.55,
+    backgroundColor: '#181820',
+    padding: 20,
+    justifyContent: 'center',
+  },
+  wizardStep: {
+    width: '100%',
+  },
+  wizardTitle: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  wizardDesc: {
+    color: '#8E8E9F',
+    fontSize: 13,
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  wizardInput: {
+    height: 48,
+    backgroundColor: '#0F0F13',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    color: '#FFF',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#3A3A4A',
+    marginBottom: 16,
+  },
+  wizardBtn: {
+    height: 48,
+    backgroundColor: '#FE3C72',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  wizardBtnText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  wizardBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  wizardBtnSecondary: {
+    height: 48,
+    paddingHorizontal: 20,
+    backgroundColor: '#2A2A35',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3A3A4A',
+  },
+  wizardBtnSecondaryText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  skipBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#FE3C7215',
+    borderWidth: 1,
+    borderColor: '#FE3C7240',
+  },
+  skipBtnText: {
+    color: '#FE3C72',
+    fontSize: 13,
+    fontWeight: 'bold',
   },
 });

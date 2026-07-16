@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Switch, SafeAreaView, StatusBar, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Switch, SafeAreaView, StatusBar, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 
 export default function PlatformConfigScreen({ route, navigation }) {
   const { platform, vpsUrl, proxyIp } = route.params;
+  const [loading, setLoading] = useState(false);
 
   // Cycle settings (Numbers managed by steppers for optimal mobile usability)
   const [likesPerCycle, setLikesPerCycle] = useState(50);
@@ -32,6 +33,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
   };
 
   const handleStartSession = async () => {
+    setLoading(true);
     // Extract host dynamically
     let host = '127.0.0.1';
     try {
@@ -75,18 +77,25 @@ export default function PlatformConfigScreen({ route, navigation }) {
     // Load Neko WebRTC player with native UI controls (shows Neko's own keyboard toggle button)
     const nekoPlayerUrl = `http://${host}:8080/?usr=User&pwd=admin`;
 
+    setLoading(false);
     navigation.navigate('Browser', {
       platform,
       vpsUrl: nekoPlayerUrl,
       proxyIp,
-      extensionSettings,
-      cloudApiUrl: `http://${host}:3001`
+      extensionSettings
     });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#FE3C72" />
+          <Text style={styles.loadingText}>Starting Neko Browser...</Text>
+          <Text style={styles.loadingSubtext}>Preloading extension & preparing session volume</Text>
+        </View>
+      )}
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={{ flex: 1 }}
@@ -492,5 +501,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 0.5,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 10, 14, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10000,
+  },
+  loadingText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 20,
+  },
+  loadingSubtext: {
+    color: '#8E8E9F',
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
 });

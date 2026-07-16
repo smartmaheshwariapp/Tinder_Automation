@@ -48,3 +48,6 @@ Thumbs.db
 *.mov
 *.wmv
 
+# Neko Chrome profile sessions (large runtime cache, not source)
+neko-setup/sessions/
+neko-setup/clean-extension/

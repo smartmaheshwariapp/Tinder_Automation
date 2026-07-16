@@ -24,6 +24,42 @@ try {
 }
 
 // ============================================
+// DEV MODE BOOTSTRAP
+// Runs on every service worker start.
+// Seeds a permanent pro user + trial into storage so no login is ever needed.
+// Completely inert when CONFIG.DEV_MODE is false.
+// ============================================
+async function _seedDevModeState() {
+  if (typeof CONFIG === 'undefined' || !CONFIG.DEV_MODE) return;
+
+  const devUser = {
+    ...CONFIG.DEV_USER,
+    lastAuth: Date.now()  // always fresh so force_reauth age checks never trigger
+  };
+
+  const devTrial = {
+    startTime: Date.now(),
+    likesUsed: 0,
+    messagesUsed: 0,
+    isPro: true,
+    activated: true,
+    _devMode: true
+  };
+
+  await chrome.storage.local.set({
+    user: devUser,
+    trial_v3: devTrial,
+    onboardingComplete: true,
+    hasSeenOnboarding: true
+  });
+
+  // Clear any leftover session-expired flag that could surface the login modal
+  await chrome.storage.local.remove(['sessionExpired', 'refreshToken']);
+
+  console.log('[Background] DEV_MODE active — dev user seeded as pro, auth gates bypassed.');
+}
+
+// ============================================
 // ERROR REPORTING — sends errors to server for admin observability
 // ============================================
 const ERROR_REPORT_URL = 'https://flirteasy-auth.shnaiderdm.workers.dev/api/errors/report';
@@ -126,6 +162,11 @@ async function _flushTrackQueue() {
   if (_trackFlushTimer) { clearTimeout(_trackFlushTimer); _trackFlushTimer = null; }
   await _drainStorageLogBuffer();
   if (_trackQueue.length === 0) return;
+  // DEV MODE: discard telemetry — don't hit the real server with a fake token
+  if (typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE) {
+    _trackQueue.length = 0;
+    return;
+  }
   const events = _trackQueue.splice(0, 100);
   try {
     const token = await _getTrackToken();
@@ -149,45 +190,12 @@ async function _flushTrackQueue() {
   }
 }
 
-// Fetch default developer credentials from local Cloud Worker to bypass manual sign-up/onboarding popup
-async function autoRegisterExtension() {
-  try {
-     const WORKER_HOSTS = ['host.docker.internal', '10.252.121.154', '172.17.0.1', '172.18.0.1', 'localhost'];
-     for (const host of WORKER_HOSTS) {
-       try {
-         const res = await fetch(`http://${host}:3001/cloud/config/dev_user_1_session`, { signal: AbortSignal.timeout(2000) });
-         if (res.ok) {
-           const data = await res.json();
-           if (data.user) {
-             await chrome.storage.local.set({ 
-               user: data.user, 
-               userSettings: data.settings,
-               onboardingComplete: true
-             });
-             console.log('[Background] ⚡ Extension Auto-Registered successfully via ' + host);
-             
-             // Reload active Bumble tabs to apply new configurations and start swiping
-             chrome.tabs.query({ url: '*://*.bumble.com/*' }, (tabs) => {
-               if (tabs && tabs.length > 0) {
-                 console.log('[Background] Reloading Bumble tabs to initialize swiper...');
-                 for (const tab of tabs) {
-                   chrome.tabs.reload(tab.id);
-                 }
-               }
-             });
-             break;
-           }
-         }
-       } catch(e) {}
-     }
-  } catch(e) {}
-}
-
-// Trigger auto-registration on background script load
-autoRegisterExtension();
-
 chrome.runtime.onInstalled.addListener(async (details) => {
   console.log('[Background] Extension installed, reason:', details.reason);
+
+  // DEV MODE: seed auth state before anything else so no gate ever fires
+  await _seedDevModeState();
+
   if (typeof info === 'function') {
     info('FlirtEasy extension installed');
   }
@@ -196,7 +204,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // Ensure onboarding flag is set properly for the popup to catch it
   if (details.reason === 'install') {
     const { onboardingComplete } = await chrome.storage.local.get('onboardingComplete');
-    if (!onboardingComplete) {
+    // In DEV_MODE onboardingComplete was already set to true by _seedDevModeState
+    if (!onboardingComplete && !(typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE)) {
       console.log('[Background] First install detected — setting onboarding flag');
       await chrome.storage.local.set({ onboardingComplete: false });
     }
@@ -241,6 +250,10 @@ chrome.runtime.onSuspend.addListener(() => {
 
 chrome.runtime.onStartup.addListener(async () => {
   console.log('[Background] Extension started — checking agent state for recovery');
+
+  // DEV MODE: re-seed auth state on every browser startup (service workers are ephemeral)
+  await _seedDevModeState();
+
   fetchRemoteConfig();
   await _drainStorageLogBuffer();
   if (_trackQueue.length > 0) _flushTrackQueue();
@@ -571,70 +584,6 @@ async function ensureOnConnectionsPage(tabId, platform = 'tinder') {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-
-  if (request.action === 'notifyLogin') {
-    const { platform } = request.payload;
-    const userId = request.payload.userId || 'dev_user_1';
-    // Try each possible host until one responds
-    const WORKER_HOSTS = [
-      'host.docker.internal',
-      '172.17.0.1',
-      '172.18.0.1',
-      '10.252.121.154',
-      'localhost'
-    ];
-    (async () => {
-      for (const host of WORKER_HOSTS) {
-        try {
-          const res = await fetch(`http://${host}:3001/cloud/sessions/${userId}/notify-login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ platform, status: 'logged_in' }),
-            signal: AbortSignal.timeout(2000)
-          });
-          if (res.ok) {
-            console.log(`[Background] Login notified successfully via ${host}`);
-            break;
-          }
-        } catch (e) {
-          // try next host
-        }
-      }
-    })();
-    sendResponse({ success: true });
-    return true;
-  }
-
-  if (request.action === 'logSwipe') {
-    const { name, age, action, photoUrl, platform, userId } = request.payload;
-    const WORKER_HOSTS = [
-      'host.docker.internal',
-      '172.17.0.1',
-      '172.18.0.1',
-      '10.252.121.154',
-      'localhost'
-    ];
-    (async () => {
-      for (const host of WORKER_HOSTS) {
-        try {
-          const res = await fetch(`http://${host}:3001/cloud/sessions/${userId}/log-swipe`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, age, action, photoUrl, platform }),
-            signal: AbortSignal.timeout(2000)
-          });
-          if (res.ok) {
-            console.log(`[Background] Swipe logged successfully to worker via ${host}`);
-            break;
-          }
-        } catch (e) {
-          // try next host
-        }
-      }
-    })();
-    sendResponse({ success: true });
-    return true;
-  }
 
   // Handle token detection messages
   if (request.action === 'tokensFound') {
@@ -1693,6 +1642,7 @@ async function handleTestOpenAI(testData) {
 
     if (useProxy) {
       const storage = await chrome.storage.local.get('user');
+      // DEV MODE: dev user token is always present in storage — this check passes naturally
       if (!storage.user || !storage.user.token) {
         return { success: false, error: 'Authentication required. Please sign in to verify connection.' };
       }

@@ -9,7 +9,6 @@ const SettingsTabViews = {
     this._reorderSafetyContent();
     this._buildManualControls();
     this._buildAiProfileSection();
-    this._buildGeolocationSection();
     this._buildAccountSection();
   },
 
@@ -77,34 +76,6 @@ const SettingsTabViews = {
 
     shell.appendChild(this._createCategoryLabel('Safety'));
     shell.appendChild(card);
-  },
-
-  _buildGeolocationSection() {
-    const shell = document.getElementById('settingsTab');
-    const geoSection = document.getElementById('geolocationSection');
-    if (!shell || !geoSection) return;
-
-    const card = this._createCard();
-    card.appendChild(geoSection);
-
-    shell.appendChild(this._createCategoryLabel('Location'));
-    shell.appendChild(card);
-
-    geoSection.style.padding = '0';
-    geoSection.style.margin = '0';
-    geoSection.style.background = 'transparent';
-    geoSection.style.border = 'none';
-    geoSection.style.boxShadow = 'none';
-
-    const header = geoSection.querySelector('.section-header');
-    if (header) {
-      header.style.display = 'flex';
-      header.style.alignItems = 'center';
-      header.style.minHeight = '52px';
-      header.style.padding = '0 16px';
-      header.style.margin = '0';
-      header.style.gap = '0';
-    }
   },
 
   _updateSafetyLabels() {

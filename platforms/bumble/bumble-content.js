@@ -86,7 +86,19 @@ async function initializeBumble() {
 
     // Check login status
     if (!isBumbleLoggedIn()) {
-        console.log('[Bumble] User not logged in');
+        console.log('[Bumble] User not logged in. Starting login helper...');
+        if (typeof window._bumbleLoginInterval === 'undefined') {
+            window._bumbleLoginInterval = setInterval(() => {
+                if (isBumbleLoggedIn()) {
+                    console.log('[Bumble] Logged in successfully! Clearing helper.');
+                    clearInterval(window._bumbleLoginInterval);
+                    delete window._bumbleLoginInterval;
+                    initializeBumble();
+                    return;
+                }
+                handleBumbleLoginLanding();
+            }, 1000);
+        }
         return;
     }
 
@@ -4266,5 +4278,54 @@ window.addEventListener('message', (event) => {
         respond({ success: false, error: `Unknown action: ${action}` });
     }
 });
+
+function simulateClick(element) {
+    if (!element) return;
+    
+    // Dispatch pointer events (required for mobile/touch listeners)
+    const pointerDown = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, view: window });
+    element.dispatchEvent(pointerDown);
+    
+    // Dispatch mouse press events
+    const mouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window });
+    element.dispatchEvent(mouseDown);
+    
+    const pointerUp = new PointerEvent('pointerup', { bubbles: true, cancelable: true, view: window });
+    element.dispatchEvent(pointerUp);
+    
+    const mouseUp = new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window });
+    element.dispatchEvent(mouseUp);
+    
+    // Dispatch standard click
+    const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+    element.dispatchEvent(clickEvent);
+}
+
+function handleBumbleLoginLanding() {
+    // If not on login/get-started, stop
+    if (!window.location.href.includes('get-started') && !window.location.href.includes('login')) return;
+    
+    // If the country code input or any phone text field is already visible, stop clicking
+    if (document.getElementById('phone-country-code') || document.querySelector('input[type="tel"]')) {
+        return;
+    }
+    
+    // 1. First, check if "Use cell phone number" span is visible on screen
+    const spans = Array.from(document.querySelectorAll('span.action'));
+    const cellPhoneSpan = spans.find(s => (s.textContent || s.innerText || '').toLowerCase().includes('use cell phone number'));
+    if (cellPhoneSpan) {
+        console.log('[Bumble Login Helper] Found Use cell phone number span, simulating click...');
+        simulateClick(cellPhoneSpan);
+        return;
+    }
+    
+    // 2. Only if cell phone span is not present, click "Continue with other methods" button
+    const otherMethodsBtn = document.querySelector('.other-methods-button');
+    if (otherMethodsBtn) {
+        console.log('[Bumble Login Helper] Found Continue with other methods button, simulating click...');
+        simulateClick(otherMethodsBtn);
+        return;
+    }
+}
 
 

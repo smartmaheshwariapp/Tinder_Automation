@@ -52,16 +52,16 @@ scp -i ~/.ssh/delight.pem -r C:\Users\MIISCO\source\repos\Tinder\neko-setup ubun
    sudo ./setup.sh
    ```
 
-The script will automatically install Docker, set up dependencies, open the appropriate firewall ports (`8080/tcp` and `52000-52100/udp`), and launch Neko.
+The script will automatically install Docker, Docker Compose, Node.js, configure the firewall, and register the Neko Orchestrator as a background daemon service (`neko-orchestrator`).
 
 ---
 
-## 📺 Step 4: Access and Control Live Streaming
+## 📺 Step 4: Access and Controls
 
-1. Open your web browser and go to: `http://YOUR_VPS_IP:8080`
-2. Log in using the username `admin` and the password you defined in `NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD`.
-3. To start or stop the RTMP stream:
-   - Click the **hamburger menu (Settings)** in the top-right corner.
-   - Click **Admin** (if not already selected).
-   - Toggle the **Broadcast** switch to turn the live stream ON/OFF.
-4. Open the browser inside Neko, navigate to what you want to stream (e.g. video player, music player, web page), make it full-screen, and it will stream live 24/7!
+1. The **Neko Session Orchestrator** is now running continuously in the background on port `3000`.
+2. When you start a session from your mobile app, the app communicates with the orchestrator, which launches Neko.
+3. The WebRTC stream can then be accessed directly from your mobile app WebView (connecting to port `8080` on the VPS).
+4. If you want to check the status or view the logs of the background orchestrator service on your VPS, run:
+   ```bash
+   sudo systemctl status neko-orchestrator
+   ```

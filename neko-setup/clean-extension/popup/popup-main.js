@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Feature flag / maintenance check (uses cached flags — instant render) ──
   const { remoteFeatureFlags } = cachedFlagsResult;
-  if (remoteFeatureFlags) {
+  if (remoteFeatureFlags && !(typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE)) {
     const platformLC = (window.CURRENT_PLATFORM || '').toLowerCase(); // 'tinder' | 'bumble' | ''
     const flagKey = platformLC === 'tinder' ? 'tinder_enabled'
                   : platformLC === 'bumble' ? 'bumble_enabled'
@@ -81,19 +81,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Restore session from sync backup if local storage was wiped
-  const _localUser = await chrome.storage.local.get(['user', 'refreshToken']);
-  if (!_localUser.user) {
-    const _syncBackup = await chrome.storage.sync.get(['userBackup', 'refreshTokenBackup']).catch(() => ({}));
-    if (_syncBackup.userBackup?.token) {
-      await chrome.storage.local.set({ user: { ..._syncBackup.userBackup, signedIn: true } });
+  // DEV MODE: storage is seeded by the background — skip sync restore entirely
+  if (!(typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE)) {
+    const _localUser = await chrome.storage.local.get(['user', 'refreshToken']);
+    if (!_localUser.user) {
+      const _syncBackup = await chrome.storage.sync.get(['userBackup', 'refreshTokenBackup']).catch(() => ({}));
+      if (_syncBackup.userBackup?.token) {
+        await chrome.storage.local.set({ user: { ..._syncBackup.userBackup, signedIn: true } });
+        if (_syncBackup.refreshTokenBackup) {
+          await chrome.storage.local.set({ refreshToken: _syncBackup.refreshTokenBackup });
+        }
+      }
+    } else if (!_localUser.refreshToken) {
+      const _syncBackup = await chrome.storage.sync.get('refreshTokenBackup').catch(() => ({}));
       if (_syncBackup.refreshTokenBackup) {
         await chrome.storage.local.set({ refreshToken: _syncBackup.refreshTokenBackup });
       }
-    }
-  } else if (!_localUser.refreshToken) {
-    const _syncBackup = await chrome.storage.sync.get('refreshTokenBackup').catch(() => ({}));
-    if (_syncBackup.refreshTokenBackup) {
-      await chrome.storage.local.set({ refreshToken: _syncBackup.refreshTokenBackup });
     }
   }
 
@@ -118,23 +121,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('trialStatusContainer')?.classList.remove('hud-loading');
 
   // PRODUCTION SYNC: Always verify status on launch
-  if (typeof syncUserStatus === 'function') {
+  // DEV MODE: skip — dev user never needs a server round-trip
+  if (typeof syncUserStatus === 'function' && !(typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE)) {
     syncUserStatus(); // Run in background to not block UI
   }
 
   // Auto re-login prompt: if token expired during a background cycle, show login modal
+  // DEV MODE: never show re-login prompt — the dev user never expires
   const { sessionExpired } = await chrome.storage.local.get('sessionExpired');
-  if (sessionExpired) {
+  if (sessionExpired && !(typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE)) {
     await chrome.storage.local.remove('sessionExpired');
     if (typeof openAuthModal === 'function') {
       openAuthModal(true);
     }
+  } else if (sessionExpired) {
+    // In dev mode just clear the flag silently
+    await chrome.storage.local.remove('sessionExpired');
   }
 
 
   // Check if onboarding is complete before showing main UI
+  // DEV MODE: always skip onboarding — dev users go straight to the popup
   const { onboardingComplete } = await chrome.storage.local.get('onboardingComplete');
-  if (onboardingComplete === false) {
+  if (onboardingComplete === false && !(typeof CONFIG !== 'undefined' && CONFIG.DEV_MODE)) {
     // Redirect the popup to the new full-page onboarding
     window.location.href = '../onboarding/onboarding.html';
     return; // Stop popup initialization
@@ -168,7 +177,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   initializeMasterToggle();
   initializeAgeSlider();
   initializeDistanceSlider();
-  if (typeof initializeGeolocationDropdowns === 'function') initializeGeolocationDropdowns();
   initializeTimePickers();
   initializeAboutYouToggle();
   initializeRunBtnCarousel();

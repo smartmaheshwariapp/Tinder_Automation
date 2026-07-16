@@ -4,6 +4,7 @@
   "BrowserSignin": 0,
   "DefaultNotificationsSetting": 2,
   "DeveloperToolsAvailability": 1,
+  "ExtensionDeveloperModeSettings": 0,
   "EditBookmarksEnabled": false,
   "FullscreenAllowed": true,
   "IncognitoModeAvailability": 1,
@@ -23,16 +24,11 @@
     "file:///home/neko/Downloads"
   ],
   "URLBlocklist": [
-      "file://*",
-      "chrome://policy"
+    "file://*"
   ],
   "ExtensionInstallForcelist": [
-      "ddkjiahejlhfcafbddmgiahcphecmpfh;https://clients2.google.com/service/update2/crx",
-      "mnjggcdmjocbbbhaepdhchncahnbgone;https://clients2.google.com/service/update2/crx"
-  ],
-  "ExtensionInstallAllowlist": [
-      "ddkjiahejlhfcafbddmgiahcphecmpfh",
-      "mnjggcdmjocbbbhaepdhchncahnbgone"
+    "ddkjiahejlhfcafbddmgiahcphecmpfh;https://clients2.google.com/service/update2/crx",
+    "mnjggcdmjocbbbhaepdhchncahnbgone;https://clients2.google.com/service/update2/crx"
   ],
   "ExtensionInstallBlocklist": []
 }

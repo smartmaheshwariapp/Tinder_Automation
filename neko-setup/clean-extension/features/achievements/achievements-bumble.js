@@ -16,11 +16,8 @@ if (!window.hasInitializedAchievementsBumble) {
 
     isBadgeShowing = true;
 
-    const BADGE_ICONS = window.__reactInitProps?.BADGE_ICONS || window.BADGE_ICONS || {};
-    const RARITY_CONFIG = window.__reactInitProps?.RARITY_CONFIG || window.RARITY_CONFIG || {};
-
     // Use global BADGE_ICONS if available
-    let badgeSvg = BADGE_ICONS[badge.id] || BADGE_ICONS.theAwakening;
+    let badgeSvg = (window.BADGE_ICONS && window.BADGE_ICONS[badge.id]) || (window.BADGE_ICONS && window.BADGE_ICONS.theAwakening);
 
     if (!badgeSvg) {
       badgeSvg = `⚡`;
@@ -45,7 +42,7 @@ if (!window.hasInitializedAchievementsBumble) {
       c2 = '#F59E0B';
     }
 
-    const config = RARITY_CONFIG[rarityKey] || { effect: 'sparkles' };
+    const config = (window.RARITY_CONFIG && window.RARITY_CONFIG[rarityKey]) || { effect: 'sparkles' };
     const rarityTitle = rarityKey.toUpperCase();
 
     const overlay = document.createElement('div');

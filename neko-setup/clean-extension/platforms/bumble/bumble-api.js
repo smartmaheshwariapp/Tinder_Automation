@@ -16,53 +16,12 @@
     const error = DEBUG_ENABLED ? console.error.bind(console) : () => { };
 
     // Only initialize once
-    if (window.__reactRootContext) {
+    if (window.__bumbleInterceptorLoaded) {
         log('[Bumble] API Interceptor already loaded, skipping');
         return;
     }
-    window.__reactRootContext = true;
+    window.__bumbleInterceptorLoaded = true;
     log('[Bumble] API Interceptor loaded');
-
-    // Geolocation Spoofing Injection (Method 1)
-    try {
-        const scriptEl = document.querySelector('script[data-flirteasy-interceptor]');
-        if (scriptEl) {
-            const geoEnabled = scriptEl.getAttribute('data-geo-enabled') === 'true';
-            if (geoEnabled) {
-                const lat = parseFloat(scriptEl.getAttribute('data-geo-lat'));
-                const lng = parseFloat(scriptEl.getAttribute('data-geo-lng'));
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    const spoofedCoordinates = {
-                        latitude: lat,
-                        longitude: lng,
-                        accuracy: 15,
-                        altitude: null,
-                        altitudeAccuracy: null,
-                        heading: null,
-                        speed: null
-                    };
-
-                    navigator.geolocation.getCurrentPosition = function (success, error, options) {
-                        success({
-                            coords: spoofedCoordinates,
-                            timestamp: Date.now()
-                        });
-                    };
-
-                    navigator.geolocation.watchPosition = function (success, error, options) {
-                        success({
-                            coords: spoofedCoordinates,
-                            timestamp: Date.now()
-                        });
-                        return 1; // Dummy watch ID
-                    };
-                    log(`[Bumble] Geolocation spoofed to: ${lat}, ${lng}`);
-                }
-            }
-        }
-    } catch (err) {
-        error('[Bumble] Error setting up Geolocation spoofing:', err);
-    }
 
     // Cache for intercepted data
     const messageCache = new Map();
@@ -143,29 +102,16 @@
         return false;
     }
 
-    // Helper to safely extract string URL from fetch arguments or XHR inputs
-    function getUrlString(urlInput) {
-        if (typeof urlInput === 'string') return urlInput;
-        if (urlInput instanceof URL) return urlInput.href;
-        if (urlInput && typeof urlInput === 'object') {
-            const nestedUrl = urlInput.url;
-            if (typeof nestedUrl === 'string') return nestedUrl;
-            if (nestedUrl instanceof URL) return nestedUrl.href;
-        }
-        return '';
-    }
-
     // ========== FETCH INTERCEPTOR ==========
 
     const originalFetch = window.fetch;
     window.fetch = function (...args) {
-        const url = getUrlString(args[0]);
+        let url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
 
         // Optimization: Only process Bumble APIs.
         // Return original fetch immediately for third-party tracking/ads (like LinkedIn)
         // to avoid our interceptor appearing in stack traces for unrelated CSP/Network errors.
-        const isBumble = url.includes('bumble.com') || url.includes('mwebapi') || (!url.startsWith('http') && !url.startsWith('//'));
-        if (!isBumble) {
+        if (!url.includes('bumble.com') && !url.includes('mwebapi')) {
             return originalFetch.apply(this, args);
         }
 
@@ -192,21 +138,16 @@
     const originalXHRSend = XMLHttpRequest.prototype.send;
 
     XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-        this._bumbleUrl = getUrlString(url);
+        this._bumbleUrl = url;
         return originalXHROpen.apply(this, [method, url, ...rest]);
     };
 
     XMLHttpRequest.prototype.send = function (...args) {
-        const url = this._bumbleUrl || '';
-        const isBumble = url.includes('bumble.com') || url.includes('mwebapi') || (!url.startsWith('http') && !url.startsWith('//'));
-        
-        if (!isBumble) {
-            return originalXHRSend.apply(this, args);
-        }
-
         const self = this;
         this.addEventListener('load', function () {
             try {
+                if (!self._bumbleUrl?.includes('bumble.com') && !self._bumbleUrl?.includes('mwebapi')) return;
+
                 const data = JSON.parse(this.responseText);
                 routeResponse(data, self._bumbleUrl);
             } catch (e) {

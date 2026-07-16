@@ -12,9 +12,7 @@ function initializeChangeTracking() {
     'enable6ModeSystem', 'customizePreview', 'customPromptPreview',
     'ageFilterEnabled', 'minAge', 'maxAge',
     'distanceFilterEnabled', 'maxDistance',
-    'visualPreferencesEnabled', 'visualThreshold',
-    'geolocationEnabled', 'geolocationLatitude', 'geolocationLongitude',
-    'geolocationCountry', 'geolocationCity'
+    'visualPreferencesEnabled', 'visualThreshold'
   ];
 
   const modes = ['intro', 'followup', 'conversation', 'datesetup', 'moveoffapp', 'exit'];
@@ -64,9 +62,6 @@ function initializeChangeTracking() {
         }
         if (id === 'distanceFilterEnabled') {
           updateDistanceFilterUI();
-        }
-        if (id === 'geolocationEnabled') {
-          updateGeolocationUI();
         }
         if (id === 'useEmojis') {
           updateGeneratedPromptPreview();

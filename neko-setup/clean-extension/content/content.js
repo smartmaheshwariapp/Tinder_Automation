@@ -1,25 +1,15 @@
 // Inject interceptor into page context (only once)
 if (!document.querySelector('script[data-flirteasy-interceptor]')) {
-  chrome.storage.local.get('userSettings', (data) => {
-    if (!chrome.runtime?.id) return;
-    const settings = data.userSettings || {};
-    const geo = settings.geolocation || { enabled: false };
-
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('content/api-interceptor.js');
-    script.setAttribute('data-flirteasy-interceptor', 'true');
-    script.setAttribute('data-geo-enabled', geo.enabled ? 'true' : 'false');
-    script.setAttribute('data-geo-lat', geo.latitude || '');
-    script.setAttribute('data-geo-lng', geo.longitude || '');
-
-    script.onload = function () {
-      this.remove();
-    };
-    script.onerror = function () {
-      console.error('[FlirtEasy] Failed to inject API interceptor');
-    };
-    (document.head || document.documentElement).appendChild(script);
-  });
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('content/api-interceptor.js');
+  script.setAttribute('data-flirteasy-interceptor', 'true');
+  script.onload = function () {
+    this.remove();
+  };
+  script.onerror = function () {
+    console.error('[FlirtEasy] Failed to inject API interceptor');
+  };
+  (document.head || document.documentElement).appendChild(script);
 }
 
 // Inject Achievement System
@@ -4150,13 +4140,21 @@ window.addEventListener('achievement:openPanel', () => {
 
 console.log('[FlirtEasy] Achievement system integrated with Tinder UI');
 
-// Periodic check to notify the Cloud Worker when Tinder logs in inside Neko
-setInterval(() => {
-  if (typeof isLoggedIn === 'function' && isLoggedIn()) {
-    chrome.runtime.sendMessage({
-      action: 'notifyLogin',
-      payload: { platform: 'tinder', userId: 'dev_user_1' }
-    });
-  }
-}, 5000);
+// ── PAGE↔CONTENT SCRIPT BRIDGE ──
+window.addEventListener('message', (event) => {
+  if (event.source !== window || !event.data || event.data.type !== 'FLIRTEASY_CMD') return;
+  const { action, reqId } = event.data;
+  const respond = (payload) => window.postMessage({ type: 'FLIRTEASY_RESP', reqId, ...payload }, '*');
 
+  if (action === 'startAgent') {
+    chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }, (res) => {
+      respond({ success: res?.success ?? true });
+    });
+  } else if (action === 'stopAgent') {
+    chrome.runtime.sendMessage({ action: 'stopAgent' }, (res) => {
+      respond({ success: res?.success ?? true });
+    });
+  } else {
+    respond({ success: false, error: `Unknown action: ${action}` });
+  }
+});
