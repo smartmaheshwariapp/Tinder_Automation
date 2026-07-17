@@ -4140,6 +4140,14 @@ window.addEventListener('achievement:openPanel', () => {
 
 console.log('[FlirtEasy] Achievement system integrated with Tinder UI');
 
+// Check login status on load
+if (typeof isLoggedIn === 'function' && isLoggedIn()) {
+  if (typeof window.ORCHESTRATOR_USER_ID !== 'undefined') {
+    fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=tinder`)
+      .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
+  }
+}
+
 // ── PAGE↔CONTENT SCRIPT BRIDGE ──
 window.addEventListener('message', (event) => {
   if (event.source !== window || !event.data || event.data.type !== 'FLIRTEASY_CMD') return;

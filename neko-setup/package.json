@@ -1,0 +1,15 @@
+{
+  "name": "neko-setup",
+  "version": "1.0.0",
+  "description": "This directory contains automated setup scripts and configurations to run **Neko** (a self-hosted virtual browser) inside a Docker container on your VPS, allowing you to use the browser and broadcast the browser session directly to streaming platforms like YouTube, Twitch, or TikTok via RTMP.",
+  "main": "orchestrator.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chrome-remote-interface": "^0.34.0"
+  }
+}

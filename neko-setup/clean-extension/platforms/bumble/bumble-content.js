@@ -91,6 +91,10 @@ async function initializeBumble() {
             window._bumbleLoginInterval = setInterval(() => {
                 if (isBumbleLoggedIn()) {
                     console.log('[Bumble] Logged in successfully! Clearing helper.');
+                    if (typeof window.ORCHESTRATOR_USER_ID !== 'undefined') {
+                        fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=bumble`)
+                            .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
+                    }
                     clearInterval(window._bumbleLoginInterval);
                     delete window._bumbleLoginInterval;
                     initializeBumble();
@@ -103,6 +107,10 @@ async function initializeBumble() {
     }
 
     console.log('[Bumble] User is logged in, ready for automation');
+    if (typeof window.ORCHESTRATOR_USER_ID !== 'undefined') {
+        fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=bumble`)
+            .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
+    }
 
     // Initialize Bridges
     setupBumbleAchievementBridge();
@@ -4313,9 +4321,19 @@ function simulateClick(element) {
  * until the user is logged in. Each call advances one step if possible.
  */
 function handleBumbleLoginLanding() {
-    // Only run on login/get-started pages
     const url = window.location.href;
-    if (!url.includes('get-started') && !url.includes('login')) return;
+    if (!url.includes('get-started') && !url.includes('login') && !url.includes('confirm-phone') && !url.includes('registration')) return;
+
+    // ── Check if we are on the OTP screen ──────────────────────────────────
+    const isOtpPage = url.includes('confirm-phone') || document.querySelector('input[autocomplete="one-time-code"]') || Array.from(document.querySelectorAll('h1,h2,p,span')).some(el => {
+        const text = (el.innerText || el.textContent || '').trim();
+        return /enter the 6-digit code/i.test(text) || /enter the verification code/i.test(text);
+    });
+    if (isOtpPage) {
+        console.log('[Bumble Login] OTP verification screen detected.');
+        window.postMessage({ type: 'bumble:otpInputReady' }, '*');
+        return;
+    }
 
     // ── STOP: Phone input is already visible — we're done ──────────────────
     const phoneInput = document.querySelector(

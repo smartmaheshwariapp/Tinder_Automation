@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Dimensions, AppState, TextInput } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 // Neko container screen resolution (must match NEKO_DESKTOP_SCREEN in docker-compose)
@@ -16,8 +16,9 @@ export default function BrowserScreen({ route, navigation }) {
   // then transition to 'phone' once the phone input is visible.
   // For other platforms: start at 'phone' directly.
   const isBumble = platform?.toLowerCase() === 'bumble';
-  const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'phone');
+  const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'country_code');
   const [inputText, setInputText] = useState('');
+  const [countryCode, setCountryCode] = useState('+91');
   const [sendingText, setSendingText] = useState(false);
   const [dummyText, setDummyText] = useState('');
   const appState = useRef(AppState.currentState);
@@ -199,6 +200,11 @@ export default function BrowserScreen({ route, navigation }) {
               JSON.stringify({ type: 'bumble:phoneInputReady' })
             );
           }
+          if (e.data && e.data.type === 'bumble:otpInputReady') {
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
+              JSON.stringify({ type: 'bumble:otpInputReady' })
+            );
+          }
         });
       })();
     ` : '';
@@ -224,7 +230,12 @@ export default function BrowserScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>✕ Close</Text>
         </TouchableOpacity>
@@ -261,10 +272,14 @@ export default function BrowserScreen({ route, navigation }) {
           onMessage={(event) => {
             try {
               const msg = JSON.parse(event.nativeEvent.data);
-              // Extension signals phone input is ready — advance wizard automatically
+              // Extension signals phone input is ready — advance wizard automatically to country code
               if (msg.type === 'bumble:phoneInputReady' && loginStep === 'navigating') {
-                console.log('[Browser] Bumble phone input ready — advancing wizard');
-                setLoginStep('phone');
+                console.log('[Browser] Bumble phone input ready — advancing wizard to country code');
+                setLoginStep('country_code');
+              }
+              // Extension signals OTP input is ready (we log it, but transition is handled by the 20s delay)
+              if (msg.type === 'bumble:otpInputReady') {
+                console.log('[Browser] Bumble OTP input ready (waiting for 20s timer...)');
               }
             } catch (_) {}
           }}
@@ -302,52 +317,129 @@ export default function BrowserScreen({ route, navigation }) {
               </Text>
               <TouchableOpacity
                 style={[styles.wizardBtn, { backgroundColor: '#2A2A35', borderWidth: 1, borderColor: '#3A3A4A' }]}
-                onPress={() => setLoginStep('phone')}
+                onPress={() => setLoginStep('country_code')}
               >
                 <Text style={[styles.wizardBtnText, { color: '#8E8E9F' }]}>Skip — I'll navigate manually</Text>
               </TouchableOpacity>
             </View>
           )}
 
+          {loginStep === 'country_code' && (
+            <View style={styles.wizardStep}>
+              <Text style={styles.wizardTitle}>Select Country Code</Text>
+              <Text style={styles.wizardDesc}>
+                Enter the dialing country code for your phone number.
+              </Text>
+              <TextInput
+                style={styles.wizardInput}
+                placeholder="e.g. +91"
+                placeholderTextColor="#6E6E7F"
+                value={countryCode}
+                onChangeText={setCountryCode}
+                keyboardType="phone-pad"
+              />
+              <TouchableOpacity 
+                style={styles.wizardBtn}
+                disabled={sendingText}
+                onPress={async () => {
+                  if (!countryCode.trim()) return;
+                  setSendingText(true);
+                  try {
+                    const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                    await fetch(`${orchestratorUrl}/type-text`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ text: countryCode, field: 'country-code' }),
+                    });
+                  } catch (e) {
+                    console.error('Network error sending country code:', e);
+                  } finally {
+                    setSendingText(false);
+                    setLoginStep('phone');
+                  }
+                }}
+              >
+                {sendingText ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.wizardBtnText}>Next ➔</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
           {loginStep === 'phone' && (
             <View style={styles.wizardStep}>
-              <Text style={styles.wizardTitle}>Enter Your Phone Number</Text>
+              <Text style={styles.wizardTitle}>Enter Mobile Number</Text>
               <Text style={styles.wizardDesc}>
                 {isBumble
-                  ? 'Type your number into the Bumble phone field above, then tap Send.'
+                  ? 'Enter your mobile number below, then tap Send.'
                   : `Enter your mobile number to log into your ${platform} account.`}
               </Text>
               <TextInput
                 style={styles.wizardInput}
-                placeholder="e.g. +12345678900"
+                placeholder="Mobile Number"
                 placeholderTextColor="#6E6E7F"
                 value={inputText}
                 onChangeText={setInputText}
                 keyboardType="phone-pad"
                 autoComplete="tel"
               />
-              <TouchableOpacity 
-                style={styles.wizardBtn}
-                disabled={sendingText}
-                onPress={async () => {
-                  if (!inputText.trim()) return;
-                  await handleSendText();
-                  await handlePressEnter();
-                  setLoginStep('otp');
-                }}
-              >
-                {sendingText ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <Text style={styles.wizardBtnText}>Send & Continue ➔</Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.wizardBtnRow}>
+                <TouchableOpacity 
+                  style={[styles.wizardBtnSecondary, { marginRight: 8 }]}
+                  disabled={sendingText}
+                  onPress={() => {
+                    setLoginStep('country_code');
+                  }}
+                >
+                  <Text style={styles.wizardBtnSecondaryText}>↩ Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.wizardBtn, { flex: 1 }]}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    if (!inputText.trim()) return;
+                    setSendingText(true);
+                    
+                    try {
+                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                      const response = await fetch(`${orchestratorUrl}/type-text`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: inputText, field: 'phone-number' }),
+                      });
+                      if (response.ok) {
+                        setInputText(''); // Clear input on success
+                      } else {
+                        console.error('Failed to send text to virtual browser');
+                      }
+                    } catch (e) {
+                      console.error('Network error sending text:', e);
+                    }
+                    
+                    await handlePressEnter();
+                    
+                    // Wait 20 seconds to allow the page to submit, load the OTP screen, and the SMS to arrive
+                    setTimeout(() => {
+                      setSendingText(false);
+                      setLoginStep('otp');
+                    }, 20000);
+                  }}
+                >
+                  {sendingText ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.wizardBtnText}>Send & Continue ➔</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
           {loginStep === 'otp' && (
             <View style={styles.wizardStep}>
-              <Text style={styles.wizardTitle}>Guided Login - Step 2</Text>
+              <Text style={styles.wizardTitle}>Guided Login - Step 3</Text>
               <Text style={styles.wizardDesc}>Enter the verification code (OTP) sent to your mobile device.</Text>
               <TextInput
                 style={styles.wizardInput}
@@ -427,6 +519,7 @@ export default function BrowserScreen({ route, navigation }) {
         blurOnSubmit={false}
         onSubmitEditing={() => injectKeyEvent('\n')}
       />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

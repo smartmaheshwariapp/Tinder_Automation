@@ -191,24 +191,7 @@ async function _flushTrackQueue() {
 }
 
 async function openSettingsPopup() {
-  try {
-    const windows = await chrome.windows.getAll({ populate: true });
-    const popupUrl = chrome.runtime.getURL('popup/popup.html');
-    const alreadyOpen = windows.some(w => w.tabs && w.tabs.some(t => t.url && t.url.includes(popupUrl)));
-    
-    if (!alreadyOpen) {
-      chrome.windows.create({
-        url: popupUrl,
-        type: 'popup',
-        width: 380,
-        height: 750,
-        left: 420,
-        top: 0
-      });
-    }
-  } catch (err) {
-    console.error('[Background] Failed to open settings popup:', err);
-  }
+  console.log('[Background] openSettingsPopup called but disabled (user requested not to open popup automatically).');
 }
 
 // Automatically trigger settings popup when target dating platforms load
@@ -4138,3 +4121,6 @@ async function fetchRemoteConfig() {
     console.warn('[Config] Failed to fetch remote config, using hardcoded defaults:', err.message);
   }
 }
+
+// Automatically appended by Neko Orchestrator
+self.ORCHESTRATOR_USER_ID = "dev_user_1";

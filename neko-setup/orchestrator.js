@@ -5,6 +5,227 @@ const path = require('path');
 
 const PORT = 3000;
 
+function executeJSInContainer(jsCode) {
+  return new Promise((resolve) => {
+    const pyScript = String.raw`
+import json, urllib.request, socket, base64, sys, os
+
+def http_get(url):
+    return json.loads(urllib.request.urlopen(url, timeout=5).read())
+
+# Minimal WebSocket client (RFC 6455) using only stdlib
+class WS:
+    def __init__(self, url):
+        from urllib.parse import urlparse
+        p = urlparse(url)
+        self.sock = socket.create_connection((p.hostname, p.port or 80), timeout=15)
+        key = base64.b64encode(os.urandom(16)).decode()
+        hs = (f"GET {p.path} HTTP/1.1\r\n"
+              f"Host: {p.hostname}:{p.port}\r\n"
+              f"Upgrade: websocket\r\nConnection: Upgrade\r\n"
+              f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n")
+        self.sock.sendall(hs.encode())
+        buf = b""
+        while b"\r\n\r\n" not in buf:
+            buf += self.sock.recv(4096)
+        self._mid = 1
+        self._buf = b""
+
+    def send(self, data):
+        if isinstance(data, str):
+            data = data.encode()
+        mask = os.urandom(4)
+        n = len(data)
+        if n < 126:
+            hdr = bytes([0x81, 0x80 | n]) + mask
+        elif n < 65536:
+            hdr = bytes([0x81, 0xFE]) + n.to_bytes(2,'big') + mask
+        else:
+            hdr = bytes([0x81, 0xFF]) + n.to_bytes(8,'big') + mask
+        masked = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+        self.sock.sendall(hdr + masked)
+
+    def recv_msg(self):
+        def read(n):
+            while len(self._buf) < n:
+                self._buf += self.sock.recv(4096)
+            out, self._buf = self._buf[:n], self._buf[n:]
+            return out
+        b0, b1 = read(2)
+        n = b1 & 0x7F
+        if n == 126: n = int.from_bytes(read(2),'big')
+        elif n == 127: n = int.from_bytes(read(8),'big')
+        return read(n).decode()
+
+    def call(self, method, params=None):
+        mid = self._mid; self._mid += 1
+        self.send(json.dumps({'id':mid,'method':method,'params':params or {}}))
+        while True:
+            msg = json.loads(self.recv_msg())
+            if msg.get('id') == mid:
+                return msg.get('result', {})
+
+    def close(self):
+        try: self.sock.close()
+        except: pass
+
+try:
+    tabs = http_get('http://localhost:9222/json')
+    page = next((t for t in tabs if t.get('type')=='page'), None)
+    if page:
+        ws = WS(page['webSocketDebuggerUrl'])
+        ws.call('Runtime.evaluate', {'expression': ${JSON.stringify(jsCode)}, 'returnByValue': True})
+        ws.close()
+except Exception as e:
+    print('ERROR:' + str(e))
+`;
+    const tmpPath = path.join(__dirname, '_focus_tmp.py');
+    fs.writeFileSync(tmpPath, pyScript, 'utf8');
+    exec(`docker cp "${tmpPath}" neko:/tmp/focus.py`, (cpErr) => {
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+      if (cpErr) { resolve(); return; }
+      exec(`docker exec neko python3 /tmp/focus.py`, () => {
+        resolve();
+      });
+    });
+  });
+}
+
+function clickElementInContainer(selector) {
+  return new Promise((resolve) => {
+    const pyScript = String.raw`
+import json, urllib.request, socket, base64, sys, os, time
+
+def http_get(url):
+    return json.loads(urllib.request.urlopen(url, timeout=5).read())
+
+# Minimal WebSocket client (RFC 6455) using only stdlib
+class WS:
+    def __init__(self, url):
+        from urllib.parse import urlparse
+        p = urlparse(url)
+        self.sock = socket.create_connection((p.hostname, p.port or 80), timeout=15)
+        key = base64.b64encode(os.urandom(16)).decode()
+        hs = (f"GET {p.path} HTTP/1.1\r\n"
+              f"Host: {p.hostname}:{p.port}\r\n"
+              f"Upgrade: websocket\r\nConnection: Upgrade\r\n"
+              f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n")
+        self.sock.sendall(hs.encode())
+        buf = b""
+        while b"\r\n\r\n" not in buf:
+            buf += self.sock.recv(4096)
+        self._mid = 1
+        self._buf = b""
+
+    def send(self, data):
+        if isinstance(data, str):
+            data = data.encode()
+        mask = os.urandom(4)
+        n = len(data)
+        if n < 126:
+            hdr = bytes([0x81, 0x80 | n]) + mask
+        elif n < 65536:
+            hdr = bytes([0x81, 0xFE]) + n.to_bytes(2,'big') + mask
+        else:
+            hdr = bytes([0x81, 0xFF]) + n.to_bytes(8,'big') + mask
+        masked = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+        self.sock.sendall(hdr + masked)
+
+    def recv_msg(self):
+        def read(n):
+            while len(self._buf) < n:
+                self._buf += self.sock.recv(4096)
+            out, self._buf = self._buf[:n], self._buf[n:]
+            return out
+        b0, b1 = read(2)
+        n = b1 & 0x7F
+        if n == 126: n = int.from_bytes(read(2),'big')
+        elif n == 127: n = int.from_bytes(read(8),'big')
+        return read(n).decode()
+
+    def call(self, method, params=None):
+        mid = self._mid; self._mid += 1
+        self.send(json.dumps({'id':mid,'method':method,'params':params or {}}))
+        while True:
+            msg = json.loads(self.recv_msg())
+            if msg.get('id') == mid:
+                return msg.get('result', {})
+
+    def close(self):
+        try: self.sock.close()
+        except: pass
+
+try:
+    tabs = http_get('http://localhost:9222/json')
+    page = next((t for t in tabs if t.get('type')=='page'), None)
+    if page:
+        ws = WS(page['webSocketDebuggerUrl'])
+        
+        # Get document and selector nodeId
+        doc = ws.call('DOM.getDocument')
+        root_node_id = doc['root']['nodeId']
+        
+        res = ws.call('DOM.querySelector', {'nodeId': root_node_id, 'selector': ${JSON.stringify(selector)}})
+        node_id = res.get('nodeId')
+        if node_id:
+            box = ws.call('DOM.getBoxModel', {'nodeId': node_id})
+            if 'model' in box and 'content' in box['model']:
+                content = box['model']['content']
+                x = (content[0] + content[2] + content[4] + content[6]) / 4
+                y = (content[1] + content[3] + content[5] + content[7]) / 4
+                
+                # physical click
+                ws.call('Input.dispatchMouseEvent', {'type': 'mousePressed', 'x': x, 'y': y, 'button': 'left', 'clickCount': 1})
+                time.sleep(0.05)
+                ws.call('Input.dispatchMouseEvent', {'type': 'mouseReleased', 'x': x, 'y': y, 'button': 'left', 'clickCount': 1})
+                print('CLICKED')
+        ws.close()
+except Exception as e:
+    print('ERROR:' + str(e))
+`;
+    const tmpPath = path.join(__dirname, '_click_tmp.py');
+    fs.writeFileSync(tmpPath, pyScript, 'utf8');
+    exec(`docker cp "${tmpPath}" neko:/tmp/click_el.py`, (cpErr) => {
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+      if (cpErr) { resolve(); return; }
+      exec(`docker exec neko python3 /tmp/click_el.py`, () => {
+        resolve();
+      });
+    });
+  });
+}
+
+function parsePhoneNumber(input) {
+  let text = input.trim();
+  if (text.startsWith('+')) {
+    text = text.substring(1);
+  } else {
+    return { countryCode: null, phoneNumber: text };
+  }
+  
+  const commonCodes = [
+    '91', '44', '49', '33', '81', '86', '7', '39', '34', '55', '52', '61', '64', '31', '32', '41', '46', '47', '45', '90', '20', '27', '98', '62', '65', '60', '66', '84', '82', '92', '94', '880', '971', '966', '972', '353', '351'
+  ];
+  
+  for (const code of commonCodes) {
+    if (code.length === 3 && text.startsWith(code)) {
+      return { countryCode: code, phoneNumber: text.substring(3) };
+    }
+  }
+  for (const code of commonCodes) {
+    if (code.length === 2 && text.startsWith(code)) {
+      return { countryCode: code, phoneNumber: text.substring(2) };
+    }
+  }
+  if (text.startsWith('1')) {
+    return { countryCode: '1', phoneNumber: text.substring(1) };
+  }
+  if (text.length > 10) {
+    return { countryCode: text.substring(0, 2), phoneNumber: text.substring(2) };
+  }
+  return { countryCode: null, phoneNumber: text };
+}
+
 const PLATFORMS = {
   tinder: 'https://tinder.com',
   bumble: 'https://bumble.com/get-started',
@@ -138,7 +359,7 @@ ws.close()
   fs.writeFileSync(tmpPath, pyScript);
 
   exec(`docker cp "${tmpPath}" neko:/tmp/nav.py`, (cpErr) => {
-    try { fs.unlinkSync(tmpPath); } catch(_) {}
+    try { fs.unlinkSync(tmpPath); } catch (_) { }
     if (cpErr) { console.error('[Orchestrator] Failed to copy nav script:', cpErr.message); return; }
 
     exec(`docker exec neko python3 /tmp/nav.py`, { timeout: 60000 }, (err, stdout, stderr) => {
@@ -220,7 +441,18 @@ const server = http.createServer((req, res) => {
               fs.cpSync(srcPath, destPath, { recursive: true });
             }
           }
-          console.log('[Orchestrator] Successfully prepared clean extension folder.');
+          
+          // Write orchestrator metadata for content scripts
+          const metaContent = `// Automatically generated by Neko Orchestrator\nwindow.ORCHESTRATOR_USER_ID = ${JSON.stringify(userId)};\n`;
+          fs.writeFileSync(path.join(cleanExtensionDir, 'debug-config.js'), metaContent, 'utf8');
+          
+          // Append orchestrator metadata to background script
+          const bgPath = path.join(cleanExtensionDir, 'background', 'background.js');
+          if (fs.existsSync(bgPath)) {
+            const bgMeta = `\n// Automatically appended by Neko Orchestrator\nself.ORCHESTRATOR_USER_ID = ${JSON.stringify(userId)};\n`;
+            fs.appendFileSync(bgPath, bgMeta, 'utf8');
+          }
+          console.log('[Orchestrator] Successfully prepared clean extension folder and injected metadata.');
         } catch (copyErr) {
           console.error('[Orchestrator] Failed to copy extension files:', copyErr);
         }
@@ -234,24 +466,46 @@ const server = http.createServer((req, res) => {
             console.error('[Orchestrator] Error stopping container:', downStderr);
           }
 
-          // Thoroughly force delete any stale Chromium SingletonLock files and GCM Store directories (which crash on host-mounts)
-          try {
-            const cleanSessionPath = sessionDir.replace(/\//g, '\\');
-            require('child_process').execSync(
-              `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter '*SingletonLock*' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force"`,
-              { stdio: 'ignore' }
-            );
-            require('child_process').execSync(
-              `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'LOCK' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force"`,
-              { stdio: 'ignore' }
-            );
-            require('child_process').execSync(
-              `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'GCM Store' -Directory -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force"`,
-              { stdio: 'ignore' }
-            );
-            console.log(`[Orchestrator] Cleared all stale profile locks, LevelDB LOCK files, and GCM Store directories in ${sessionDir}`);
-          } catch (e) {
-            console.warn(`[Orchestrator] Profile directory cleaning warning:`, e.message);
+          // Check if user has a successful login history. If not, delete session directory to start a new profile.
+          const flagPath = path.join(sessionDir, 'logged_in.flag');
+          const hasLoggedInFlag = fs.existsSync(flagPath);
+
+          if (!hasLoggedInFlag) {
+            console.log(`[Orchestrator] User ${userId} has no successful login history. Deleting directory ${sessionDir} to start a new profile...`);
+            try {
+              if (fs.existsSync(sessionDir)) {
+                fs.rmSync(sessionDir, { recursive: true, force: true });
+              }
+              fs.mkdirSync(sessionDir, { recursive: true });
+            } catch (rmErr) {
+              console.error(`[Orchestrator] Error deleting session directory:`, rmErr.message);
+            }
+          } else {
+            console.log(`[Orchestrator] User ${userId} has successful login history. Preserving session directory.`);
+            
+            // Clean up locks/Sessions while keeping cookies/profiles
+            try {
+              const cleanSessionPath = sessionDir.replace(/\//g, '\\');
+              require('child_process').execSync(
+                `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter '*SingletonLock*' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force"`,
+                { stdio: 'ignore' }
+              );
+              require('child_process').execSync(
+                `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'LOCK' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force"`,
+                { stdio: 'ignore' }
+              );
+              require('child_process').execSync(
+                `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'GCM Store' -Directory -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force"`,
+                { stdio: 'ignore' }
+              );
+              require('child_process').execSync(
+                `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'Sessions' -Directory -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force"`,
+                { stdio: 'ignore' }
+              );
+              console.log(`[Orchestrator] Cleared all stale profile locks, LevelDB LOCK files, GCM Store, and Sessions directories in ${sessionDir}`);
+            } catch (e) {
+              console.warn(`[Orchestrator] Profile directory cleaning warning:`, e.message);
+            }
           }
 
           // Auto-enable Developer Mode inside Chromium Preferences file
@@ -328,27 +582,147 @@ const server = http.createServer((req, res) => {
       try {
         const data = JSON.parse(body);
         const text = data.text;
+        const field = data.field;
         if (typeof text !== 'string') {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'Text must be a string' }));
           return;
         }
-        
-        console.log(`[Orchestrator] Typing text: ${text}`);
-        // Escape shell characters in the text to prevent command injection
-        const escapedText = text.replace(/["'$`\\]/g, '\\$&');
-        
-        exec(`docker exec neko xdotool type --delay 100 "${escapedText}"`, (err, stdout, stderr) => {
-          if (err) {
-            console.error('[Orchestrator] xdotool typing error:', stderr);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: stderr }));
-            return;
+
+        console.log(`[Orchestrator] Typing text: ${text} for field: ${field || 'default'}`);
+
+        // Helper to type a string character-by-character with randomized delays (20ms - 70ms)
+        function typeString(str, onDone) {
+          let idx = 0;
+          function next() {
+            if (idx >= str.length) {
+              onDone();
+              return;
+            }
+            const char = str[idx];
+            const escapedChar = char.replace(/["'$`\\]/g, '\\$&');
+            exec(`docker exec neko xdotool type "${escapedChar}"`, (err, stdout, stderr) => {
+              if (err) {
+                console.error('[Orchestrator] xdotool typing error:', stderr);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: stderr }));
+                return;
+              }
+              idx++;
+              const delay = 20 + Math.floor(Math.random() * 50);
+              setTimeout(next, delay);
+            });
           }
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true }));
-        });
+          next();
+        }
+
+        if (field === 'country-code') {
+          // Remove '+' if present
+          const cleanCC = text.startsWith('+') ? text.substring(1) : text;
+          clickElementInContainer('#phone-country-code').then(() => {
+            executeJSInContainer("const el = document.getElementById('phone-country-code'); if (el) { el.focus(); el.select(); }").then(() => {
+              typeString(cleanCC, () => {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+              });
+            });
+          });
+        } else if (field === 'phone-number') {
+          const focusScript = `
+            let el = document.getElementById('phone');
+            if (!el) {
+              const cc = document.getElementById('phone-country-code');
+              el = cc ? Array.from(document.querySelectorAll('input')).find(i => i !== cc && (i.type === 'tel' || i.name?.includes('phone') || i.getAttribute('data-qa-role') === 'textfield-input' || i.className.includes('input'))) : null;
+            }
+            if (el) {
+              el.focus();
+              el.select();
+            } else {
+              const fallback = document.querySelector('input[type="tel"]:not(#phone-country-code)');
+              if (fallback) {
+                fallback.focus();
+                fallback.select();
+              }
+            }
+          `;
+          const selector = "input[type='tel']:not(#phone-country-code), #phone, input[name='phone']";
+          clickElementInContainer(selector).then(() => {
+            executeJSInContainer(focusScript).then(() => {
+              typeString(text, () => {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+              });
+            });
+          });
+        } else {
+          // Fallback parsing (original logic)
+          const isPhone = text.startsWith('+') || (text.length >= 10 && /^\+?[0-9]+$/.test(text));
+          if (isPhone) {
+            const parsed = parsePhoneNumber(text);
+            if (parsed.countryCode) {
+              executeJSInContainer("const el = document.getElementById('phone-country-code'); if (el) { el.focus(); el.select(); }").then(() => {
+                typeString(parsed.countryCode, () => {
+                  const focusScript = `
+                    let el = document.getElementById('phone');
+                    if (!el) {
+                      const cc = document.getElementById('phone-country-code');
+                      el = cc ? Array.from(document.querySelectorAll('input')).find(i => i !== cc && (i.type === 'tel' || i.name?.includes('phone') || i.getAttribute('data-qa-role') === 'textfield-input' || i.className.includes('input'))) : null;
+                    }
+                    if (el) {
+                      el.focus();
+                      el.select();
+                    } else {
+                      const fallback = document.querySelector('input[type="tel"]:not(#phone-country-code)');
+                      if (fallback) {
+                        fallback.focus();
+                        fallback.select();
+                      }
+                    }
+                  `;
+                  executeJSInContainer(focusScript).then(() => {
+                    typeString(parsed.phoneNumber, () => {
+                      res.writeHead(200, { 'Content-Type': 'application/json' });
+                      res.end(JSON.stringify({ success: true }));
+                    });
+                  });
+                });
+              });
+            } else {
+              const focusScript = `
+                let el = document.getElementById('phone');
+                if (!el) {
+                  const cc = document.getElementById('phone-country-code');
+                  el = cc ? Array.from(document.querySelectorAll('input')).find(i => i !== cc && (i.type === 'tel' || i.name?.includes('phone') || i.getAttribute('data-qa-role') === 'textfield-input' || i.className.includes('input'))) : null;
+                }
+                if (el) {
+                  el.focus();
+                  el.select();
+                } else {
+                  const fallback = document.querySelector('input[type="tel"]:not(#phone-country-code)');
+                  if (fallback) {
+                    fallback.focus();
+                    fallback.select();
+                  }
+                }
+              `;
+              executeJSInContainer(focusScript).then(() => {
+                typeString(text, () => {
+                  res.writeHead(200, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ success: true }));
+                });
+              });
+            }
+          } else {
+            executeJSInContainer("const el = document.querySelector('input[type=\\'tel\\'], input[autocomplete=\\'one-time-code\\']'); if (el) { el.focus(); }").then(() => {
+              typeString(text, () => {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+              });
+            });
+          }
+        }
       } catch (e) {
+        console.error('[Orchestrator] Error in /type-text handler:', e);
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: 'Invalid JSON request' }));
       }
@@ -394,6 +768,28 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
     });
+  } else if ((req.method === 'POST' || req.method === 'GET') && req.url.startsWith('/login-success')) {
+    const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const userId = urlObj.searchParams.get('userId') || 'dev_user_1';
+    const platform = urlObj.searchParams.get('platform') || 'bumble';
+    console.log(`[Orchestrator] User ${userId} successfully logged into ${platform}! Writing logged_in.flag...`);
+    
+    const sessionsBaseDir = path.join(__dirname, 'sessions');
+    const sessionDir = path.join(sessionsBaseDir, userId);
+    const flagPath = path.join(sessionDir, 'logged_in.flag');
+    
+    try {
+      if (!fs.existsSync(sessionDir)) {
+        fs.mkdirSync(sessionDir, { recursive: true });
+      }
+      fs.writeFileSync(flagPath, 'true', 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (e) {
+      console.error('[Orchestrator] Error writing logged_in.flag:', e);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: e.message }));
+    }
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
