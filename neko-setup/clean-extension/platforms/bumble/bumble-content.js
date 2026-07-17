@@ -4301,31 +4301,63 @@ function simulateClick(element) {
     element.dispatchEvent(clickEvent);
 }
 
+/**
+ * Bumble Login Auto-Navigator
+ *
+ * Bumble's login page has a 2-step flow before the phone input appears:
+ *   Screen 1: "Continue with other methods"  → .other-methods-button
+ *   Screen 2: "Use cell phone number"         → button.button--transparent
+ *   Screen 3: Phone number input              ← target state
+ *
+ * This function is called on a 1-second interval by initializeBumble()
+ * until the user is logged in. Each call advances one step if possible.
+ */
 function handleBumbleLoginLanding() {
-    // If not on login/get-started, stop
-    if (!window.location.href.includes('get-started') && !window.location.href.includes('login')) return;
-    
-    // If the country code input or any phone text field is already visible, stop clicking
-    if (document.getElementById('phone-country-code') || document.querySelector('input[type="tel"]')) {
+    // Only run on login/get-started pages
+    const url = window.location.href;
+    if (!url.includes('get-started') && !url.includes('login')) return;
+
+    // ── STOP: Phone input is already visible — we're done ──────────────────
+    const phoneInput = document.querySelector(
+        'input[type="tel"], input[name="phone"], #phone-country-code, [data-qa-role="phone-input"]'
+    );
+    if (phoneInput) {
+        console.log('[Bumble Login] Phone input visible — auto-navigation complete.');
+        // Notify the mobile app WebView so the wizard advances to the phone step
+        window.postMessage({ type: 'bumble:phoneInputReady' }, '*');
         return;
     }
-    
-    // 1. First, check if "Use cell phone number" span is visible on screen
-    const spans = Array.from(document.querySelectorAll('span.action'));
-    const cellPhoneSpan = spans.find(s => (s.textContent || s.innerText || '').toLowerCase().includes('use cell phone number'));
-    if (cellPhoneSpan) {
-        console.log('[Bumble Login Helper] Found Use cell phone number span, simulating click...');
-        simulateClick(cellPhoneSpan);
+
+    // ── STEP 2: "Use cell phone number" button ─────────────────────────────
+    // Must check this BEFORE step 1 — once we're on screen 2, don't re-click step 1.
+    // Bumble renders this as: <button class="button button--transparent ...">Use cell phone number</button>
+    // Also has a <span class="action text-break-words"> as fallback.
+    const cellPhoneBtn = document.querySelector('button.button--transparent')
+        || Array.from(document.querySelectorAll('button,a,span')).find(el => {
+            const text = (el.innerText || el.textContent || '').trim();
+            const rect = el.getBoundingClientRect();
+            const visible = rect.width > 0 && rect.height > 0
+                && rect.top < window.innerHeight && rect.bottom > 0;
+            return /use cell phone number/i.test(text) && visible && el.children.length <= 2;
+        });
+
+    if (cellPhoneBtn) {
+        console.log('[Bumble Login] Clicking "Use cell phone number"...', cellPhoneBtn.className);
+        simulateClick(cellPhoneBtn);
         return;
     }
-    
-    // 2. Only if cell phone span is not present, click "Continue with other methods" button
+
+    // ── STEP 1: "Continue with other methods" button ───────────────────────
+    // Bumble renders this as: <div class="other-methods-button" role="button">
     const otherMethodsBtn = document.querySelector('.other-methods-button');
     if (otherMethodsBtn) {
-        console.log('[Bumble Login Helper] Found Continue with other methods button, simulating click...');
+        console.log('[Bumble Login] Clicking "Continue with other methods"...');
         simulateClick(otherMethodsBtn);
         return;
     }
+
+    // Nothing found yet — page still loading, interval will retry.
+    console.log('[Bumble Login] Waiting for login buttons to appear...');
 }
 
 

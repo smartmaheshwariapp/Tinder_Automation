@@ -2,12 +2,21 @@ import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Dimensions, AppState, TextInput } from 'react-native';
 import { WebView } from 'react-native-webview';
 
+// Neko container screen resolution (must match NEKO_DESKTOP_SCREEN in docker-compose)
+// 416x912 — portrait mobile dimensions
+const NEKO_WIDTH = 416;
+const NEKO_HEIGHT = 912;
+
 export default function BrowserScreen({ route, navigation }) {
   const { platform, vpsUrl, proxyIp, extensionSettings } = route.params;
   const webViewRef = useRef(null);
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(true);
-  const [loginStep, setLoginStep] = useState('phone'); // 'phone', 'otp', 'done'
+  // For Bumble: start at 'navigating' so user sees a status while auto-clicks happen,
+  // then transition to 'phone' once the phone input is visible.
+  // For other platforms: start at 'phone' directly.
+  const isBumble = platform?.toLowerCase() === 'bumble';
+  const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'phone');
   const [inputText, setInputText] = useState('');
   const [sendingText, setSendingText] = useState(false);
   const [dummyText, setDummyText] = useState('');
@@ -27,7 +36,42 @@ export default function BrowserScreen({ route, navigation }) {
     }
   };
 
-  const handleSendText = async () => {
+  // Sends a mouse click at absolute (x, y) inside the Neko container via xdotool.
+  const clickAt = async (x, y) => {
+    try {
+      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+      await fetch(`${orchestratorUrl}/click`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x, y }),
+      });
+    } catch (e) {
+      console.error('[Browser] clickAt error:', e);
+    }
+  };
+
+  // For Bumble: automatically clicks through the two-step method selection
+  // so the user lands directly on the phone number input screen.
+  // Sequence:
+  //   1. Wait 2s for Bumble's JS to finish rendering
+  //   2. Click "Continue with other methods"
+  //   3. Wait 1.5s for the next screen to render
+  //   4. Click "Use cell phone number"
+  //   5. Wait 1s for the phone input to appear
+  //   6. Advance wizard to 'phone' step
+  const autoNavigateBumbleLogin = async () => {
+    // Step 1 — let Bumble's page fully render before clicking
+    await new Promise(r => setTimeout(r, 2000));
+    await clickAt(BUMBLE_BTN_OTHER_METHODS.x, BUMBLE_BTN_OTHER_METHODS.y);
+
+    // Step 2 — wait for "Continue with other methods" screen to load
+    await new Promise(r => setTimeout(r, 1500));
+    await clickAt(BUMBLE_BTN_CELL_PHONE.x, BUMBLE_BTN_CELL_PHONE.y);
+
+    // Step 3 — wait for phone number input to appear, then show wizard
+    await new Promise(r => setTimeout(r, 1000));
+    setLoginStep('phone');
+  };  const handleSendText = async () => {
     if (!inputText.trim()) return;
     setSendingText(true);
     try {
@@ -141,6 +185,24 @@ export default function BrowserScreen({ route, navigation }) {
       }
     `;
 
+    // Listen for the extension's signal that Bumble's phone input is ready.
+    // The bumble-content.js extension posts window.postMessage({ type: 'bumble:phoneInputReady' })
+    // once it has auto-clicked through "Continue with other methods" → "Use cell phone number".
+    // Neko's WebRTC client relays postMessages from the container page to the host WebView.
+    const listenerJs = isBumble ? `
+      (function() {
+        if (window.__flirteasyPhoneReadyListening) return;
+        window.__flirteasyPhoneReadyListening = true;
+        window.addEventListener('message', function(e) {
+          if (e.data && e.data.type === 'bumble:phoneInputReady') {
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
+              JSON.stringify({ type: 'bumble:phoneInputReady' })
+            );
+          }
+        });
+      })();
+    ` : '';
+
     const jsCode = `
       (function() {
         try {
@@ -149,6 +211,7 @@ export default function BrowserScreen({ route, navigation }) {
           style.id = 'flirteasy-mobile-layout';
           style.innerHTML = \`${cssCode}\`;
           document.head.appendChild(style);
+          ${listenerJs}
         } catch(e) {}
       })();
     `;
@@ -171,7 +234,9 @@ export default function BrowserScreen({ route, navigation }) {
         </View>
         {loginStep !== 'done' ? (
           <TouchableOpacity style={styles.skipBtn} onPress={() => setLoginStep('done')}>
-            <Text style={styles.skipBtnText}>Skip Wizard ➔</Text>
+            <Text style={styles.skipBtnText}>
+              {loginStep === 'navigating' ? 'Skip ➔' : 'Skip Wizard ➔'}
+            </Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity 
@@ -192,6 +257,16 @@ export default function BrowserScreen({ route, navigation }) {
           onLoadEnd={() => {
             setLoading(false);
             injectConfigScript();
+          }}
+          onMessage={(event) => {
+            try {
+              const msg = JSON.parse(event.nativeEvent.data);
+              // Extension signals phone input is ready — advance wizard automatically
+              if (msg.type === 'bumble:phoneInputReady' && loginStep === 'navigating') {
+                console.log('[Browser] Bumble phone input ready — advancing wizard');
+                setLoginStep('phone');
+              }
+            } catch (_) {}
           }}
           onError={() => {
             setTimeout(() => {
@@ -218,10 +293,30 @@ export default function BrowserScreen({ route, navigation }) {
 
       {loginStep !== 'done' && (
         <View style={styles.wizardPanel}>
+          {loginStep === 'navigating' && (
+            <View style={styles.wizardStep}>
+              <ActivityIndicator size="large" color="#FFCB37" style={{ marginBottom: 16 }} />
+              <Text style={styles.wizardTitle}>Opening Phone Login...</Text>
+              <Text style={styles.wizardDesc}>
+                Automatically navigating to the phone number screen on Bumble. Just a moment.
+              </Text>
+              <TouchableOpacity
+                style={[styles.wizardBtn, { backgroundColor: '#2A2A35', borderWidth: 1, borderColor: '#3A3A4A' }]}
+                onPress={() => setLoginStep('phone')}
+              >
+                <Text style={[styles.wizardBtnText, { color: '#8E8E9F' }]}>Skip — I'll navigate manually</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {loginStep === 'phone' && (
             <View style={styles.wizardStep}>
-              <Text style={styles.wizardTitle}>Guided Login - Step 1</Text>
-              <Text style={styles.wizardDesc}>Enter your mobile number to log into your {platform} account in Neko.</Text>
+              <Text style={styles.wizardTitle}>Enter Your Phone Number</Text>
+              <Text style={styles.wizardDesc}>
+                {isBumble
+                  ? 'Type your number into the Bumble phone field above, then tap Send.'
+                  : `Enter your mobile number to log into your ${platform} account.`}
+              </Text>
               <TextInput
                 style={styles.wizardInput}
                 placeholder="e.g. +12345678900"
