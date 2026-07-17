@@ -316,7 +316,7 @@ def wait_click(ws, sel, label, timeout=15):
     while time.time()-t < timeout:
         if eval_js(ws, expr) == 'clicked':
             print('CLICKED:'+label, flush=True); return True
-        time.sleep(0.6)
+        time.sleep(0.1)
     print('TIMEOUT:'+label, flush=True); return False
 
 # Connect
@@ -335,19 +335,25 @@ print('CDP_CONNECTED', flush=True)
 if eval_js(ws, "!!document.querySelector('input[type=\"tel\"],#phone-country-code')"):
     print('ALREADY_ON_PHONE', flush=True); ws.close(); sys.exit(0)
 
-# Wait for page render
-time.sleep(2)
+# Wait a short moment for initial load
+time.sleep(0.3)
 
 # Step 1
 wait_click(ws, '.other-methods-button', 'Continue_with_other_methods', 15)
-time.sleep(2)
 
 # Step 2
 wait_click(ws, 'button.button--transparent', 'Use_cell_phone_number', 10)
-time.sleep(2)
 
-# Verify
-if eval_js(ws, "!!document.querySelector('input[type=\"tel\"],#phone-country-code')"):
+# Verify with polling
+t = time.time()
+found = False
+while time.time() - t < 5:
+    if eval_js(ws, "!!document.querySelector('input[type=\"tel\"],#phone-country-code')"):
+        found = True
+        break
+    time.sleep(0.1)
+
+if found:
     print('PHONE_READY', flush=True)
 else:
     print('PHONE_NOT_FOUND', flush=True)
@@ -367,16 +373,17 @@ ws.close()
       lines.forEach(l => console.log('[Orchestrator] Nav:', l.trim()));
       if (stderr && stderr.trim()) console.warn('[Orchestrator] Nav stderr:', stderr.trim());
 
-      if ((stdout || '').includes('PHONE_READY')) {
+      if ((stdout || '').includes('PHONE_READY') || (stdout || '').includes('ALREADY_ON_PHONE')) {
         console.log('[Orchestrator] ✅ Phone input ready — user can enter their number.');
-      } else if ((stdout || '').includes('ALREADY_ON_PHONE')) {
-        console.log('[Orchestrator] ✅ Already on phone input screen.');
+        navReady = true;
       } else {
         console.warn('[Orchestrator] ⚠️  Navigation incomplete — check browser.');
       }
     });
   });
 }
+
+let navReady = false;
 
 const server = http.createServer((req, res) => {
   // CORS Headers
@@ -790,6 +797,204 @@ const server = http.createServer((req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: e.message }));
     }
+  } else if (req.method === 'GET' && req.url === '/nav-status') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ready: navReady }));
+  } else if (req.method === 'GET' && req.url === '/check-page-state') {
+    const checkScript = `
+      (function() {
+        const url = window.location.href;
+        
+        // Check if user is on homepage/logged in
+        const isLoggedIn = (
+          document.querySelector('[data-qa-role="encounters-cards-area"]') !== null ||
+          document.querySelector('.encounters-main') !== null ||
+          document.querySelector('[class*="encounters"]') !== null ||
+          url.includes('/app/') ||
+          document.title.toLowerCase().includes('meet') ||
+          document.querySelector('div[class*="profile"]') !== null
+        );
+        
+        // Check for captcha
+        const hasCaptcha = (
+          document.querySelector('iframe[src*="captcha"]') !== null ||
+          document.querySelector('iframe[src*="recaptcha"]') !== null ||
+          document.querySelector('.g-recaptcha') !== null ||
+          document.querySelector('[class*="captcha"]') !== null ||
+          document.querySelector('div[class*="antibot"]') !== null ||
+          document.title.toLowerCase().includes('captcha')
+        );
+        
+        // Check if OTP input still visible (OTP was wrong or need re-entry)
+        const hasOtpInput = (
+          document.querySelector('input[type="tel"]') !== null ||
+          document.querySelector('input[autocomplete="one-time-code"]') !== null
+        );
+        
+        if (isLoggedIn) return 'logged_in';
+        if (hasCaptcha) return 'captcha';
+        if (hasOtpInput) return 'otp_screen';
+        return 'unknown';
+      })()
+    `;
+    // Run a Python CDP script that captures the return value.
+    const pyCheck = String.raw`
+import json, urllib.request, socket, base64, sys, os
+
+def http_get(url):
+    return json.loads(urllib.request.urlopen(url, timeout=5).read())
+
+class WS:
+    def __init__(self, url):
+        from urllib.parse import urlparse
+        p = urlparse(url)
+        self.sock = socket.create_connection((p.hostname, p.port or 80), timeout=15)
+        key = base64.b64encode(os.urandom(16)).decode()
+        hs = (f"GET {p.path} HTTP/1.1\r\n"
+              f"Host: {p.hostname}:{p.port}\r\n"
+              f"Upgrade: websocket\r\nConnection: Upgrade\r\n"
+              f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n")
+        self.sock.sendall(hs.encode())
+        buf = b""
+        while b"\r\n\r\n" not in buf:
+            buf += self.sock.recv(4096)
+        self._mid = 1
+        self._buf = b""
+
+    def send(self, data):
+        if isinstance(data, str): data = data.encode()
+        mask = os.urandom(4)
+        n = len(data)
+        if n < 126: hdr = bytes([0x81, 0x80 | n]) + mask
+        elif n < 65536: hdr = bytes([0x81, 0xFE]) + n.to_bytes(2,'big') + mask
+        else: hdr = bytes([0x81, 0xFF]) + n.to_bytes(8,'big') + mask
+        self.sock.sendall(hdr + bytes(b ^ mask[i%4] for i,b in enumerate(data)))
+
+    def recv_msg(self):
+        def read(n):
+            while len(self._buf) < n: self._buf += self.sock.recv(4096)
+            out, self._buf = self._buf[:n], self._buf[n:]
+            return out
+        b0,b1 = read(2); n = b1&0x7F
+        if n==126: n=int.from_bytes(read(2),'big')
+        elif n==127: n=int.from_bytes(read(8),'big')
+        return read(n).decode()
+
+    def call(self, method, params=None):
+        mid = self._mid; self._mid += 1
+        self.send(json.dumps({'id':mid,'method':method,'params':params or {}}))
+        while True:
+            msg = json.loads(self.recv_msg())
+            if msg.get('id') == mid: return msg.get('result', {})
+
+    def close(self):
+        try: self.sock.close()
+        except: pass
+
+try:
+    tabs = http_get('http://localhost:9222/json')
+    page = next((t for t in tabs if t.get('type')==='page'), None)
+    if not page: print('unknown'); sys.exit(0)
+    ws = WS(page['webSocketDebuggerUrl'])
+    script = """
+    (function() {
+        var url = window.location.href;
+        var isLoggedIn = (
+          document.querySelector('[data-qa-role="encounters-cards-area"]') !== null ||
+          document.querySelector('.encounters-main') !== null ||
+          url.indexOf('/app/') !== -1 ||
+          document.title.toLowerCase().indexOf('meet') !== -1
+        );
+        var hasCaptcha = (
+          document.querySelector('iframe[src*="captcha"]') !== null ||
+          document.querySelector('iframe[src*="recaptcha"]') !== null ||
+          document.querySelector('.g-recaptcha') !== null ||
+          document.querySelector('[class*="captcha"]') !== null ||
+          document.title.toLowerCase().indexOf('captcha') !== -1
+        );
+        var hasOtpInput = (
+          url.indexOf('confirm-phone') !== -1 ||
+          document.querySelector('input[autocomplete="one-time-code"]') !== null ||
+          document.querySelector('input[name="code"]') !== null ||
+          document.querySelector('input[id="code"]') !== null ||
+          (document.querySelector('input[type="tel"]') !== null && document.getElementById('phone') === null && document.getElementById('phone-country-code') === null) ||
+          (function() {
+            var elements = document.querySelectorAll('h1, h2, p, span, label');
+            for (var i = 0; i < elements.length; i++) {
+              var txt = (elements[i].innerText || elements[i].textContent || '').toLowerCase();
+              if (txt.indexOf('enter the 6-digit code') !== -1 || txt.indexOf('verification code') !== -1 || txt.indexOf('code we sent') !== -1 || txt.indexOf('enter code') !== -1) {
+                return true;
+              }
+            }
+            return false;
+          })()
+        );
+        if (isLoggedIn) return 'logged_in';
+        if (hasCaptcha) return 'captcha';
+        if (hasOtpInput) return 'otp_screen';
+        return 'unknown';
+    })()
+    """
+    result = ws.call('Runtime.evaluate', {'expression': script.strip(), 'returnByValue': True})
+    state = (result.get('result') or {}).get('value', 'unknown')
+    if state == 'unknown':
+        debug_script = """
+        (function() {
+            var inputs = Array.from(document.querySelectorAll('input')).map(function(i) {
+                return {
+                    tag: i.tagName,
+                    type: i.type,
+                    id: i.id,
+                    name: i.name,
+                    placeholder: i.placeholder,
+                    autocomplete: i.getAttribute('autocomplete'),
+                    className: i.className
+                };
+            });
+            var headings = Array.from(document.querySelectorAll('h1, h2, h3, label')).map(function(h) {
+                return (h.innerText || h.textContent || '').trim().substring(0, 100);
+            });
+            return JSON.stringify({
+                url: window.location.href,
+                title: document.title,
+                inputs: inputs,
+                headings: headings
+            });
+        })()
+        """
+        dbg_res = ws.call('Runtime.evaluate', {'expression': debug_script, 'returnByValue': True})
+        dbg_val = (dbg_res.get('result') or {}).get('value', '{}')
+        print("DEBUG_INFO:" + dbg_val)
+    print(state)
+    ws.close()
+except Exception as e:
+    print('unknown')
+`;
+      const tmpPath = require('path').join(__dirname, '_state_check.py');
+      require('fs').writeFileSync(tmpPath, pyCheck, 'utf8');
+      require('child_process').exec(`docker cp "${tmpPath}" neko:/tmp/state_check.py`, (cpErr) => {
+        try { require('fs').unlinkSync(tmpPath); } catch (_) {}
+        if (cpErr) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ state: 'unknown' }));
+          return;
+        }
+        require('child_process').exec(`docker exec neko python3 /tmp/state_check.py`, (err, stdout) => {
+          const lines = (stdout || '').split('\n').filter(Boolean);
+          let state = 'unknown';
+          lines.forEach(line => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('DEBUG_INFO:')) {
+              console.log('[Orchestrator] Page debug info:', trimmed.substring(11));
+            } else {
+              state = trimmed;
+            }
+          });
+          console.log(`[Orchestrator] Page state check: ${state}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ state }));
+        });
+      });
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
