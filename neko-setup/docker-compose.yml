@@ -4,6 +4,9 @@ services:
     container_name: neko
     restart: unless-stopped
     shm_size: "2gb" # Prevent browser crashes from heavy pages (e.g. streaming sites)
+    security_opt:
+      - apparmor:unconfined
+      - seccomp:unconfined
     extra_hosts:
       - "host.docker.internal:host-gateway"
     cap_add:
