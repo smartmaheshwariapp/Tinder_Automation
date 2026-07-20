@@ -799,6 +799,69 @@ const server = http.createServer((req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: e.message }));
     }
+  } else if (req.method === 'POST' && req.url === '/resend-code') {
+    console.log('[Orchestrator] Resend code requested. Human-like tabbing sequence starting...');
+    
+    // 1. Focus the first OTP input field on screen
+    const focusFirstInputScript = `
+      (function() {
+        const inputs = Array.from(document.querySelectorAll('input[type="tel"], input[autocomplete="one-time-code"], input'));
+        if (inputs.length > 0) {
+          inputs[0].focus();
+          inputs[0].click();
+          return 'FOCUSED';
+        }
+        return 'NO_INPUT';
+      })()
+    `;
+    
+    executeJSInContainer(focusFirstInputScript).then(() => {
+      // Step-by-step human tabbing: 6 Tab presses + 1 Return press with natural random delays (120ms - 250ms)
+      const steps = ['Tab', 'Tab', 'Tab', 'Tab', 'Tab', 'Tab', 'Return'];
+      let stepIdx = 0;
+
+      function sendHumanKey() {
+        if (stepIdx >= steps.length) {
+          console.log('[Orchestrator] Human tabbing sequence completed successfully!');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+          return;
+        }
+
+        const key = steps[stepIdx];
+        exec(`docker exec neko xdotool key ${key}`, (err, stdout, stderr) => {
+          if (err) {
+            console.error('[Orchestrator] Human key error:', stderr);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: stderr }));
+            return;
+          }
+          stepIdx++;
+          // Random delay between keypresses: 120ms to 250ms
+          const humanDelay = 120 + Math.floor(Math.random() * 130);
+          setTimeout(sendHumanKey, humanDelay);
+        });
+      }
+
+      // Start human tabbing after a short initial pause (200ms)
+      setTimeout(sendHumanKey, 200);
+    });
+  } else if (req.method === 'POST' && req.url === '/swipe') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      let data = {};
+      try { data = JSON.parse(body || '{}'); } catch (_) {}
+      const key = data.key === 'Left' ? 'Left' : 'Right';
+      
+      // Respond instantly so mobile app doesn't wait
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, key: key }));
+
+      exec(`docker exec neko xdotool key --delay 0 ${key}`, (err, stdout, stderr) => {
+        if (err) console.error('[Orchestrator] Swipe key error:', stderr);
+      });
+    });
   } else if (req.method === 'GET' && req.url === '/nav-status') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ready: navReady }));
@@ -817,20 +880,31 @@ const server = http.createServer((req, res) => {
           document.querySelector('div[class*="profile"]') !== null
         );
         
-        // Check for captcha
+        // Check for captcha or puzzle ("Protecting your account" / "Start Puzzle")
         const hasCaptcha = (
           document.querySelector('iframe[src*="captcha"]') !== null ||
           document.querySelector('iframe[src*="recaptcha"]') !== null ||
+          document.querySelector('iframe[src*="arkose"]') !== null ||
+          document.querySelector('iframe[src*="funcaptcha"]') !== null ||
+          document.querySelector('iframe[src*="challenge"]') !== null ||
           document.querySelector('.g-recaptcha') !== null ||
           document.querySelector('[class*="captcha"]') !== null ||
           document.querySelector('div[class*="antibot"]') !== null ||
-          document.title.toLowerCase().includes('captcha')
+          document.title.toLowerCase().includes('captcha') ||
+          document.title.toLowerCase().includes('challenge') ||
+          Array.from(document.querySelectorAll('h1, h2, h3, div, p, button')).some(el => {
+            const t = (el.innerText || el.textContent || '').toLowerCase();
+            return t.includes('protecting your account') || t.includes('start puzzle') || t.includes('verify your account') || t.includes('press & hold') || t.includes('press and hold');
+          })
         );
         
-        // Check if OTP input still visible (OTP was wrong or need re-entry)
+        // Check if OTP input / confirm-phone URL is active
         const hasOtpInput = (
+          url.includes('/confirm-phone') ||
           document.querySelector('input[type="tel"]') !== null ||
-          document.querySelector('input[autocomplete="one-time-code"]') !== null
+          document.querySelector('input[autocomplete="one-time-code"]') !== null ||
+          document.querySelector('input[name*="code"]') !== null ||
+          document.querySelector('input[name*="otp"]') !== null
         );
         
         if (isLoggedIn) return 'logged_in';
