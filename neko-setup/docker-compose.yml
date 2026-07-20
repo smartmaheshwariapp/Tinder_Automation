@@ -31,5 +31,4 @@ services:
       # Persists bookmarks, history, and cookies across restarts using local session folder
       - ${NEKO_SESSION_DIR:-./sessions/default}:/home/neko/.config/chromium
       - ./chromium.conf:/etc/neko/supervisord/chromium.conf:ro
-      - ./policies.json:/etc/chromium/policies/managed/policies.json:ro
       - ./clean-extension:/src/extension:ro
