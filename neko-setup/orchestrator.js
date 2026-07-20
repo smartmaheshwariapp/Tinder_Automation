@@ -486,6 +486,7 @@ const server = http.createServer((req, res) => {
                 fs.rmSync(sessionDir, { recursive: true, force: true });
               }
               fs.mkdirSync(sessionDir, { recursive: true });
+              try { require('child_process').execSync(`chmod -R 777 "${sessionDir}"`); } catch (_) {}
             } catch (rmErr) {
               console.error(`[Orchestrator] Error deleting session directory:`, rmErr.message);
             }
@@ -513,6 +514,7 @@ const server = http.createServer((req, res) => {
                 }
               };
               cleanProfileLocks(sessionDir);
+              try { require('child_process').execSync(`chmod -R 777 "${sessionDir}"`); } catch (_) {}
               console.log(`[Orchestrator] Cleared all stale profile locks, LevelDB LOCK files, GCM Store, and Sessions directories in ${sessionDir}`);
             } catch (e) {
               console.warn(`[Orchestrator] Profile directory cleaning warning:`, e.message);
