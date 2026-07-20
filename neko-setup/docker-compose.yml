@@ -9,9 +9,9 @@ services:
     cap_add:
       - SYS_ADMIN # Required for browser sandbox security
     ports:
-      - "8080:8080"   # Neko Web interface
-      - "8088:8088/tcp" # WebRTC TCP Multiplexer
-      - "9222:9222"   # Chrome DevTools Protocol (CDP)
+      - "8080:8080"       # Neko Web interface
+      - "52000-52099:52000-52099/udp" # WebRTC Ephemeral Port Range
+      - "9222:9222"       # Chrome DevTools Protocol (CDP)
     environment:
       # --- General Settings ---
       NEKO_DESKTOP_SCREEN: "416x912@30"
@@ -21,7 +21,7 @@ services:
       NEKO_CAPTURE_VIDEO_SHOW_POINTER: "false"
       # --- WebRTC Configuration ---
       NEKO_WEBRTC_NAT1TO1: ${NEKO_WEBRTC_NAT1TO1:-192.168.1.4}
-      NEKO_WEBRTC_TCPMUX: 8088
+      NEKO_EPR: "52000-52099"
       NEKO_WEBRTC_ICELITE: "true"
       NEKO_SESSION_IMPLICIT_HOSTING: "true"
     volumes:
