@@ -492,25 +492,27 @@ const server = http.createServer((req, res) => {
           } else {
             console.log(`[Orchestrator] User ${userId} has successful login history. Preserving session directory.`);
             
-            // Clean up locks/Sessions while keeping cookies/profiles
+            // Clean up locks/Sessions while keeping cookies/profiles (Cross-platform Node.js)
             try {
-              const cleanSessionPath = sessionDir.replace(/\//g, '\\');
-              require('child_process').execSync(
-                `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter '*SingletonLock*' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force"`,
-                { stdio: 'ignore' }
-              );
-              require('child_process').execSync(
-                `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'LOCK' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force"`,
-                { stdio: 'ignore' }
-              );
-              require('child_process').execSync(
-                `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'GCM Store' -Directory -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force"`,
-                { stdio: 'ignore' }
-              );
-              require('child_process').execSync(
-                `powershell -Command "Get-ChildItem -Path '${cleanSessionPath}' -Filter 'Sessions' -Directory -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force"`,
-                { stdio: 'ignore' }
-              );
+              const cleanProfileLocks = (targetDir) => {
+                if (!fs.existsSync(targetDir)) return;
+                const entries = fs.readdirSync(targetDir, { withFileTypes: true });
+                for (const entry of entries) {
+                  const fullPath = path.join(targetDir, entry.name);
+                  if (entry.isDirectory()) {
+                    if (entry.name === 'GCM Store' || entry.name === 'Sessions') {
+                      try { fs.rmSync(fullPath, { recursive: true, force: true }); } catch (_) {}
+                    } else {
+                      cleanProfileLocks(fullPath);
+                    }
+                  } else {
+                    if (entry.name.includes('SingletonLock') || entry.name === 'LOCK') {
+                      try { fs.rmSync(fullPath, { force: true }); } catch (_) {}
+                    }
+                  }
+                }
+              };
+              cleanProfileLocks(sessionDir);
               console.log(`[Orchestrator] Cleared all stale profile locks, LevelDB LOCK files, GCM Store, and Sessions directories in ${sessionDir}`);
             } catch (e) {
               console.warn(`[Orchestrator] Profile directory cleaning warning:`, e.message);
