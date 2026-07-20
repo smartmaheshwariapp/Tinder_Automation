@@ -10,7 +10,7 @@ const PLATFORMS = [
 
 export default function PlatformSelectScreen({ navigation }) {
   // Hardcoded values to handle backend routing invisibly to the user
-  const [vpsUrl, setVpsUrl] = useState('http://82.29.160.123/?usr=User&pwd=admin');
+  const [vpsUrl, setVpsUrl] = useState('http://82.29.160.123:8080/?usr=User&pwd=admin');
   const [proxyIp, setProxyIp] = useState('jestcsld:lhwbi2hzo3eg@198.23.243.226:1080');
 
   const handleSelect = (platform) => {
