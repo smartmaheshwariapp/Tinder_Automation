@@ -88,8 +88,10 @@ export default function PlatformConfigScreen({ route, navigation }) {
       }
     };
 
-    // Load Neko WebRTC player with native UI controls (shows Neko's own keyboard toggle button)
-    const nekoPlayerUrl = `http://${host}:8080/?usr=User&pwd=admin`;
+    // Use configured HTTPS stream domain URL (e.g. https://stream.smartmaheshwari.com)
+    const nekoPlayerUrl = (vpsUrl && vpsUrl.includes('://')) 
+      ? vpsUrl 
+      : `https://${host}/?usr=User&pwd=admin`;
 
     setLoading(false);
     navigation.navigate('Browser', {

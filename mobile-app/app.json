@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FlirtEasy",
+    "name": "Flirt Easy",
     "slug": "flirteasy",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,7 +15,6 @@
     },
     "android": {
       "package": "com.flirteasy.app",
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#0F0F13",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -30,6 +29,11 @@
       "eas": {
         "projectId": "60d1aae8-292b-4e3f-83e9-37949213bba2"
       }
-    }
+    },
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/60d1aae8-292b-4e3f-83e9-37949213bba2"
+    },
+    "owner": "miiscoorg"
   }
 }

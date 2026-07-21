@@ -353,6 +353,9 @@ export default function BrowserScreen({ route, navigation }) {
 
   const finalUrl = React.useMemo(() => {
     let clean = (vpsUrl || '').replace('http://', 'https://');
+    if (clean.includes('stream.') || clean.startsWith('https://')) {
+      clean = clean.replace(':8080', '');
+    }
     if (!clean.startsWith('https://')) {
       clean = 'https://' + clean;
     }
