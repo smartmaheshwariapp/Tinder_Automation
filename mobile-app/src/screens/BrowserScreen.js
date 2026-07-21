@@ -352,7 +352,11 @@ export default function BrowserScreen({ route, navigation }) {
   };
 
   const finalUrl = React.useMemo(() => {
-    return `${vpsUrl}${vpsUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+    let clean = (vpsUrl || '').replace('http://', 'https://');
+    if (!clean.startsWith('https://')) {
+      clean = 'https://' + clean;
+    }
+    return `${clean}${clean.includes('?') ? '&' : '?'}t=${Date.now()}`;
   }, [vpsUrl]);
 
   return (
