@@ -54,8 +54,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
     let apiHost = host.startsWith('stream.') ? host.replace('stream.', 'api.') : host;
     const urlsToTry = [
       `https://${apiHost}/start-session`,
-      `http://${host}:3001/start-session`,
-      `https://${host}:3001/start-session`
+      `http://${apiHost}:3001/start-session`,
+      `https://${apiHost}:3001/start-session`
     ];
 
     for (const url of urlsToTry) {
