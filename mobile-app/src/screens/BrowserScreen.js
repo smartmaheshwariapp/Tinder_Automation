@@ -27,6 +27,14 @@ export default function BrowserScreen({ route, navigation }) {
 
   const lastSwipeTime = useRef(0);
 
+  // Safety timeout to dismiss loading overlay after 3 seconds max
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleSwipe = (direction) => {
     const now = Date.now();
     if (now - lastSwipeTime.current < 120) return;
@@ -290,31 +298,17 @@ export default function BrowserScreen({ route, navigation }) {
   const injectConfigScript = () => {
     const settingsJson = JSON.stringify(extensionSettings || {});
     const cssCode = `
-      header, nav, .nav, #nav, .navbar, .header,
-      .neko-nav, .neko-header, .neko-sidebar, .neko-chat, .neko-menu, .neko-controls, .neko-topbar, .neko-room-header,
-      .v-app-bar, .v-toolbar, .v-navigation-drawer, .v-app-bar-title,
-      [class*="v-toolbar"], [class*="v-app-bar"], [class*="v-navigation-drawer"],
-      [class*="nav-bar"], [class*="topbar"], [class*="neko-nav"], [class*="header"] {
+      .v-app-bar, .v-toolbar, .v-navigation-drawer, header.v-app-bar, .neko-nav, .neko-header, .v-app-bar--fixed {
         display: none !important;
         height: 0 !important;
-        min-height: 0 !important;
-        max-height: 0 !important;
         opacity: 0 !important;
-        pointer-events: none !important;
         visibility: hidden !important;
       }
-      html, body, #neko, #app, .v-application, .neko-main, .video-container, .neko-video, video, canvas, main, .v-main {
+      .v-main, .neko-main, .video-container, .neko-video, video, canvas {
+        padding-top: 0 !important;
+        margin: 0 !important;
         width: 100% !important;
         height: 100% !important;
-        max-width: 100vw !important;
-        max-height: 100vh !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        top: 0 !important;
-        left: 0 !important;
-        position: absolute !important;
-        overflow: hidden !important;
-        box-sizing: border-box !important;
       }
     `;
 
@@ -343,31 +337,12 @@ export default function BrowserScreen({ route, navigation }) {
         try {
           localStorage.setItem('flirteasy_settings_sync', '${settingsJson}');
           
-          function applyHidingCSS() {
-            if (!document.getElementById('flirteasy-mobile-layout')) {
-              const style = document.createElement('style');
-              style.id = 'flirteasy-mobile-layout';
-              style.innerHTML = \`${cssCode}\`;
-              (document.head || document.documentElement).appendChild(style);
-            }
-            try {
-              document.querySelectorAll('div, header, nav, section').forEach(function(el) {
-                const text = (el.innerText || el.textContent || '').trim().toLowerCase();
-                if (text.includes('n.eko') || text.includes('neko')) {
-                  const rect = el.getBoundingClientRect();
-                  if (rect.top < 120 && rect.height < 120 && rect.height > 0) {
-                    el.style.display = 'none';
-                    el.style.height = '0px';
-                    el.style.opacity = '0';
-                    el.style.pointerEvents = 'none';
-                  }
-                }
-              });
-            } catch (_) {}
+          if (!document.getElementById('flirteasy-mobile-layout')) {
+            const style = document.createElement('style');
+            style.id = 'flirteasy-mobile-layout';
+            style.innerHTML = \`${cssCode}\`;
+            (document.head || document.documentElement).appendChild(style);
           }
-          
-          applyHidingCSS();
-          setInterval(applyHidingCSS, 150);
 
           ${listenerJs}
         } catch(e) {}
@@ -432,7 +407,6 @@ export default function BrowserScreen({ route, navigation }) {
             ref={webViewRef}
             source={{ uri: finalUrl }}
             style={styles.webview}
-            onLoadStart={() => setLoading(true)}
             onLoadEnd={() => {
               setLoading(false);
               injectConfigScript();
