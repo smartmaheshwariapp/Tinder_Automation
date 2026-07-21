@@ -46,12 +46,10 @@ export default function PlatformConfigScreen({ route, navigation }) {
       }
     } catch (e) {}
 
-    const nekoOrchestratorUrl = `${protocol}//${host}:3000/start-session`;
-
-    // Start Neko container with shared sessions volume
+    // Start Neko container with shared sessions volume (try HTTP first then HTTPS on port 3000)
     try {
-      console.log('[Config] Requesting Neko orchestrator to start container...');
-      await fetch(nekoOrchestratorUrl, {
+      console.log('[Config] Requesting Neko orchestrator on http://' + host + ':3000...');
+      await fetch(`http://${host}:3000/start-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -60,7 +58,19 @@ export default function PlatformConfigScreen({ route, navigation }) {
         }),
       });
     } catch (err) {
-      console.warn('[Config] Neko Orchestrator connection failed:', err);
+      try {
+        console.log('[Config] Fallback requesting Neko orchestrator on https://' + host + ':3000...');
+        await fetch(`https://${host}:3000/start-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            platform: platform.toLowerCase(), 
+            userId: 'dev_user_1' 
+          }),
+        });
+      } catch (err2) {
+        console.warn('[Config] Neko Orchestrator connection failed:', err2);
+      }
     }
 
     const extensionSettings = {

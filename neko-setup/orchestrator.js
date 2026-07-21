@@ -1103,10 +1103,13 @@ function getLocalIP() {
   return '127.0.0.1';
 }
 
-const localIP = getLocalIP();
-console.log(`[Orchestrator] Detected LAN IP: ${localIP}`);
-fs.writeFileSync(path.join(__dirname, '.env'), `NEKO_WEBRTC_NAT1TO1=${localIP}\n`, 'utf8');
-console.log(`[Orchestrator] Written .env → NEKO_WEBRTC_NAT1TO1=${localIP}`);
+const envPath = path.join(__dirname, '.env');
+if (!fs.existsSync(envPath)) {
+  const localIP = getLocalIP();
+  console.log(`[Orchestrator] Detected LAN IP: ${localIP}`);
+  fs.writeFileSync(envPath, `NEKO_WEBRTC_NAT1TO1=${localIP}\n`, 'utf8');
+  console.log(`[Orchestrator] Written .env → NEKO_WEBRTC_NAT1TO1=${localIP}`);
+}
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Orchestrator] Local Neko Session Manager listening on port ${PORT}...`);

@@ -153,10 +153,11 @@ export default function BrowserScreen({ route, navigation }) {
   const getOrchestratorUrl = (nekoUrl) => {
     try {
       const urlObj = new URL(nekoUrl.split('/?')[0]);
+      urlObj.protocol = 'http:';
       urlObj.port = '3000';
       return urlObj.origin;
     } catch (e) {
-      let base = nekoUrl.split('/?')[0];
+      let base = nekoUrl.split('/?')[0].replace('https://', 'http://');
       if (base.includes(':8080')) {
         return base.replace(/:8080/, ':3000');
       }
