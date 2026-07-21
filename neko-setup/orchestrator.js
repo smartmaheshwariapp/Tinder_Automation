@@ -789,8 +789,10 @@ const server = http.createServer((req, res) => {
           return false;
         })()`;
 
-        executeJSInContainer(focusFirstOtpScript).then(() => {
-          exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
+        const otpSelector = "input[autocomplete='one-time-code'], input[inputmode='numeric'], input[data-qa-role='digit-input'], input[type='tel']";
+        clickElementInContainer(otpSelector).then(() => {
+          executeJSInContainer(focusFirstOtpScript).then(() => {
+            exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
             setTimeout(() => {
               let idx = 0;
               function typeChar() {
@@ -813,6 +815,7 @@ const server = http.createServer((req, res) => {
             }, 150);
           });
         });
+      });
 
       } catch (err) {
         console.error('[Orchestrator] Error in /submit-otp handler:', err);
@@ -887,55 +890,27 @@ const server = http.createServer((req, res) => {
           nextChar();
         }
 
-        // Step 1: Focus and clear country code
-        executeJSInContainer(`(function() {
-          const el = document.getElementById('phone-country-code');
-          if (el) {
-            el.focus();
-            el.value = '';
-            try {
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-            } catch (_) {}
-            if (typeof el.select === 'function') el.select();
-          }
-        })()`).then(() => {
+        // 1. Physical mouse click on Country Code input
+        const ccSelector = "input[autocomplete='country'], #phone-country-code, select[name*='country'], input[name*='country']";
+        clickElementInContainer(ccSelector).then(() => {
           exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
             typeStringSync(cleanCc, () => {
-              // Step 2: Wait 400ms, dismiss dropdown, focus main phone input
               setTimeout(() => {
-                const focusPhoneScript = `(function() {
-                  try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 })); } catch (_) {}
-                  const cc = document.getElementById('phone-country-code');
-                  const inputs = Array.from(document.querySelectorAll('input'));
-                  let el = inputs.find(i => i !== cc && (i.id === 'phone' || i.name === 'phone' || i.type === 'tel' || i.getAttribute('data-qa-role') === 'textfield-input' || i.placeholder?.toLowerCase().includes('phone') || i.placeholder?.toLowerCase().includes('number')));
-                  if (!el) {
-                    el = document.querySelector('input[type="tel"]:not(#phone-country-code), #phone, input[name="phone"]');
-                  }
-                  if (el) {
-                    el.focus();
-                    el.click();
-                    el.value = '';
-                    try {
-                      el.dispatchEvent(new Event('input', { bubbles: true }));
-                      el.dispatchEvent(new Event('change', { bubbles: true }));
-                    } catch (_) {}
-                    if (typeof el.select === 'function') el.select();
-                    return true;
-                  }
-                  return false;
-                })()`;
-
-                executeJSInContainer(focusPhoneScript).then(() => {
+                // 2. Physical mouse click on Phone Number input
+                const phoneSelector = "input[type='tel']:not(#phone-country-code), input[name='phone'], input[data-qa-role='textfield-input'], #phone";
+                clickElementInContainer(phoneSelector).then(() => {
                   exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
                     setTimeout(() => {
-                      // Step 3: Type mobile phone number
+                      // 3. Type mobile phone number
                       typeStringSync(phone, () => {
-                        // Step 4: Press Enter / click submit button
+                        // 4. Click Submit Button & Press Return
                         setTimeout(() => {
-                          exec('docker exec neko xdotool key Return', () => {
-                            res.writeHead(200, { 'Content-Type': 'application/json' });
-                            res.end(JSON.stringify({ success: true }));
+                          const submitSelector = "button[type='submit'], button.button--theme-primary, button[data-qa-role='submit']";
+                          clickElementInContainer(submitSelector).then(() => {
+                            exec('docker exec neko xdotool key Return', () => {
+                              res.writeHead(200, { 'Content-Type': 'application/json' });
+                              res.end(JSON.stringify({ success: true }));
+                            });
                           });
                         }, 300);
                       });
