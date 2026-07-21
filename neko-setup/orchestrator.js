@@ -650,8 +650,9 @@ const server = http.createServer((req, res) => {
         if (field === 'country-code') {
           // Remove '+' if present
           const cleanCC = text.startsWith('+') ? text.substring(1) : text;
-          clickElementInContainer('#phone-country-code').then(() => {
-            executeJSInContainer("const el = document.getElementById('phone-country-code'); if (el) { el.focus(); el.select(); }").then(() => {
+          const ccSelector = "#phone-country-code, input[name='country-code']";
+          clickElementInContainer(ccSelector).then(() => {
+            exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
               typeString(cleanCC, () => {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
@@ -659,97 +660,58 @@ const server = http.createServer((req, res) => {
             });
           });
         } else if (field === 'phone-number') {
-          const focusScript = `(function() {
-            try {
-              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
-            } catch (_) {}
-
-            const cc = document.getElementById('phone-country-code');
-            const inputs = Array.from(document.querySelectorAll('input'));
-            let el = inputs.find(i => i !== cc && (i.id === 'phone' || i.name === 'phone' || i.type === 'tel' || i.getAttribute('data-qa-role') === 'textfield-input' || i.placeholder?.toLowerCase().includes('phone') || i.placeholder?.toLowerCase().includes('number')));
-            if (!el) {
-              el = document.querySelector('input[type="tel"]:not(#phone-country-code), #phone, input[name="phone"]');
-            }
-            if (el) {
-              el.focus();
-              el.click();
-              if (typeof el.select === 'function') el.select();
-              return true;
-            }
-            return false;
-          })()`;
-
-          executeJSInContainer(focusScript).then(() => {
-            setTimeout(() => {
+          const phoneSelector = "#phone, input[name='phone'], input[autocomplete='custom-phone']";
+          clickElementInContainer(phoneSelector).then(() => {
+            exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
               typeString(text, () => {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
               });
-            }, 150);
+            });
           });
         } else {
           // Fallback parsing (original logic)
           const isPhone = text.startsWith('+') || (text.length >= 10 && /^\+?[0-9]+$/.test(text));
           if (isPhone) {
             const parsed = parsePhoneNumber(text);
+            const ccSelector = "#phone-country-code, input[name='country-code']";
+            const phoneSelector = "#phone, input[name='phone'], input[autocomplete='custom-phone']";
+
             if (parsed.countryCode) {
-              executeJSInContainer("const el = document.getElementById('phone-country-code'); if (el) { el.focus(); el.select(); }").then(() => {
-                typeString(parsed.countryCode, () => {
-                  const focusScript = `
-                    let el = document.getElementById('phone');
-                    if (!el) {
-                      const cc = document.getElementById('phone-country-code');
-                      el = cc ? Array.from(document.querySelectorAll('input')).find(i => i !== cc && (i.type === 'tel' || i.name?.includes('phone') || i.getAttribute('data-qa-role') === 'textfield-input' || i.className.includes('input'))) : null;
-                    }
-                    if (el) {
-                      el.focus();
-                      el.select();
-                    } else {
-                      const fallback = document.querySelector('input[type="tel"]:not(#phone-country-code)');
-                      if (fallback) {
-                        fallback.focus();
-                        fallback.select();
-                      }
-                    }
-                  `;
-                  executeJSInContainer(focusScript).then(() => {
-                    typeString(parsed.phoneNumber, () => {
-                      res.writeHead(200, { 'Content-Type': 'application/json' });
-                      res.end(JSON.stringify({ success: true }));
-                    });
+              clickElementInContainer(ccSelector).then(() => {
+                exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
+                  typeString(parsed.countryCode, () => {
+                    setTimeout(() => {
+                      clickElementInContainer(phoneSelector).then(() => {
+                        exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
+                          typeString(parsed.phoneNumber, () => {
+                            res.writeHead(200, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ success: true }));
+                          });
+                        });
+                      });
+                    }, 300);
                   });
                 });
               });
             } else {
-              const focusScript = `
-                let el = document.getElementById('phone');
-                if (!el) {
-                  const cc = document.getElementById('phone-country-code');
-                  el = cc ? Array.from(document.querySelectorAll('input')).find(i => i !== cc && (i.type === 'tel' || i.name?.includes('phone') || i.getAttribute('data-qa-role') === 'textfield-input' || i.className.includes('input'))) : null;
-                }
-                if (el) {
-                  el.focus();
-                  el.select();
-                } else {
-                  const fallback = document.querySelector('input[type="tel"]:not(#phone-country-code)');
-                  if (fallback) {
-                    fallback.focus();
-                    fallback.select();
-                  }
-                }
-              `;
-              executeJSInContainer(focusScript).then(() => {
-                typeString(text, () => {
-                  res.writeHead(200, { 'Content-Type': 'application/json' });
-                  res.end(JSON.stringify({ success: true }));
+              clickElementInContainer(phoneSelector).then(() => {
+                exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
+                  typeString(text, () => {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true }));
+                  });
                 });
               });
             }
           } else {
-            executeJSInContainer("const el = document.querySelector('input[type=\\'tel\\'], input[autocomplete=\\'one-time-code\\']'); if (el) { el.focus(); }").then(() => {
-              typeString(text, () => {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true }));
+            const otpSelector = "input[autocomplete='one-time-code'], input[inputmode='numeric'], input[data-qa-role='digit-input'], input[type='tel']";
+            clickElementInContainer(otpSelector).then(() => {
+              exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
+                typeString(text, () => {
+                  res.writeHead(200, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ success: true }));
+                });
               });
             });
           }
@@ -890,14 +852,14 @@ const server = http.createServer((req, res) => {
           nextChar();
         }
 
-        // 1. Physical mouse click on Country Code input
-        const ccSelector = "input[autocomplete='country'], #phone-country-code, select[name*='country'], input[name*='country']";
+        // 1. Physical mouse click on Country Code input (#phone-country-code)
+        const ccSelector = "#phone-country-code, input[name='country-code']";
         clickElementInContainer(ccSelector).then(() => {
           exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
             typeStringSync(cleanCc, () => {
               setTimeout(() => {
-                // 2. Physical mouse click on Phone Number input
-                const phoneSelector = "input[type='tel']:not(#phone-country-code), input[name='phone'], input[data-qa-role='textfield-input'], #phone";
+                // 2. Physical mouse click on Phone Number input (#phone)
+                const phoneSelector = "#phone, input[name='phone'], input[autocomplete='custom-phone']";
                 clickElementInContainer(phoneSelector).then(() => {
                   exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
                     setTimeout(() => {
