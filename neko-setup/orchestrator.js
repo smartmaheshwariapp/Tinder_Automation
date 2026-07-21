@@ -827,44 +827,53 @@ const server = http.createServer((req, res) => {
       }
     });
   } else if (req.method === 'POST' && req.url === '/resend-code') {
-    console.log('[Orchestrator] Resend code requested...');
-    const resendScript = `(function() {
-      const btns = Array.from(document.querySelectorAll('button, a, div, span, [role="button"]'));
-      const target = btns.find(b => {
-        const t = (b.innerText || b.textContent || '').toLowerCase();
-        return t.includes('resend') || t.includes("didn't receive") || t.includes('try again') || t.includes('send code again') || t.includes('send again');
-      });
-      if (target) {
-        target.click();
+    console.log('[Orchestrator] Resend code requested. Executing 6-Tab sequence + Return to trigger Resend...');
+
+    const focusFirstInputScript = `(function() {
+      const inputs = Array.from(document.querySelectorAll('input'));
+      const firstOtpBox = inputs.find(i => 
+        i.getAttribute('autocomplete') === 'one-time-code' ||
+        i.getAttribute('inputmode') === 'numeric' ||
+        i.getAttribute('data-qa-role') === 'digit-input' ||
+        i.maxLength === 1 || i.maxLength === 6 ||
+        i.type === 'tel' || i.type === 'number'
+      ) || inputs[0];
+
+      if (firstOtpBox) {
+        firstOtpBox.focus();
+        firstOtpBox.click();
         return true;
       }
       return false;
     })()`;
 
-    executeJSInContainer(resendScript).then(() => {
-      setTimeout(() => {
-        const focusFirstOtpScript = `(function() {
-          const inputs = Array.from(document.querySelectorAll('input'));
-          const firstOtpBox = inputs.find(i => 
-            i.getAttribute('autocomplete') === 'one-time-code' ||
-            i.getAttribute('inputmode') === 'numeric' ||
-            i.getAttribute('data-qa-role') === 'digit-input' ||
-            i.maxLength === 1 || i.maxLength === 6 ||
-            i.type === 'tel' || i.type === 'number'
-          ) || inputs[0];
+    executeJSInContainer(focusFirstInputScript).then(() => {
+      // Sequence: Tab x 6 to navigate to "Resend Code", then Return to click it
+      const steps = ['Tab', 'Tab', 'Tab', 'Tab', 'Tab', 'Tab', 'Return'];
+      let stepIdx = 0;
 
-          if (firstOtpBox) {
-            firstOtpBox.focus();
-            firstOtpBox.click();
-            return true;
-          }
-          return false;
-        })()`;
-        executeJSInContainer(focusFirstOtpScript).then(() => {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true }));
+      function sendHumanKey() {
+        if (stepIdx >= steps.length) {
+          console.log('[Orchestrator] 6-Tab sequence for resend-code completed!');
+          setTimeout(() => {
+            executeJSInContainer(focusFirstInputScript).then(() => {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: true }));
+            });
+          }, 600);
+          return;
+        }
+
+        const key = steps[stepIdx];
+        exec(`docker exec neko xdotool key ${key}`, (err, stdout, stderr) => {
+          if (err) console.error('[Orchestrator] Resend key error:', stderr);
+          stepIdx++;
+          const humanDelay = 120 + Math.floor(Math.random() * 130);
+          setTimeout(sendHumanKey, humanDelay);
         });
-      }, 500);
+      }
+
+      setTimeout(sendHumanKey, 200);
     });
   } else if (req.method === 'POST' && req.url === '/submit-phone') {
     let body = '';

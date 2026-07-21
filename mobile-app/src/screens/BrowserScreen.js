@@ -97,7 +97,7 @@ export default function BrowserScreen({ route, navigation }) {
     // Safety: auto-advance after 30s regardless
     const safetyTimer = setTimeout(() => {
       if (!cancelled) setLoginStep('phone');
-    }, 30000);
+    }, 15000);
 
     return () => {
       cancelled = true;
@@ -141,7 +141,7 @@ export default function BrowserScreen({ route, navigation }) {
     const startTimer = setTimeout(poll, 500);
     const safetyTimer = setTimeout(() => {
       if (!cancelled) setLoginStep('otp');
-    }, 30000);
+    }, 15000);
 
     return () => {
       cancelled = true;
