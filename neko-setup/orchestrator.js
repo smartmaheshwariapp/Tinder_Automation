@@ -688,8 +688,23 @@ const server = http.createServer((req, res) => {
           executeJSInContainer(focusScript).then(() => {
             setTimeout(() => {
               typeString(text, () => {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true }));
+                const clickSubmitScript = `(function() {
+                  var btn = document.getElementById('phone-field-submit') || document.querySelector('button[type="submit"]');
+                  if (!btn) {
+                    var btns = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]'));
+                    btn = btns.find(function(b) {
+                      var txt = (b.innerText || b.textContent || b.value || '').toLowerCase();
+                      var isQuick = txt.indexOf('quick') !== -1 || txt.indexOf('google') !== -1 || txt.indexOf('apple') !== -1 || txt.indexOf('passkey') !== -1;
+                      return !isQuick && (txt.indexOf('continue') !== -1 || txt.indexOf('next') !== -1 || txt.indexOf('submit') !== -1 || txt.indexOf('verify') !== -1 || txt.indexOf('confirm') !== -1);
+                    });
+                  }
+                  if (btn) { btn.click(); return true; }
+                  return false;
+                })()`;
+                executeJSInContainer(clickSubmitScript).then(() => {
+                  res.writeHead(200, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ success: true }));
+                });
               });
             }, 150);
           });
@@ -754,8 +769,23 @@ const server = http.createServer((req, res) => {
           } else {
             executeJSInContainer("const el = document.querySelector('input[type=\\'tel\\'], input[autocomplete=\\'one-time-code\\']'); if (el) { el.focus(); }").then(() => {
               typeString(text, () => {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true }));
+                const clickSubmitScript = `(function() {
+                  var btn = document.getElementById('phone-field-submit') || document.querySelector('button[type="submit"]');
+                  if (!btn) {
+                    var btns = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]'));
+                    btn = btns.find(function(b) {
+                      var txt = (b.innerText || b.textContent || b.value || '').toLowerCase();
+                      var isQuick = txt.indexOf('quick') !== -1 || txt.indexOf('google') !== -1 || txt.indexOf('apple') !== -1 || txt.indexOf('passkey') !== -1;
+                      return !isQuick && (txt.indexOf('continue') !== -1 || txt.indexOf('next') !== -1 || txt.indexOf('submit') !== -1 || txt.indexOf('verify') !== -1 || txt.indexOf('confirm') !== -1);
+                    });
+                  }
+                  if (btn) { btn.click(); return true; }
+                  return false;
+                })()`;
+                executeJSInContainer(clickSubmitScript).then(() => {
+                  res.writeHead(200, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ success: true }));
+                });
               });
             });
           }
@@ -826,6 +856,7 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ success: false, error: 'Invalid JSON request' }));
       }
     });
+  /* Resend code endpoint commented out for now
   } else if (req.method === 'POST' && req.url === '/resend-code') {
     console.log('[Orchestrator] Resend code requested. Executing 6-Tab sequence + Return to trigger Resend...');
 
@@ -875,6 +906,7 @@ const server = http.createServer((req, res) => {
 
       setTimeout(sendHumanKey, 200);
     });
+  */
   } else if (req.method === 'POST' && req.url === '/submit-phone') {
     let body = '';
     req.on('data', chunk => { body += chunk; });

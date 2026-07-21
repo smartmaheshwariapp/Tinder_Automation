@@ -94,10 +94,10 @@ export default function BrowserScreen({ route, navigation }) {
     // Start polling after 500ms
     const startTimer = setTimeout(poll, 500);
 
-    // Safety: auto-advance after 30s regardless
+    // Safety: auto-advance after 10s regardless
     const safetyTimer = setTimeout(() => {
       if (!cancelled) setLoginStep('phone');
-    }, 15000);
+    }, 10000);
 
     return () => {
       cancelled = true;
@@ -108,7 +108,7 @@ export default function BrowserScreen({ route, navigation }) {
 
   // Poll /check-page-state while waiting for OTP screen to appear.
   // Advances to 'otp' when OTP input detected, 'done' if already logged in.
-  // Safety auto-advance to 'otp' after 30s.
+  // Safety auto-advance to 'otp' after 10s.
   useEffect(() => {
     if (loginStep !== 'waiting_otp') return;
 
@@ -141,7 +141,7 @@ export default function BrowserScreen({ route, navigation }) {
     const startTimer = setTimeout(poll, 500);
     const safetyTimer = setTimeout(() => {
       if (!cancelled) setLoginStep('otp');
-    }, 15000);
+    }, 10000);
 
     return () => {
       cancelled = true;
@@ -199,7 +199,9 @@ export default function BrowserScreen({ route, navigation }) {
     // Step 3 — wait for phone number input to appear, then show wizard
     await new Promise(r => setTimeout(r, 1000));
     setLoginStep('phone');
-  }; const handleSendText = async () => {
+  };
+
+  const handleSendText = async () => {
     if (!inputText.trim()) return;
     setSendingText(true);
     try {
@@ -211,6 +213,7 @@ export default function BrowserScreen({ route, navigation }) {
       });
       if (response.ok) {
         setInputText(''); // Clear input on success
+        await handlePressEnter();
       } else {
         console.error('Failed to send text to virtual browser');
       }
@@ -593,6 +596,7 @@ export default function BrowserScreen({ route, navigation }) {
                   keyboardType="number-pad"
                 />
 
+                {/* Resend OTP button commented out for now
                 <TouchableOpacity
                   style={styles.resendBtn}
                   disabled={sendingText}
@@ -607,6 +611,7 @@ export default function BrowserScreen({ route, navigation }) {
                 >
                   <Text style={styles.resendBtnText}>🔄 Didn't receive code? Send code again</Text>
                 </TouchableOpacity>
+                */}
 
                 <View style={[styles.wizardBtnRow, { marginTop: 12 }]}>
                   <TouchableOpacity
@@ -641,9 +646,9 @@ export default function BrowserScreen({ route, navigation }) {
                         return;
                       }
 
-                      // Poll page state for up to 15 seconds
+                      // Poll page state for up to 10 seconds
                       let attempts = 0;
-                      const maxAttempts = 30;
+                      const maxAttempts = 20;
                       const pollInterval = setInterval(async () => {
                         attempts++;
                         try {
