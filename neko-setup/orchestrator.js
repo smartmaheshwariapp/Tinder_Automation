@@ -407,9 +407,16 @@ const server = http.createServer((req, res) => {
 
     req.on('end', () => {
       try {
-        const data = JSON.parse(body);
-        const platformKey = String(data.platform).toLowerCase();
-        const startUrl = PLATFORMS[platformKey] || PLATFORMS.tinder;
+        console.log('[Orchestrator] Received /start-session body:', body);
+        let data = {};
+        try {
+          if (body && body.trim()) {
+            data = JSON.parse(body);
+          }
+        } catch (_) {}
+
+        const platformKey = String(data.platform || 'bumble').toLowerCase();
+        const startUrl = PLATFORMS[platformKey] || PLATFORMS.bumble;
         const userId = String(data.userId || 'dev_user_1');
 
         // Resolve local session directory
