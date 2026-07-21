@@ -34,15 +34,19 @@ export default function PlatformConfigScreen({ route, navigation }) {
 
   const handleStartSession = async () => {
     setLoading(true);
-    // Extract host dynamically
-    let host = '127.0.0.1';
+    // Extract host and protocol dynamically
+    let host = 'api.smartmaheshwari.com';
+    let protocol = vpsUrl.startsWith('https') ? 'https:' : 'http:';
     try {
-      const cleanUrl = vpsUrl.includes('://') ? vpsUrl : 'http://' + vpsUrl;
-      const match = cleanUrl.match(/\/\/([^:/]+)/);
-      if (match) host = match[1];
+      const cleanUrl = vpsUrl.includes('://') ? vpsUrl : 'https://' + vpsUrl;
+      const match = cleanUrl.match(/^(https?:)\/\/([^:/]+)/);
+      if (match) {
+        protocol = match[1];
+        host = match[2];
+      }
     } catch (e) {}
 
-    const nekoOrchestratorUrl = `http://${host}:3000/start-session`;
+    const nekoOrchestratorUrl = `${protocol}//${host}:3000/start-session`;
 
     // Start Neko container with shared sessions volume
     try {
