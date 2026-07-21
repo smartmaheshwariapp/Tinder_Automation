@@ -3,7 +3,7 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3001;
 
 function executeJSInContainer(jsCode) {
   return new Promise((resolve) => {
@@ -386,6 +386,8 @@ ws.close()
 let navReady = false;
 
 const server = http.createServer((req, res) => {
+  console.log(`[Orchestrator] Incoming ${req.method} ${req.url}`);
+
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');

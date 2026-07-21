@@ -58,7 +58,7 @@ The script will automatically install Docker, Docker Compose, Node.js, configure
 
 ## 📺 Step 4: Access and Controls
 
-1. The **Neko Session Orchestrator** is now running continuously in the background on port `3000`.
+1. The **Neko Session Orchestrator** is now running continuously in the background on port `3001`.
 2. When you start a session from your mobile app, the app communicates with the orchestrator, which launches Neko.
 3. The WebRTC stream can then be accessed directly from your mobile app WebView (connecting to port `8080` on the VPS).
 4. If you want to check the status or view the logs of the background orchestrator service on your VPS, run:

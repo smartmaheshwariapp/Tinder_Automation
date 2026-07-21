@@ -153,15 +153,14 @@ export default function BrowserScreen({ route, navigation }) {
   const getOrchestratorUrl = (nekoUrl) => {
     try {
       const urlObj = new URL(nekoUrl.split('/?')[0]);
+      if (urlObj.hostname.startsWith('stream.')) {
+        return urlObj.protocol + '//' + urlObj.hostname.replace('stream.', 'api.');
+      }
       urlObj.protocol = 'http:';
-      urlObj.port = '3000';
+      urlObj.port = '3001';
       return urlObj.origin;
     } catch (e) {
-      let base = nekoUrl.split('/?')[0].replace('https://', 'http://');
-      if (base.includes(':8080')) {
-        return base.replace(/:8080/, ':3000');
-      }
-      return base + ':3000';
+      return 'https://api.smartmaheshwari.com';
     }
   };
 

@@ -51,10 +51,11 @@ export default function PlatformConfigScreen({ route, navigation }) {
       userId: 'dev_user_1' 
     });
 
+    let apiHost = host.startsWith('stream.') ? host.replace('stream.', 'api.') : host;
     const urlsToTry = [
-      `https://${host}/start-session`,
-      `http://${host}:3000/start-session`,
-      `https://${host}:3000/start-session`
+      `https://${apiHost}/start-session`,
+      `http://${host}:3001/start-session`,
+      `https://${host}:3001/start-session`
     ];
 
     for (const url of urlsToTry) {

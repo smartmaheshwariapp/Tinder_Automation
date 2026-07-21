@@ -9,8 +9,8 @@ const PLATFORMS = [
 ];
 
 export default function PlatformSelectScreen({ navigation }) {
-  // Configured production domain for backend routing
-  const [vpsUrl, setVpsUrl] = useState('https://api.smartmaheshwari.com/?usr=User&pwd=admin');
+  // Configured production domains for backend stream and API routing
+  const [vpsUrl, setVpsUrl] = useState('https://stream.smartmaheshwari.com/?usr=User&pwd=admin');
   const [proxyIp, setProxyIp] = useState('jestcsld:lhwbi2hzo3eg@198.23.243.226:1080');
 
   const handleSelect = (platform) => {
