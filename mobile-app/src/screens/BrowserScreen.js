@@ -17,7 +17,7 @@ export default function BrowserScreen({ route, navigation }) {
   // For other platforms: start at 'phone' directly.
   const isBumble = platform?.toLowerCase() === 'bumble';
   const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'phone');
-  const [showNeko, setShowNeko] = useState(false);
+  const [showNeko, setShowNeko] = useState(true);
   const [inputText, setInputText] = useState('');
   const [countryCode, setCountryCode] = useState('+91');
   const [captchaText, setCaptchaText] = useState('');
