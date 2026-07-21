@@ -882,13 +882,15 @@ const server = http.createServer((req, res) => {
             const char = str[idx++];
             const escapedChar = char.replace(/["'$`\\]/g, '\\$&');
             exec(`docker exec neko xdotool type "${escapedChar}"`, () => {
-              setTimeout(nextChar, 40);
+              // Human typing speed: 50ms - 130ms random delay per keystroke
+              const delay = 50 + Math.floor(Math.random() * 80);
+              setTimeout(nextChar, delay);
             });
           }
           nextChar();
         }
 
-        // Step 1: Focus and clear country code if element exists
+        // Step 1: Focus country code input if present
         executeJSInContainer(`(function() {
           const el = document.getElementById('phone-country-code');
           if (el) {
@@ -898,7 +900,7 @@ const server = http.createServer((req, res) => {
         })()`).then(() => {
           exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
             typeStringSync(cleanCc, () => {
-              // Step 2: Wait 400ms, dismiss any dropdown, focus main phone input
+              // Step 2: Wait 400ms (human pause), dismiss any dropdown, focus main phone input
               setTimeout(() => {
                 const focusPhoneScript = `(function() {
                   try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 })); } catch (_) {}
@@ -916,16 +918,6 @@ const server = http.createServer((req, res) => {
                   if (el) {
                     el.focus();
                     el.click();
-                    try {
-                      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-                      if (nativeSetter) {
-                        nativeSetter.call(el, "${phone}");
-                      } else {
-                        el.value = "${phone}";
-                      }
-                      el.dispatchEvent(new Event('input', { bubbles: true }));
-                      el.dispatchEvent(new Event('change', { bubbles: true }));
-                    } catch (_) {}
                     if (typeof el.select === 'function') el.select();
                     return true;
                   }
@@ -935,9 +927,9 @@ const server = http.createServer((req, res) => {
                 executeJSInContainer(focusPhoneScript).then(() => {
                   exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
                     setTimeout(() => {
-                      // Step 3: Type mobile phone number via xdotool to trigger native events as well
+                      // Step 3: Type mobile phone number character-by-character with human delays
                       typeStringSync(phone, () => {
-                        // Step 4: Press Enter / click submit button
+                        // Step 4: Wait 500ms human pause before submitting
                         setTimeout(() => {
                           exec('docker exec neko xdotool key Return', () => {
                             const submitScript = `(function() {
@@ -952,9 +944,9 @@ const server = http.createServer((req, res) => {
                             res.writeHead(200, { 'Content-Type': 'application/json' });
                             res.end(JSON.stringify({ success: true }));
                           });
-                        }, 300);
+                        }, 500);
                       });
-                    }, 150);
+                    }, 200);
                   });
                 });
               }, 400);
