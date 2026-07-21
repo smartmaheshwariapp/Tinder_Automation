@@ -860,6 +860,7 @@ const server = http.createServer((req, res) => {
         });
       }, 500);
     });
+  } else if (req.method === 'POST' && req.url === '/submit-phone') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
