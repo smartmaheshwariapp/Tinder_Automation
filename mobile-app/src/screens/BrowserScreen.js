@@ -533,24 +533,33 @@ export default function BrowserScreen({ route, navigation }) {
                     try {
                       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
 
-                      // Submit country code and phone number atomically to avoid race conditions
-                      const response = await fetch(`${orchestratorUrl}/submit-phone`, {
+                      // Step 1: Send Country Code if provided
+                      if (countryCode.trim()) {
+                        await fetch(`${orchestratorUrl}/type-text`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ text: countryCode.trim(), field: 'country-code' }),
+                        });
+                        await new Promise(r => setTimeout(r, 250));
+                      }
+
+                      // Step 2: Send Mobile Number
+                      const response = await fetch(`${orchestratorUrl}/type-text`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                          countryCode: countryCode.trim(), 
-                          phoneNumber: inputText.trim() 
-                        }),
+                        body: JSON.stringify({ text: inputText.trim(), field: 'phone-number' }),
                       });
 
                       if (response.ok) {
-                        setInputText('');
+                        setInputText(''); // Clear input on success
                       } else {
-                        console.error('Failed to submit phone number');
+                        console.error('Failed to send text to virtual browser');
                       }
                     } catch (e) {
-                      console.error('Network error submitting phone number:', e);
+                      console.error('Network error sending text:', e);
                     }
+
+                    await handlePressEnter();
 
                     // Immediately show OTP waiting screen, poll for OTP input to appear
                     setSendingText(false);
@@ -631,11 +640,12 @@ export default function BrowserScreen({ route, navigation }) {
                       // Send OTP to the browser
                       try {
                         const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                        await fetch(`${orchestratorUrl}/submit-otp`, {
+                        await fetch(`${orchestratorUrl}/type-text`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ otp: inputText.trim() }),
+                          body: JSON.stringify({ text: inputText }),
                         });
+                        await fetch(`${orchestratorUrl}/press-enter`, { method: 'POST' });
                         setInputText('');
                       } catch (e) {
                         console.error('Error sending OTP:', e);
