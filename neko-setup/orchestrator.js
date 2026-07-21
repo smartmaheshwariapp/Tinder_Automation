@@ -773,6 +773,9 @@ const server = http.createServer((req, res) => {
         const focusFirstOtpScript = `(function() {
           const inputs = Array.from(document.querySelectorAll('input'));
           const firstOtpBox = inputs.find(i => 
+            i.closest('.code-field') !== null ||
+            i.getAttribute('autocomplete') === 'digit' ||
+            i.getAttribute('data-qa-role') === 'textfield-input' ||
             i.getAttribute('autocomplete') === 'one-time-code' ||
             i.getAttribute('inputmode') === 'numeric' ||
             i.getAttribute('data-qa-role') === 'digit-input' ||
@@ -795,18 +798,35 @@ const server = http.createServer((req, res) => {
               let idx = 0;
               function typeChar() {
                 if (idx >= otp.length) {
+                  // Human pause (400ms) before clicking submit / pressing enter
                   setTimeout(() => {
                     exec('docker exec neko xdotool key Return', () => {
+                      const clickOtpSubmitScript = `(function() {
+                        const btn = document.querySelector('button[data-qa-role="button"], button[type="submit"]');
+                        if (btn && !btn.disabled) {
+                          btn.click();
+                          return true;
+                        }
+                        const span = document.querySelector('span.action.text-break-words, span.action');
+                        if (span) {
+                          span.click();
+                          if (span.parentElement) span.parentElement.click();
+                          return true;
+                        }
+                        return false;
+                      })()`;
+                      executeJSInContainer(clickOtpSubmitScript).catch(() => {});
                       res.writeHead(200, { 'Content-Type': 'application/json' });
                       res.end(JSON.stringify({ success: true }));
                     });
-                  }, 200);
+                  }, 400);
                   return;
                 }
                 const char = otp[idx++];
                 const escapedChar = char.replace(/["'$`\\]/g, '\\$&');
                 exec(`docker exec neko xdotool type "${escapedChar}"`, () => {
-                  setTimeout(typeChar, 50);
+                  const delay = 50 + Math.floor(Math.random() * 80);
+                  setTimeout(typeChar, delay);
                 });
               }
               typeChar();
@@ -933,12 +953,25 @@ const server = http.createServer((req, res) => {
                         setTimeout(() => {
                           exec('docker exec neko xdotool key Return', () => {
                             const submitScript = `(function() {
-                              const btns = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]'));
-                              const btn = btns.find(b => {
-                                const t = (b.innerText || b.textContent || b.value || '').toLowerCase();
-                                return t.includes('continue') || t.includes('next') || t.includes('submit') || t.includes('sign in') || t.includes('log in');
+                              // Specific check for Bumble Continue span selector: <span class="action text-break-words">Continue</span>
+                              const bumbleSpan = document.querySelector('span.action.text-break-words, span.action');
+                              if (bumbleSpan) {
+                                bumbleSpan.click();
+                                if (bumbleSpan.parentElement) bumbleSpan.parentElement.click();
+                                return true;
+                              }
+
+                              const els = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"], span, div, a'));
+                              const target = els.find(b => {
+                                const t = (b.innerText || b.textContent || b.value || '').trim().toLowerCase();
+                                return t === 'continue' || t.includes('continue') || t.includes('next') || t.includes('submit');
                               });
-                              if (btn) btn.click();
+                              if (target) {
+                                target.click();
+                                if (target.tagName === 'SPAN' && target.parentElement) target.parentElement.click();
+                                return true;
+                              }
+                              return false;
                             })()`;
                             executeJSInContainer(submitScript).catch(() => {});
                             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1125,6 +1158,10 @@ const server = http.createServer((req, res) => {
         // Check if OTP input / confirm-phone URL is active
         const hasOtpInput = (
           url.includes('/confirm-phone') ||
+          document.querySelector('.code-field') !== null ||
+          document.querySelector('[data-qa-role="codefield-container"]') !== null ||
+          document.querySelector('input[autocomplete="digit"]') !== null ||
+          document.querySelector('input[data-qa-role="textfield-input"]') !== null ||
           document.querySelector('input[type="tel"]') !== null ||
           document.querySelector('input[autocomplete="one-time-code"]') !== null ||
           document.querySelector('input[name*="code"]') !== null ||

@@ -94,10 +94,10 @@ export default function BrowserScreen({ route, navigation }) {
     // Start polling after 500ms
     const startTimer = setTimeout(poll, 500);
 
-    // Safety: auto-advance after 30s regardless
+    // Safety: auto-advance after 5s max if polling or auto-navigate hasn't advanced yet
     const safetyTimer = setTimeout(() => {
       if (!cancelled) setLoginStep('phone');
-    }, 30000);
+    }, 5000);
 
     return () => {
       cancelled = true;
