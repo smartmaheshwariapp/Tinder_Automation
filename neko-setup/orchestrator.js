@@ -309,15 +309,24 @@ def eval_js(ws, expr):
     return (r.get('result') or {}).get('value')
 
 def wait_click(ws, sel, label, timeout=15):
-    expr = ("(function(){var e=document.querySelector('"+sel+"');"
-            "if(e&&e.offsetParent!==null){e.click();return 'clicked';}"
-            "return 'nf';})()")
+    expr = ("(function(){"
+            "var e = document.querySelector('" + sel + "');"
+            "if(!e){"
+            "  var btns = Array.from(document.querySelectorAll('button, [role=\"button\"], div, span'));"
+            "  e = btns.find(function(b){"
+            "    var txt = (b.innerText || b.textContent || '').toLowerCase();"
+            "    return txt.includes('other method') || txt.includes('cell phone') || txt.includes('phone number') || txt.includes('mobile');"
+            "  });"
+            "}"
+            "if(e && e.offsetParent !== null){ e.click(); return 'clicked'; }"
+            "return 'nf';"
+            "})()")
     t = time.time()
-    while time.time()-t < timeout:
+    while time.time() - t < timeout:
         if eval_js(ws, expr) == 'clicked':
-            print('CLICKED:'+label, flush=True); return True
+            print('CLICKED:' + label, flush=True); return True
         time.sleep(0.1)
-    print('TIMEOUT:'+label, flush=True); return False
+    print('TIMEOUT:' + label, flush=True); return False
 
 # Connect
 try:
