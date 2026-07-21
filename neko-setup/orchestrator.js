@@ -860,6 +860,7 @@ const server = http.createServer((req, res) => {
         });
       }, 500);
     });
+  } else if (req.method === 'POST' && req.url === '/submit-phone') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
@@ -887,36 +888,41 @@ const server = http.createServer((req, res) => {
           nextChar();
         }
 
-        // Step 1: Focus and clear country code
+        // Step 1: Focus and clear country code if element exists
         executeJSInContainer(`(function() {
           const el = document.getElementById('phone-country-code');
           if (el) {
             el.focus();
-            el.value = '';
-            try {
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-            } catch (_) {}
             if (typeof el.select === 'function') el.select();
           }
         })()`).then(() => {
           exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
             typeStringSync(cleanCc, () => {
-              // Step 2: Wait 400ms, dismiss dropdown, focus main phone input
+              // Step 2: Wait 400ms, dismiss any dropdown, focus main phone input
               setTimeout(() => {
                 const focusPhoneScript = `(function() {
                   try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 })); } catch (_) {}
                   const cc = document.getElementById('phone-country-code');
+                  if (cc && document.activeElement === cc) { cc.blur(); }
+
                   const inputs = Array.from(document.querySelectorAll('input'));
                   let el = inputs.find(i => i !== cc && (i.id === 'phone' || i.name === 'phone' || i.type === 'tel' || i.getAttribute('data-qa-role') === 'textfield-input' || i.placeholder?.toLowerCase().includes('phone') || i.placeholder?.toLowerCase().includes('number')));
                   if (!el) {
-                    el = document.querySelector('input[type="tel"]:not(#phone-country-code), #phone, input[name="phone"]');
+                    el = document.querySelector('input[type="tel"]:not(#phone-country-code), #phone, input[name*="phone"], input[id*="phone"], input[autocomplete*="tel"]');
+                  }
+                  if (!el) {
+                    el = inputs.find(i => i !== cc && i.type !== 'hidden' && i.type !== 'submit' && i.type !== 'button');
                   }
                   if (el) {
                     el.focus();
                     el.click();
-                    el.value = '';
                     try {
+                      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                      if (nativeSetter) {
+                        nativeSetter.call(el, "${phone}");
+                      } else {
+                        el.value = "${phone}";
+                      }
                       el.dispatchEvent(new Event('input', { bubbles: true }));
                       el.dispatchEvent(new Event('change', { bubbles: true }));
                     } catch (_) {}
@@ -929,11 +935,20 @@ const server = http.createServer((req, res) => {
                 executeJSInContainer(focusPhoneScript).then(() => {
                   exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
                     setTimeout(() => {
-                      // Step 3: Type mobile phone number
+                      // Step 3: Type mobile phone number via xdotool to trigger native events as well
                       typeStringSync(phone, () => {
                         // Step 4: Press Enter / click submit button
                         setTimeout(() => {
                           exec('docker exec neko xdotool key Return', () => {
+                            const submitScript = `(function() {
+                              const btns = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]'));
+                              const btn = btns.find(b => {
+                                const t = (b.innerText || b.textContent || b.value || '').toLowerCase();
+                                return t.includes('continue') || t.includes('next') || t.includes('submit') || t.includes('sign in') || t.includes('log in');
+                              });
+                              if (btn) btn.click();
+                            })()`;
+                            executeJSInContainer(submitScript).catch(() => {});
                             res.writeHead(200, { 'Content-Type': 'application/json' });
                             res.end(JSON.stringify({ success: true }));
                           });
