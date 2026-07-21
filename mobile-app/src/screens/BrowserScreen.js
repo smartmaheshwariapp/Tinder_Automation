@@ -94,10 +94,10 @@ export default function BrowserScreen({ route, navigation }) {
     // Start polling after 500ms
     const startTimer = setTimeout(poll, 500);
 
-    // Safety: auto-advance after 5s max if polling or auto-navigate hasn't advanced yet
+    // Safety: auto-advance after 30s regardless
     const safetyTimer = setTimeout(() => {
       if (!cancelled) setLoginStep('phone');
-    }, 5000);
+    }, 30000);
 
     return () => {
       cancelled = true;
@@ -537,9 +537,9 @@ export default function BrowserScreen({ route, navigation }) {
                       const response = await fetch(`${orchestratorUrl}/submit-phone`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                          countryCode: countryCode.trim(), 
-                          phoneNumber: inputText.trim() 
+                        body: JSON.stringify({
+                          countryCode: countryCode.trim(),
+                          phoneNumber: inputText.trim()
                         }),
                       });
 

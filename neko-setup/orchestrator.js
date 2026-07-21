@@ -82,7 +82,7 @@ except Exception as e:
     const tmpPath = path.join(__dirname, '_focus_tmp.py');
     fs.writeFileSync(tmpPath, pyScript, 'utf8');
     exec(`docker cp "${tmpPath}" neko:/tmp/focus.py`, (cpErr) => {
-      try { fs.unlinkSync(tmpPath); } catch (_) { }
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
       if (cpErr) { resolve(); return; }
       exec(`docker exec neko python3 /tmp/focus.py`, () => {
         resolve();
@@ -186,7 +186,7 @@ except Exception as e:
     const tmpPath = path.join(__dirname, '_click_tmp.py');
     fs.writeFileSync(tmpPath, pyScript, 'utf8');
     exec(`docker cp "${tmpPath}" neko:/tmp/click_el.py`, (cpErr) => {
-      try { fs.unlinkSync(tmpPath); } catch (_) { }
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
       if (cpErr) { resolve(); return; }
       exec(`docker exec neko python3 /tmp/click_el.py`, () => {
         resolve();
@@ -202,11 +202,11 @@ function parsePhoneNumber(input) {
   } else {
     return { countryCode: null, phoneNumber: text };
   }
-
+  
   const commonCodes = [
     '91', '44', '49', '33', '81', '86', '7', '39', '34', '55', '52', '61', '64', '31', '32', '41', '46', '47', '45', '90', '20', '27', '98', '62', '65', '60', '66', '84', '82', '92', '94', '880', '971', '966', '972', '353', '351'
   ];
-
+  
   for (const code of commonCodes) {
     if (code.length === 3 && text.startsWith(code)) {
       return { countryCode: code, phoneNumber: text.substring(3) };
@@ -422,7 +422,7 @@ const server = http.createServer((req, res) => {
           if (body && body.trim()) {
             data = JSON.parse(body);
           }
-        } catch (_) { }
+        } catch (_) {}
 
         const platformKey = String(data.platform || 'bumble').toLowerCase();
         const startUrl = PLATFORMS[platformKey] || PLATFORMS.bumble;
@@ -468,11 +468,11 @@ const server = http.createServer((req, res) => {
               fs.cpSync(srcPath, destPath, { recursive: true });
             }
           }
-
+          
           // Append orchestrator metadata for content scripts
           const metaContent = `\n// Automatically appended by Neko Orchestrator\nglobalThis.ORCHESTRATOR_USER_ID = ${JSON.stringify(userId)};\n`;
           fs.appendFileSync(path.join(cleanExtensionDir, 'debug-config.js'), metaContent, 'utf8');
-
+          
           // Append orchestrator metadata to background script
           const bgPath = path.join(cleanExtensionDir, 'background', 'background.js');
           if (fs.existsSync(bgPath)) {
@@ -504,13 +504,13 @@ const server = http.createServer((req, res) => {
                 fs.rmSync(sessionDir, { recursive: true, force: true });
               }
               fs.mkdirSync(sessionDir, { recursive: true });
-              try { require('child_process').execSync(`chmod -R 777 "${sessionDir}"`); } catch (_) { }
+              try { require('child_process').execSync(`chmod -R 777 "${sessionDir}"`); } catch (_) {}
             } catch (rmErr) {
               console.error(`[Orchestrator] Error deleting session directory:`, rmErr.message);
             }
           } else {
             console.log(`[Orchestrator] User ${userId} has successful login history. Preserving session directory.`);
-
+            
             // Clean up locks/Sessions while keeping cookies/profiles (Cross-platform Node.js)
             try {
               const cleanProfileLocks = (targetDir) => {
@@ -520,19 +520,19 @@ const server = http.createServer((req, res) => {
                   const fullPath = path.join(targetDir, entry.name);
                   if (entry.isDirectory()) {
                     if (entry.name === 'GCM Store' || entry.name === 'Sessions') {
-                      try { fs.rmSync(fullPath, { recursive: true, force: true }); } catch (_) { }
+                      try { fs.rmSync(fullPath, { recursive: true, force: true }); } catch (_) {}
                     } else {
                       cleanProfileLocks(fullPath);
                     }
                   } else {
                     if (entry.name.includes('SingletonLock') || entry.name === 'LOCK') {
-                      try { fs.rmSync(fullPath, { force: true }); } catch (_) { }
+                      try { fs.rmSync(fullPath, { force: true }); } catch (_) {}
                     }
                   }
                 }
               };
               cleanProfileLocks(sessionDir);
-              try { require('child_process').execSync(`chmod -R 777 "${sessionDir}"`); } catch (_) { }
+              try { require('child_process').execSync(`chmod -R 777 "${sessionDir}"`); } catch (_) {}
               console.log(`[Orchestrator] Cleared all stale profile locks, LevelDB LOCK files, GCM Store, and Sessions directories in ${sessionDir}`);
             } catch (e) {
               console.warn(`[Orchestrator] Profile directory cleaning warning:`, e.message);
@@ -773,9 +773,6 @@ const server = http.createServer((req, res) => {
         const focusFirstOtpScript = `(function() {
           const inputs = Array.from(document.querySelectorAll('input'));
           const firstOtpBox = inputs.find(i => 
-            i.closest('.code-field') !== null ||
-            i.getAttribute('autocomplete') === 'digit' ||
-            i.getAttribute('data-qa-role') === 'textfield-input' ||
             i.getAttribute('autocomplete') === 'one-time-code' ||
             i.getAttribute('inputmode') === 'numeric' ||
             i.getAttribute('data-qa-role') === 'digit-input' ||
@@ -798,35 +795,18 @@ const server = http.createServer((req, res) => {
               let idx = 0;
               function typeChar() {
                 if (idx >= otp.length) {
-                  // Human pause (400ms) before clicking submit / pressing enter
                   setTimeout(() => {
                     exec('docker exec neko xdotool key Return', () => {
-                      const clickOtpSubmitScript = `(function() {
-                        const btn = document.querySelector('button[data-qa-role="button"], button[type="submit"]');
-                        if (btn && !btn.disabled) {
-                          btn.click();
-                          return true;
-                        }
-                        const span = document.querySelector('span.action.text-break-words, span.action');
-                        if (span) {
-                          span.click();
-                          if (span.parentElement) span.parentElement.click();
-                          return true;
-                        }
-                        return false;
-                      })()`;
-                      executeJSInContainer(clickOtpSubmitScript).catch(() => {});
                       res.writeHead(200, { 'Content-Type': 'application/json' });
                       res.end(JSON.stringify({ success: true }));
                     });
-                  }, 400);
+                  }, 200);
                   return;
                 }
                 const char = otp[idx++];
                 const escapedChar = char.replace(/["'$`\\]/g, '\\$&');
                 exec(`docker exec neko xdotool type "${escapedChar}"`, () => {
-                  const delay = 50 + Math.floor(Math.random() * 80);
-                  setTimeout(typeChar, delay);
+                  setTimeout(typeChar, 50);
                 });
               }
               typeChar();
@@ -880,7 +860,6 @@ const server = http.createServer((req, res) => {
         });
       }, 500);
     });
-  } else if (req.method === 'POST' && req.url === '/submit-phone') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
@@ -902,42 +881,45 @@ const server = http.createServer((req, res) => {
             const char = str[idx++];
             const escapedChar = char.replace(/["'$`\\]/g, '\\$&');
             exec(`docker exec neko xdotool type "${escapedChar}"`, () => {
-              // Human typing speed: 50ms - 130ms random delay per keystroke
-              const delay = 50 + Math.floor(Math.random() * 80);
-              setTimeout(nextChar, delay);
+              setTimeout(nextChar, 40);
             });
           }
           nextChar();
         }
 
-        // Step 1: Focus country code input if present
+        // Step 1: Focus and clear country code
         executeJSInContainer(`(function() {
           const el = document.getElementById('phone-country-code');
           if (el) {
             el.focus();
+            el.value = '';
+            try {
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (_) {}
             if (typeof el.select === 'function') el.select();
           }
         })()`).then(() => {
           exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
             typeStringSync(cleanCc, () => {
-              // Step 2: Wait 400ms (human pause), dismiss any dropdown, focus main phone input
+              // Step 2: Wait 400ms, dismiss dropdown, focus main phone input
               setTimeout(() => {
                 const focusPhoneScript = `(function() {
                   try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 })); } catch (_) {}
                   const cc = document.getElementById('phone-country-code');
-                  if (cc && document.activeElement === cc) { cc.blur(); }
-
                   const inputs = Array.from(document.querySelectorAll('input'));
                   let el = inputs.find(i => i !== cc && (i.id === 'phone' || i.name === 'phone' || i.type === 'tel' || i.getAttribute('data-qa-role') === 'textfield-input' || i.placeholder?.toLowerCase().includes('phone') || i.placeholder?.toLowerCase().includes('number')));
                   if (!el) {
-                    el = document.querySelector('input[type="tel"]:not(#phone-country-code), #phone, input[name*="phone"], input[id*="phone"], input[autocomplete*="tel"]');
-                  }
-                  if (!el) {
-                    el = inputs.find(i => i !== cc && i.type !== 'hidden' && i.type !== 'submit' && i.type !== 'button');
+                    el = document.querySelector('input[type="tel"]:not(#phone-country-code), #phone, input[name="phone"]');
                   }
                   if (el) {
                     el.focus();
                     el.click();
+                    el.value = '';
+                    try {
+                      el.dispatchEvent(new Event('input', { bubbles: true }));
+                      el.dispatchEvent(new Event('change', { bubbles: true }));
+                    } catch (_) {}
                     if (typeof el.select === 'function') el.select();
                     return true;
                   }
@@ -947,39 +929,17 @@ const server = http.createServer((req, res) => {
                 executeJSInContainer(focusPhoneScript).then(() => {
                   exec('docker exec neko xdotool key ctrl+a BackSpace', () => {
                     setTimeout(() => {
-                      // Step 3: Type mobile phone number character-by-character with human delays
+                      // Step 3: Type mobile phone number
                       typeStringSync(phone, () => {
-                        // Step 4: Wait 500ms human pause before submitting
+                        // Step 4: Press Enter / click submit button
                         setTimeout(() => {
                           exec('docker exec neko xdotool key Return', () => {
-                            const submitScript = `(function() {
-                              // Specific check for Bumble Continue span selector: <span class="action text-break-words">Continue</span>
-                              const bumbleSpan = document.querySelector('span.action.text-break-words, span.action');
-                              if (bumbleSpan) {
-                                bumbleSpan.click();
-                                if (bumbleSpan.parentElement) bumbleSpan.parentElement.click();
-                                return true;
-                              }
-
-                              const els = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"], span, div, a'));
-                              const target = els.find(b => {
-                                const t = (b.innerText || b.textContent || b.value || '').trim().toLowerCase();
-                                return t === 'continue' || t.includes('continue') || t.includes('next') || t.includes('submit');
-                              });
-                              if (target) {
-                                target.click();
-                                if (target.tagName === 'SPAN' && target.parentElement) target.parentElement.click();
-                                return true;
-                              }
-                              return false;
-                            })()`;
-                            executeJSInContainer(submitScript).catch(() => {});
                             res.writeHead(200, { 'Content-Type': 'application/json' });
                             res.end(JSON.stringify({ success: true }));
                           });
-                        }, 500);
+                        }, 300);
                       });
-                    }, 200);
+                    }, 150);
                   });
                 });
               }, 400);
@@ -1039,11 +999,11 @@ const server = http.createServer((req, res) => {
     const userId = urlObj.searchParams.get('userId') || 'dev_user_1';
     const platform = urlObj.searchParams.get('platform') || 'bumble';
     console.log(`[Orchestrator] User ${userId} successfully logged into ${platform}! Writing logged_in.flag...`);
-
+    
     const sessionsBaseDir = path.join(__dirname, 'sessions');
     const sessionDir = path.join(sessionsBaseDir, userId);
     const flagPath = path.join(sessionDir, 'logged_in.flag');
-
+    
     try {
       if (!fs.existsSync(sessionDir)) {
         fs.mkdirSync(sessionDir, { recursive: true });
@@ -1058,7 +1018,7 @@ const server = http.createServer((req, res) => {
     }
   } else if (req.method === 'POST' && req.url === '/resend-code') {
     console.log('[Orchestrator] Resend code requested. Human-like tabbing sequence starting...');
-
+    
     // 1. Focus the first OTP input field on screen
     const focusFirstInputScript = `
       (function() {
@@ -1071,7 +1031,7 @@ const server = http.createServer((req, res) => {
         return 'NO_INPUT';
       })()
     `;
-
+    
     executeJSInContainer(focusFirstInputScript).then(() => {
       // Step-by-step human tabbing: 6 Tab presses + 1 Return press with natural random delays (120ms - 250ms)
       const steps = ['Tab', 'Tab', 'Tab', 'Tab', 'Tab', 'Tab', 'Return'];
@@ -1108,9 +1068,9 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
       let data = {};
-      try { data = JSON.parse(body || '{}'); } catch (_) { }
+      try { data = JSON.parse(body || '{}'); } catch (_) {}
       const key = data.key === 'Left' ? 'Left' : 'Right';
-
+      
       // Respond instantly so mobile app doesn't wait
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, key: key }));
@@ -1158,10 +1118,6 @@ const server = http.createServer((req, res) => {
         // Check if OTP input / confirm-phone URL is active
         const hasOtpInput = (
           url.includes('/confirm-phone') ||
-          document.querySelector('.code-field') !== null ||
-          document.querySelector('[data-qa-role="codefield-container"]') !== null ||
-          document.querySelector('input[autocomplete="digit"]') !== null ||
-          document.querySelector('input[data-qa-role="textfield-input"]') !== null ||
           document.querySelector('input[type="tel"]') !== null ||
           document.querySelector('input[autocomplete="one-time-code"]') !== null ||
           document.querySelector('input[name*="code"]') !== null ||
@@ -1307,31 +1263,31 @@ try:
 except Exception as e:
     print('unknown')
 `;
-    const tmpPath = require('path').join(__dirname, '_state_check.py');
-    require('fs').writeFileSync(tmpPath, pyCheck, 'utf8');
-    require('child_process').exec(`docker cp "${tmpPath}" neko:/tmp/state_check.py`, (cpErr) => {
-      try { require('fs').unlinkSync(tmpPath); } catch (_) { }
-      if (cpErr) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ state: 'unknown' }));
-        return;
-      }
-      require('child_process').exec(`docker exec neko python3 /tmp/state_check.py`, (err, stdout) => {
-        const lines = (stdout || '').split('\n').filter(Boolean);
-        let state = 'unknown';
-        lines.forEach(line => {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('DEBUG_INFO:')) {
-            console.log('[Orchestrator] Page debug info:', trimmed.substring(11));
-          } else {
-            state = trimmed;
-          }
+      const tmpPath = require('path').join(__dirname, '_state_check.py');
+      require('fs').writeFileSync(tmpPath, pyCheck, 'utf8');
+      require('child_process').exec(`docker cp "${tmpPath}" neko:/tmp/state_check.py`, (cpErr) => {
+        try { require('fs').unlinkSync(tmpPath); } catch (_) {}
+        if (cpErr) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ state: 'unknown' }));
+          return;
+        }
+        require('child_process').exec(`docker exec neko python3 /tmp/state_check.py`, (err, stdout) => {
+          const lines = (stdout || '').split('\n').filter(Boolean);
+          let state = 'unknown';
+          lines.forEach(line => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('DEBUG_INFO:')) {
+              console.log('[Orchestrator] Page debug info:', trimmed.substring(11));
+            } else {
+              state = trimmed;
+            }
+          });
+          console.log(`[Orchestrator] Page state check: ${state}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ state }));
         });
-        console.log(`[Orchestrator] Page state check: ${state}`);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ state }));
       });
-    });
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
