@@ -879,7 +879,7 @@ const server = http.createServer((req, res) => {
         console.log(`[Orchestrator] Atomic /submit-phone -> countryCode: ${cleanCc}, phoneNumber: ${phone}`);
 
         const pyScript = String.raw`
-import json, urllib.request, socket, base64, sys, os, time
+import json, urllib.request, socket, base64, sys, os, time, random
 
 def http_get(url):
     return json.loads(urllib.request.urlopen(url, timeout=5).read())
@@ -940,21 +940,29 @@ try:
         country_code = ${JSON.stringify(cleanCc)}
         phone_number = ${JSON.stringify(phone)}
         
-        js = """
+        # Step 1: Set country code if present
+        if country_code:
+            cc_js = """
+            (function() {
+              var ccEl = document.getElementById('phone-country-code');
+              if (ccEl) {
+                try {
+                  var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                  nativeSetter.call(ccEl, """ + json.dumps(country_code) + """);
+                } catch(e) { ccEl.value = """ + json.dumps(country_code) + """; }
+                ccEl.dispatchEvent(new Event('input', { bubbles: true }));
+                ccEl.dispatchEvent(new Event('change', { bubbles: true }));
+                return true;
+              }
+              return false;
+            })()
+            """
+            ws.call('Runtime.evaluate', {'expression': cc_js.strip(), 'returnByValue': True})
+        
+        # Step 2: Find main phone input and clear it
+        focus_js = """
         (function() {
-          var cc = """ + json.dumps(country_code) + """;
-          var phone = """ + json.dumps(phone_number) + """;
-          
           var ccEl = document.getElementById('phone-country-code');
-          if (ccEl && cc) {
-            try {
-              var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-              nativeSetter.call(ccEl, cc);
-            } catch(e) { ccEl.value = cc; }
-            ccEl.dispatchEvent(new Event('input', { bubbles: true }));
-            ccEl.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-          
           var inputs = Array.from(document.querySelectorAll('input'));
           var el = inputs.find(function(i) {
             return i !== ccEl && (i.id === 'phone' || i.name === 'phone' || i.type === 'tel' || i.getAttribute('data-qa-role') === 'textfield-input' || (i.placeholder && i.placeholder.toLowerCase().indexOf('phone') !== -1) || (i.placeholder && i.placeholder.toLowerCase().indexOf('number') !== -1));
@@ -966,12 +974,10 @@ try:
           
           el.focus();
           el.click();
-          
           try {
             var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            nativeSetter.call(el, phone);
-          } catch(e) { el.value = phone; }
-          
+            nativeSetter.call(el, '');
+          } catch(e) { el.value = ''; }
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
           
@@ -980,17 +986,24 @@ try:
         })()
         """
         
-        res = ws.call('Runtime.evaluate', {'expression': js.strip(), 'returnByValue': True})
+        res = ws.call('Runtime.evaluate', {'expression': focus_js.strip(), 'returnByValue': True})
         val = (res.get('result') or {}).get('value')
         
         if val and val.get('found'):
             x, y = val['x'], val['y']
+            # Physical mouse click at input field center
             ws.call('Input.dispatchMouseEvent', {'type': 'mousePressed', 'x': x, 'y': y, 'button': 'left', 'clickCount': 1})
-            time.sleep(0.05)
+            time.sleep(0.04)
             ws.call('Input.dispatchMouseEvent', {'type': 'mouseReleased', 'x': x, 'y': y, 'button': 'left', 'clickCount': 1})
-            time.sleep(0.05)
-            ws.call('Input.insertText', {'text': phone_number})
             time.sleep(0.1)
+            
+            # Character-by-character human typing with randomized delays (40ms - 110ms)
+            for ch in phone_number:
+                ws.call('Input.insertText', {'text': ch})
+                time.sleep(random.uniform(0.04, 0.11))
+            
+            # Brief human pause after typing before clicking submit (300ms - 500ms)
+            time.sleep(random.uniform(0.3, 0.5))
             
             # Click submit button
             submit_js = """
