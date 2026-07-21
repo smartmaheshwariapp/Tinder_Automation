@@ -4,14 +4,18 @@ services:
     container_name: neko
     restart: unless-stopped
     shm_size: "2gb" # Prevent browser crashes from heavy pages (e.g. streaming sites)
+    security_opt:
+      - apparmor:unconfined
+      - seccomp:unconfined
     extra_hosts:
       - "host.docker.internal:host-gateway"
     cap_add:
       - SYS_ADMIN # Required for browser sandbox security
     ports:
-      - "8080:8080"   # Neko Web interface
-      - "8088:8088/tcp" # WebRTC TCP Multiplexer
-      - "9222:9222"   # Chrome DevTools Protocol (CDP)
+      - "8080:8080"       # Neko Web interface
+      - "52000-52099:52000-52099/udp" # WebRTC Ephemeral Port Range UDP
+      - "52000:52000/tcp" # WebRTC TCP Multiplexer Fallback
+      - "9222:9222"       # Chrome DevTools Protocol (CDP)
     environment:
       # --- General Settings ---
       NEKO_DESKTOP_SCREEN: "416x912@30"
@@ -20,9 +24,11 @@ services:
       NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD: "admin"
       NEKO_CAPTURE_VIDEO_SHOW_POINTER: "false"
       # --- WebRTC Configuration ---
-      NEKO_WEBRTC_NAT1TO1: ${NEKO_WEBRTC_NAT1TO1:-192.168.1.4}
-      NEKO_WEBRTC_TCPMUX: 8088
-      NEKO_WEBRTC_ICELITE: "true"
+      NEKO_WEBRTC_NAT1TO1: ${NEKO_WEBRTC_NAT1TO1:-82.29.160.123}
+      NEKO_EPR: "52000-52099"
+      NEKO_WEBRTC_UDPMUX: "52000"
+      NEKO_WEBRTC_TCPMUX: "52000"
+      NEKO_WEBRTC_ICELITE: "false"
       NEKO_SESSION_IMPLICIT_HOSTING: "true"
     volumes:
       # Persists bookmarks, history, and cookies across restarts using local session folder

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 // Neko container screen resolution (must match NEKO_DESKTOP_SCREEN in docker-compose)
@@ -16,7 +16,7 @@ export default function BrowserScreen({ route, navigation }) {
   // then transition to 'phone' once the phone input is visible.
   // For other platforms: start at 'phone' directly.
   const isBumble = platform?.toLowerCase() === 'bumble';
-  const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'country_code');
+  const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'phone');
   const [showNeko, setShowNeko] = useState(false);
   const [inputText, setInputText] = useState('');
   const [countryCode, setCountryCode] = useState('+91');
@@ -25,8 +25,44 @@ export default function BrowserScreen({ route, navigation }) {
   const [dummyText, setDummyText] = useState('');
   const appState = useRef(AppState.currentState);
 
+  const lastSwipeTime = useRef(0);
+
+  const handleSwipe = (direction) => {
+    const now = Date.now();
+    if (now - lastSwipeTime.current < 120) return;
+    lastSwipeTime.current = now;
+
+    try {
+      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+      fetch(`${orchestratorUrl}/swipe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: direction }),
+      }).catch(() => { });
+    } catch (e) { }
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const { dx } = gestureState;
+        if (dx > 15) {
+          console.log('[Mobile] Swiped Right -> Triggering Left arrow key');
+          handleSwipe('Left');
+        } else if (dx < -15) {
+          console.log('[Mobile] Swiped Left -> Triggering Right arrow key');
+          handleSwipe('Right');
+        }
+      },
+    })
+  ).current;
+
   // Poll orchestrator /nav-status while on navigating step.
-  // Advances to country_code when orchestrator signals phone input is ready.
+  // Advances to phone when orchestrator signals phone input is ready.
   // Safety auto-advance after 30s even if polling fails.
   useEffect(() => {
     if (!isBumble || loginStep !== 'navigating') return;
@@ -40,10 +76,10 @@ export default function BrowserScreen({ route, navigation }) {
         const resp = await fetch(`${orchestratorUrl}/nav-status`);
         const data = await resp.json();
         if (data.ready && !cancelled) {
-          setLoginStep('country_code');
+          setLoginStep('phone');
           return;
         }
-      } catch (_) {}
+      } catch (_) { }
       if (!cancelled) setTimeout(poll, 500);
     };
 
@@ -52,7 +88,7 @@ export default function BrowserScreen({ route, navigation }) {
 
     // Safety: auto-advance after 30s regardless
     const safetyTimer = setTimeout(() => {
-      if (!cancelled) setLoginStep('country_code');
+      if (!cancelled) setLoginStep('phone');
     }, 30000);
 
     return () => {
@@ -85,11 +121,12 @@ export default function BrowserScreen({ route, navigation }) {
             setLoginStep('otp');
             return;
           } else if (state === 'captcha') {
+            setShowNeko(true); // Automatically show live browser when puzzle appears
             setLoginStep('captcha');
             return;
           }
         }
-      } catch (_) {}
+      } catch (_) { }
       if (!cancelled) setTimeout(poll, 500);
     };
 
@@ -154,7 +191,7 @@ export default function BrowserScreen({ route, navigation }) {
     // Step 3 — wait for phone number input to appear, then show wizard
     await new Promise(r => setTimeout(r, 1000));
     setLoginStep('phone');
-  };  const handleSendText = async () => {
+  }; const handleSendText = async () => {
     if (!inputText.trim()) return;
     setSendingText(true);
     try {
@@ -190,7 +227,7 @@ export default function BrowserScreen({ route, navigation }) {
   const injectKeyEvent = (key) => {
     let normalizedKey = key;
     if (key === '\n') normalizedKey = 'Enter';
-    
+
     const charCode = normalizedKey.length === 1 ? normalizedKey.charCodeAt(0) : 0;
     let keyCode = charCode;
     if (normalizedKey === 'Backspace') keyCode = 8;
@@ -253,25 +290,35 @@ export default function BrowserScreen({ route, navigation }) {
   const injectConfigScript = () => {
     const settingsJson = JSON.stringify(extensionSettings || {});
     const cssCode = `
-      html, body, #neko, .neko-main, .video-container, .neko-video, video, canvas {
+      header, nav, .nav, #nav, .navbar, .header,
+      .neko-nav, .neko-header, .neko-sidebar, .neko-chat, .neko-menu, .neko-controls, .neko-topbar, .neko-room-header,
+      .v-app-bar, .v-toolbar, .v-navigation-drawer, .v-app-bar-title,
+      [class*="v-toolbar"], [class*="v-app-bar"], [class*="v-navigation-drawer"],
+      [class*="nav-bar"], [class*="topbar"], [class*="neko-nav"], [class*="header"] {
+        display: none !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+      }
+      html, body, #neko, #app, .v-application, .neko-main, .video-container, .neko-video, video, canvas, main, .v-main {
         width: 100% !important;
         height: 100% !important;
         max-width: 100vw !important;
         max-height: 100vh !important;
         margin: 0 !important;
         padding: 0 !important;
+        top: 0 !important;
+        left: 0 !important;
+        position: absolute !important;
         overflow: hidden !important;
         box-sizing: border-box !important;
-      }
-      .neko-sidebar, .neko-chat {
-        display: none !important;
       }
     `;
 
     // Listen for the extension's signal that Bumble's phone input is ready.
-    // The bumble-content.js extension posts window.postMessage({ type: 'bumble:phoneInputReady' })
-    // once it has auto-clicked through "Continue with other methods" → "Use cell phone number".
-    // Neko's WebRTC client relays postMessages from the container page to the host WebView.
     const listenerJs = isBumble ? `
       (function() {
         if (window.__flirteasyPhoneReadyListening) return;
@@ -295,10 +342,33 @@ export default function BrowserScreen({ route, navigation }) {
       (function() {
         try {
           localStorage.setItem('flirteasy_settings_sync', '${settingsJson}');
-          const style = document.createElement('style');
-          style.id = 'flirteasy-mobile-layout';
-          style.innerHTML = \`${cssCode}\`;
-          document.head.appendChild(style);
+          
+          function applyHidingCSS() {
+            if (!document.getElementById('flirteasy-mobile-layout')) {
+              const style = document.createElement('style');
+              style.id = 'flirteasy-mobile-layout';
+              style.innerHTML = \`${cssCode}\`;
+              (document.head || document.documentElement).appendChild(style);
+            }
+            try {
+              document.querySelectorAll('div, header, nav, section').forEach(function(el) {
+                const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+                if (text.includes('n.eko') || text.includes('neko')) {
+                  const rect = el.getBoundingClientRect();
+                  if (rect.top < 120 && rect.height < 120 && rect.height > 0) {
+                    el.style.display = 'none';
+                    el.style.height = '0px';
+                    el.style.opacity = '0';
+                    el.style.pointerEvents = 'none';
+                  }
+                }
+              });
+            } catch (_) {}
+          }
+          
+          applyHidingCSS();
+          setInterval(applyHidingCSS, 150);
+
           ${listenerJs}
         } catch(e) {}
       })();
@@ -318,192 +388,187 @@ export default function BrowserScreen({ route, navigation }) {
         keyboardVerticalOffset={0}
       >
         <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>✕ Close</Text>
-        </TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{platform} Session</Text>
-          <Text style={styles.subtitle} numberOfLines={1}>IP: {proxyIp}</Text>
-        </View>
-        {loginStep !== 'done' ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity 
-              style={[styles.toggleNekoBtn, { marginRight: 6 }]} 
-              onPress={() => setShowNeko(!showNeko)}
-            >
-              <Text style={styles.toggleNekoBtnText}>
-                {showNeko ? '🙈 Hide Browser' : '👁️ View Browser'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.skipBtn} onPress={() => setLoginStep('done')}>
-              <Text style={styles.skipBtnText}>
-                {loginStep === 'navigating' ? 'Skip' : 'Skip'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity 
-            style={[styles.menuBtn, { marginRight: 8, backgroundColor: '#3A3A4A15', borderColor: '#3A3A4A40' }]} 
-            onPress={() => inputRef.current.focus()}
-          >
-            <Text style={[styles.menuBtnText, { color: '#FFF' }]}>⌨️ Keyboard</Text>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backBtnText}>✕ Close</Text>
           </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={[
-        styles.webviewContainer, 
-        loginStep !== 'done' && (showNeko ? styles.webviewContainerSplit : styles.webviewContainerHidden)
-      ]}>
-        <WebView
-          ref={webViewRef}
-          source={{ uri: finalUrl }}
-          style={styles.webview}
-          onLoadStart={() => setLoading(true)}
-          onLoadEnd={() => {
-            setLoading(false);
-            injectConfigScript();
-          }}
-          onMessage={(event) => {
-            try {
-              const msg = JSON.parse(event.nativeEvent.data);
-              // Extension signals phone input is ready — advance wizard automatically to country code
-              if (msg.type === 'bumble:phoneInputReady' && loginStep === 'navigating') {
-                console.log('[Browser] Bumble phone input ready — advancing wizard to country code');
-                setLoginStep('country_code');
-              }
-              // Extension signals OTP input is ready (we log it, but transition is handled by the 20s delay)
-              if (msg.type === 'bumble:otpInputReady') {
-                console.log('[Browser] Bumble OTP input ready (waiting for 20s timer...)');
-              }
-            } catch (_) {}
-          }}
-          onError={() => {
-            setTimeout(() => {
-              if (webViewRef.current) webViewRef.current.reload();
-            }, 3000);
-          }}
-          allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={false}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          scrollEnabled={false}
-          bounces={false}
-          overScrollMode="never"
-          keyboardDisplayRequiresUserAction={false}
-          userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        />
-        {loading && (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color="#FE3C72" />
-            <Text style={styles.loaderText}>Connecting to Virtual Browser...</Text>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>{platform} Session</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>IP: {proxyIp}</Text>
           </View>
-        )}
-      </View>
-
-      {loginStep !== 'done' && (
-        <View style={[styles.wizardPanel, !showNeko && styles.wizardPanelFull]}>
-          {loginStep === 'navigating' && (
-            <View style={styles.wizardStep}>
-              <ActivityIndicator size="large" color="#FFCB37" style={{ marginBottom: 16 }} />
-              <Text style={styles.wizardTitle}>Opening Phone Login...</Text>
-              <Text style={styles.wizardDesc}>
-                Automatically navigating to the phone number screen on Bumble. Just a moment.
-              </Text>
+          {loginStep !== 'done' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity
-                style={[styles.wizardBtn, { backgroundColor: '#2A2A35', borderWidth: 1, borderColor: '#3A3A4A' }]}
-                onPress={() => setLoginStep('country_code')}
+                style={[styles.toggleNekoBtn, { marginRight: 6 }]}
+                onPress={() => setShowNeko(!showNeko)}
               >
-                <Text style={[styles.wizardBtnText, { color: '#8E8E9F' }]}>Skip — I'll navigate manually</Text>
+                <Text style={styles.toggleNekoBtnText}>
+                  {showNeko ? '🙈 Hide Browser' : '👁️ View Browser'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.skipBtn} onPress={() => setLoginStep('done')}>
+                <Text style={styles.skipBtnText}>
+                  {loginStep === 'navigating' ? 'Skip' : 'Skip'}
+                </Text>
               </TouchableOpacity>
             </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.menuBtn, { marginRight: 8, backgroundColor: '#3A3A4A15', borderColor: '#3A3A4A40' }]}
+              onPress={() => inputRef.current.focus()}
+            >
+              <Text style={[styles.menuBtnText, { color: '#FFF' }]}>⌨️ Keyboard</Text>
+            </TouchableOpacity>
           )}
+        </View>
 
-          {loginStep === 'country_code' && (
-            <View style={styles.wizardStep}>
-              <Text style={styles.wizardTitle}>Select Country Code</Text>
-              <Text style={styles.wizardDesc}>
-                Enter the dialing country code for your phone number.
-              </Text>
-              <TextInput
-                style={styles.wizardInput}
-                placeholder="e.g. +91"
-                placeholderTextColor="#6E6E7F"
-                value={countryCode}
-                onChangeText={setCountryCode}
-                keyboardType="phone-pad"
-              />
-              <TouchableOpacity 
-                style={styles.wizardBtn}
-                disabled={sendingText}
-                onPress={async () => {
-                  if (!countryCode.trim()) return;
-                  setSendingText(true);
-                  try {
-                    const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                    await fetch(`${orchestratorUrl}/type-text`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ text: countryCode, field: 'country-code' }),
-                    });
-                  } catch (e) {
-                    console.error('Network error sending country code:', e);
-                  } finally {
-                    setSendingText(false);
-                    setLoginStep('phone');
+        <View
+          {...panResponder.panHandlers}
+          style={[
+            styles.webviewContainer,
+            loginStep !== 'done' && (showNeko ? styles.webviewContainerSplit : styles.webviewContainerHidden)
+          ]}
+        >
+          <WebView
+            ref={webViewRef}
+            source={{ uri: finalUrl }}
+            style={styles.webview}
+            onLoadStart={() => setLoading(true)}
+            onLoadEnd={() => {
+              setLoading(false);
+              injectConfigScript();
+            }}
+            onMessage={(event) => {
+              try {
+                const msg = JSON.parse(event.nativeEvent.data);
+                // Extension signals phone input is ready — advance wizard automatically to phone
+                if (msg.type === 'bumble:phoneInputReady' && loginStep === 'navigating') {
+                  console.log('[Browser] Bumble phone input ready — advancing wizard to phone');
+                  setLoginStep('phone');
+                }
+                // Extension signals OTP input is ready (we log it, but transition is handled by the 20s delay)
+                if (msg.type === 'bumble:otpInputReady') {
+                  console.log('[Browser] Bumble OTP input ready (waiting for 20s timer...)');
+                }
+              } catch (_) { }
+            }}
+            onError={() => {
+              setTimeout(() => {
+                if (webViewRef.current) webViewRef.current.reload();
+              }, 3000);
+            }}
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            mediaCapturePermissionGrantType="grant"
+            originWhitelist={['*']}
+            mixedContentMode="always"
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            injectedJavaScript={`
+            (function() {
+              const css = "header, nav, #nav, .nav, .navbar, .header, .neko-nav, .neko-header, .neko-sidebar, .neko-chat, .neko-menu, .neko-controls, .neko-topbar, .v-app-bar, .v-toolbar, [class*='v-toolbar'], [class*='v-app-bar'], [class*='header'], [class*='nav'] { display: none !important; height: 0 !important; opacity: 0 !important; visibility: hidden !important; } html, body, #neko, #app, .v-application, .neko-main, .video-container, .neko-video, video, canvas { width: 100% !important; height: 100% !important; margin: 0 !important; padding: 0 !important; top: 0 !important; left: 0 !important; position: absolute !important; }";
+              const s = document.createElement('style');
+              s.innerHTML = css;
+              (document.head || document.documentElement).appendChild(s);
+              setInterval(function() {
+                document.querySelectorAll('div, header, nav').forEach(function(el) {
+                  const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+                  if (t.includes('n.eko') || t.includes('neko')) {
+                    const r = el.getBoundingClientRect();
+                    if (r.top < 120 && r.height < 120 && r.height > 0) { el.style.display = 'none'; }
                   }
-                }}
-              >
-                {sendingText ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <Text style={styles.wizardBtnText}>Next ➔</Text>
-                )}
-              </TouchableOpacity>
+                });
+              }, 150);
+            })();
+            true;
+          `}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            scrollEnabled={false}
+            bounces={false}
+            overScrollMode="never"
+            keyboardDisplayRequiresUserAction={false}
+            userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+          />
+          {loading && (
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator size="large" color="#FE3C72" />
+              <Text style={styles.loaderText}>Connecting to Virtual Browser...</Text>
             </View>
           )}
+        </View>
 
-          {loginStep === 'phone' && (
-            <View style={styles.wizardStep}>
-              <Text style={styles.wizardTitle}>Enter Mobile Number</Text>
-              <Text style={styles.wizardDesc}>
-                {isBumble
-                  ? 'Enter your mobile number below, then tap Send.'
-                  : `Enter your mobile number to log into your ${platform} account.`}
-              </Text>
-              <TextInput
-                style={styles.wizardInput}
-                placeholder="Mobile Number"
-                placeholderTextColor="#6E6E7F"
-                value={inputText}
-                onChangeText={setInputText}
-                keyboardType="phone-pad"
-                autoComplete="tel"
-              />
-              <View style={styles.wizardBtnRow}>
-                <TouchableOpacity 
-                  style={[styles.wizardBtnSecondary, { marginRight: 8 }]}
-                  disabled={sendingText}
-                  onPress={() => {
-                    setLoginStep('country_code');
-                  }}
+        {loginStep !== 'done' && (
+          <View style={[styles.wizardPanel, !showNeko && styles.wizardPanelFull]}>
+            {loginStep === 'navigating' && (
+              <View style={styles.wizardStep}>
+                <ActivityIndicator size="large" color="#FFCB37" style={{ marginBottom: 16 }} />
+                <Text style={styles.wizardTitle}>Opening Phone Login...</Text>
+                <Text style={styles.wizardDesc}>
+                  Automatically navigating to the phone number screen on Bumble. Just a moment.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.wizardBtn, { backgroundColor: '#2A2A35', borderWidth: 1, borderColor: '#3A3A4A' }]}
+                  onPress={() => setLoginStep('phone')}
                 >
-                  <Text style={styles.wizardBtnSecondaryText}>↩ Back</Text>
+                  <Text style={[styles.wizardBtnText, { color: '#8E8E9F' }]}>Skip — I'll navigate manually</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.wizardBtn, { flex: 1 }]}
+              </View>
+            )}
+
+            {loginStep === 'phone' && (
+              <View style={styles.wizardStep}>
+                <Text style={styles.wizardTitle}>Enter Mobile Number</Text>
+                <Text style={styles.wizardDesc}>
+                  Enter your country code and mobile number to log into your account.
+                </Text>
+
+                <View style={styles.phoneInputRow}>
+                  <TextInput
+                    style={styles.countryCodeInput}
+                    placeholder="+91"
+                    placeholderTextColor="#6E6E7F"
+                    value={countryCode}
+                    onChangeText={setCountryCode}
+                    keyboardType="phone-pad"
+                  />
+                  <TextInput
+                    style={styles.phoneNumberInput}
+                    placeholder="Mobile Number"
+                    placeholderTextColor="#6E6E7F"
+                    value={inputText}
+                    onChangeText={setInputText}
+                    keyboardType="phone-pad"
+                    autoComplete="tel"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={styles.wizardBtn}
                   disabled={sendingText}
                   onPress={async () => {
                     if (!inputText.trim()) return;
                     setSendingText(true);
-                    
+
                     try {
                       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+
+                      // Step 1: Send Country Code if provided
+                      if (countryCode.trim()) {
+                        await fetch(`${orchestratorUrl}/type-text`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ text: countryCode.trim(), field: 'country-code' }),
+                        });
+                        await new Promise(r => setTimeout(r, 250));
+                      }
+
+                      // Step 2: Send Mobile Number
                       const response = await fetch(`${orchestratorUrl}/type-text`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: inputText, field: 'phone-number' }),
+                        body: JSON.stringify({ text: inputText.trim(), field: 'phone-number' }),
                       });
+
                       if (response.ok) {
                         setInputText(''); // Clear input on success
                       } else {
@@ -512,9 +577,9 @@ export default function BrowserScreen({ route, navigation }) {
                     } catch (e) {
                       console.error('Network error sending text:', e);
                     }
-                    
+
                     await handlePressEnter();
-                    
+
                     // Immediately show OTP waiting screen, poll for OTP input to appear
                     setSendingText(false);
                     setLoginStep('waiting_otp');
@@ -527,248 +592,241 @@ export default function BrowserScreen({ route, navigation }) {
                   )}
                 </TouchableOpacity>
               </View>
-            </View>
-          )}
-
-          {loginStep === 'waiting_otp' && (
-            <View style={styles.wizardStep}>
-              <ActivityIndicator size="large" color="#FFCB37" style={{ marginBottom: 16 }} />
-              <Text style={styles.wizardTitle}>Sending OTP...</Text>
-              <Text style={styles.wizardDesc}>
-                Bumble is sending a verification code to your phone. This may take a few seconds.
-              </Text>
-              <TouchableOpacity
-                style={[styles.wizardBtn, { backgroundColor: '#2A2A35', borderWidth: 1, borderColor: '#3A3A4A', marginTop: 8 }]}
-                onPress={() => setLoginStep('otp')}
-              >
-                <Text style={[styles.wizardBtnText, { color: '#8E8E9F' }]}>I already got the code →</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {loginStep === 'otp' && (
-            <View style={styles.wizardStep}>
-              <Text style={styles.wizardTitle}>Enter Verification Code</Text>
-              <Text style={styles.wizardDesc}>Enter the verification code (OTP) sent to your mobile device.</Text>
-              <TextInput
-                style={styles.wizardInput}
-                placeholder="Enter OTP..."
-                placeholderTextColor="#6E6E7F"
-                value={inputText}
-                onChangeText={setInputText}
-                keyboardType="number-pad"
-              />
-              <View style={styles.wizardBtnRow}>
-                <TouchableOpacity 
-                  style={[styles.wizardBtnSecondary, { marginRight: 8 }]}
-                  disabled={sendingText}
-                  onPress={() => {
-                    setInputText('');
-                    setLoginStep('phone');
-                  }}
-                >
-                  <Text style={styles.wizardBtnSecondaryText}>↩ Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.wizardBtn, { flex: 1 }]}
-                  disabled={sendingText}
-                  onPress={async () => {
-                    if (!inputText.trim()) return;
-                    setSendingText(true);
-                    
-                    // Send OTP to the browser
-                    try {
-                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                      await fetch(`${orchestratorUrl}/type-text`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: inputText }),
-                      });
-                      await fetch(`${orchestratorUrl}/press-enter`, { method: 'POST' });
-                      setInputText('');
-                    } catch (e) {
-                      console.error('Error sending OTP:', e);
-                      setSendingText(false);
-                      return;
-                    }
-                    
-                    // Poll page state for up to 15 seconds
-                    let attempts = 0;
-                    const maxAttempts = 30;
-                    const pollInterval = setInterval(async () => {
-                      attempts++;
-                      try {
-                        const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                        const resp = await fetch(`${orchestratorUrl}/check-page-state`);
-                        const data = await resp.json();
-                        const state = data.state;
-                        
-                        if (state === 'logged_in') {
-                          clearInterval(pollInterval);
-                          setSendingText(false);
-                          setLoginStep('done');
-                        } else if (state === 'captcha') {
-                          clearInterval(pollInterval);
-                          setSendingText(false);
-                          setLoginStep('captcha');
-                        } else if (attempts >= maxAttempts) {
-                          clearInterval(pollInterval);
-                          setSendingText(false);
-                          // Unknown state — go to done so user can interact manually
-                          setLoginStep('done');
-                        }
-                        // If 'otp_screen' or 'unknown', keep polling
-                      } catch (e) {
-                        if (attempts >= maxAttempts) {
-                          clearInterval(pollInterval);
-                          setSendingText(false);
-                          setLoginStep('done');
-                        }
-                      }
-                    }, 500);
-                  }}
-                >
-                  {sendingText ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.wizardBtnText}>Verify & Log In ✓</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {loginStep === 'captcha' && (
-            <View style={styles.wizardStep}>
-              <Text style={styles.wizardTitle}>🔒 Captcha Required</Text>
-              <Text style={styles.wizardDesc}>
-                Bumble is showing a captcha. Look at the screen above, solve it and type the captcha text below.
-              </Text>
-              <TextInput
-                style={styles.wizardInput}
-                placeholder="Enter captcha text..."
-                placeholderTextColor="#6E6E7F"
-                value={captchaText}
-                onChangeText={setCaptchaText}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <View style={styles.wizardBtnRow}>
-                <TouchableOpacity 
-                  style={[styles.wizardBtnSecondary, { marginRight: 8 }]}
-                  disabled={sendingText}
-                  onPress={() => {
-                    setCaptchaText('');
-                    setLoginStep('otp');
-                  }}
-                >
-                  <Text style={styles.wizardBtnSecondaryText}>↩ Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.wizardBtn, { flex: 1 }]}
-                  disabled={sendingText}
-                  onPress={async () => {
-                    if (!captchaText.trim()) return;
-                    setSendingText(true);
-                    try {
-                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                      await fetch(`${orchestratorUrl}/type-text`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: captchaText }),
-                      });
-                      await fetch(`${orchestratorUrl}/press-enter`, { method: 'POST' });
-                      setCaptchaText('');
-                    } catch (e) {
-                      console.error('Error sending captcha:', e);
-                      setSendingText(false);
-                      return;
-                    }
-                    
-                    // Re-check page state after captcha
-                    let attempts = 0;
-                    const maxAttempts = 30;
-                    const pollInterval = setInterval(async () => {
-                      attempts++;
-                      try {
-                        const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                        const resp = await fetch(`${orchestratorUrl}/check-page-state`);
-                        const data = await resp.json();
-                        const state = data.state;
-                        
-                        if (state === 'logged_in') {
-                          clearInterval(pollInterval);
-                          setSendingText(false);
-                          setLoginStep('done');
-                        } else if (state === 'otp_screen') {
-                          clearInterval(pollInterval);
-                          setSendingText(false);
-                          setLoginStep('otp'); // go back to OTP if needed
-                        } else if (attempts >= maxAttempts) {
-                          clearInterval(pollInterval);
-                          setSendingText(false);
-                          setLoginStep('done');
-                        }
-                      } catch (e) {
-                        if (attempts >= maxAttempts) {
-                          clearInterval(pollInterval);
-                          setSendingText(false);
-                          setLoginStep('done');
-                        }
-                      }
-                    }, 500);
-                  }}
-                >
-                  {sendingText ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.wizardBtnText}>Submit Captcha ✓</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        </View>
-      )}
-
-      {loginStep === 'done' && (
-        <View style={styles.inputPanel}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Paste Phone No. or OTP code here..."
-            placeholderTextColor="#8E8E9F"
-            value={inputText}
-            onChangeText={setInputText}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <TouchableOpacity 
-            style={styles.sendBtn} 
-            onPress={handleSendText}
-            disabled={sendingText}
-          >
-            {sendingText ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <Text style={styles.sendBtnText}>Send</Text>
             )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
-            <Text style={styles.enterBtnText}>⏎ Enter</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
-      <TextInput
-        ref={inputRef}
-        style={styles.hiddenInput}
-        value={dummyText}
-        onChangeText={handleTextChange}
-        autoCapitalize="none"
-        autoCorrect={false}
-        blurOnSubmit={false}
-        onSubmitEditing={() => injectKeyEvent('\n')}
-      />
+            {loginStep === 'waiting_otp' && (
+              <View style={styles.wizardStep}>
+                <ActivityIndicator size="large" color="#FFCB37" style={{ marginBottom: 16 }} />
+                <Text style={styles.wizardTitle}>Sending OTP...</Text>
+                <Text style={styles.wizardDesc}>
+                  Bumble is sending a verification code to your phone. This may take a few seconds.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.wizardBtn, { backgroundColor: '#2A2A35', borderWidth: 1, borderColor: '#3A3A4A', marginTop: 8 }]}
+                  onPress={() => setLoginStep('otp')}
+                >
+                  <Text style={[styles.wizardBtnText, { color: '#8E8E9F' }]}>I already got the code →</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {loginStep === 'otp' && (
+              <View style={styles.wizardStep}>
+                <Text style={styles.wizardTitle}>Enter Verification Code</Text>
+                <Text style={styles.wizardDesc}>Enter the verification code (OTP) sent to your mobile device.</Text>
+                <TextInput
+                  style={styles.wizardInput}
+                  placeholder="Enter OTP..."
+                  placeholderTextColor="#6E6E7F"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  keyboardType="number-pad"
+                />
+
+                <TouchableOpacity
+                  style={styles.resendBtn}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    try {
+                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                      await fetch(`${orchestratorUrl}/resend-code`, { method: 'POST' });
+                    } catch (e) {
+                      console.error('Error requesting resend code:', e);
+                    }
+                  }}
+                >
+                  <Text style={styles.resendBtnText}>🔄 Didn't receive code? Send code again</Text>
+                </TouchableOpacity>
+
+                <View style={[styles.wizardBtnRow, { marginTop: 12 }]}>
+                  <TouchableOpacity
+                    style={[styles.wizardBtnSecondary, { marginRight: 8 }]}
+                    disabled={sendingText}
+                    onPress={() => {
+                      setInputText('');
+                      setLoginStep('phone');
+                    }}
+                  >
+                    <Text style={styles.wizardBtnSecondaryText}>↩ Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.wizardBtn, { flex: 1 }]}
+                    disabled={sendingText}
+                    onPress={async () => {
+                      if (!inputText.trim()) return;
+                      setSendingText(true);
+
+                      // Send OTP to the browser
+                      try {
+                        const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                        await fetch(`${orchestratorUrl}/type-text`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ text: inputText }),
+                        });
+                        await fetch(`${orchestratorUrl}/press-enter`, { method: 'POST' });
+                        setInputText('');
+                      } catch (e) {
+                        console.error('Error sending OTP:', e);
+                        setSendingText(false);
+                        return;
+                      }
+
+                      // Poll page state for up to 15 seconds
+                      let attempts = 0;
+                      const maxAttempts = 30;
+                      const pollInterval = setInterval(async () => {
+                        attempts++;
+                        try {
+                          const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                          const resp = await fetch(`${orchestratorUrl}/check-page-state`);
+                          const data = await resp.json();
+                          const state = data.state;
+
+                          if (state === 'logged_in') {
+                            clearInterval(pollInterval);
+                            setSendingText(false);
+                            setLoginStep('done');
+                          } else if (state === 'captcha') {
+                            clearInterval(pollInterval);
+                            setSendingText(false);
+                            setLoginStep('captcha');
+                          } else if (attempts >= maxAttempts) {
+                            clearInterval(pollInterval);
+                            setSendingText(false);
+                            // Unknown state — go to done so user can interact manually
+                            setLoginStep('done');
+                          }
+                          // If 'otp_screen' or 'unknown', keep polling
+                        } catch (e) {
+                          if (attempts >= maxAttempts) {
+                            clearInterval(pollInterval);
+                            setSendingText(false);
+                            setLoginStep('done');
+                          }
+                        }
+                      }, 500);
+                    }}
+                  >
+                    {sendingText ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text style={styles.wizardBtnText}>Verify & Log In ✓</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {loginStep === 'captcha' && (
+              <View style={styles.wizardStep}>
+                <View style={styles.puzzleWarningBox}>
+                  <Text style={styles.puzzleWarningTitle}>🧩 Please Solve Puzzle First</Text>
+                  <Text style={styles.puzzleWarningDesc}>
+                    Security verification detected ("Protecting your account" / "Start Puzzle").
+                  </Text>
+                  <Text style={styles.puzzleInstructionText}>
+                    👉 The live browser screen is visible above. Tap "Start Puzzle" on the browser screen above to solve it manually.
+                  </Text>
+                </View>
+
+                <View style={{ marginBottom: 12 }}>
+                  <TextInput
+                    style={styles.wizardInput}
+                    placeholder="Enter captcha text (if text-based)..."
+                    placeholderTextColor="#6E6E7F"
+                    value={captchaText}
+                    onChangeText={setCaptchaText}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <View style={styles.wizardBtnRow}>
+                  <TouchableOpacity
+                    style={[styles.wizardBtnSecondary, { marginRight: 8 }]}
+                    disabled={sendingText}
+                    onPress={() => {
+                      setCaptchaText('');
+                      setLoginStep('otp');
+                    }}
+                  >
+                    <Text style={styles.wizardBtnSecondaryText}>Skip to OTP ➔</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.wizardBtn, { flex: 1 }]}
+                    disabled={sendingText}
+                    onPress={async () => {
+                      if (captchaText.trim()) {
+                        setSendingText(true);
+                        try {
+                          const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                          await fetch(`${orchestratorUrl}/type-text`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text: captchaText.trim() }),
+                          });
+                          await fetch(`${orchestratorUrl}/press-enter`, { method: 'POST' });
+                          setCaptchaText('');
+                        } catch (e) {
+                          console.error('Error sending captcha:', e);
+                        } finally {
+                          setSendingText(false);
+                        }
+                      }
+                      setLoginStep('otp');
+                    }}
+                  >
+                    {sendingText ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text style={styles.wizardBtnText}>I Solved the Puzzle ✓</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
+        {loginStep === 'done' && (
+          <View style={styles.inputPanel}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Paste Phone No. or OTP code here..."
+              placeholderTextColor="#8E8E9F"
+              value={inputText}
+              onChangeText={setInputText}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={styles.sendBtn}
+              onPress={handleSendText}
+              disabled={sendingText}
+            >
+              {sendingText ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={styles.sendBtnText}>Send</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
+              <Text style={styles.enterBtnText}>⏎ Enter</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <TextInput
+          ref={inputRef}
+          style={styles.hiddenInput}
+          value={dummyText}
+          onChangeText={handleTextChange}
+          autoCapitalize="none"
+          autoCorrect={false}
+          blurOnSubmit={false}
+          onSubmitEditing={() => injectKeyEvent('\n')}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -905,67 +963,105 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
   webviewContainerSplit: {
-    flex: 0.45,
+    flex: 0.65,
     borderBottomWidth: 1,
-    borderColor: '#2A2A35',
+    borderColor: '#232332',
   },
   wizardPanel: {
-    flex: 0.55,
-    backgroundColor: '#181820',
-    padding: 20,
+    flex: 0.35,
+    backgroundColor: '#13131C',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     justifyContent: 'center',
   },
   wizardStep: {
     width: '100%',
   },
   wizardTitle: {
-    color: '#FFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+    letterSpacing: 0.2,
   },
   wizardDesc: {
-    color: '#8E8E9F',
-    fontSize: 13,
-    marginBottom: 20,
-    lineHeight: 18,
+    color: '#9A9AB0',
+    fontSize: 12.5,
+    marginBottom: 12,
+    lineHeight: 16,
   },
   wizardInput: {
-    height: 48,
-    backgroundColor: '#0F0F13',
-    borderRadius: 8,
-    paddingHorizontal: 16,
+    height: 44,
+    backgroundColor: '#0A0A0F',
+    borderRadius: 10,
+    paddingHorizontal: 14,
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 15,
     borderWidth: 1,
-    borderColor: '#3A3A4A',
-    marginBottom: 16,
+    borderColor: '#2D2D3E',
+    marginBottom: 12,
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  countryCodeInput: {
+    width: 76,
+    height: 44,
+    backgroundColor: '#0A0A0F',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: '#2D2D3E',
+    marginRight: 8,
+    textAlign: 'center',
+  },
+  phoneNumberInput: {
+    flex: 1,
+    height: 44,
+    backgroundColor: '#0A0A0F',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    color: '#FFF',
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: '#2D2D3E',
   },
   wizardBtn: {
-    height: 48,
+    height: 44,
     backgroundColor: '#FE3C72',
-    borderRadius: 8,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#FE3C72',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
   },
   wizardBtnText: {
     color: '#FFF',
     fontSize: 15,
     fontWeight: 'bold',
+    letterSpacing: 0.2,
   },
   wizardBtnRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   wizardBtnSecondary: {
-    height: 48,
+    height: 52,
     paddingHorizontal: 20,
-    backgroundColor: '#2A2A35',
-    borderRadius: 8,
+    backgroundColor: '#20202C',
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#3A3A4A',
+    borderColor: '#2D2D3E',
   },
   wizardBtnSecondaryText: {
     color: '#FFF',
@@ -973,9 +1069,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   skipBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     backgroundColor: '#FE3C7215',
     borderWidth: 1,
     borderColor: '#FE3C7240',
@@ -986,9 +1082,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   toggleNekoBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     backgroundColor: '#FFCB3715',
     borderWidth: 1,
     borderColor: '#FFCB3740',
@@ -1005,5 +1101,41 @@ const styles = StyleSheet.create({
   },
   wizardPanelFull: {
     flex: 1,
+  },
+  puzzleWarningBox: {
+    backgroundColor: '#FFCB3715',
+    borderWidth: 1,
+    borderColor: '#FFCB3740',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+  },
+  puzzleWarningTitle: {
+    color: '#FFCB37',
+    fontSize: 17.5,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  puzzleWarningDesc: {
+    color: '#E0E0E5',
+    fontSize: 13.5,
+    lineHeight: 19,
+    marginBottom: 8,
+  },
+  puzzleInstructionText: {
+    color: '#FFF',
+    fontSize: 13.5,
+    fontWeight: '600',
+    lineHeight: 19,
+  },
+  resendBtn: {
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  resendBtnText: {
+    color: '#FFCB37',
+    fontSize: 13.5,
+    fontWeight: '600',
   },
 });

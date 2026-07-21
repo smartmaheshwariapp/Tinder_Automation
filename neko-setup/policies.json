@@ -1,33 +1,16 @@
 {
-  "AutofillAddressEnabled": false,
-  "AutofillCreditCardEnabled": false,
-  "BrowserSignin": 0,
-  "DefaultNotificationsSetting": 2,
-  "DeveloperToolsAvailability": 1,
+  "ExtensionInstallAllowlist": [
+    "*"
+  ],
+  "ExtensionInstallSources": [
+    "file:///*",
+    "https://*/*"
+  ],
   "ExtensionDeveloperModeSettings": 1,
-  "EditBookmarksEnabled": false,
-  "FullscreenAllowed": true,
-  "IncognitoModeAvailability": 1,
-  "SyncDisabled": true,
-  "AutoplayAllowed": true,
-  "BrowserAddPersonEnabled": false,
-  "BrowserGuestModeEnabled": false,
-  "DefaultPopupsSetting": 2,
-  "DownloadRestrictions": 3,
-  "VideoCaptureAllowed": true,
-  "AllowFileSelectionDialogs": false,
-  "PromptForDownloadLocation": false,
-  "BookmarkBarEnabled": false,
-  "PasswordManagerEnabled": false,
-  "BrowserLabsEnabled": false,
-  "ExtensionInstallSources": ["file:///src/extension/*"],
-  "ExtensionInstallAllowlist": ["*"],
-  "ExtensionInstallBlocklist": [],
+  "DeveloperToolsAvailability": 1,
   "ExtensionSettings": {
     "*": {
       "installation_mode": "allowed"
     }
-  },
-  "AutoplayAllowed": true,
-  "VideoCaptureAllowed": true
+  }
 }
