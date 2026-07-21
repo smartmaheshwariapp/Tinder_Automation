@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "com.flirteasy.app",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#0F0F13",
         "foregroundImage": "./assets/android-icon-foreground.png",
