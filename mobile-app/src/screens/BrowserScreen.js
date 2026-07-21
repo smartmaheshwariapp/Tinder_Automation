@@ -462,8 +462,6 @@ export default function BrowserScreen({ route, navigation }) {
             })();
             true;
           `}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
             scrollEnabled={false}
             bounces={false}
             overScrollMode="never"
