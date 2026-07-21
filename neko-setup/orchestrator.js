@@ -1005,19 +1005,35 @@ try:
             # Brief human pause after typing before clicking submit (300ms - 500ms)
             time.sleep(random.uniform(0.3, 0.5))
             
-            # Click submit button
+            # Click submit button (specifically #phone-field-submit "Continue" button)
             submit_js = """
             (function() {
-              var btns = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"], a'));
-              var target = btns.find(function(b) {
-                var txt = (b.innerText || b.textContent || b.value || '').toLowerCase();
-                return txt.indexOf('continue') !== -1 || txt.indexOf('next') !== -1 || txt.indexOf('submit') !== -1 || txt.indexOf('sign in') !== -1 || txt.indexOf('log in') !== -1;
-              });
-              if (target) { target.click(); return 'clicked'; }
-              return 'none';
+              var btn = document.getElementById('phone-field-submit');
+              if (!btn) {
+                btn = document.querySelector('button[type="submit"]');
+              }
+              if (!btn) {
+                var btns = Array.from(document.querySelectorAll('button, input[type="submit"], [role="button"]'));
+                btn = btns.find(function(b) {
+                  var txt = (b.innerText || b.textContent || b.value || '').toLowerCase();
+                  var isQuick = txt.indexOf('quick') !== -1 || txt.indexOf('google') !== -1 || txt.indexOf('apple') !== -1 || txt.indexOf('passkey') !== -1;
+                  return !isQuick && (txt.indexOf('continue') !== -1 || txt.indexOf('next') !== -1 || txt.indexOf('submit') !== -1);
+                });
+              }
+              if (btn) {
+                btn.click();
+                var rect = btn.getBoundingClientRect();
+                return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, clicked: true };
+              }
+              return { clicked: false };
             })()
             """
-            ws.call('Runtime.evaluate', {'expression': submit_js.strip(), 'returnByValue': True})
+            submit_res = ws.call('Runtime.evaluate', {'expression': submit_js.strip(), 'returnByValue': True})
+            s_val = (submit_res.get('result') or {}).get('value')
+            if s_val and s_val.get('clicked') and s_val.get('x'):
+                ws.call('Input.dispatchMouseEvent', {'type': 'mousePressed', 'x': s_val['x'], 'y': s_val['y'], 'button': 'left', 'clickCount': 1})
+                time.sleep(0.04)
+                ws.call('Input.dispatchMouseEvent', {'type': 'mouseReleased', 'x': s_val['x'], 'y': s_val['y'], 'button': 'left', 'clickCount': 1})
             
         ws.close()
 except Exception as e:
@@ -1033,10 +1049,8 @@ except Exception as e:
             return;
           }
           exec(`docker exec neko python3 /tmp/submit_phone.py`, (pyErr, pyStdout) => {
-            exec('docker exec neko xdotool key Return', () => {
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: true }));
-            });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
           });
         });
 
