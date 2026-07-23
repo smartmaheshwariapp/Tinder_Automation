@@ -9,11 +9,11 @@ const PLATFORMS = [
 ];
 
 export default function PlatformSelectScreen({ navigation }) {
-  const [env, setEnv] = useState('local'); // 'server' | 'local'
+  const [env, setEnv] = useState('server'); // 'server' | 'local'
 
   // Settings when running on the remote VPS
   const [serverUrl, setServerUrl] = useState('https://stream.smartmaheshwari.com/?usr=User&pwd=admin');
-  const [serverProxy, setServerProxy] = useState('jestcsld:lhwbi2hzo3eg@198.23.243.226:1080');
+  const [serverProxy, setServerProxy] = useState('');
 
   // Settings when running locally
   const [localUrl, setLocalUrl] = useState('http://192.168.1.3:8080/?usr=User&pwd=admin');
@@ -66,16 +66,6 @@ export default function PlatformSelectScreen({ navigation }) {
             value={env === 'server' ? serverUrl : localUrl}
             onChangeText={env === 'server' ? setServerUrl : setLocalUrl}
             placeholder={env === 'server' ? "Production URL" : "http://localhost:8080/?usr=User&pwd=admin"}
-            placeholderTextColor="#6E6E7F"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Text style={[styles.inputLabel, { marginTop: 12 }]}>SOCKS5 Proxy (Optional)</Text>
-          <TextInput
-            style={styles.textInput}
-            value={env === 'server' ? serverProxy : localProxy}
-            onChangeText={env === 'server' ? setServerProxy : setLocalProxy}
-            placeholder="username:password@ip:port"
             placeholderTextColor="#6E6E7F"
             autoCapitalize="none"
             autoCorrect={false}

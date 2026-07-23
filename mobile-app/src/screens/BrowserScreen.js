@@ -457,7 +457,9 @@ export default function BrowserScreen({ route, navigation }) {
           </TouchableOpacity>
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{platform} Session</Text>
-            <Text style={styles.subtitle} numberOfLines={1}>IP: {proxyIp}</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {proxyIp ? `IP: ${proxyIp}` : 'Direct Connection'}
+            </Text>
           </View>
           {loginStep !== 'done' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
