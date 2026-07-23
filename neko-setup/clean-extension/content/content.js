@@ -4135,16 +4135,165 @@ window.addEventListener('achievement:openPanel', () => {
   chrome.runtime.sendMessage({ action: 'openAchievements' });
 });
 
-
-
-
 console.log('[FlirtEasy] Achievement system integrated with Tinder UI');
 
 // Check login status on load
-if (typeof isLoggedIn === 'function' && isLoggedIn()) {
-  if (typeof window.ORCHESTRATOR_USER_ID !== 'undefined') {
-    fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=tinder`)
-      .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
+if (typeof isLoggedIn === 'function') {
+  if (isLoggedIn()) {
+    if (typeof window.ORCHESTRATOR_USER_ID !== 'undefined') {
+      fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=tinder`)
+        .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
+    }
+  } else {
+    console.log('[Content] User is not logged in. Starting Tinder login helper...');
+
+    const simulateClick = (element) => {
+      if (!element) return;
+      
+      const rect = element.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+
+      const eventOptions = {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: x,
+        clientY: y,
+        screenX: x,
+        screenY: y
+      };
+      
+      const pointerDown = new PointerEvent('pointerdown', eventOptions);
+      element.dispatchEvent(pointerDown);
+      
+      const mouseDown = new MouseEvent('mousedown', eventOptions);
+      element.dispatchEvent(mouseDown);
+      
+      const pointerUp = new PointerEvent('pointerup', eventOptions);
+      element.dispatchEvent(pointerUp);
+      
+      const mouseUp = new MouseEvent('mouseup', eventOptions);
+      element.dispatchEvent(mouseUp);
+      
+      const clickEvent = new MouseEvent('click', eventOptions);
+      element.dispatchEvent(clickEvent);
+    };
+
+    const isVisible = (element) => {
+      if (!element) return false;
+      try {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      } catch (_) {
+        return false;
+      }
+    };
+
+    const clickElement = (element) => {
+      if (!element) return;
+      try {
+        element.click();
+      } catch (err) {
+        console.warn('[Tinder Login] Native click failed:', err);
+      }
+      simulateClick(element);
+    };
+
+    const handleCookieAccept = () => {
+      // 1. Try to find visible button or a tags first to avoid matching outer wrapper divs or hidden elements
+      let acceptBtn = Array.from(document.querySelectorAll('button, a')).find(el => {
+        if (!isVisible(el)) return false;
+        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+        return txt === 'i accept' || txt === 'i accept cookies' || txt === 'accept all' || txt === 'accept' || txt === 'i agree';
+      });
+      // 2. Fallback to other tags
+      if (!acceptBtn) {
+        const elements = Array.from(document.querySelectorAll('.lxn9zzn, div, span'));
+        acceptBtn = elements.find(el => {
+          if (!isVisible(el)) return false;
+          const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+          return txt === 'i accept' || txt === 'i accept cookies' || txt === 'accept all' || txt === 'accept' || txt === 'i agree';
+        });
+      }
+      if (acceptBtn) {
+        console.log('[Tinder Login] Found Cookie Consent Accept button, clicking it!');
+        clickElement(acceptBtn);
+        return true;
+      }
+      return false;
+    };
+
+    const handleTinderLoginLanding = () => {
+      handleCookieAccept();
+
+      // 1. Prioritize button/a tags for "Trouble logging in"
+      let troubleBtn = Array.from(document.querySelectorAll('button, a')).find(el => {
+        if (!isVisible(el)) return false;
+        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+        return txt.includes('trouble logging in');
+      });
+      // Fallback
+      if (!troubleBtn) {
+        troubleBtn = Array.from(document.querySelectorAll('div, span')).find(el => {
+          if (!isVisible(el)) return false;
+          const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+          return txt.includes('trouble logging in');
+        });
+      }
+      if (troubleBtn) {
+        console.log('[Tinder Login] Found "Trouble logging in?" button, clicking it!');
+        clickElement(troubleBtn);
+        return;
+      }
+
+      const isModalOpen = document.querySelector('input[type="tel"], input[type="email"], input[autocomplete="one-time-code"]');
+      if (!isModalOpen) {
+        let loginBtn = null;
+        try {
+          loginBtn = document.querySelector('span.Typs\\(sans-button-md\\)');
+          if (loginBtn && !isVisible(loginBtn)) {
+            loginBtn = null;
+          }
+        } catch (_) {}
+        if (!loginBtn) {
+          // Prioritize button/a
+          loginBtn = Array.from(document.querySelectorAll('button, a')).find(el => {
+            if (!isVisible(el)) return false;
+            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+            return txt === 'log in' || txt === 'login';
+          });
+        }
+        if (!loginBtn) {
+          // Fallback to div/span
+          loginBtn = Array.from(document.querySelectorAll('div, span')).find(el => {
+            if (!isVisible(el)) return false;
+            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+            return txt === 'log in' || txt === 'login';
+          });
+        }
+        if (loginBtn) {
+          console.log('[Tinder Login] Found "Log in" button, clicking it!');
+          clickElement(loginBtn);
+        }
+      }
+    };
+
+    if (typeof window._tinderLoginInterval === 'undefined') {
+      window._tinderLoginInterval = setInterval(() => {
+        if (isLoggedIn()) {
+          console.log('[Tinder Login] Logged in successfully! Clearing helper.');
+          if (typeof window.ORCHESTRATOR_USER_ID !== 'undefined') {
+            fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=tinder`)
+              .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
+          }
+          clearInterval(window._tinderLoginInterval);
+          delete window._tinderLoginInterval;
+          return;
+        }
+        handleTinderLoginLanding();
+      }, 1000);
+    }
   }
 }
 

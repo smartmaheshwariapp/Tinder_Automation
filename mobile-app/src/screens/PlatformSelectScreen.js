@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, SafeAreaView, StatusBar } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, SafeAreaView, StatusBar, TextInput } from 'react-native';
 
 const PLATFORMS = [
   { id: 'tinder', name: 'Tinder', color: '#FE3C72', desc: 'Auto-swiping & AI replies' },
@@ -9,15 +9,24 @@ const PLATFORMS = [
 ];
 
 export default function PlatformSelectScreen({ navigation }) {
-  // Configured production domains for backend stream and API routing
-  const [vpsUrl, setVpsUrl] = useState('https://stream.smartmaheshwari.com/?usr=User&pwd=admin');
-  const [proxyIp, setProxyIp] = useState('jestcsld:lhwbi2hzo3eg@198.23.243.226:1080');
+  const [env, setEnv] = useState('local'); // 'server' | 'local'
+
+  // Settings when running on the remote VPS
+  const [serverUrl, setServerUrl] = useState('https://stream.smartmaheshwari.com/?usr=User&pwd=admin');
+  const [serverProxy, setServerProxy] = useState('jestcsld:lhwbi2hzo3eg@198.23.243.226:1080');
+
+  // Settings when running locally
+  const [localUrl, setLocalUrl] = useState('http://192.168.1.3:8080/?usr=User&pwd=admin');
+  const [localProxy, setLocalProxy] = useState('');
+
+  const activeUrl = env === 'server' ? serverUrl : localUrl;
+  const activeProxy = env === 'server' ? serverProxy : localProxy;
 
   const handleSelect = (platform) => {
     navigation.navigate('PlatformConfig', {
       platform: platform.name,
-      vpsUrl: vpsUrl,
-      proxyIp: proxyIp,
+      vpsUrl: activeUrl,
+      proxyIp: activeProxy,
     });
   };
 
@@ -29,6 +38,48 @@ export default function PlatformSelectScreen({ navigation }) {
         <View style={styles.header}>
           <Text style={styles.title}>FlirtEasy</Text>
           <Text style={styles.subtitle}>Virtual Browser & AI swiper control panel</Text>
+        </View>
+
+        {/* Environment Selection */}
+        <Text style={styles.sectionTitle}>Select Environment</Text>
+        <View style={styles.toggleRow}>
+          <TouchableOpacity
+            style={[styles.toggleBtn, env === 'server' && styles.toggleBtnActive]}
+            onPress={() => setEnv('server')}
+          >
+            <Text style={[styles.toggleBtnText, env === 'server' && styles.toggleBtnTextActive]}>🌐 Server (VPS)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, env === 'local' && styles.toggleBtnActive]}
+            onPress={() => setEnv('local')}
+          >
+            <Text style={[styles.toggleBtnText, env === 'local' && styles.toggleBtnTextActive]}>💻 Local (Dev)</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Connection Settings */}
+        <Text style={styles.sectionTitle}>Connection Settings</Text>
+        <View style={styles.configCard}>
+          <Text style={styles.inputLabel}>Stream Server URL</Text>
+          <TextInput
+            style={styles.textInput}
+            value={env === 'server' ? serverUrl : localUrl}
+            onChangeText={env === 'server' ? setServerUrl : setLocalUrl}
+            placeholder={env === 'server' ? "Production URL" : "http://localhost:8080/?usr=User&pwd=admin"}
+            placeholderTextColor="#6E6E7F"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={[styles.inputLabel, { marginTop: 12 }]}>SOCKS5 Proxy (Optional)</Text>
+          <TextInput
+            style={styles.textInput}
+            value={env === 'server' ? serverProxy : localProxy}
+            onChangeText={env === 'server' ? setServerProxy : setLocalProxy}
+            placeholder="username:password@ip:port"
+            placeholderTextColor="#6E6E7F"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
         </View>
 
         {/* Platform Selection */}
@@ -87,6 +138,57 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'column',
     gap: 15,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    backgroundColor: '#181820',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#2A2A35',
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  toggleBtnActive: {
+    backgroundColor: '#FE3C72',
+  },
+  toggleBtnText: {
+    color: '#8E8E9F',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  toggleBtnTextActive: {
+    color: '#FFF',
+  },
+  configCard: {
+    backgroundColor: '#181820',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#2A2A35',
+    marginBottom: 25,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#8E8E9F',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  textInput: {
+    backgroundColor: '#0F0F13',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2A2A35',
+    color: '#FFF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
   },
   card: {
     backgroundColor: '#181820',

@@ -1,23 +1,21 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 // Neko container screen resolution (must match NEKO_DESKTOP_SCREEN in docker-compose)
-// 416x912 — portrait mobile dimensions
-const NEKO_WIDTH = 416;
-const NEKO_HEIGHT = 912;
+// 768x1024 — HD tablet/desktop portrait aspect ratio for zero captcha cutoff
+const NEKO_WIDTH = 768;
+const NEKO_HEIGHT = 1024;
 
 export default function BrowserScreen({ route, navigation }) {
   const { platform, vpsUrl, proxyIp, extensionSettings } = route.params;
   const webViewRef = useRef(null);
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(true);
-  // For Bumble: start at 'navigating' so user sees a status while auto-clicks happen,
-  // then transition to 'phone' once the phone input is visible.
-  // For other platforms: start at 'phone' directly.
   const isBumble = platform?.toLowerCase() === 'bumble';
-  const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'phone');
+  const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'options');
   const [showNeko, setShowNeko] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false); // Fullscreen video toggle
   const [inputText, setInputText] = useState('');
   const [countryCode, setCountryCode] = useState('+91');
   const [captchaText, setCaptchaText] = useState('');
@@ -106,11 +104,9 @@ export default function BrowserScreen({ route, navigation }) {
     };
   }, [loginStep, isBumble]);
 
-  // Poll /check-page-state while waiting for OTP screen to appear.
-  // Advances to 'otp' when OTP input detected, 'done' if already logged in.
-  // Safety auto-advance to 'otp' after 10s.
+  // Poll /check-page-state while we are in the login process (any step other than 'done')
   useEffect(() => {
-    if (loginStep !== 'waiting_otp') return;
+    if (loginStep === 'done') return;
 
     let cancelled = false;
     const orchestratorUrl = getOrchestratorUrl(vpsUrl);
@@ -125,30 +121,49 @@ export default function BrowserScreen({ route, navigation }) {
           if (state === 'logged_in') {
             setLoginStep('done');
             return;
-          } else if (state === 'otp_screen') {
-            setLoginStep('otp');
-            return;
           } else if (state === 'captcha') {
             setShowNeko(true); // Automatically show live browser when puzzle appears
             setLoginStep('captcha');
             return;
+          } else if (state === 'login_options' && loginStep !== 'options') {
+            setLoginStep('options');
+            return;
+          } else if (state === 'email_screen' && loginStep !== 'email') {
+            // Found email input textbox! Clear inputText and set step to email.
+            setInputText('');
+            setLoginStep('email');
+            return;
+          } else if (state === 'waiting_email' && loginStep !== 'waiting_email') {
+            setLoginStep('waiting_email');
+            return;
+          } else if (state === 'phone_screen' && loginStep !== 'phone') {
+            setInputText('');
+            setLoginStep('phone');
+            return;
+          } else if (state === 'google_email_screen' && loginStep !== 'google_email') {
+            setInputText('');
+            setLoginStep('google_email');
+            return;
+          } else if (state === 'google_password_screen' && loginStep !== 'google_password') {
+            setInputText('');
+            setLoginStep('google_password');
+            return;
+          } else if (state === 'otp_screen' && loginStep !== 'otp' && loginStep !== 'waiting_otp' && loginStep !== 'waiting_email') {
+            setInputText('');
+            setLoginStep('otp');
+            return;
           }
         }
       } catch (_) { }
-      if (!cancelled) setTimeout(poll, 500);
+      if (!cancelled) setTimeout(poll, 1000); // Poll every 1 second
     };
 
-    const startTimer = setTimeout(poll, 500);
-    const safetyTimer = setTimeout(() => {
-      if (!cancelled) setLoginStep('otp');
-    }, 10000);
-
+    const pollTimer = setTimeout(poll, 500);
     return () => {
       cancelled = true;
-      clearTimeout(startTimer);
-      clearTimeout(safetyTimer);
+      clearTimeout(pollTimer);
     };
-  }, [loginStep]);
+  }, [loginStep, vpsUrl]);
 
   const getOrchestratorUrl = (nekoUrl) => {
     try {
@@ -199,6 +214,15 @@ export default function BrowserScreen({ route, navigation }) {
     // Step 3 — wait for phone number input to appear, then show wizard
     await new Promise(r => setTimeout(r, 1000));
     setLoginStep('phone');
+  };
+
+  const handleGoBack = async () => {
+    try {
+      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+      fetch(`${orchestratorUrl}/go-back`, { method: 'POST' }).catch(() => {});
+    } catch (e) {}
+    setInputText('');
+    setLoginStep('options');
   };
 
   const handleSendText = async () => {
@@ -293,25 +317,49 @@ export default function BrowserScreen({ route, navigation }) {
       appState.current = nextAppState;
     });
 
+    // Auto-reset Neko video scale and scroll position whenever native keyboard hides
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      if (webViewRef.current) {
+        webViewRef.current.injectJavaScript(`
+          (function() {
+            window.scrollTo(0, 0);
+            document.body.scrollTop = 0;
+            var v = document.querySelector('video') || document.querySelector('canvas') || document.querySelector('.neko-video');
+            if (v) {
+              v.style.transform = 'none';
+              v.style.zoom = '1';
+            }
+          })();
+        `);
+      }
+    });
+
     return () => {
       subscription.remove();
+      hideSub.remove();
     };
   }, []);
 
   const injectConfigScript = () => {
     const settingsJson = JSON.stringify(extensionSettings || {});
     const cssCode = `
+      html, body, #app, .v-application, .v-main, .neko-main, .video-container, .neko-video, video, canvas {
+        padding-top: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+        transform: none !important;
+        zoom: 1 !important;
+        overflow: hidden !important;
+      }
       .v-app-bar, .v-toolbar, .v-navigation-drawer, header.v-app-bar, .neko-nav, .neko-header, .v-app-bar--fixed {
         display: none !important;
         height: 0 !important;
         opacity: 0 !important;
         visibility: hidden !important;
-      }
-      .v-main, .neko-main, .video-container, .neko-video, video, canvas {
-        padding-top: 0 !important;
-        margin: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
       }
     `;
 
@@ -347,6 +395,24 @@ export default function BrowserScreen({ route, navigation }) {
             (document.head || document.documentElement).appendChild(style);
           }
 
+          var meta = document.querySelector('meta[name="viewport"]');
+          if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = 'viewport';
+            (document.head || document.documentElement).appendChild(meta);
+          }
+          meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover';
+
+          window.addEventListener('resize', function() {
+            window.scrollTo(0, 0);
+            document.body.scrollTop = 0;
+            var v = document.querySelector('video') || document.querySelector('canvas') || document.querySelector('.neko-video');
+            if (v) {
+              v.style.transform = 'none';
+              v.style.zoom = '1';
+            }
+          });
+
           ${listenerJs}
         } catch(e) {}
       })();
@@ -355,12 +421,25 @@ export default function BrowserScreen({ route, navigation }) {
   };
 
   const finalUrl = React.useMemo(() => {
-    let clean = (vpsUrl || '').replace('http://', 'https://');
-    if (clean.includes('stream.') || clean.startsWith('https://')) {
-      clean = clean.replace(':8080', '');
-    }
-    if (!clean.startsWith('https://')) {
-      clean = 'https://' + clean;
+    let clean = vpsUrl || '';
+    const isLocal = clean.includes('localhost') || 
+                    clean.includes('127.0.0.1') || 
+                    clean.includes('10.') || 
+                    clean.includes('192.168.') || 
+                    clean.includes('172.');
+
+    if (!isLocal) {
+      clean = clean.replace('http://', 'https://');
+      if (clean.includes('stream.') || clean.startsWith('https://')) {
+        clean = clean.replace(':8080', '');
+      }
+      if (!clean.startsWith('https://')) {
+        clean = 'https://' + clean;
+      }
+    } else {
+      if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+        clean = 'http://' + clean;
+      }
     }
     return `${clean}${clean.includes('?') ? '&' : '?'}t=${Date.now()}`;
   }, [vpsUrl]);
@@ -383,17 +462,23 @@ export default function BrowserScreen({ route, navigation }) {
           {loginStep !== 'done' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity
+                style={[styles.toggleNekoBtn, { marginRight: 4 }]}
+                onPress={() => setIsExpanded(!isExpanded)}
+              >
+                <Text style={styles.toggleNekoBtnText}>
+                  {isExpanded ? '📱 Split' : '🔍 Expand'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.toggleNekoBtn, { marginRight: 6 }]}
                 onPress={() => setShowNeko(!showNeko)}
               >
                 <Text style={styles.toggleNekoBtnText}>
-                  {showNeko ? '🙈 Hide Browser' : '👁️ View Browser'}
+                  {showNeko ? '🙈 Hide' : '👁️ View'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.skipBtn} onPress={() => setLoginStep('done')}>
-                <Text style={styles.skipBtnText}>
-                  {loginStep === 'navigating' ? 'Skip' : 'Skip'}
-                </Text>
+                <Text style={styles.skipBtnText}>Skip</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -410,13 +495,23 @@ export default function BrowserScreen({ route, navigation }) {
           {...panResponder.panHandlers}
           style={[
             styles.webviewContainer,
-            loginStep !== 'done' && (showNeko ? styles.webviewContainerSplit : styles.webviewContainerHidden)
+            loginStep !== 'done' && (
+              showNeko
+                ? (isExpanded || loginStep === 'captcha' ? styles.webviewContainerFull : styles.webviewContainerSplit)
+                : styles.webviewContainerHidden
+            )
           ]}
         >
           <WebView
             ref={webViewRef}
             source={{ uri: finalUrl }}
             style={styles.webview}
+            scrollEnabled={false}
+            bounces={false}
+            scalesPageToFit={false}
+            setBuiltInZoomControls={false}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
             onLoadEnd={() => {
               setLoading(false);
               injectConfigScript();
@@ -481,6 +576,181 @@ export default function BrowserScreen({ route, navigation }) {
 
         {loginStep !== 'done' && (
           <View style={[styles.wizardPanel, !showNeko && styles.wizardPanelFull]}>
+            {loginStep === 'options' && (
+              <View style={styles.wizardStep}>
+                <View style={styles.wizardHeaderRow}>
+                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                    <Text style={styles.wizardBackBtnText}>⬅️ Home</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>Choose Login Method</Text>
+                </View>
+                <Text style={styles.wizardDesc}>
+                  Select how you want to log into your {platform} account:
+                </Text>
+
+                <TouchableOpacity
+                  style={[styles.wizardBtn, { marginBottom: 10 }]}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    setSendingText(true);
+                    try {
+                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                      await fetch(`${orchestratorUrl}/click-text`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: 'phone' }),
+                      });
+                    } catch (e) {}
+                    setSendingText(false);
+                    setLoginStep('phone');
+                  }}
+                >
+                  <Text style={styles.wizardBtnText}>📱 Log in with Phone Number</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    setSendingText(true);
+                    try {
+                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                      await fetch(`${orchestratorUrl}/click-text`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: 'email' }),
+                      });
+                    } catch (e) {}
+                    setSendingText(false);
+                    setLoginStep('email');
+                  }}
+                >
+                  <Text style={styles.wizardBtnSecondaryText}>📧 Log in with Email Address</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    setSendingText(true);
+                    try {
+                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                      await fetch(`${orchestratorUrl}/click-text`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: 'google' }),
+                      });
+                    } catch (e) {}
+                    setSendingText(false);
+                    setLoginStep('google_email');
+                  }}
+                >
+                  <Text style={styles.wizardBtnSecondaryText}>🌐 Log in with Google</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {loginStep === 'google_email' && (
+              <View style={styles.wizardStep}>
+                <View style={styles.wizardHeaderRow}>
+                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>Google Sign-In 🌐</Text>
+                </View>
+                <Text style={styles.wizardDesc}>
+                  Enter your Google Email Address or Phone Number to log into Tinder.
+                </Text>
+
+                <TextInput
+                  style={styles.wizardInput}
+                  placeholder="Email or Phone..."
+                  placeholderTextColor="#6E6E7F"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+
+                <TouchableOpacity
+                  style={styles.wizardBtn}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    if (!inputText.trim()) return;
+                    setSendingText(true);
+                    try {
+                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                      await fetch(`${orchestratorUrl}/submit-google-email`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: inputText.trim() }),
+                      });
+                      setInputText('');
+                    } catch (e) {
+                      console.error('Error submitting Google email:', e);
+                    }
+                    setSendingText(false);
+                  }}
+                >
+                  {sendingText ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.wizardBtnText}>Next ➔</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {loginStep === 'google_password' && (
+              <View style={styles.wizardStep}>
+                <View style={styles.wizardHeaderRow}>
+                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>Enter Google Password 🔒</Text>
+                </View>
+                <Text style={styles.wizardDesc}>
+                  Enter your Google Account Password to complete sign-in.
+                </Text>
+
+                <TextInput
+                  style={styles.wizardInput}
+                  placeholder="Google Password..."
+                  placeholderTextColor="#6E6E7F"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  secureTextEntry
+                />
+
+                <TouchableOpacity
+                  style={styles.wizardBtn}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    if (!inputText.trim()) return;
+                    setSendingText(true);
+                    try {
+                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                      await fetch(`${orchestratorUrl}/submit-google-password`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password: inputText.trim() }),
+                      });
+                      setInputText('');
+                    } catch (e) {
+                      console.error('Error submitting Google password:', e);
+                    }
+                    setSendingText(false);
+                  }}
+                >
+                  {sendingText ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.wizardBtnText}>Sign In ➔</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+
             {loginStep === 'navigating' && (
               <View style={styles.wizardStep}>
                 <ActivityIndicator size="large" color="#FFCB37" style={{ marginBottom: 16 }} />
@@ -497,9 +767,72 @@ export default function BrowserScreen({ route, navigation }) {
               </View>
             )}
 
+            {loginStep === 'email' && (
+              <View style={styles.wizardStep}>
+                <View style={styles.wizardHeaderRow}>
+                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>Enter Email Address</Text>
+                </View>
+                <Text style={styles.wizardDesc}>
+                  Enter the email address associated with your account to receive your login code.
+                </Text>
+
+                <TextInput
+                  style={styles.wizardInput}
+                  placeholder="email@example.com"
+                  placeholderTextColor="#6E6E7F"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                />
+
+                <TouchableOpacity
+                  style={styles.wizardBtn}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    if (!inputText.trim()) return;
+                    setSendingText(true);
+
+                    try {
+                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                      const response = await fetch(`${orchestratorUrl}/submit-email`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: inputText.trim() }),
+                      });
+
+                      if (response.ok) {
+                        setInputText('');
+                      }
+                    } catch (e) {
+                      console.error('Network error submitting email address:', e);
+                    }
+
+                    setSendingText(false);
+                    setLoginStep('waiting_email');
+                  }}
+                >
+                  {sendingText ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.wizardBtnText}>Submit Email ➔</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+
             {loginStep === 'phone' && (
               <View style={styles.wizardStep}>
-                <Text style={styles.wizardTitle}>Enter Mobile Number</Text>
+                <View style={styles.wizardHeaderRow}>
+                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>Enter Mobile Number</Text>
+                </View>
                 <Text style={styles.wizardDesc}>
                   Enter your country code and mobile number to log into your account.
                 </Text>
@@ -533,8 +866,6 @@ export default function BrowserScreen({ route, navigation }) {
 
                     try {
                       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-
-                      // Submit country code and phone number atomically to avoid race conditions
                       const response = await fetch(`${orchestratorUrl}/submit-phone`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -546,14 +877,11 @@ export default function BrowserScreen({ route, navigation }) {
 
                       if (response.ok) {
                         setInputText('');
-                      } else {
-                        console.error('Failed to submit phone number');
                       }
                     } catch (e) {
                       console.error('Network error submitting phone number:', e);
                     }
 
-                    // Immediately show OTP waiting screen, poll for OTP input to appear
                     setSendingText(false);
                     setLoginStep('waiting_otp');
                   }}
@@ -562,6 +890,58 @@ export default function BrowserScreen({ route, navigation }) {
                     <ActivityIndicator size="small" color="#FFF" />
                   ) : (
                     <Text style={styles.wizardBtnText}>Send & Continue ➔</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {loginStep === 'waiting_email' && (
+              <View style={styles.wizardStep}>
+                <View style={styles.wizardHeaderRow}>
+                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>Enter Email Code (OTP) 📧</Text>
+                </View>
+                <Text style={styles.wizardDesc}>
+                  Enter the verification code sent to your email address.
+                </Text>
+
+                <TextInput
+                  style={styles.wizardInput}
+                  placeholder="Enter 6-digit Email Code..."
+                  placeholderTextColor="#6E6E7F"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  keyboardType="number-pad"
+                />
+
+                <TouchableOpacity
+                  style={styles.wizardBtn}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    if (!inputText.trim()) return;
+                    setSendingText(true);
+
+                    try {
+                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                      await fetch(`${orchestratorUrl}/submit-otp`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ otp: inputText.trim() }),
+                      });
+                      setInputText('');
+                    } catch (e) {
+                      console.error('Error submitting email OTP:', e);
+                    }
+
+                    setSendingText(false);
+                  }}
+                >
+                  {sendingText ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.wizardBtnText}>Submit Email Code ➔</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -585,7 +965,12 @@ export default function BrowserScreen({ route, navigation }) {
 
             {loginStep === 'otp' && (
               <View style={styles.wizardStep}>
-                <Text style={styles.wizardTitle}>Enter Verification Code</Text>
+                <View style={styles.wizardHeaderRow}>
+                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>Enter SMS Verification Code</Text>
+                </View>
                 <Text style={styles.wizardDesc}>Enter the verification code (OTP) sent to your mobile device.</Text>
                 <TextInput
                   style={styles.wizardInput}
@@ -941,6 +1326,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#232332',
   },
+  webviewContainerFull: {
+    flex: 1,
+  },
   wizardPanel: {
     flex: 0.35,
     backgroundColor: '#13131C',
@@ -950,6 +1338,25 @@ const styles = StyleSheet.create({
   },
   wizardStep: {
     width: '100%',
+  },
+  wizardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  wizardBackBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#262636',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#36364A',
+  },
+  wizardBackBtnText: {
+    color: '#E0E0E6',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   wizardTitle: {
     color: '#FFFFFF',

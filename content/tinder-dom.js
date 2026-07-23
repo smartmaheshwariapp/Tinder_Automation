@@ -423,6 +423,10 @@ function closeMatchModal() {
 }
 
 function isLoggedIn() {
+  if (!window.location.pathname.includes('/app')) {
+    return false;
+  }
+
   const loginIndicators = [
     () => findElement(window.SELECTORS.navigation.explore),
     () => findElement(window.SELECTORS.navigation.messages),
