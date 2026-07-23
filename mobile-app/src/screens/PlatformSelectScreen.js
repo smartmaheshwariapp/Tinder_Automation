@@ -40,22 +40,6 @@ export default function PlatformSelectScreen({ navigation }) {
           <Text style={styles.subtitle}>Virtual Browser & AI swiper control panel</Text>
         </View>
 
-        {/* Environment Selection */}
-        <Text style={styles.sectionTitle}>Select Environment</Text>
-        <View style={styles.toggleRow}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, env === 'server' && styles.toggleBtnActive]}
-            onPress={() => setEnv('server')}
-          >
-            <Text style={[styles.toggleBtnText, env === 'server' && styles.toggleBtnTextActive]}>🌐 Server (VPS)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, env === 'local' && styles.toggleBtnActive]}
-            onPress={() => setEnv('local')}
-          >
-            <Text style={[styles.toggleBtnText, env === 'local' && styles.toggleBtnTextActive]}>💻 Local (Dev)</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Connection Settings */}
         <Text style={styles.sectionTitle}>Connection Settings</Text>
