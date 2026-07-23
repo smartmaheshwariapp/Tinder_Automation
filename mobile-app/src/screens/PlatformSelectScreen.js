@@ -9,6 +9,7 @@ const PLATFORMS = [
 ];
 
 export default function PlatformSelectScreen({ navigation }) {
+  const [appMode, setAppMode] = useState('user'); // 'user' | 'dev'
   const [env, setEnv] = useState('server'); // 'server' | 'local'
 
   // Settings when running on the remote VPS
@@ -19,8 +20,8 @@ export default function PlatformSelectScreen({ navigation }) {
   const [localUrl, setLocalUrl] = useState('http://192.168.1.3:8080/?usr=User&pwd=admin');
   const [localProxy, setLocalProxy] = useState('');
 
-  const activeUrl = env === 'server' ? serverUrl : localUrl;
-  const activeProxy = env === 'server' ? serverProxy : localProxy;
+  const activeUrl = appMode === 'user' ? serverUrl : (env === 'server' ? serverUrl : localUrl);
+  const activeProxy = appMode === 'user' ? serverProxy : (env === 'server' ? serverProxy : localProxy);
 
   const handleSelect = (platform) => {
     navigation.navigate('PlatformConfig', {
@@ -41,20 +42,55 @@ export default function PlatformSelectScreen({ navigation }) {
         </View>
 
 
-        {/* Connection Settings */}
-        <Text style={styles.sectionTitle}>Connection Settings</Text>
-        <View style={styles.configCard}>
-          <Text style={styles.inputLabel}>Stream Server URL</Text>
-          <TextInput
-            style={styles.textInput}
-            value={env === 'server' ? serverUrl : localUrl}
-            onChangeText={env === 'server' ? setServerUrl : setLocalUrl}
-            placeholder={env === 'server' ? "Production URL" : "http://localhost:8080/?usr=User&pwd=admin"}
-            placeholderTextColor="#6E6E7F"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+        {/* App Mode Selection */}
+        <Text style={styles.sectionTitle}>App Mode</Text>
+        <View style={styles.toggleRow}>
+          <TouchableOpacity
+            style={[styles.toggleBtn, appMode === 'user' && styles.toggleBtnActive]}
+            onPress={() => setAppMode('user')}
+          >
+            <Text style={[styles.toggleBtnText, appMode === 'user' && styles.toggleBtnTextActive]}>👤 User Mode</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, appMode === 'dev' && styles.toggleBtnActive]}
+            onPress={() => setAppMode('dev')}
+          >
+            <Text style={[styles.toggleBtnText, appMode === 'dev' && styles.toggleBtnTextActive]}>🛠️ Developer Mode</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Connection Settings (Developer Mode Only) */}
+        {appMode === 'dev' && (
+          <View style={{ marginBottom: 20 }}>
+            <Text style={styles.sectionTitle}>Connection Settings</Text>
+            <View style={styles.toggleRow}>
+              <TouchableOpacity
+                style={[styles.toggleBtn, env === 'server' && styles.toggleBtnActive]}
+                onPress={() => setEnv('server')}
+              >
+                <Text style={[styles.toggleBtnText, env === 'server' && styles.toggleBtnTextActive]}>🌐 Server (VPS)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleBtn, env === 'local' && styles.toggleBtnActive]}
+                onPress={() => setEnv('local')}
+              >
+                <Text style={[styles.toggleBtnText, env === 'local' && styles.toggleBtnTextActive]}>💻 Local (Dev)</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.configCard}>
+              <Text style={styles.inputLabel}>Stream Server URL</Text>
+              <TextInput
+                style={styles.textInput}
+                value={env === 'server' ? serverUrl : localUrl}
+                onChangeText={env === 'server' ? setServerUrl : setLocalUrl}
+                placeholder={env === 'server' ? "Production URL" : "http://localhost:8080/?usr=User&pwd=admin"}
+                placeholderTextColor="#6E6E7F"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+        )}
 
         {/* Platform Selection */}
         <Text style={styles.sectionTitle}>Select Active Platform</Text>
