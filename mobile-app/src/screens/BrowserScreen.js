@@ -7,6 +7,16 @@ import { WebView } from 'react-native-webview';
 const NEKO_WIDTH = 768;
 const NEKO_HEIGHT = 1024;
 
+const maskProxy = (proxy) => {
+  if (!proxy) return '';
+  const match = proxy.match(/^(https?|socks5?|socks):\/\/([^:]+):([^@]+)@(.+)$/);
+  if (match) {
+    const [_, protocol, user, pass, hostPort] = match;
+    return `${protocol}://*****:*****@${hostPort}`;
+  }
+  return proxy;
+};
+
 export default function BrowserScreen({ route, navigation }) {
   const { platform, vpsUrl, proxyIp, extensionSettings } = route.params;
   const webViewRef = useRef(null);
@@ -458,7 +468,7 @@ export default function BrowserScreen({ route, navigation }) {
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{platform} Session</Text>
             <Text style={styles.subtitle} numberOfLines={1}>
-              {proxyIp ? `IP: ${proxyIp}` : 'Direct Connection'}
+              {proxyIp ? `IP: ${maskProxy(proxyIp)}` : 'Direct Connection'}
             </Text>
           </View>
           {loginStep !== 'done' ? (

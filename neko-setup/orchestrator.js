@@ -677,6 +677,23 @@ const server = http.createServer((req, res) => {
         const userId = String(data.userId || 'dev_user_1');
         const proxyIp = String(data.proxyIp || '').trim();
 
+        // Parse proxy credentials if provided
+        let parsedProxy = null;
+        let finalProxyIp = proxyIp;
+        if (proxyIp) {
+          const match = proxyIp.match(/^(https?|socks5?|socks):\/\/([^:]+):([^@]+)@(.+)$/);
+          if (match) {
+            parsedProxy = {
+              protocol: match[1],
+              username: match[2],
+              password: match[3],
+              hostPort: match[4]
+            };
+            // Set finalProxyIp to scheme + host:port for Chromium compatibility
+            finalProxyIp = `${parsedProxy.protocol}://${parsedProxy.hostPort}`;
+          }
+        }
+
         // Resolve local session directory
         const sessionsBaseDir = path.join(__dirname, 'sessions');
         const sessionDir = path.join(sessionsBaseDir, userId).replace(/\\/g, '/');
@@ -724,7 +741,7 @@ const server = http.createServer((req, res) => {
           // Append orchestrator metadata to background script
           const bgPath = path.join(cleanExtensionDir, 'background', 'background.js');
           if (fs.existsSync(bgPath)) {
-            const bgMeta = `\n// Automatically appended by Neko Orchestrator\nself.ORCHESTRATOR_USER_ID = ${JSON.stringify(userId)};\n`;
+            const bgMeta = `\n// Automatically appended by Neko Orchestrator\nself.ORCHESTRATOR_USER_ID = ${JSON.stringify(userId)};\nself.PROXY_AUTH = ${JSON.stringify(parsedProxy ? { username: parsedProxy.username, password: parsedProxy.password } : null)};\n`;
             try { fs.appendFileSync(bgPath, bgMeta, 'utf8'); } catch (_) {}
           }
           console.log('[Orchestrator] Successfully prepared clean extension folder and injected metadata.');
@@ -809,7 +826,7 @@ const server = http.createServer((req, res) => {
 
           // Start the container with the correct NEKO_START_URL and dynamic session directory
           const detectedNatIp = resolveWebrtcNatIp();
-          console.log(`[Orchestrator] Starting container for ${platformKey} with directory ${sessionDir} (WebRTC NAT: ${detectedNatIp}, Proxy: ${proxyIp || 'none'})...`);
+          console.log(`[Orchestrator] Starting container for ${platformKey} with directory ${sessionDir} (WebRTC NAT: ${detectedNatIp}, Proxy: ${finalProxyIp || 'none'})...`);
           exec('docker compose up -d', {
             cwd: __dirname,
             env: {
@@ -817,7 +834,7 @@ const server = http.createServer((req, res) => {
               NEKO_START_URL: startUrl,
               NEKO_SESSION_DIR: sessionDir,
               NEKO_WEBRTC_NAT1TO1: detectedNatIp,
-              NEKO_PROXY: proxyIp   // empty string = no proxy; chromium.conf checks this
+              NEKO_PROXY: finalProxyIp   // empty string = no proxy; chromium.conf checks this
             }
           }, (upErr, upStdout, upStderr) => {
             if (upErr) {

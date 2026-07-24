@@ -1,4 +1,23 @@
 
+// Register proxy authentication listener if credentials are provided
+if (typeof chrome !== 'undefined' && chrome.webRequest && chrome.webRequest.onAuthRequired) {
+  chrome.webRequest.onAuthRequired.addListener(
+    (details) => {
+      if (details.isProxy && typeof self !== 'undefined' && self.PROXY_AUTH) {
+        return {
+          authCredentials: {
+            username: self.PROXY_AUTH.username,
+            password: self.PROXY_AUTH.password
+          }
+        };
+      }
+      return {};
+    },
+    { urls: ["<all_urls>"] },
+    ["blocking"]
+  );
+}
+
 importScripts('/debug-config.js');
 try {
   importScripts(
