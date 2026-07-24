@@ -30,6 +30,7 @@ services:
       NEKO_WEBRTC_TCPMUX: "52000"
       NEKO_WEBRTC_ICELITE: "false"
       NEKO_SESSION_IMPLICIT_HOSTING: "true"
+      NEKO_PROXY: ${NEKO_PROXY:-}
     volumes:
       # Persists bookmarks, history, and cookies across restarts using local session folder
       - ${NEKO_SESSION_DIR:-./sessions/default}:/home/neko/.config/chromium

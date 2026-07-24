@@ -48,7 +48,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
 
     const payload = JSON.stringify({ 
       platform: platform.toLowerCase(), 
-      userId: 'dev_user_1' 
+      userId: 'dev_user_1',
+      proxyIp: proxyIp || ''
     });
 
     let apiHost = host.startsWith('stream.') ? host.replace('stream.', 'api.') : host;

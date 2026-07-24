@@ -675,6 +675,7 @@ const server = http.createServer((req, res) => {
         const platformKey = String(data.platform || 'bumble').toLowerCase();
         const startUrl = PLATFORMS[platformKey] || PLATFORMS.bumble;
         const userId = String(data.userId || 'dev_user_1');
+        const proxyIp = String(data.proxyIp || '').trim();
 
         // Resolve local session directory
         const sessionsBaseDir = path.join(__dirname, 'sessions');
@@ -808,14 +809,15 @@ const server = http.createServer((req, res) => {
 
           // Start the container with the correct NEKO_START_URL and dynamic session directory
           const detectedNatIp = resolveWebrtcNatIp();
-          console.log(`[Orchestrator] Starting container for ${platformKey} with directory ${sessionDir} (WebRTC NAT: ${detectedNatIp})...`);
+          console.log(`[Orchestrator] Starting container for ${platformKey} with directory ${sessionDir} (WebRTC NAT: ${detectedNatIp}, Proxy: ${proxyIp || 'none'})...`);
           exec('docker compose up -d', {
             cwd: __dirname,
             env: {
               ...process.env,
               NEKO_START_URL: startUrl,
               NEKO_SESSION_DIR: sessionDir,
-              NEKO_WEBRTC_NAT1TO1: detectedNatIp
+              NEKO_WEBRTC_NAT1TO1: detectedNatIp,
+              NEKO_PROXY: proxyIp   // empty string = no proxy; chromium.conf checks this
             }
           }, (upErr, upStdout, upStderr) => {
             if (upErr) {

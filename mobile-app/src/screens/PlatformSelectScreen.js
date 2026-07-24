@@ -88,6 +88,26 @@ export default function PlatformSelectScreen({ navigation }) {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
+              <Text style={[styles.inputLabel, { marginTop: 14 }]}>Proxy Server (Optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={env === 'server' ? serverProxy : localProxy}
+                onChangeText={env === 'server' ? setServerProxy : setLocalProxy}
+                placeholder="socks5://user:pass@host:port  or  http://host:port"
+                placeholderTextColor="#6E6E7F"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+              {(env === 'server' ? serverProxy : localProxy) ? (
+                <Text style={{ color: '#4CAF50', fontSize: 11, marginTop: 6, marginLeft: 2 }}>
+                  🛡️ Chrome will open through this proxy
+                </Text>
+              ) : (
+                <Text style={{ color: '#6E6E7F', fontSize: 11, marginTop: 6, marginLeft: 2 }}>
+                  Leave blank for direct connection
+                </Text>
+              )}
             </View>
           </View>
         )}
