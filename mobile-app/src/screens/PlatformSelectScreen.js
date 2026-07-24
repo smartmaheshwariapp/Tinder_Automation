@@ -14,23 +14,23 @@ export default function PlatformSelectScreen({ navigation }) {
 
   // Settings when running on the remote VPS
   const [serverUrl, setServerUrl] = useState('https://stream.smartmaheshwari.com/?usr=User&pwd=admin');
-  const [serverProxy, setServerProxy] = useState('socks5://*****:*****@46.203.181.164:43343');
+  const [serverProxy, setServerProxy] = useState('http://*****:*****@46.203.181.164:43343');
 
   // Settings when running locally
   const [localUrl, setLocalUrl] = useState('http://192.168.1.3:8080/?usr=User&pwd=admin');
-  const [localProxy, setLocalProxy] = useState('socks5://*****:*****@46.203.181.164:43343');
+  const [localProxy, setLocalProxy] = useState('http://*****:*****@46.203.181.164:43343');
 
   // User Mode Region Selection
   const [userRegion, setUserRegion] = useState('Israel'); // 'Israel' | 'India'
 
   const activeUrl = appMode === 'user' ? serverUrl : (env === 'server' ? serverUrl : localUrl);
   const activeProxy = appMode === 'user'
-    ? (userRegion === 'Israel' ? 'socks5://*****:*****@46.203.181.164:43343' : '')
+    ? (userRegion === 'Israel' ? 'http://*****:*****@46.203.181.164:43343' : '')
     : (env === 'server' ? serverProxy : localProxy);
 
   const handleSelect = (platform) => {
-    const realProxy = activeProxy === 'socks5://*****:*****@46.203.181.164:43343'
-      ? 'socks5://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
+    const realProxy = activeProxy === 'http://*****:*****@46.203.181.164:43343'
+      ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
       : activeProxy;
 
     navigation.navigate('PlatformConfig', {
