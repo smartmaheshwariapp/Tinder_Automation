@@ -3,8 +3,79 @@ const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const net = require('net');
 
 const PORT = process.env.PORT || 3001;
+
+let activeProxyTunnel = null;
+
+function closeActiveProxyTunnel() {
+  if (activeProxyTunnel) {
+    try {
+      activeProxyTunnel.close();
+      console.log('[Orchestrator] Active proxy tunnel closed.');
+    } catch (err) {
+      console.error('[Orchestrator] Error closing proxy tunnel:', err.message);
+    }
+    activeProxyTunnel = null;
+  }
+}
+
+function startProxyTunnel(localPort, targetHost, targetPort, username, password) {
+  closeActiveProxyTunnel();
+
+  const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+  const server = http.createServer((req, res) => {
+    const options = {
+      host: targetHost,
+      port: targetPort,
+      path: req.url,
+      method: req.method,
+      headers: {
+        ...req.headers,
+        'Proxy-Authorization': authHeader
+      }
+    };
+
+    const proxyReq = http.request(options, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+      res.writeHead(502);
+      res.end('Proxy tunnel error: ' + err.message);
+    });
+
+    req.pipe(proxyReq);
+  });
+
+  server.on('connect', (req, clientSocket, head) => {
+    const serverUrl = req.url;
+    const proxySocket = net.connect(targetPort, targetHost, () => {
+      proxySocket.write(`CONNECT ${serverUrl} HTTP/1.1\r\nProxy-Authorization: ${authHeader}\r\n\r\n`);
+      if (head && head.length) {
+        proxySocket.write(head);
+      }
+      proxySocket.pipe(clientSocket);
+      clientSocket.pipe(proxySocket);
+    });
+
+    proxySocket.on('error', (err) => {
+      clientSocket.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
+    });
+
+    clientSocket.on('error', () => {
+      proxySocket.end();
+    });
+  });
+
+  server.listen(localPort, '0.0.0.0', () => {
+    console.log(`[Orchestrator] Local authenticated proxy tunnel listening on port ${localPort} -> forwarding to ${targetHost}:${targetPort}`);
+  });
+
+  activeProxyTunnel = server;
+}
 
 function resolveWebrtcNatIp() {
   if (process.env.NEKO_WEBRTC_NAT1TO1) {
@@ -689,9 +760,19 @@ const server = http.createServer((req, res) => {
               password: match[3],
               hostPort: match[4]
             };
-            // Set finalProxyIp to scheme + host:port for Chromium compatibility
-            finalProxyIp = `${parsedProxy.protocol}://${parsedProxy.hostPort}`;
+            const [targetHost, targetPortStr] = parsedProxy.hostPort.split(':');
+            const targetPort = parseInt(targetPortStr, 10);
+
+            // Start the local proxy tunnel on port 3080
+            startProxyTunnel(3080, targetHost, targetPort, parsedProxy.username, parsedProxy.password);
+
+            // Route container through the local tunnel on the host
+            finalProxyIp = 'http://host.docker.internal:3080';
+          } else {
+            closeActiveProxyTunnel();
           }
+        } else {
+          closeActiveProxyTunnel();
         }
 
         // Resolve local session directory
@@ -870,6 +951,7 @@ const server = http.createServer((req, res) => {
     });
   } else if (req.method === 'POST' && req.url === '/stop-session') {
     console.log('[Orchestrator] Stop request received. Stopping container...');
+    closeActiveProxyTunnel();
     exec('docker compose down', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
       if (downErr) {
         console.error('[Orchestrator] Error stopping container:', downStderr);
