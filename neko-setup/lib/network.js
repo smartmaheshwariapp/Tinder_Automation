@@ -173,6 +173,12 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
     const serverUrl = req.url;
 
     const proxySocket = net.connect(targetPort, targetHost, () => {
+      // Catch handshake errors
+      proxySocket.on('error', (err) => {
+        try { clientSocket.end('HTTP/1.1 502 Bad Gateway\r\n\r\n'); } catch (_) {}
+        cleanup();
+      });
+
       proxySocket.write(`CONNECT ${serverUrl} HTTP/1.1\r\nProxy-Authorization: ${authHeader}\r\n\r\n`);
       if (head && head.length) {
         proxySocket.write(head);
@@ -199,7 +205,6 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
     clientSocket.on('end', cleanup);
 
     proxySocket.on('error', (err) => {
-      try { clientSocket.end('HTTP/1.1 502 Bad Gateway\r\n\r\n'); } catch (_) {}
       cleanup();
     });
 
