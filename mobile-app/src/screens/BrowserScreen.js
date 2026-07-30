@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { resolveLocalUrl } from '../utils/network';
 
 // Neko container screen resolution (must match NEKO_DESKTOP_SCREEN in docker-compose)
 // 768x1024 — HD tablet/desktop portrait aspect ratio for zero captcha cutoff
@@ -18,7 +19,8 @@ const maskProxy = (proxy) => {
 };
 
 export default function BrowserScreen({ route, navigation }) {
-  const { platform, vpsUrl, proxyIp, extensionSettings } = route.params;
+  const { platform, vpsUrl: rawVpsUrl, proxyIp, extensionSettings } = route.params;
+  const vpsUrl = resolveLocalUrl(rawVpsUrl);
   const webViewRef = useRef(null);
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -30,10 +32,32 @@ export default function BrowserScreen({ route, navigation }) {
   const [countryCode, setCountryCode] = useState('+91');
   const [captchaText, setCaptchaText] = useState('');
   const [sendingText, setSendingText] = useState(false);
+  const [resendingCode, setResendingCode] = useState(false);
+  const [resendStatusText, setResendStatusText] = useState('');
+  const [otpSubtype, setOtpSubtype] = useState('email'); // 'email' or 'sms'
+  const [emailErrorText, setEmailErrorText] = useState('');
+  const [submittedEmail, setSubmittedEmail] = useState('');
+  const [submittedPhone, setSubmittedPhone] = useState('');
+  const [rateLimitTimer, setRateLimitTimer] = useState(0);
   const [dummyText, setDummyText] = useState('');
   const appState = useRef(AppState.currentState);
 
   const lastSwipeTime = useRef(0);
+
+  // 60-second countdown timer for email rate limit
+  useEffect(() => {
+    if (rateLimitTimer <= 0) return;
+    const interval = setInterval(() => {
+      setRateLimitTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [rateLimitTimer]);
 
   // Safety timeout to dismiss loading overlay after 3 seconds max
   useEffect(() => {
@@ -135,12 +159,17 @@ export default function BrowserScreen({ route, navigation }) {
             setShowNeko(true); // Automatically show live browser when puzzle appears
             setLoginStep('captcha');
             return;
-          } else if (state === 'login_options' && loginStep !== 'options') {
-            setLoginStep('options');
+          } else if (state === 'email_rate_limited') {
+            setEmailErrorText('⚠️ You\'ve made too many attempts. Please try again later.');
+            setRateLimitTimer(60);
+            if (loginStep !== 'email') {
+              setLoginStep('email');
+            }
             return;
           } else if (state === 'email_screen' && loginStep !== 'email') {
             // Found email input textbox! Clear inputText and set step to email.
             setInputText('');
+            setEmailErrorText('');
             setLoginStep('email');
             return;
           } else if (state === 'waiting_email' && loginStep !== 'waiting_email') {
@@ -158,9 +187,34 @@ export default function BrowserScreen({ route, navigation }) {
             setInputText('');
             setLoginStep('google_password');
             return;
-          } else if (state === 'otp_screen' && loginStep !== 'otp' && loginStep !== 'waiting_otp' && loginStep !== 'waiting_email') {
+          } else if (state === 'email_otp_screen') {
+            setOtpSubtype('email');
+            if (data && data.email) setSubmittedEmail(data.email);
+            if (loginStep !== 'otp') {
+              setInputText('');
+              setLoginStep('otp');
+            }
+            return;
+          } else if (state === 'sms_otp_screen') {
+            if (data && data.phone) setSubmittedPhone(data.phone);
+            if (otpSubtype !== 'sms') {
+              setOtpSubtype('sms');
+              setInputText(''); // Clear email OTP from input when transitioning to SMS OTP
+            }
+            if (loginStep !== 'otp') {
+              setInputText('');
+              setLoginStep('otp');
+            }
+            return;
+          } else if (state === 'otp_screen') {
+            if (loginStep !== 'otp') {
+              setInputText('');
+              setLoginStep('otp');
+            }
+            return;
+          } else if (state === 'login_options' && loginStep !== 'options') {
             setInputText('');
-            setLoginStep('otp');
+            setLoginStep('options');
             return;
           }
         }
@@ -177,7 +231,8 @@ export default function BrowserScreen({ route, navigation }) {
 
   const getOrchestratorUrl = (nekoUrl) => {
     try {
-      const urlObj = new URL(nekoUrl.split('/?')[0]);
+      const resolvedNekoUrl = resolveLocalUrl(nekoUrl);
+      const urlObj = new URL(resolvedNekoUrl.split('/?')[0]);
       if (urlObj.hostname.startsWith('stream.')) {
         return urlObj.protocol + '//' + urlObj.hostname.replace('stream.', 'api.');
       }
@@ -227,12 +282,13 @@ export default function BrowserScreen({ route, navigation }) {
   };
 
   const handleGoBack = async () => {
-    try {
-      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-      fetch(`${orchestratorUrl}/go-back`, { method: 'POST' }).catch(() => {});
-    } catch (e) {}
+    setSendingText(false);
     setInputText('');
     setLoginStep('options');
+    try {
+      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+      await fetch(`${orchestratorUrl}/go-back`, { method: 'POST' });
+    } catch (e) {}
   };
 
   const handleSendText = async () => {
@@ -589,9 +645,6 @@ export default function BrowserScreen({ route, navigation }) {
             {loginStep === 'options' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Text style={styles.wizardBackBtnText}>⬅️ Home</Text>
-                  </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Choose Login Method</Text>
                 </View>
                 <Text style={styles.wizardDesc}>
@@ -608,26 +661,6 @@ export default function BrowserScreen({ route, navigation }) {
                       await fetch(`${orchestratorUrl}/click-text`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: 'phone' }),
-                      });
-                    } catch (e) {}
-                    setSendingText(false);
-                    setLoginStep('phone');
-                  }}
-                >
-                  <Text style={styles.wizardBtnText}>📱 Log in with Phone Number</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
-                  disabled={sendingText}
-                  onPress={async () => {
-                    setSendingText(true);
-                    try {
-                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                      await fetch(`${orchestratorUrl}/click-text`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ text: 'email' }),
                       });
                     } catch (e) {}
@@ -635,7 +668,7 @@ export default function BrowserScreen({ route, navigation }) {
                     setLoginStep('email');
                   }}
                 >
-                  <Text style={styles.wizardBtnSecondaryText}>📧 Log in with Email Address</Text>
+                  <Text style={styles.wizardBtnText}>📧 Log in with Email Address</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -656,6 +689,26 @@ export default function BrowserScreen({ route, navigation }) {
                   }}
                 >
                   <Text style={styles.wizardBtnSecondaryText}>🌐 Log in with Google</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
+                  disabled={sendingText}
+                  onPress={async () => {
+                    setSendingText(true);
+                    try {
+                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                      await fetch(`${orchestratorUrl}/click-text`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: 'trouble logging in' }),
+                      });
+                    } catch (e) {}
+                    setSendingText(false);
+                    setLoginStep('phone');
+                  }}
+                >
+                  <Text style={styles.wizardBtnSecondaryText}>❓ Trouble Logging In?</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -763,10 +816,15 @@ export default function BrowserScreen({ route, navigation }) {
 
             {loginStep === 'navigating' && (
               <View style={styles.wizardStep}>
-                <ActivityIndicator size="large" color="#FFCB37" style={{ marginBottom: 16 }} />
-                <Text style={styles.wizardTitle}>Opening Phone Login...</Text>
+                <View style={styles.wizardHeaderRow}>
+                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>Opening Phone Login...</Text>
+                </View>
+                <ActivityIndicator size="large" color="#FFCB37" style={{ marginVertical: 12 }} />
                 <Text style={styles.wizardDesc}>
-                  Automatically navigating to the phone number screen on Bumble. Just a moment.
+                  Automatically navigating to the phone number screen. Just a moment.
                 </Text>
                 <TouchableOpacity
                   style={[styles.wizardBtn, { backgroundColor: '#2A2A35', borderWidth: 1, borderColor: '#3A3A4A' }]}
@@ -789,49 +847,74 @@ export default function BrowserScreen({ route, navigation }) {
                   Enter the email address associated with your account to receive your login code.
                 </Text>
 
+                {emailErrorText ? (
+                  <View style={{ backgroundColor: 'rgba(255, 75, 75, 0.15)', borderWidth: 1, borderColor: '#FF4B4B', padding: 10, borderRadius: 8, marginBottom: 12 }}>
+                    <Text style={{ color: '#FF6B6B', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+                      {emailErrorText}
+                    </Text>
+                  </View>
+                ) : null}
+
                 <TextInput
                   style={styles.wizardInput}
                   placeholder="email@example.com"
                   placeholderTextColor="#6E6E7F"
                   value={inputText}
-                  onChangeText={setInputText}
+                  onChangeText={(txt) => {
+                    setInputText(txt);
+                    if (emailErrorText) setEmailErrorText('');
+                  }}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
                 />
 
-                <TouchableOpacity
-                  style={styles.wizardBtn}
-                  disabled={sendingText}
-                  onPress={async () => {
-                    if (!inputText.trim()) return;
-                    setSendingText(true);
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <TouchableOpacity
+                    style={[styles.resendBtn, { flex: 1, marginVertical: 0, paddingVertical: 12, backgroundColor: '#2A2A3A', borderColor: '#3A3A4D' }]}
+                    onPress={() => {
+                      setInputText('');
+                      setEmailErrorText('');
+                    }}
+                  >
+                    <Text style={[styles.resendBtnText, { color: '#B0B0C0' }]}>🧹 Clear Email</Text>
+                  </TouchableOpacity>
 
-                    try {
-                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                      const response = await fetch(`${orchestratorUrl}/submit-email`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: inputText.trim() }),
-                      });
+                  <TouchableOpacity
+                    style={[styles.wizardBtn, { flex: 1, marginTop: 0 }]}
+                    disabled={sendingText}
+                    onPress={async () => {
+                      if (!inputText.trim()) return;
+                      setSubmittedEmail(inputText.trim());
+                      setSendingText(true);
 
-                      if (response.ok) {
-                        setInputText('');
+                      try {
+                        const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                        await fetch(`${orchestratorUrl}/submit-email`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email: inputText.trim() }),
+                        });
+                      } catch (e) {
+                        console.error('Network error submitting email address:', e);
                       }
-                    } catch (e) {
-                      console.error('Network error submitting email address:', e);
-                    }
 
-                    setSendingText(false);
-                    setLoginStep('waiting_email');
-                  }}
-                >
-                  {sendingText ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.wizardBtnText}>Submit Email ➔</Text>
-                  )}
-                </TouchableOpacity>
+                      setSendingText(false);
+                    }}
+                  >
+                    {sendingText ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : rateLimitTimer > 0 ? (
+                      <Text style={styles.wizardBtnText}>
+                        ⏳ Retry in {rateLimitTimer}s
+                      </Text>
+                    ) : (
+                      <Text style={styles.wizardBtnText}>
+                        {emailErrorText ? '🔄 Retry Next' : 'Submit Email ➔'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
@@ -872,6 +955,7 @@ export default function BrowserScreen({ route, navigation }) {
                   disabled={sendingText}
                   onPress={async () => {
                     if (!inputText.trim()) return;
+                    setSubmittedPhone(`${countryCode.trim()} ${inputText.trim()}`);
                     setSendingText(true);
 
                     try {
@@ -911,58 +995,69 @@ export default function BrowserScreen({ route, navigation }) {
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
                     <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
                   </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Enter Email Code (OTP) 📧</Text>
+                  <Text style={styles.wizardTitle}>Check Your Email! 📩</Text>
                 </View>
                 <Text style={styles.wizardDesc}>
-                  Enter the verification code sent to your email address.
+                  If we found an account with your email, an email has been sent. Please check your email inbox to log in.
                 </Text>
 
-                <TextInput
-                  style={styles.wizardInput}
-                  placeholder="Enter 6-digit Email Code..."
-                  placeholderTextColor="#6E6E7F"
-                  value={inputText}
-                  onChangeText={setInputText}
-                  keyboardType="number-pad"
-                />
+                <View style={{ marginTop: 10, padding: 12, backgroundColor: '#1E1E28', borderRadius: 8, marginBottom: 14 }}>
+                  <Text style={{ color: '#8E8E9F', fontSize: 13, fontWeight: '600', marginBottom: 10 }}>Didn't receive a link?</Text>
+                  
+                  <TouchableOpacity
+                    style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
+                    disabled={sendingText}
+                    onPress={async () => {
+                      setSendingText(true);
+                      try {
+                        const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                        await fetch(`${orchestratorUrl}/click-text`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ text: 'different email' }),
+                        });
+                      } catch (e) {}
+                      setSendingText(false);
+                      setLoginStep('email');
+                    }}
+                  >
+                    <Text style={styles.wizardBtnSecondaryText}>✉️ Use a different email</Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.wizardBtn}
-                  disabled={sendingText}
-                  onPress={async () => {
-                    if (!inputText.trim()) return;
-                    setSendingText(true);
-
-                    try {
-                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                      await fetch(`${orchestratorUrl}/submit-otp`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ otp: inputText.trim() }),
-                      });
-                      setInputText('');
-                    } catch (e) {
-                      console.error('Error submitting email OTP:', e);
-                    }
-
-                    setSendingText(false);
-                  }}
-                >
-                  {sendingText ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.wizardBtnText}>Submit Email Code ➔</Text>
-                  )}
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.wizardBtnSecondary}
+                    disabled={sendingText}
+                    onPress={async () => {
+                      setSendingText(true);
+                      try {
+                        const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                        await fetch(`${orchestratorUrl}/click-text`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ text: 'phone' }),
+                        });
+                      } catch (e) {}
+                      setSendingText(false);
+                      setLoginStep('phone');
+                    }}
+                  >
+                    <Text style={styles.wizardBtnSecondaryText}>📱 Log in with phone number</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
             {loginStep === 'waiting_otp' && (
               <View style={styles.wizardStep}>
-                <ActivityIndicator size="large" color="#FFCB37" style={{ marginBottom: 16 }} />
-                <Text style={styles.wizardTitle}>Sending OTP...</Text>
+                <View style={styles.wizardHeaderRow}>
+                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>Sending OTP...</Text>
+                </View>
+                <ActivityIndicator size="large" color="#FFCB37" style={{ marginVertical: 12 }} />
                 <Text style={styles.wizardDesc}>
-                  Bumble is sending a verification code to your phone. This may take a few seconds.
+                  A verification code is being sent to your phone. This may take a few seconds.
                 </Text>
                 <TouchableOpacity
                   style={[styles.wizardBtn, { backgroundColor: '#2A2A35', borderWidth: 1, borderColor: '#3A3A4A', marginTop: 8 }]}
@@ -979,54 +1074,118 @@ export default function BrowserScreen({ route, navigation }) {
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
                     <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
                   </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Enter SMS Verification Code</Text>
+                  <Text style={styles.wizardTitle}>
+                    {otpSubtype === 'sms' ? 'Device Verification (SMS) 📱' : 'Email Verification 📧'}
+                  </Text>
                 </View>
-                <Text style={styles.wizardDesc}>Enter the verification code (OTP) sent to your mobile device.</Text>
+                <Text style={styles.wizardDesc}>
+                  {otpSubtype === 'sms'
+                    ? (submittedPhone
+                        ? `We don't recognize your device. Enter the 6-digit passcode sent to ${submittedPhone} (SMS).`
+                        : "We don't recognize your device. Enter the 6-digit passcode sent to your phone (SMS).")
+                    : (submittedEmail
+                        ? `Enter the 6-digit passcode sent to ${submittedEmail}.`
+                        : "Enter the 6-digit passcode sent to your email address.")}
+                </Text>
+
                 <TextInput
                   style={styles.wizardInput}
-                  placeholder="Enter OTP..."
+                  placeholder="Enter 6-digit OTP..."
                   placeholderTextColor="#6E6E7F"
                   value={inputText}
                   onChangeText={setInputText}
                   keyboardType="number-pad"
+                  maxLength={6}
                 />
 
-                {/* Resend OTP button commented out for now
-                <TouchableOpacity
-                  style={styles.resendBtn}
-                  disabled={sendingText}
-                  onPress={async () => {
-                    try {
-                      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                      await fetch(`${orchestratorUrl}/resend-code`, { method: 'POST' });
-                    } catch (e) {
-                      console.error('Error requesting resend code:', e);
-                    }
-                  }}
-                >
-                  <Text style={styles.resendBtnText}>🔄 Didn't receive code? Send code again</Text>
-                </TouchableOpacity>
-                */}
+                <View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>
+                  <TouchableOpacity
+                    style={[styles.resendBtn, { flex: 1, marginVertical: 0, paddingVertical: 10 }]}
+                    disabled={sendingText || resendingCode}
+                    onPress={async () => {
+                      setResendingCode(true);
+                      setResendStatusText('Requesting new code...');
+                      try {
+                        const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                        const res = await fetch(`${orchestratorUrl}/resend-code`, { method: 'POST' });
+                        if (res.ok) {
+                          setResendStatusText(`✅ New ${otpSubtype === 'sms' ? 'SMS' : 'email'} code requested! Check your inbox.`);
+                        } else {
+                          setResendStatusText('❌ Resend request sent.');
+                        }
+                      } catch (e) {
+                        console.error('Error requesting resend code:', e);
+                        setResendStatusText('❌ Network error requesting code.');
+                      } finally {
+                        setResendingCode(false);
+                        setTimeout(() => setResendStatusText(''), 6000);
+                      }
+                    }}
+                  >
+                    <Text style={styles.resendBtnText}>
+                      {resendingCode ? '🔄 Resending...' : (otpSubtype === 'sms' ? '📩 Resend via SMS' : '📩 Resend via Email')}
+                    </Text>
+                  </TouchableOpacity>
 
-                <View style={[styles.wizardBtnRow, { marginTop: 12 }]}>
+                  {otpSubtype === 'sms' && (
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#2A2A3A',
+                        borderRadius: 10,
+                        paddingVertical: 10,
+                        paddingHorizontal: 8,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: '#3A3A4D',
+                      }}
+                      disabled={sendingText}
+                      onPress={async () => {
+                        setSendingText(true);
+                        setInputText('');
+                        try {
+                          const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+                          await fetch(`${orchestratorUrl}/click-text`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text: 'trouble logging in' }),
+                          });
+                          // Immediately update step to email for instant UI feedback
+                          setLoginStep('email');
+                        } catch (e) {
+                          console.error('Error clicking trouble logging in:', e);
+                        } finally {
+                          setSendingText(false);
+                        }
+                      }}
+                    >
+                      <Text style={{ color: '#FFCB37', fontSize: 12, fontWeight: '600' }}>❓ Trouble Logging In?</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {resendStatusText ? (
+                  <Text style={{ color: resendStatusText.includes('✅') ? '#4CAF50' : '#FF9800', fontSize: 12, marginBottom: 8, fontWeight: '600', marginLeft: 2 }}>
+                    {resendStatusText}
+                  </Text>
+                ) : null}
+
+                <View style={[styles.wizardBtnRow, { marginTop: 8 }]}>
                   <TouchableOpacity
                     style={[styles.wizardBtnSecondary, { marginRight: 8 }]}
                     disabled={sendingText}
-                    onPress={() => {
-                      setInputText('');
-                      setLoginStep('phone');
-                    }}
+                    onPress={handleGoBack}
                   >
                     <Text style={styles.wizardBtnSecondaryText}>↩ Back</Text>
                   </TouchableOpacity>
+
                   <TouchableOpacity
-                    style={[styles.wizardBtn, { flex: 1 }]}
-                    disabled={sendingText}
+                    style={[styles.wizardBtnPrimary, { flex: 1 }]}
+                    disabled={sendingText || !inputText.trim()}
                     onPress={async () => {
                       if (!inputText.trim()) return;
                       setSendingText(true);
-
-                      // Send OTP to the browser
                       try {
                         const orchestratorUrl = getOrchestratorUrl(vpsUrl);
                         await fetch(`${orchestratorUrl}/submit-otp`, {
@@ -1034,47 +1193,11 @@ export default function BrowserScreen({ route, navigation }) {
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ otp: inputText.trim() }),
                         });
-                        setInputText('');
                       } catch (e) {
-                        console.error('Error sending OTP:', e);
+                        console.error('Error submitting OTP:', e);
+                      } finally {
                         setSendingText(false);
-                        return;
                       }
-
-                      // Poll page state for up to 10 seconds
-                      let attempts = 0;
-                      const maxAttempts = 20;
-                      const pollInterval = setInterval(async () => {
-                        attempts++;
-                        try {
-                          const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-                          const resp = await fetch(`${orchestratorUrl}/check-page-state`);
-                          const data = await resp.json();
-                          const state = data.state;
-
-                          if (state === 'logged_in') {
-                            clearInterval(pollInterval);
-                            setSendingText(false);
-                            setLoginStep('done');
-                          } else if (state === 'captcha') {
-                            clearInterval(pollInterval);
-                            setSendingText(false);
-                            setLoginStep('captcha');
-                          } else if (attempts >= maxAttempts) {
-                            clearInterval(pollInterval);
-                            setSendingText(false);
-                            // Unknown state — go to done so user can interact manually
-                            setLoginStep('done');
-                          }
-                          // If 'otp_screen' or 'unknown', keep polling
-                        } catch (e) {
-                          if (attempts >= maxAttempts) {
-                            clearInterval(pollInterval);
-                            setSendingText(false);
-                            setLoginStep('done');
-                          }
-                        }
-                      }, 500);
                     }}
                   >
                     {sendingText ? (
@@ -1089,6 +1212,12 @@ export default function BrowserScreen({ route, navigation }) {
 
             {loginStep === 'captcha' && (
               <View style={styles.wizardStep}>
+                <View style={styles.wizardHeaderRow}>
+                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.wizardTitle}>Solve Security Puzzle</Text>
+                </View>
                 <View style={styles.puzzleWarningBox}>
                   <Text style={styles.puzzleWarningTitle}>🧩 Please Solve Puzzle First</Text>
                   <Text style={styles.puzzleWarningDesc}>

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, SafeAreaView, StatusBar, TextInput } from 'react-native';
+import { getAutoDetectedLocalIp, resolveLocalUrl } from '../utils/network';
 
 const PLATFORMS = [
   { id: 'tinder', name: 'Tinder', color: '#FE3C72', desc: 'Auto-swiping & AI replies' },
@@ -16,9 +17,18 @@ export default function PlatformSelectScreen({ navigation }) {
   const [serverUrl, setServerUrl] = useState('https://stream.smartmaheshwari.com/?usr=User&pwd=admin');
   const [serverProxy, setServerProxy] = useState('http://*****:*****@46.203.181.164:43343');
 
-  // Settings when running locally
-  const [localUrl, setLocalUrl] = useState('http://192.168.1.3:8080/?usr=User&pwd=admin');
-  const [localProxy, setLocalProxy] = useState('http://*****:*****@46.203.181.164:43343');
+  // Settings when running locally (Auto-detected PC LAN IP)
+  const autoIp = getAutoDetectedLocalIp();
+  const [localUrl, setLocalUrl] = useState(`http://${autoIp}:8080/?usr=User&pwd=admin`);
+  const [localProxy, setLocalProxy] = useState('');
+
+  // Automatically update localUrl if autoIp changes or is detected
+  useEffect(() => {
+    const detected = getAutoDetectedLocalIp();
+    if (detected && detected !== 'localhost' && localUrl.includes('localhost')) {
+      setLocalUrl(`http://${detected}:8080/?usr=User&pwd=admin`);
+    }
+  }, []);
 
   // User Mode Region Selection
   const [userRegion, setUserRegion] = useState('Israel'); // 'Israel' | 'India'
@@ -33,9 +43,11 @@ export default function PlatformSelectScreen({ navigation }) {
       ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
       : activeProxy;
 
+    const resolvedUrl = resolveLocalUrl(activeUrl);
+
     navigation.navigate('PlatformConfig', {
       platform: platform.name,
-      vpsUrl: activeUrl,
+      vpsUrl: resolvedUrl,
       proxyIp: realProxy,
     });
   };
@@ -87,12 +99,12 @@ export default function PlatformSelectScreen({ navigation }) {
               </TouchableOpacity>
             </View>
             <View style={styles.configCard}>
-              <Text style={styles.inputLabel}>Stream Server URL</Text>
+              <Text style={styles.inputLabel}>Stream Server URL {env === 'local' && '(Use PC LAN IP on mobile phone)'}</Text>
               <TextInput
                 style={styles.textInput}
                 value={env === 'server' ? serverUrl : localUrl}
                 onChangeText={env === 'server' ? setServerUrl : setLocalUrl}
-                placeholder={env === 'server' ? "Production URL" : "http://localhost:8080/?usr=User&pwd=admin"}
+                placeholder={env === 'server' ? "Production URL" : "http://192.168.x.x:8080/?usr=User&pwd=admin"}
                 placeholderTextColor="#6E6E7F"
                 autoCapitalize="none"
                 autoCorrect={false}

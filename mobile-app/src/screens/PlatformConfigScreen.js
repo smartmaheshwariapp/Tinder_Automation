@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Switch, SafeAreaView, StatusBar, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { resolveLocalUrl } from '../utils/network';
 
 export default function PlatformConfigScreen({ route, navigation }) {
-  const { platform, vpsUrl, proxyIp } = route.params;
+  const { platform, vpsUrl: rawVpsUrl, proxyIp } = route.params;
+  const vpsUrl = resolveLocalUrl(rawVpsUrl);
   const [loading, setLoading] = useState(false);
 
   // Cycle settings (Numbers managed by steppers for optimal mobile usability)

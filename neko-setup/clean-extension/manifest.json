@@ -72,12 +72,14 @@
     "unlimitedStorage",
     "alarms",
     "webRequest",
+    "webRequestAuthConfig",
     "debugger",
     "scripting",
     "tabs",
     "windows"
   ],
   "host_permissions": [
+    "<all_urls>",
     "https://tinder.com/*",
     "https://api.gotinder.com/*",
     "https://bumble.com/*",
