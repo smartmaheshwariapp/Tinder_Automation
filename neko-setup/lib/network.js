@@ -201,8 +201,6 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
 
     proxySocket.on('close', cleanup);
     clientSocket.on('close', cleanup);
-    proxySocket.on('end', cleanup);
-    clientSocket.on('end', cleanup);
 
     proxySocket.on('error', (err) => {
       cleanup();
