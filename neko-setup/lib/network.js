@@ -159,7 +159,7 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
   const connectQueue = [];
 
   const processConnectQueue = () => {
-    if (activeConnectTunnels >= 2 || connectQueue.length === 0) return;
+    if (activeConnectTunnels >= 15 || connectQueue.length === 0) return;
     
     const { req, clientSocket, head } = connectQueue.shift();
     
