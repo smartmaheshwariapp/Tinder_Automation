@@ -29,7 +29,7 @@ function handleStartSession(req, res) {
         const platformKey = String(data.platform || 'bumble').toLowerCase();
         const startUrl = PLATFORMS[platformKey] || PLATFORMS.bumble;
         const userId = String(data.userId || 'dev_user_1');
-        const proxyIp = String(data.proxyIp || '').trim();
+        const proxyIp = String(data.proxyIp || process.env.DEFAULT_PROXY || '').trim();
 
         // Parse proxy credentials if provided
         let parsedProxy = null;
