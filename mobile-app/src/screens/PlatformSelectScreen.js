@@ -15,7 +15,7 @@ export default function PlatformSelectScreen({ navigation }) {
 
   // Settings when running on the remote VPS
   const [serverUrl, setServerUrl] = useState('https://stream.smartmaheshwari.com/?usr=User&pwd=admin');
-  const [serverProxy, setServerProxy] = useState('http://*****:*****@46.203.181.164:43343');
+  const [serverProxy, setServerProxy] = useState('http://*****:*****@178.171.102.222:59100');
 
   // Settings when running locally (Auto-detected PC LAN IP)
   const autoIp = getAutoDetectedLocalIp();
@@ -35,12 +35,12 @@ export default function PlatformSelectScreen({ navigation }) {
 
   const activeUrl = appMode === 'user' ? serverUrl : (env === 'server' ? serverUrl : localUrl);
   const activeProxy = appMode === 'user'
-    ? (userRegion === 'Israel' ? 'http://*****:*****@46.203.181.164:43343' : '')
+    ? (userRegion === 'Israel' ? 'http://*****:*****@178.171.102.222:59100' : '')
     : (env === 'server' ? serverProxy : localProxy);
 
   const handleSelect = (platform) => {
-    const realProxy = activeProxy === 'http://*****:*****@46.203.181.164:43343'
-      ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
+    const realProxy = activeProxy === 'http://*****:*****@178.171.102.222:59100'
+      ? 'http://bhutramohit:eYbVxUGrPs@178.171.102.222:59100'
       : activeProxy;
 
     const resolvedUrl = resolveLocalUrl(activeUrl);
