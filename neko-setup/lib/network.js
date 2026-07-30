@@ -161,19 +161,20 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
   const processConnectQueue = () => {
     if (activeConnectTunnels >= 15 || connectQueue.length === 0) return;
     
-    const { req, clientSocket, head } = connectQueue.shift();
+    const { req, clientSocket, head, serverUrl } = connectQueue.shift();
     
     // Check if client socket closed while waiting in queue
     if (clientSocket.destroyed || !clientSocket.writable) {
+      console.log(`[ProxyTunnel] Client socket destroyed before processing: ${serverUrl}`);
       processConnectQueue();
       return;
     }
 
     activeConnectTunnels++;
-    const serverUrl = req.url;
+    console.log(`[ProxyTunnel] Connecting to upstream proxy for ${serverUrl} (Active: ${activeConnectTunnels})`);
 
     const proxySocket = net.connect(targetPort, targetHost, () => {
-      // Send CONNECT request to proxy with authentication
+      console.log(`[ProxyTunnel] Socket established with proxy for ${serverUrl}, writing CONNECT header...`);
       proxySocket.write(`CONNECT ${serverUrl} HTTP/1.1\r\nProxy-Authorization: ${authHeader}\r\n\r\n`);
       
       if (head && head.length) {
@@ -184,7 +185,7 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
     });
 
     let finished = false;
-    const cleanup = () => {
+    const cleanup = (reason) => {
       if (finished) return;
       finished = true;
 
@@ -192,28 +193,35 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
       try { clientSocket.destroy(); } catch (_) {}
       
       activeConnectTunnels--;
+      console.log(`[ProxyTunnel] Tunnel closed for ${serverUrl} (${reason}). Active: ${activeConnectTunnels}`);
       processConnectQueue();
     };
 
-    proxySocket.on('close', cleanup);
-    clientSocket.on('close', cleanup);
+    proxySocket.on('close', () => cleanup('proxy_close'));
+    clientSocket.on('close', () => cleanup('client_close'));
 
     proxySocket.on('error', (err) => {
-      cleanup();
+      console.log(`[ProxyTunnel] Proxy socket error for ${serverUrl}: ${err.message}`);
+      cleanup('proxy_error');
     });
 
     clientSocket.on('error', (err) => {
-      cleanup();
+      console.log(`[ProxyTunnel] Client socket error for ${serverUrl}: ${err.message}`);
+      cleanup('client_error');
     });
   };
 
   server.on('connect', (req, clientSocket, head) => {
+    const serverUrl = req.url;
+    console.log(`[ProxyTunnel] Outgoing CONNECT request for: ${serverUrl}`);
+
     // Avoid crashing on uncaught client socket errors while waiting in queue
-    clientSocket.on('error', () => {
+    clientSocket.on('error', (err) => {
+      console.log(`[ProxyTunnel] Client socket error for ${serverUrl}: ${err.message}`);
       try { clientSocket.destroy(); } catch (_) {}
     });
 
-    connectQueue.push({ req, clientSocket, head });
+    connectQueue.push({ req, clientSocket, head, serverUrl });
     processConnectQueue();
   });
 
