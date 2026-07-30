@@ -49,8 +49,8 @@ function handleStartSession(req, res) {
             // Start the local proxy tunnel on port 3080
             startProxyTunnel(3080, targetHost, targetPort, parsedProxy.username, parsedProxy.password);
 
-            // Route container through the local tunnel on the host
-            finalProxyIp = 'http://host.docker.internal:3080';
+            // Route container through the local tunnel on the host (direct localhost for host mode)
+            finalProxyIp = 'http://127.0.0.1:3080';
           } else {
             closeActiveProxyTunnel();
           }

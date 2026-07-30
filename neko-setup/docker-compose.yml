@@ -9,13 +9,9 @@ services:
       - seccomp:unconfined
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    network_mode: host
     cap_add:
       - SYS_ADMIN # Required for browser sandbox security
-    ports:
-      - "8080:8080"       # Neko Web interface
-      - "59000-59099:59000-59099/udp" # WebRTC Ephemeral Port Range UDP
-      - "59000:59000/tcp" # WebRTC TCP Multiplexer Fallback
-      - "9222:9222"       # Chrome DevTools Protocol (CDP)
     environment:
       # --- General Settings ---
       NEKO_DESKTOP_SCREEN: "768x1024@30"
