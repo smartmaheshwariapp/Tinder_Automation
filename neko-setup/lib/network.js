@@ -213,6 +213,14 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
 
   server.on('connect', (req, clientSocket, head) => {
     const serverUrl = req.url;
+
+    // Reject non-web ports (e.g. 22, 110, 3389) used by public port scanners
+    const targetPort = parseInt(serverUrl.split(':')[1] || '443', 10);
+    if (targetPort !== 443 && targetPort !== 80 && targetPort !== 8443 && targetPort !== 8080) {
+      try { clientSocket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); } catch (_) {}
+      return;
+    }
+
     console.log(`[ProxyTunnel] Outgoing CONNECT request for: ${serverUrl}`);
 
     // Avoid crashing on uncaught client socket errors while waiting in queue
@@ -225,8 +233,8 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
     processConnectQueue();
   });
 
-  server.listen(localPort, '0.0.0.0', () => {
-    console.log(`[Orchestrator] Local authenticated proxy tunnel listening on port ${localPort} -> forwarding to ${targetHost}:${targetPort}`);
+  server.listen(localPort, '127.0.0.1', () => {
+    console.log(`[Orchestrator] Local authenticated proxy tunnel listening securely on 127.0.0.1:${localPort} -> forwarding to ${targetHost}:${targetPort}`);
   });
 
   activeProxyTunnel = server;
