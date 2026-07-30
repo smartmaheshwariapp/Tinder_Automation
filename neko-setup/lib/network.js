@@ -214,9 +214,31 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
   server.on('connect', (req, clientSocket, head) => {
     const serverUrl = req.url;
 
-    // Reject non-web ports (e.g. 22, 110, 3389) used by public port scanners
+    // Reject non-web ports
     const targetPort = parseInt(serverUrl.split(':')[1] || '443', 10);
     if (targetPort !== 443 && targetPort !== 80 && targetPort !== 8443 && targetPort !== 8080) {
+      try { clientSocket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); } catch (_) {}
+      return;
+    }
+
+    // Domain Whitelist Filter for Tinder & Bumble ecosystem
+    const hostname = serverUrl.split(':')[0].toLowerCase();
+    const isAllowed = 
+      hostname.includes('tinder') ||
+      hostname.includes('bumble') ||
+      hostname.includes('gotinder') ||
+      hostname.includes('badoo') ||
+      hostname.includes('cloudflare') ||
+      hostname.includes('google') ||
+      hostname.includes('gstatic') ||
+      hostname.includes('googleapis') ||
+      hostname.includes('facebook') ||
+      hostname.includes('recaptcha') ||
+      hostname.includes('icanhazip') ||
+      hostname.includes('httpbin');
+
+    if (!isAllowed) {
+      // Quietly drop spam/background domain requests
       try { clientSocket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); } catch (_) {}
       return;
     }
