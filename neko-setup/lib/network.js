@@ -86,8 +86,17 @@ function resolveWebrtcNatIp(req) {
 
 // ─── Authenticated Proxy Tunnel ───
 let activeProxyTunnel = null;
+let activeSockets = new Set();
 
 function closeActiveProxyTunnel() {
+  if (activeSockets.size > 0) {
+    console.log(`[Orchestrator] Destroying ${activeSockets.size} active proxy tunnel sockets...`);
+    for (const socket of activeSockets) {
+      try { socket.destroy(); } catch (_) {}
+    }
+    activeSockets.clear();
+  }
+
   if (activeProxyTunnel) {
     try {
       activeProxyTunnel.close();
@@ -126,6 +135,13 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
     });
 
     req.pipe(proxyReq);
+  });
+
+  server.on('connection', (socket) => {
+    activeSockets.add(socket);
+    socket.on('close', () => {
+      activeSockets.delete(socket);
+    });
   });
 
   server.on('connect', (req, clientSocket, head) => {

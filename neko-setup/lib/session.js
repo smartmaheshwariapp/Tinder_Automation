@@ -123,7 +123,7 @@ function handleStartSession(req, res) {
 
           // Stop any running container to reload the configuration
           console.log('[Orchestrator] Stopping existing container...');
-          exec('docker compose down && docker rm -f neko || true', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
+          exec('docker compose down -t 0 && docker rm -f neko || true', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
             if (downErr) {
               console.error('[Orchestrator] Error stopping container:', downStderr);
             }
@@ -259,7 +259,7 @@ function handleStartSession(req, res) {
 function handleStopSession(req, res) {
     console.log('[Orchestrator] Stop request received. Stopping container...');
     closeActiveProxyTunnel();
-    exec('docker compose down && docker rm -f neko || true', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
+    exec('docker compose down -t 0 && docker rm -f neko || true', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
       if (downErr) {
         console.error('[Orchestrator] Error stopping container:', downStderr);
         res.writeHead(500, { 'Content-Type': 'application/json' });
