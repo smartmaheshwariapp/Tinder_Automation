@@ -162,9 +162,16 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
     if (activeConnectTunnels >= 2 || connectQueue.length === 0) return;
     
     const { req, clientSocket, head } = connectQueue.shift();
-    activeConnectTunnels++;
+    
+    // Check if client socket closed while waiting in queue
+    if (clientSocket.destroyed || !clientSocket.writable) {
+      processConnectQueue();
+      return;
+    }
 
+    activeConnectTunnels++;
     const serverUrl = req.url;
+
     const proxySocket = net.connect(targetPort, targetHost, () => {
       proxySocket.write(`CONNECT ${serverUrl} HTTP/1.1\r\nProxy-Authorization: ${authHeader}\r\n\r\n`);
       if (head && head.length) {
@@ -174,27 +181,39 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
       clientSocket.pipe(proxySocket);
     });
 
+    let finished = false;
     const cleanup = () => {
-      proxySocket.end();
-      clientSocket.end();
+      if (finished) return;
+      finished = true;
+
+      try { proxySocket.destroy(); } catch (_) {}
+      try { clientSocket.destroy(); } catch (_) {}
+      
       activeConnectTunnels--;
       processConnectQueue();
     };
 
     proxySocket.on('close', cleanup);
     clientSocket.on('close', cleanup);
+    proxySocket.on('end', cleanup);
+    clientSocket.on('end', cleanup);
 
     proxySocket.on('error', (err) => {
-      clientSocket.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
+      try { clientSocket.end('HTTP/1.1 502 Bad Gateway\r\n\r\n'); } catch (_) {}
       cleanup();
     });
 
-    clientSocket.on('error', () => {
+    clientSocket.on('error', (err) => {
       cleanup();
     });
   };
 
   server.on('connect', (req, clientSocket, head) => {
+    // Avoid crashing on uncaught client socket errors while waiting in queue
+    clientSocket.on('error', () => {
+      try { clientSocket.destroy(); } catch (_) {}
+    });
+
     connectQueue.push({ req, clientSocket, head });
     processConnectQueue();
   });
