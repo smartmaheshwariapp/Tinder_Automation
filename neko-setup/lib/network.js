@@ -112,12 +112,22 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
   closeActiveProxyTunnel();
 
   const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+  
+  // Enforce a strict connection limit on the proxy client
+  const proxyAgent = new http.Agent({
+    keepAlive: true,
+    maxSockets: 2,       // Limit maximum concurrent sockets per origin to 2
+    maxFreeSockets: 2,
+    timeout: 60000
+  });
+
   const server = http.createServer((req, res) => {
     const options = {
       host: targetHost,
       port: targetPort,
       path: req.url,
       method: req.method,
+      agent: proxyAgent, // Inject the connection pool rate-limited agent
       headers: {
         ...req.headers,
         'Proxy-Authorization': authHeader
@@ -144,7 +154,16 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
     });
   });
 
-  server.on('connect', (req, clientSocket, head) => {
+  // Queue to limit HTTPS CONNECT connections
+  let activeConnectTunnels = 0;
+  const connectQueue = [];
+
+  const processConnectQueue = () => {
+    if (activeConnectTunnels >= 2 || connectQueue.length === 0) return;
+    
+    const { req, clientSocket, head } = connectQueue.shift();
+    activeConnectTunnels++;
+
     const serverUrl = req.url;
     const proxySocket = net.connect(targetPort, targetHost, () => {
       proxySocket.write(`CONNECT ${serverUrl} HTTP/1.1\r\nProxy-Authorization: ${authHeader}\r\n\r\n`);
@@ -155,13 +174,29 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
       clientSocket.pipe(proxySocket);
     });
 
+    const cleanup = () => {
+      proxySocket.end();
+      clientSocket.end();
+      activeConnectTunnels--;
+      processConnectQueue();
+    };
+
+    proxySocket.on('close', cleanup);
+    clientSocket.on('close', cleanup);
+
     proxySocket.on('error', (err) => {
       clientSocket.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
+      cleanup();
     });
 
     clientSocket.on('error', () => {
-      proxySocket.end();
+      cleanup();
     });
+  };
+
+  server.on('connect', (req, clientSocket, head) => {
+    connectQueue.push({ req, clientSocket, head });
+    processConnectQueue();
   });
 
   server.listen(localPort, '0.0.0.0', () => {
