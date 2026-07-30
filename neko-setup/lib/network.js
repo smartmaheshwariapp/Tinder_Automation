@@ -113,11 +113,10 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
 
   const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
   const server = http.createServer((req, res) => {
-    // Route HTTP requests through Cloudflare WARP proxy on port 40000
     const options = {
-      host: '127.0.0.1',
-      port: 40000,
-      path: `http://${targetHost}:${targetPort}${req.url}`,
+      host: targetHost,
+      port: targetPort,
+      path: req.url,
       method: req.method,
       headers: {
         ...req.headers,
@@ -147,38 +146,13 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
 
   server.on('connect', (req, clientSocket, head) => {
     const serverUrl = req.url;
-    // Route HTTPS CONNECT tunnel through Cloudflare WARP proxy on port 40000
-    const proxySocket = net.connect(40000, '127.0.0.1', () => {
-      // First establish tunnel to the target residential proxy server
-      proxySocket.write(`CONNECT ${targetHost}:${targetPort} HTTP/1.1\r\n\r\n`);
-      
-      let established = false;
-      let buffer = '';
-
-      proxySocket.on('data', function onData(data) {
-        if (!established) {
-          buffer += data.toString('utf8');
-          if (buffer.includes('\r\n\r\n')) {
-            if (buffer.startsWith('HTTP/1.1 200') || buffer.startsWith('HTTP/1.0 200')) {
-              established = true;
-              
-              // Now establish tunnel to destination website (e.g. tinder.com) using credentials
-              proxySocket.write(`CONNECT ${serverUrl} HTTP/1.1\r\nProxy-Authorization: ${authHeader}\r\n\r\n`);
-              
-              // Remove our temp listener and pipe sockets together
-              proxySocket.off('data', onData);
-              if (head && head.length) {
-                proxySocket.write(head);
-              }
-              proxySocket.pipe(clientSocket);
-              clientSocket.pipe(proxySocket);
-            } else {
-              clientSocket.end('HTTP/1.1 502 Bad Gateway (Cloudflare WARP Tunnel Failed)\r\n\r\n');
-              proxySocket.end();
-            }
-          }
-        }
-      });
+    const proxySocket = net.connect(targetPort, targetHost, () => {
+      proxySocket.write(`CONNECT ${serverUrl} HTTP/1.1\r\nProxy-Authorization: ${authHeader}\r\n\r\n`);
+      if (head && head.length) {
+        proxySocket.write(head);
+      }
+      proxySocket.pipe(clientSocket);
+      clientSocket.pipe(proxySocket);
     });
 
     proxySocket.on('error', (err) => {
