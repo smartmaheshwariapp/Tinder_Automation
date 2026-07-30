@@ -173,21 +173,14 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
     const serverUrl = req.url;
 
     const proxySocket = net.connect(targetPort, targetHost, () => {
-      // Catch handshake errors
-      proxySocket.on('error', (err) => {
-        try { clientSocket.end('HTTP/1.1 502 Bad Gateway\r\n\r\n'); } catch (_) {}
-        cleanup();
-      });
-
+      // Send CONNECT request to proxy with authentication
       proxySocket.write(`CONNECT ${serverUrl} HTTP/1.1\r\nProxy-Authorization: ${authHeader}\r\n\r\n`);
-      if (head && head.length) {
-        proxySocket.write(head);
-      }
-      proxySocket.pipe(clientSocket);
-      clientSocket.pipe(proxySocket);
     });
 
     let finished = false;
+    let established = false;
+    let responseBuffer = '';
+
     const cleanup = () => {
       if (finished) return;
       finished = true;
@@ -199,8 +192,41 @@ function startProxyTunnel(localPort, targetHost, targetPort, username, password)
       processConnectQueue();
     };
 
+    proxySocket.on('data', function onProxyData(chunk) {
+      if (established) return;
+
+      responseBuffer += chunk.toString('utf8');
+      if (responseBuffer.includes('\r\n\r\n')) {
+        if (responseBuffer.startsWith('HTTP/1.1 200') || responseBuffer.startsWith('HTTP/1.0 200')) {
+          established = true;
+          
+          // Respond back to Chromium that the tunnel is ready
+          try {
+            clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+          } catch (writeErr) {
+            cleanup();
+            return;
+          }
+
+          // Remove handshake handler and pipe sockets
+          proxySocket.off('data', onProxyData);
+          if (head && head.length) {
+            proxySocket.write(head);
+          }
+          proxySocket.pipe(clientSocket);
+          clientSocket.pipe(proxySocket);
+        } else {
+          // Handshake failed (unauthorized, rate-limit, etc.)
+          try { clientSocket.end('HTTP/1.1 502 Bad Gateway (Proxy handshake failed)\r\n\r\n'); } catch (_) {}
+          cleanup();
+        }
+      }
+    });
+
     proxySocket.on('close', cleanup);
     clientSocket.on('close', cleanup);
+    proxySocket.on('end', cleanup);
+    clientSocket.on('end', cleanup);
 
     proxySocket.on('error', (err) => {
       cleanup();
