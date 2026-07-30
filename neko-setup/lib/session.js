@@ -117,7 +117,7 @@ function handleStartSession(req, res) {
 
         // Stop any running container to reload the configuration
         console.log('[Orchestrator] Stopping existing container...');
-        exec('docker compose down', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
+        exec('docker compose down && docker rm -f neko || true', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
           if (downErr) {
             console.error('[Orchestrator] Error stopping container:', downStderr);
           }
@@ -188,42 +188,56 @@ function handleStartSession(req, res) {
             console.warn('[Orchestrator] Preferences patching warning:', prefErr.message);
           }
 
+          // Ensure port 59000 is fully closed before UP
+          if (process.platform !== 'win32') {
+            try {
+              console.log('[Orchestrator] Ensuring port 59000 is free...');
+              require('child_process').execSync('fuser -k 59000/tcp || true');
+            } catch (portErr) {
+              console.warn('[Orchestrator] Warning cleaning port 59000:', portErr.message);
+            }
+          }
+
           // Start the container with the correct NEKO_START_URL and dynamic session directory
           const detectedNatIp = resolveWebrtcNatIp(req);
           console.log(`[Orchestrator] Starting container for ${platformKey} with directory ${sessionDir} (WebRTC NAT: ${detectedNatIp}, Proxy: ${finalProxyIp || 'none'})...`);
-          exec('docker compose up -d', {
-            cwd: __dirname,
-            env: {
-              ...process.env,
-              NEKO_START_URL: startUrl,
-              NEKO_SESSION_DIR: sessionDir,
-              NEKO_WEBRTC_NAT1TO1: detectedNatIp,
-              NEKO_PROXY: finalProxyIp   // empty string = no proxy; chromium.conf checks this
-            }
-          }, (upErr, upStdout, upStderr) => {
-            if (upErr) {
-              console.error('[Orchestrator] Error starting container:', upStderr);
-              res.writeHead(500, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: false, error: upStderr }));
-              return;
-            }
-
-            console.log(`[Orchestrator] Container started. Waiting 6 seconds for Neko to initialize...`);
-            setTimeout(async () => {
-              console.log(`[Orchestrator] Session successfully started for ${data.platform}!`);
-
-              if (platformKey === 'bumble') {
-                console.log('[Orchestrator] Bumble detected — starting CDP login auto-navigation...');
-                autoNavigateBumbleLogin(); // runs async in background, doesn't block response
-              } else if (platformKey === 'tinder') {
-                console.log('[Orchestrator] Tinder detected — starting CDP login auto-navigation...');
-                autoNavigateTinderLogin(); // runs async in background, doesn't block response
+          
+          // Wait 1.5 seconds to let the socket release
+          setTimeout(() => {
+            exec('docker compose up -d', {
+              cwd: __dirname,
+              env: {
+                ...process.env,
+                NEKO_START_URL: startUrl,
+                NEKO_SESSION_DIR: sessionDir,
+                NEKO_WEBRTC_NAT1TO1: detectedNatIp,
+                NEKO_PROXY: finalProxyIp   // empty string = no proxy; chromium.conf checks this
+              }
+            }, (upErr, upStdout, upStderr) => {
+              if (upErr) {
+                console.error('[Orchestrator] Error starting container:', upStderr);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: upStderr }));
+                return;
               }
 
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: true, platform: data.platform, url: startUrl }));
-            }, 6000);
-          });
+              console.log(`[Orchestrator] Container started. Waiting 6 seconds for Neko to initialize...`);
+              setTimeout(async () => {
+                console.log(`[Orchestrator] Session successfully started for ${data.platform}!`);
+
+                if (platformKey === 'bumble') {
+                  console.log('[Orchestrator] Bumble detected — starting CDP login auto-navigation...');
+                  autoNavigateBumbleLogin(); // runs async in background, doesn't block response
+                } else if (platformKey === 'tinder') {
+                  console.log('[Orchestrator] Tinder detected — starting CDP login auto-navigation...');
+                  autoNavigateTinderLogin(); // runs async in background, doesn't block response
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, platform: data.platform, url: startUrl }));
+              }, 6000);
+            });
+          }, 1500);
         });
 
       } catch (err) {
@@ -238,7 +252,7 @@ function handleStartSession(req, res) {
 function handleStopSession(req, res) {
     console.log('[Orchestrator] Stop request received. Stopping container...');
     closeActiveProxyTunnel();
-    exec('docker compose down', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
+    exec('docker compose down && docker rm -f neko || true', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
       if (downErr) {
         console.error('[Orchestrator] Error stopping container:', downStderr);
         res.writeHead(500, { 'Content-Type': 'application/json' });
