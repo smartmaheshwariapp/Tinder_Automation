@@ -19,7 +19,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
   // Contact details
   const [shareInstagram, setShareInstagram] = useState(false);
   const [instagramValue, setInstagramValue] = useState('');
-  
+
   const [shareWhatsapp, setShareWhatsapp] = useState(false);
   const [whatsappValue, setWhatsappValue] = useState('');
 
@@ -46,10 +46,10 @@ export default function PlatformConfigScreen({ route, navigation }) {
         protocol = match[1];
         host = match[2];
       }
-    } catch (e) {}
+    } catch (e) { }
 
-    const payload = JSON.stringify({ 
-      platform: platform.toLowerCase(), 
+    const payload = JSON.stringify({
+      platform: platform.toLowerCase(),
       userId: 'dev_user_1',
       proxyIp: proxyIp || ''
     });
@@ -73,7 +73,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
           console.log('[Config] Orchestrator responded successfully from ' + url);
           break;
         }
-      } catch (err) {}
+      } catch (err) { }
     }
 
     const extensionSettings = {
@@ -92,8 +92,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
     };
 
     // Use configured HTTPS stream domain URL (e.g. https://stream.smartmaheshwari.com)
-    const nekoPlayerUrl = (vpsUrl && vpsUrl.includes('://')) 
-      ? vpsUrl 
+    const nekoPlayerUrl = (vpsUrl && vpsUrl.includes('://'))
+      ? vpsUrl
       : `https://${host}/?usr=User&pwd=admin`;
 
     setLoading(false);
@@ -111,12 +111,12 @@ export default function PlatformConfigScreen({ route, navigation }) {
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#FE3C72" />
-          <Text style={styles.loadingText}>Starting Neko Browser...</Text>
+          <Text style={styles.loadingText}>Starting FlirtEasy Browser...</Text>
           <Text style={styles.loadingSubtext}>Preloading extension & preparing session volume</Text>
         </View>
       )}
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         {/* Header */}
