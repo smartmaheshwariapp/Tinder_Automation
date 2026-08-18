@@ -1,4 +1,9 @@
 
+// Global logger helpers to prevent ReferenceError across background worker modules
+const info = (...args) => console.log('[Info]', ...args);
+const warn = (...args) => console.warn('[Warn]', ...args);
+const error = (...args) => console.error('[Error]', ...args);
+
 // Register proxy authentication listener if credentials are provided
 if (typeof chrome !== 'undefined' && chrome.webRequest && chrome.webRequest.onAuthRequired) {
   chrome.webRequest.onAuthRequired.addListener(
@@ -1282,7 +1287,7 @@ async function handleRefreshProfile(requestedPlatform) {
     }
 
     if (platformToSync === 'bumble' && bumbleTabs.length > 0) {
-      info('Refreshing Bumble profile data...');
+      console.log('[Background] Refreshing Bumble profile data...');
       let targetTabId = null;
       for (const tab of bumbleTabs) {
         const ready = await ensureContentScriptReady(tab.id, 'bumble');
@@ -1301,11 +1306,11 @@ async function handleRefreshProfile(requestedPlatform) {
         const settings = await getSettings();
         settings.userProfile = profileData;
         await saveSettings(settings);
-        info('Bumble Profile data refreshed', profileData);
+        console.log('[Background] Bumble Profile data refreshed', profileData);
         return { success: true, profile: profileData };
       }
     } else if (platformToSync === 'tinder' && tinderTabs.length > 0) {
-      info('Refreshing Tinder profile data...');
+      console.log('[Background] Refreshing Tinder profile data...');
       let targetTabId = null;
       for (const tab of tinderTabs) {
         const ready = await ensureContentScriptReady(tab.id, 'tinder');
@@ -1324,14 +1329,14 @@ async function handleRefreshProfile(requestedPlatform) {
         const settings = await getSettings();
         settings.userProfile = profileData;
         await saveSettings(settings);
-        info('Tinder Profile data refreshed', profileData);
+        console.log('[Background] Tinder Profile data refreshed', profileData);
         return { success: true, profile: profileData };
       }
     }
 
     return { success: false, error: `Could not fetch profile data for ${platformToSync}` };
   } catch (err) {
-    error('Failed to refresh profile', err);
+    console.error('[Background] Failed to refresh profile', err);
     return { success: false, error: err.message };
   }
 }
@@ -1363,13 +1368,13 @@ async function handlePushBioToPlatform(platform, bio) {
 
     if (platform === 'tinder') {
       if (!tab.url || !tab.url.includes('/app/profile')) {
-        info('Navigating to Tinder profile page to push bio...');
+        console.log('[Background] Navigating to Tinder profile page to push bio...');
         await chrome.tabs.update(tab.id, { url: 'https://tinder.com/app/profile' });
         await new Promise(resolve => setTimeout(resolve, 4000));
       }
     } else if (platform === 'bumble') {
       if (!tab.url || !tab.url.includes('/app/edit-profile')) {
-        info('Navigating to Bumble edit-profile page to push bio...');
+        console.log('[Background] Navigating to Bumble edit-profile page to push bio...');
         await chrome.tabs.update(tab.id, { url: 'https://bumble.com/app/edit-profile' });
 
         // Wait for page to finish loading

@@ -506,7 +506,12 @@ function handleSwipe(req, res) {
     req.on('end', () => {
       let data = {};
       try { data = JSON.parse(body || '{}'); } catch (_) {}
-      const key = data.key === 'Left' ? 'Left' : 'Right';
+      let key = 'Right';
+      if (data.key === 'Left' || data.direction === 'pass' || data.direction === 'left' || data.direction === 'Left') {
+        key = 'Left';
+      } else if (data.key === 'Right' || data.direction === 'like' || data.direction === 'right' || data.direction === 'Right') {
+        key = 'Right';
+      }
       
       // Respond instantly so mobile app doesn't wait
       res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -11,20 +11,22 @@ export default function App() {
   useEffect(() => {
     const boot = async () => {
       try {
-        // Check for updates
-        try {
-          setUpdateStatus("Checking for updates...");
-          const update = await Updates.checkForUpdateAsync();
-          if (update.isAvailable) {
-            setUpdateStatus("Downloading update...");
-            await Updates.fetchUpdateAsync();
-            setUpdateStatus("Update ready! Restarting...");
-            await Updates.reloadAsync();
-            return;
+        // Check for updates (Production only, skip in Expo Go)
+        if (!__DEV__) {
+          try {
+            setUpdateStatus("Checking for updates...");
+            const update = await Updates.checkForUpdateAsync();
+            if (update.isAvailable) {
+              setUpdateStatus("Downloading update...");
+              await Updates.fetchUpdateAsync();
+              setUpdateStatus("Update ready! Restarting...");
+              await Updates.reloadAsync();
+              return;
+            }
+          } catch (updateError) {
+            console.log("Update check failed:", updateError);
+            setUpdateStatus("Preparing your experience…");
           }
-        } catch (updateError) {
-          console.log("Update check failed:", updateError);
-          setUpdateStatus("Preparing your experience…");
         }
       } finally {
         setIsReady(true);

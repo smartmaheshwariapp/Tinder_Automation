@@ -1,0 +1,12 @@
+2026/08/18-06:49:35.011 3e Reusing MANIFEST /home/neko/.config/chromium/Default/IndexedDB/https_tinder.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/08/18-06:49:35.729 3e Recovering log #40
+2026/08/18-06:49:39.804 3e Reusing old log /home/neko/.config/chromium/Default/IndexedDB/https_tinder.com_0.indexeddb.leveldb/000040.log 
+2026/08/18-06:49:47.569 3e Compacting 1@1 + 1@2 files
+2026/08/18-06:49:47.695 3e Generated table #43@1: 140 keys, 77110 bytes
+2026/08/18-06:49:47.695 3e Compacted 1@1 + 1@2 files => 77110 bytes
+2026/08/18-06:49:47.808 3e compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/08/18-06:49:47.818 3e Delete type=2 #38
+2026/08/18-06:49:47.912 3e Delete type=2 #41
+2026/08/18-07:39:46.438 3e Level-0 table #45: started
+2026/08/18-07:39:46.734 3e Level-0 table #45: 3754072 bytes OK
+2026/08/18-07:39:46.791 3e Delete type=0 #40

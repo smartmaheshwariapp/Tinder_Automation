@@ -133,35 +133,23 @@ try:
         if (hasExplicitPhoneHeading) return 'phone_screen';
 
         // 5. Email OTP vs SMS OTP Check (HIGH PRIORITY: "My code is" / OTP screen)
-        var emailAddress = '';
         var hasEmailOtpInput = (function() {
             var els = Array.from(document.querySelectorAll('h1, h2, h3, p, span, label, div'));
             return els.some(function(el) {
                 if (!isVisible(el)) return false;
                 var txt = (el.innerText || el.textContent || '').toLowerCase();
-                var rawTxt = (el.innerText || el.textContent || '');
-                if (rawTxt.indexOf('@') !== -1) {
-                    var m = rawTxt.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-                    if (m) emailAddress = m[0];
-                }
                 return txt.indexOf('my code is') !== -1 ||
                        txt.indexOf('resend via email') !== -1 ||
                        (txt.indexOf('passcode to') !== -1 && txt.indexOf('@') !== -1);
             });
         })();
-        if (hasEmailOtpInput) return JSON.stringify({ state: 'email_otp_screen', email: emailAddress });
+        if (hasEmailOtpInput) return 'email_otp_screen';
 
-        var phoneAddress = '';
         var hasSmsOtpInput = (function() {
             var els = Array.from(document.querySelectorAll('h1, h2, h3, p, span, label, div, button'));
             return els.some(function(el) {
                 if (!isVisible(el)) return false;
                 var txt = (el.innerText || el.textContent || '').toLowerCase();
-                var rawTxt = (el.innerText || el.textContent || '');
-                if (rawTxt.indexOf('+') !== -1 || rawTxt.indexOf('****') !== -1) {
-                    var m = rawTxt.match(/(\+\d{1,4}\s*\d{6,12}|\*{4}\s*\d{2,4})/);
-                    if (m) phoneAddress = m[0];
-                }
                 return txt.indexOf('recognize your device') !== -1 ||
                        txt.indexOf('resend via sms') !== -1 ||
                        txt.indexOf('passcode to ****') !== -1 ||
@@ -169,7 +157,7 @@ try:
                        (txt.indexOf('trouble logging in') !== -1 && document.querySelectorAll('input').length >= 4);
             });
         })();
-        if (hasSmsOtpInput) return JSON.stringify({ state: 'sms_otp_screen', phone: phoneAddress });
+        if (hasSmsOtpInput) return 'sms_otp_screen';
 
         // 6. Email Rate Limit Check (on Email Input screen)
         var hasEmailRateLimit = (function() {
@@ -177,11 +165,9 @@ try:
             return els.some(function(e) {
                 if (!isVisible(e)) return false;
                 var txt = (e.innerText || e.textContent || '').toLowerCase();
-                return txt.indexOf('too many attempts') !== -1 ||
-                       txt.indexOf('wait up to one minute') !== -1 ||
+                return txt.indexOf('wait up to one minute') !== -1 ||
                        txt.indexOf('wait a minute') !== -1 ||
-                       txt.indexOf('please wait') !== -1 ||
-                       txt.indexOf('try again later') !== -1;
+                       txt.indexOf('please wait up to') !== -1;
             });
         })();
         if (hasEmailRateLimit) return 'email_rate_limited';
@@ -271,38 +257,30 @@ except Exception as e:
     const tmpPath = path.join(__dirname, '..', `_state_check_${uniqueId}.py`);
     fs.writeFileSync(tmpPath, pyCheck, 'utf8');
     exec(`docker cp "${tmpPath}" neko:/tmp/state_check_${uniqueId}.py`, (cpErr) => {
-      try { fs.unlinkSync(tmpPath); } catch (_) {}
-      if (cpErr) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ state: 'unknown' }));
-        return;
-      }
-      exec(`docker exec neko python3 /tmp/state_check_${uniqueId}.py`, (err, stdout) => {
-        exec(`docker exec neko rm -f /tmp/state_check_${uniqueId}.py`, () => {});
-        const lines = (stdout || '').split('\n').filter(Boolean);
-        let stateObj = { state: 'unknown', email: '' };
-        lines.forEach(line => {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('DEBUG_INFO:')) {
-            try {
-              if (trimmed.startsWith('{')) {
-                stateObj = JSON.parse(trimmed);
-              } else {
-                stateObj = { state: trimmed, email: '' };
-              }
-            } catch (_) {
-              stateObj = { state: trimmed, email: '' };
-            }
-          }
+        try { fs.unlinkSync(tmpPath); } catch (_) { }
+        if (cpErr) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ state: 'unknown' }));
+            return;
+        }
+        exec(`docker exec neko python3 /tmp/state_check_${uniqueId}.py`, (err, stdout) => {
+            exec(`docker exec neko rm -f /tmp/state_check_${uniqueId}.py`, () => { });
+            const lines = (stdout || '').split('\n').filter(Boolean);
+            let state = 'unknown';
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('DEBUG_INFO:')) {
+                    state = trimmed;
+                }
+            });
+            console.log(`[Orchestrator] Page state check: ${state}`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ state }));
         });
-        console.log(`[Orchestrator] Page state check: ${stateObj.state} ${stateObj.email ? '(' + stateObj.email + ')' : ''}`);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(stateObj));
-      });
     });
 }
 
 module.exports = {
-  handleNavStatus,
-  handleCheckPageState,
+    handleNavStatus,
+    handleCheckPageState,
 };

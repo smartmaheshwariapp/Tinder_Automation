@@ -1,30 +1,46 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Switch, SafeAreaView, StatusBar, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Switch,
+  StatusBar,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
+
+const V2_GOALS = [
+  { id: 'date', label: 'Set up a Date', icon: 'calendar-outline' },
+  { id: 'phone', label: 'WhatsApp / Phone', icon: 'logo-whatsapp' },
+  { id: 'instagram', label: 'Instagram Handle', icon: 'logo-instagram' },
+  { id: 'move_to_telegram', label: 'Move to Telegram', icon: 'paper-plane-outline' },
+  { id: 'never', label: 'Keep Engaging', icon: 'infinite-outline' },
+];
 
 export default function PlatformConfigScreen({ route, navigation }) {
   const { platform, vpsUrl: rawVpsUrl, proxyIp } = route.params;
   const vpsUrl = resolveLocalUrl(rawVpsUrl);
   const [loading, setLoading] = useState(false);
 
-  // Cycle settings (Numbers managed by steppers for optimal mobile usability)
+  // V2 Dating Goal & Contact Handle
+  const [selectedGoal, setSelectedGoal] = useState('date');
+  const [contactHandle, setContactHandle] = useState('');
+
+  // Cycle settings
   const [likesPerCycle, setLikesPerCycle] = useState(50);
   const [messagesPerCycle, setMessagesPerCycle] = useState(20);
   const [scheduleInterval, setScheduleInterval] = useState(30);
 
   // AI Prompt settings
   const [useCustomIntro, setUseCustomIntro] = useState(false);
-  const [customIntroPrompt, setCustomIntroPrompt] = useState('Hey, I noticed you like... let\'s chat!');
-
-  // Contact details
-  const [shareInstagram, setShareInstagram] = useState(false);
-  const [instagramValue, setInstagramValue] = useState('');
-
-  const [shareWhatsapp, setShareWhatsapp] = useState(false);
-  const [whatsappValue, setWhatsappValue] = useState('');
-
-  const [shareTelegram, setShareTelegram] = useState(false);
-  const [telegramValue, setTelegramValue] = useState('');
+  const [customIntroPrompt, setCustomIntroPrompt] = useState("Hey, I noticed your profile... let's chat!");
 
   const increment = (value, setter, step = 5, max = 200) => {
     setter(prev => Math.min(prev + step, max));
@@ -36,7 +52,6 @@ export default function PlatformConfigScreen({ route, navigation }) {
 
   const handleStartSession = async () => {
     setLoading(true);
-    // Extract host and protocol dynamically
     let host = 'api.smartmaheshwari.com';
     let protocol = vpsUrl.startsWith('https') ? 'https:' : 'http:';
     try {
@@ -46,52 +61,34 @@ export default function PlatformConfigScreen({ route, navigation }) {
         protocol = match[1];
         host = match[2];
       }
-    } catch (e) { }
+    } catch (_) {}
 
     const payload = JSON.stringify({
       platform: platform.toLowerCase(),
       userId: 'dev_user_1',
-      proxyIp: proxyIp || ''
+      proxyIp: proxyIp || '',
+      goal: selectedGoal,
+      contactHandle: contactHandle,
     });
 
     let apiHost = host.startsWith('stream.') ? host.replace('stream.', 'api.') : host;
     const urlsToTry = [
       `https://${apiHost}/start-session`,
       `http://${apiHost}:3001/start-session`,
-      `https://${apiHost}:3001/start-session`
+      `https://${apiHost}:3001/start-session`,
     ];
 
     for (const url of urlsToTry) {
       try {
-        console.log('[Config] Requesting Neko orchestrator on ' + url);
         const resp = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: payload,
         });
-        if (resp.ok) {
-          console.log('[Config] Orchestrator responded successfully from ' + url);
-          break;
-        }
-      } catch (err) { }
+        if (resp.ok) break;
+      } catch (_) {}
     }
 
-    const extensionSettings = {
-      likesPerCycle,
-      messagesPerCycle,
-      scheduleInterval,
-      customPrompts: {
-        useCustomIntro,
-        customIntroPrompt,
-      },
-      contacts: {
-        instagram: { enabled: shareInstagram, value: instagramValue },
-        whatsapp: { enabled: shareWhatsapp, value: whatsappValue },
-        telegram: { enabled: shareTelegram, value: telegramValue },
-      }
-    };
-
-    // Use configured HTTPS stream domain URL (e.g. https://stream.smartmaheshwari.com)
     const nekoPlayerUrl = (vpsUrl && vpsUrl.includes('://'))
       ? vpsUrl
       : `https://${host}/?usr=User&pwd=admin`;
@@ -101,18 +98,19 @@ export default function PlatformConfigScreen({ route, navigation }) {
       platform,
       vpsUrl: nekoPlayerUrl,
       proxyIp,
-      extensionSettings
     });
   };
 
+  const themeColor = platform.toLowerCase() === 'tinder' ? '#FE3C72' : '#FFB800';
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" backgroundColor="#0D0B14" />
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#FE3C72" />
-          <Text style={styles.loadingText}>Starting FlirtEasy Browser...</Text>
-          <Text style={styles.loadingSubtext}>Preloading extension & preparing session volume</Text>
+          <ActivityIndicator size="large" color={themeColor} />
+          <Text style={styles.loadingText}>Initializing Session...</Text>
+          <Text style={styles.loadingSubtext}>Connecting to browser container</Text>
         </View>
       )}
       <KeyboardAvoidingView
@@ -122,34 +120,91 @@ export default function PlatformConfigScreen({ route, navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backBtnText}>✕ Cancel</Text>
+            <Ionicons name="chevron-back" size={18} color="#D8D6E8" />
+            <Text style={styles.backBtnText}>Back</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>{platform} Setup</Text>
-          <View style={{ width: 70 }} />
+          <View style={styles.headerTitleWrap}>
+            <Text style={styles.title}>{platform} Launch Setup</Text>
+            <Text style={[styles.headerSubtitle, { color: themeColor }]}>FlirtEasy V2 Engine</Text>
+          </View>
+          <View style={{ width: 50 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <Text style={styles.pageTitle}>Automation Preferences</Text>
-          <Text style={styles.pageSubtitle}>Configure how the FlirtEasy swiper runs inside your virtual browser session.</Text>
-
-          {/* Section 1: Cycle Controls (Stepper Mode) */}
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          
+          {/* Section 1: Dating Goal Selection (V2) */}
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionHeader}>Cycle Limits</Text>
-            <Text style={styles.sectionDesc}>Control how active the auto-swiper runs per interval batch to stay safe.</Text>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardTitleRow}>
+                <Ionicons name="flag-outline" size={16} color={themeColor} />
+                <Text style={styles.sectionHeader}>Primary Dating Goal</Text>
+              </View>
+            </View>
+            <Text style={styles.sectionDesc}>Select how the AI Wingman steers and closes conversations:</Text>
+
+            <View style={styles.goalGrid}>
+              {V2_GOALS.map(goal => (
+                <TouchableOpacity
+                  key={goal.id}
+                  style={[styles.goalPill, selectedGoal === goal.id && { borderColor: themeColor, backgroundColor: themeColor + '12' }]}
+                  onPress={() => setSelectedGoal(goal.id)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={goal.icon}
+                    size={14}
+                    color={selectedGoal === goal.id ? themeColor : '#8E8DA3'}
+                  />
+                  <Text style={[styles.goalPillText, selectedGoal === goal.id && { color: '#FFF', fontWeight: '700' }]}>
+                    {goal.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {selectedGoal !== 'never' && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.inputLabel}>
+                  {selectedGoal === 'phone' ? 'WhatsApp / Phone Number' : selectedGoal === 'instagram' ? 'Instagram Username' : selectedGoal === 'move_to_telegram' ? 'Telegram Handle' : 'Contact Handle for Date Logistics'}
+                </Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder={selectedGoal === 'phone' ? '+1 (234) 567-8900' : '@username'}
+                  placeholderTextColor="#7A7990"
+                  value={contactHandle}
+                  onChangeText={setContactHandle}
+                  autoCapitalize="none"
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Section 2: Cycle Limits */}
+          <View style={styles.sectionCard}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardTitleRow}>
+                <Ionicons name="speedometer-outline" size={16} color={themeColor} />
+                <Text style={styles.sectionHeader}>Cycle Limits & Safety</Text>
+              </View>
+              <View style={[styles.activePill, { backgroundColor: themeColor + '18', borderColor: themeColor + '40' }]}>
+                <Text style={[styles.activePillText, { color: themeColor }]}>Safe Pacing</Text>
+              </View>
+            </View>
+            <Text style={styles.sectionDesc}>Batch swipe limits per interval to maintain continuous account health.</Text>
 
             {/* Likes Stepper */}
             <View style={styles.stepperContainer}>
               <View style={styles.stepperTextContainer}>
                 <Text style={styles.stepperLabel}>Likes / Batch</Text>
-                <Text style={styles.stepperHelper}>Profiles swiped per cycle</Text>
+                <Text style={styles.stepperHelper}>Target profiles per cycle</Text>
               </View>
               <View style={styles.stepperControls}>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(likesPerCycle, setLikesPerCycle, 10, 0)}>
-                  <Text style={styles.stepBtnText}>-</Text>
+                  <Feather name="minus" size={14} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.stepperValue}>{likesPerCycle}</Text>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => increment(likesPerCycle, setLikesPerCycle, 10, 200)}>
-                  <Text style={styles.stepBtnText}>+</Text>
+                  <Feather name="plus" size={14} color="#FFF" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -160,15 +215,15 @@ export default function PlatformConfigScreen({ route, navigation }) {
             <View style={styles.stepperContainer}>
               <View style={styles.stepperTextContainer}>
                 <Text style={styles.stepperLabel}>Messages / Batch</Text>
-                <Text style={styles.stepperHelper}>AI intros sent per cycle</Text>
+                <Text style={styles.stepperHelper}>AI intros per cycle</Text>
               </View>
               <View style={styles.stepperControls}>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(messagesPerCycle, setMessagesPerCycle, 5, 0)}>
-                  <Text style={styles.stepBtnText}>-</Text>
+                  <Feather name="minus" size={14} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.stepperValue}>{messagesPerCycle}</Text>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => increment(messagesPerCycle, setMessagesPerCycle, 5, 100)}>
-                  <Text style={styles.stepBtnText}>+</Text>
+                  <Feather name="plus" size={14} color="#FFF" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -178,133 +233,72 @@ export default function PlatformConfigScreen({ route, navigation }) {
             {/* Interval Stepper */}
             <View style={styles.stepperContainer}>
               <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Cycle Interval</Text>
-                <Text style={styles.stepperHelper}>Delay between batches</Text>
+                <Text style={styles.stepperLabel}>Cooldown Interval</Text>
+                <Text style={styles.stepperHelper}>Delay between runs</Text>
               </View>
               <View style={styles.stepperControls}>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(scheduleInterval, setScheduleInterval, 5, 5)}>
-                  <Text style={styles.stepBtnText}>-</Text>
+                  <Feather name="minus" size={14} color="#FFF" />
                 </TouchableOpacity>
                 <View style={styles.stepperValueWrapper}>
                   <Text style={styles.stepperValue}>{scheduleInterval}</Text>
                   <Text style={styles.stepperUnit}>min</Text>
                 </View>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => increment(scheduleInterval, setScheduleInterval, 5, 1440)}>
-                  <Text style={styles.stepBtnText}>+</Text>
+                  <Feather name="plus" size={14} color="#FFF" />
                 </TouchableOpacity>
               </View>
             </View>
           </View>
 
-          {/* Section 2: AI Settings */}
+          {/* Section 3: Custom Opener Directive */}
           <View style={styles.sectionCard}>
             <View style={styles.toggleHeaderRow}>
               <View style={styles.stepperTextContainer}>
-                <Text style={styles.sectionHeader}>Custom AI Agent Prompts</Text>
-                <Text style={styles.sectionDesc}>Customize the AI wingman personality template.</Text>
+                <View style={styles.cardTitleRow}>
+                  <Ionicons name="chatbubbles-outline" size={16} color={themeColor} />
+                  <Text style={styles.sectionHeader}>Custom Opener Prompt</Text>
+                </View>
+                <Text style={styles.sectionDesc}>Customize the initial AI icebreaker.</Text>
               </View>
               <Switch
                 value={useCustomIntro}
                 onValueChange={setUseCustomIntro}
-                trackColor={{ false: '#2A2A35', true: '#FE3C72' }}
-                thumbColor={useCustomIntro ? '#FFF' : '#8E8E9F'}
+                trackColor={{ false: '#26223B', true: themeColor }}
+                thumbColor={useCustomIntro ? '#FFF' : '#7A7990'}
               />
             </View>
 
             {useCustomIntro && (
               <View style={styles.expandableContent}>
-                <Text style={styles.inputLabel}>Custom Intro prompt directive</Text>
+                <Text style={styles.inputLabel}>Opener Prompt Directive</Text>
                 <TextInput
                   style={styles.textArea}
                   value={customIntroPrompt}
                   onChangeText={setCustomIntroPrompt}
                   multiline={true}
-                  placeholder="Tell the AI wingman how to compose the first message..."
-                  placeholderTextColor="#555"
-                  numberOfLines={4}
+                  placeholder="Instructions for the AI message generator..."
+                  placeholderTextColor="#7A7990"
+                  numberOfLines={3}
                 />
               </View>
             )}
           </View>
 
-          {/* Section 3: Contact Sharing (Off-App) */}
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionHeader}>Off-App Auto Sharing</Text>
-            <Text style={styles.sectionDesc}>Automatically transition high-value matches to your socials.</Text>
-
-            {/* Instagram Linker */}
-            <View style={styles.contactContainer}>
-              <View style={styles.contactToggleRow}>
-                <Text style={styles.contactName}>Instagram Username</Text>
-                <Switch
-                  value={shareInstagram}
-                  onValueChange={setShareInstagram}
-                  trackColor={{ false: '#2A2A35', true: '#FE3C72' }}
-                  thumbColor={shareInstagram ? '#FFF' : '#8E8E9F'}
-                />
-              </View>
-              {shareInstagram && (
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="@username"
-                  placeholderTextColor="#666"
-                  value={instagramValue}
-                  onChangeText={setInstagramValue}
-                  autoCapitalize="none"
-                />
-              )}
-            </View>
-
-            {/* WhatsApp Linker */}
-            <View style={styles.contactContainer}>
-              <View style={styles.contactToggleRow}>
-                <Text style={styles.contactName}>WhatsApp Business Phone</Text>
-                <Switch
-                  value={shareWhatsapp}
-                  onValueChange={setShareWhatsapp}
-                  trackColor={{ false: '#2A2A35', true: '#FE3C72' }}
-                  thumbColor={shareWhatsapp ? '#FFF' : '#8E8E9F'}
-                />
-              </View>
-              {shareWhatsapp && (
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="+1 (234) 567-8900"
-                  placeholderTextColor="#666"
-                  value={whatsappValue}
-                  onChangeText={setwhatsappValue => setWhatsappValue(whatsappValue)}
-                  keyboardType="phone-pad"
-                />
-              )}
-            </View>
-
-            {/* Telegram Linker */}
-            <View style={styles.contactContainer}>
-              <View style={styles.contactToggleRow}>
-                <Text style={styles.contactName}>Telegram Handle</Text>
-                <Switch
-                  value={shareTelegram}
-                  onValueChange={setShareTelegram}
-                  trackColor={{ false: '#2A2A35', true: '#FE3C72' }}
-                  thumbColor={shareTelegram ? '#FFF' : '#8E8E9F'}
-                />
-              </View>
-              {shareTelegram && (
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="@telegram_handle"
-                  placeholderTextColor="#666"
-                  value={telegramValue}
-                  onChangeText={setTelegramValue}
-                  autoCapitalize="none"
-                />
-              )}
-            </View>
-          </View>
-
-          {/* Launch Gradient Button */}
-          <TouchableOpacity style={styles.launchBtn} onPress={handleStartSession}>
-            <Text style={styles.launchBtnText}>Launch Automation Session</Text>
+          {/* Launch Button */}
+          <TouchableOpacity
+            style={[styles.launchBtn, { backgroundColor: themeColor }]}
+            onPress={handleStartSession}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.launchBtnText, { color: platform.toLowerCase() === 'bumble' ? '#000' : '#FFF' }]}>
+              Launch Virtual Browser
+            </Text>
+            <Ionicons
+              name="arrow-forward"
+              size={16}
+              color={platform.toLowerCase() === 'bumble' ? '#000' : '#FFF'}
+            />
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -315,74 +309,113 @@ export default function PlatformConfigScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0E',
+    backgroundColor: '#0D0B14',
   },
   header: {
-    height: 56,
-    marginTop: 35,
+    height: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderColor: '#1C1C24',
-    backgroundColor: '#111116',
+    borderColor: '#26223B',
+    backgroundColor: '#161424',
   },
   backBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: '#1E1E26',
+    backgroundColor: '#26223B',
   },
   backBtnText: {
-    color: '#8E8E9F',
+    color: '#D8D6E8',
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: '600',
+  },
+  headerTitleWrap: {
+    alignItems: 'center',
   },
   title: {
     color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    marginTop: 1,
   },
   scrollContent: {
-    padding: 20,
-  },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 6,
-  },
-  pageSubtitle: {
-    fontSize: 13,
-    color: '#8E8E9F',
-    lineHeight: 18,
-    marginBottom: 25,
+    padding: 16,
+    paddingBottom: 36,
   },
   sectionCard: {
-    backgroundColor: '#111116',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
+    backgroundColor: '#161424',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#1C1C24',
+    borderColor: '#26223B',
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   sectionHeader: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#FFF',
-    marginBottom: 4,
+  },
+  activePill: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  activePillText: {
+    fontSize: 10.5,
+    fontWeight: '700',
   },
   sectionDesc: {
     fontSize: 12,
-    color: '#6E6E7F',
-    lineHeight: 16,
-    marginBottom: 20,
+    color: '#8E8DA3',
+    lineHeight: 17,
+    marginTop: 2,
+    marginBottom: 12,
+  },
+  goalGrid: {
+    gap: 8,
+  },
+  goalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#0D0B14',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#221E33',
+  },
+  goalPillText: {
+    color: '#8E8DA3',
+    fontSize: 12.5,
+    fontWeight: '500',
   },
   divider: {
     height: 1,
-    backgroundColor: '#1C1C24',
-    marginVertical: 15,
+    backgroundColor: '#221E33',
+    marginVertical: 12,
   },
   stepperContainer: {
     flexDirection: 'row',
@@ -394,53 +427,48 @@ const styles = StyleSheet.create({
     paddingRight: 10,
   },
   stepperLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#E0E0E6',
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#FFF',
   },
   stepperHelper: {
     fontSize: 11,
-    color: '#6E6E7F',
+    color: '#716E89',
     marginTop: 2,
   },
   stepperControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A22',
-    borderRadius: 12,
-    padding: 4,
+    backgroundColor: '#0D0B14',
+    borderRadius: 8,
+    padding: 3,
     borderWidth: 1,
-    borderColor: '#242432',
+    borderColor: '#26223B',
   },
   stepBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#262636',
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    backgroundColor: '#26223B',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  stepBtnText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
   stepperValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#FFF',
-    minWidth: 40,
+    minWidth: 36,
     textAlign: 'center',
   },
   stepperValueWrapper: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    minWidth: 50,
+    minWidth: 44,
     justifyContent: 'center',
   },
   stepperUnit: {
     fontSize: 10,
-    color: '#6E6E7F',
+    color: '#716E89',
     marginLeft: 2,
   },
   toggleHeaderRow: {
@@ -449,96 +477,68 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   expandableContent: {
-    marginTop: 15,
+    marginTop: 12,
     borderTopWidth: 1,
-    borderColor: '#1C1C24',
-    paddingTop: 15,
+    borderColor: '#221E33',
+    paddingTop: 12,
   },
   inputLabel: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
-    color: '#FE3C72',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  textArea: {
-    backgroundColor: '#0A0A0E',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#242432',
-    color: '#FFF',
-    padding: 14,
-    fontSize: 14,
-    height: 90,
-    textAlignVertical: 'top',
-    lineHeight: 18,
-  },
-  contactContainer: {
-    marginBottom: 12,
-    backgroundColor: '#16161F',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#1F1F2C',
-  },
-  contactToggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  contactName: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#E0E0E6',
+    color: '#A09FB5',
+    marginBottom: 6,
   },
   textInput: {
-    backgroundColor: '#0A0A0E',
+    backgroundColor: '#0D0B14',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#242432',
+    borderColor: '#26223B',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     color: '#FFF',
+    fontSize: 12.5,
+  },
+  textArea: {
+    backgroundColor: '#0D0B14',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#26223B',
     padding: 10,
-    fontSize: 13,
-    marginTop: 12,
+    color: '#FFF',
+    fontSize: 12.5,
+    minHeight: 70,
+    textAlignVertical: 'top',
   },
   launchBtn: {
-    backgroundColor: '#FE3C72',
-    borderRadius: 16,
-    padding: 18,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 40,
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    marginTop: 8,
   },
   launchBtnText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+    fontSize: 14.5,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 10, 14, 0.9)',
+    backgroundColor: 'rgba(13, 11, 20, 0.96)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10000,
+    zIndex: 999,
   },
   loadingText: {
     color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 20,
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 14,
   },
   loadingSubtext: {
-    color: '#8E8E9F',
-    fontSize: 13,
-    marginTop: 8,
-    textAlign: 'center',
-    paddingHorizontal: 20,
+    color: '#716E89',
+    fontSize: 12,
+    marginTop: 4,
   },
 });

@@ -178,18 +178,58 @@ function handleStartSession(req, res) {
               }
             }
 
-            // Auto-enable Developer Mode inside Chromium Preferences file
+            // Auto-enable Developer Mode and permanent Location/Notification permissions in Chromium Preferences
             try {
-              const prefsPath = path.join(sessionDir, 'Default', 'Preferences');
-              if (fs.existsSync(prefsPath)) {
-                const content = fs.readFileSync(prefsPath, 'utf8');
-                const prefs = JSON.parse(content);
-                prefs.extensions = prefs.extensions || {};
-                prefs.extensions.ui = prefs.extensions.ui || {};
-                prefs.extensions.ui.developer_mode = true;
-                fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf8');
-                console.log('[Orchestrator] Enabled Developer Mode in Preferences.');
+              const defaultDir = path.join(sessionDir, 'Default');
+              if (!fs.existsSync(defaultDir)) {
+                fs.mkdirSync(defaultDir, { recursive: true });
               }
+              const prefsPath = path.join(defaultDir, 'Preferences');
+              let prefs = {};
+              if (fs.existsSync(prefsPath)) {
+                try { prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf8')); } catch (_) {}
+              }
+              
+              prefs.extensions = prefs.extensions || {};
+              prefs.extensions.ui = prefs.extensions.ui || {};
+              prefs.extensions.ui.developer_mode = true;
+
+              prefs.profile = prefs.profile || {};
+              prefs.profile.exit_type = 'Normal';
+              prefs.profile.exited_cleanly = true;
+              prefs.profile.content_settings = prefs.profile.content_settings || {};
+              prefs.profile.content_settings.exceptions = prefs.profile.content_settings.exceptions || {};
+
+              // 1 = Allow geolocation
+              prefs.profile.content_settings.exceptions.geolocation = {
+                'https://tinder.com,*': { setting: 1 },
+                'https://*.tinder.com,*': { setting: 1 },
+                'https://bumble.com,*': { setting: 1 },
+                'https://*.bumble.com,*': { setting: 1 }
+              };
+
+              // 1 = Allow notifications
+              prefs.profile.content_settings.exceptions.notifications = {
+                'https://tinder.com,*': { setting: 1 },
+                'https://*.tinder.com,*': { setting: 1 },
+                'https://bumble.com,*': { setting: 1 },
+                'https://*.bumble.com,*': { setting: 1 }
+              };
+
+              fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf8');
+
+              // Also patch Local State to guarantee clean exit flag
+              const localStatePath = path.join(sessionDir, 'Local State');
+              let localState = {};
+              if (fs.existsSync(localStatePath)) {
+                try { localState = JSON.parse(fs.readFileSync(localStatePath, 'utf8')); } catch (_) {}
+              }
+              localState.user_experience_metrics = localState.user_experience_metrics || {};
+              localState.user_experience_metrics.stability = localState.user_experience_metrics.stability || {};
+              localState.user_experience_metrics.stability.exited_cleanly = true;
+              fs.writeFileSync(localStatePath, JSON.stringify(localState, null, 2), 'utf8');
+
+              console.log('[Orchestrator] Configured Developer Mode, Normal Exit State & Auto-Allow Geolocation/Notifications.');
             } catch (prefErr) {
               console.warn('[Orchestrator] Preferences patching warning:', prefErr.message);
             }
