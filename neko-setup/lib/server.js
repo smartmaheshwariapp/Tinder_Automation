@@ -9,6 +9,10 @@ const tinderAuth = require('./routes/tinder-auth');
 const { handleSubmitGoogleEmail, handleSubmitGooglePassword } = require('./routes/google-auth');
 const { handleGoBackMain, handleClick, handlePressEnter, handleGoBack2, handleClickText, handleSwipe } = require('./routes/interaction');
 const { handleLoginSuccess, handleResendCode3 } = require('./routes/misc');
+const { handleExtensionStats } = require('./routes/extension-stats');
+const { handleStartAgent, handleStopAgent } = require('./routes/agent-control');
+const { handleGetSettings, handleUpdateSettings, handleSyncProfile, handlePushBio } = require('./routes/settings');
+
 
 const server = http.createServer((req, res) => {
   console.log(`[Orchestrator] Incoming ${req.method} ${req.url}`);
@@ -28,6 +32,16 @@ const server = http.createServer((req, res) => {
     handleStartSession(req, res);
   } else if (req.method === 'POST' && req.url === '/stop-session') {
     handleStopSession(req, res);
+  } else if (req.method === 'POST' && req.url === '/start-agent') {
+    handleStartAgent(req, res);
+  } else if (req.method === 'POST' && req.url === '/stop-agent') {
+    handleStopAgent(req, res);
+  } else if (req.method === 'POST' && req.url === '/update-settings') {
+    handleUpdateSettings(req, res);
+  } else if (req.method === 'POST' && req.url === '/sync-profile') {
+    handleSyncProfile(req, res);
+  } else if (req.method === 'POST' && req.url === '/push-bio') {
+    handlePushBio(req, res);
   } else if (req.method === 'POST' && req.url === '/go-back') {
     handleGoBackMain(req, res);
   } else if (req.method === 'POST' && req.url === '/type-text') {
@@ -58,6 +72,21 @@ const server = http.createServer((req, res) => {
     handleNavStatus(req, res);
   } else if (req.method === 'GET' && req.url === '/check-page-state') {
     handleCheckPageState(req, res);
+  } else if (req.method === 'GET' && req.url === '/extension-stats') {
+    handleExtensionStats(req, res);
+  } else if (req.method === 'GET' && req.url === '/extension-settings') {
+    handleGetSettings(req, res);
+  } else if (req.method === 'GET' && (req.url === '/test' || req.url === '/')) {
+    const fs = require('fs');
+    const path = require('path');
+    const testHtmlPath = path.join(__dirname, '..', 'public', 'test.html');
+    if (fs.existsSync(testHtmlPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(fs.readFileSync(testHtmlPath, 'utf8'));
+    } else {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Test studio not found');
+    }
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');

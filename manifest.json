@@ -72,7 +72,6 @@
     "unlimitedStorage",
     "alarms",
     "webRequest",
-    "webRequestAuthConfig",
     "debugger",
     "scripting",
     "tabs",

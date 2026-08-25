@@ -175,6 +175,7 @@ async function loadSettingsExtended() {
 
   // Stop conditions
   const stopConditions = settings.stopConditions || [];
+  document.querySelectorAll('input[name="stopCondition"]').forEach(cb => { cb.checked = false; });
   if (stopConditions.length === 0) {
     const never = document.querySelector('input[name="stopCondition"][value="never"]');
     if (never) never.checked = true;
@@ -188,6 +189,10 @@ async function loadSettingsExtended() {
   const stopAfterGoalToggle = document.getElementById('automationStopAfterGoal');
   if (stopAfterGoalToggle) {
     stopAfterGoalToggle.checked = stopConditions.length > 0 && settings.stopAfterGoalEnabled !== false;
+  }
+
+  if (typeof AutomationViews !== 'undefined' && typeof AutomationViews._renderGoalDropdown === 'function') {
+    AutomationViews._renderGoalDropdown();
   }
 
   // Load contact details — delegate to shared helper so it can also be

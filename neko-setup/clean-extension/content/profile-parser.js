@@ -632,56 +632,13 @@ async function getUserOwnProfile() {
     return null;
   }
 
-  // Auto-click Edit button and switch to Preview tab
-  let editButton = null;
-  for (let i = 0; i < 15; i++) {
-    editButton = document.querySelector('button[aria-label="Edit profile"]') ||
-      Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.trim() === 'Edit');
-    if (editButton) break;
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-
-  if (editButton) {
-    console.log('[FlirtEasy] Clicking Edit button to open profile editor');
-    editButton.click();
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // Click Preview tab using role="tab" selector
-    let previewTab = null;
-    for (let i = 0; i < 10; i++) {
-      previewTab = document.querySelector('button[role="tab"][aria-selected="false"]') ||
-        Array.from(document.querySelectorAll('button[role="tab"]')).find(btn =>
-          btn.textContent.trim() === 'Preview'
-        );
-      if (previewTab) break;
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
-    if (previewTab) {
-      console.log('[FlirtEasy] Clicking Preview tab');
-      previewTab.click();
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Click "View all" buttons to expand collapsed sections
-      const viewAllButtons = document.querySelectorAll('button');
-      const expandButtons = Array.from(viewAllButtons).filter(btn => {
-        const text = btn.textContent.toLowerCase();
-        return text.includes('view all') || text.includes('view more');
-      });
-
-      console.log(`[FlirtEasy] Found ${expandButtons.length} expand buttons`);
-      if (expandButtons.length > 0) {
-        for (const btn of expandButtons) {
-          console.log(`[FlirtEasy] Clicking expand button: ${btn.textContent}`);
-          btn.click();
-          await new Promise(resolve => setTimeout(resolve, 400));
-        }
-      }
-
-      console.log('[FlirtEasy] Preview should be loaded now');
-    } else {
-      console.log('[FlirtEasy] Preview tab not found');
-    }
+  // Wait up to 4 seconds for React to hydrate and render profile components
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const hasContent = document.querySelector('textarea') || 
+                       document.querySelector('h2') || 
+                       (document.body.innerText && (document.body.innerText.includes('ABOUT') || document.body.innerText.includes('PASSIONS')));
+    if (hasContent) break;
+    await new Promise(r => setTimeout(r, 300));
   }
 
   const profile = {
@@ -699,6 +656,7 @@ async function getUserOwnProfile() {
     distancePreference: null,
     interestedIn: null,
     lookingFor: null,
+    relationshipType: null,
     languages: [],
     preferredLanguages: [],
     zodiac: null,
@@ -715,6 +673,156 @@ async function getUserOwnProfile() {
     dietaryPreference: null,
     socialMedia: null
   };
+
+  // ── LAYER 1: Parse modern Tinder /app/profile/edit page directly ──
+  const isEditPage = window.location.pathname.includes('/app/profile/edit');
+  if (isEditPage || document.querySelector('textarea') || (document.body.innerText && document.body.innerText.includes('ABOUT'))) {
+    // 1. Bio from textarea
+    const textareas = Array.from(document.querySelectorAll('textarea'));
+    if (textareas.length > 0 && textareas[0].value) {
+      profile.bio = textareas[0].value.trim();
+      console.log(`[FlirtEasy] Found bio from textarea: ${profile.bio.substring(0, 40)}...`);
+    }
+
+    const pageText = document.body.innerText || '';
+
+    // 2. Name from "ABOUT <NAME>"
+    const nameMatch = pageText.match(/ABOUT\s+([A-Za-z0-9_ -]+)\s*\n/i);
+    if (nameMatch) {
+      profile.name = nameMatch[1].trim();
+      console.log(`[FlirtEasy] Found name from ABOUT header: ${profile.name}`);
+    }
+
+    // 3. Name & Age from page text (e.g. "Sanket,\n27")
+    const nameAgeMatch = pageText.match(/([A-Z][a-z]+),\s*\n?\s*(\d{2})/);
+    if (nameAgeMatch) {
+      if (!profile.name) profile.name = nameAgeMatch[1].trim();
+      if (!profile.age) profile.age = parseInt(nameAgeMatch[2]);
+      console.log(`[FlirtEasy] Found name/age from text: ${profile.name}, ${profile.age}`);
+    }
+
+    // 4. Passions
+    const passionsMatch = pageText.match(/PASSIONS\s*\n([^\n]+)/i);
+    if (passionsMatch && !passionsMatch[1].includes('Update your passions')) {
+      profile.interests = passionsMatch[1].split(/[,]+/).map(s => s.trim()).filter(Boolean);
+      console.log(`[FlirtEasy] Found passions: ${profile.interests.join(', ')}`);
+    }
+
+    // 5. Height
+    const heightMatch = pageText.match(/HEIGHT\s*\n([^\n]+)/i);
+    if (heightMatch && !heightMatch[1].includes('RELATIONSHIP')) {
+      profile.height = heightMatch[1].trim();
+    }
+
+    // 6. Relationship Goals & Type
+    const relGoalsMatch = pageText.match(/RELATIONSHIP GOALS\s*\n(?:Looking for\s*\n)?([^\n]+)/i);
+    if (relGoalsMatch) {
+      profile.lookingFor = relGoalsMatch[1].trim();
+    }
+    const relTypeMatch = pageText.match(/RELATIONSHIP TYPE\s*\n(?:Open to\.\.\.\s*\n)?([^\n]+)/i);
+    if (relTypeMatch) {
+      profile.relationshipType = relTypeMatch[1].trim();
+    }
+
+    // 7. Languages
+    const langMatch = pageText.match(/LANGUAGES I KNOW\s*\n(?:Add languages\s*\n)?([^\n]+)/i);
+    if (langMatch && !langMatch[1].includes('BASICS')) {
+      profile.languages = langMatch[1].split(/[,]+/).map(s => s.trim()).filter(Boolean);
+    }
+
+    // 8. Basics
+    const basicsMatch = pageText.match(/BASICS\s*\n([\s\S]*?)LIFESTYLE/i);
+    if (basicsMatch) {
+      const bText = basicsMatch[1];
+      const zodiacM = bText.match(/Zodiac\s*\n([^\n]+)/i);
+      if (zodiacM) profile.zodiac = zodiacM[1].trim();
+      const eduM = bText.match(/Education\s*\n([^\n]+)/i);
+      if (eduM) profile.education = eduM[1].trim();
+      const familyM = bText.match(/Family Plans\s*\n([^\n]+)/i);
+      if (familyM) profile.familyPlans = familyM[1].trim();
+      const commM = bText.match(/Communication Style\s*\n([^\n]+)/i);
+      if (commM) profile.communicationStyle = commM[1].trim();
+      const loveM = bText.match(/Love Style\s*\n([^\n]+)/i);
+      if (loveM) profile.loveStyle = loveM[1].trim();
+    }
+
+    // 9. Lifestyle
+    const lifeMatch = pageText.match(/LIFESTYLE\s*\n([\s\S]*?)JOB TITLE/i);
+    if (lifeMatch) {
+      const lText = lifeMatch[1];
+      const petsM = lText.match(/Pets\s*\n([^\n]+)/i);
+      if (petsM) { profile.pets = petsM[1].trim(); profile.userPets = profile.pets; }
+      const drinkM = lText.match(/Drinking\s*\n([^\n]+)/i);
+      if (drinkM) profile.drinking = drinkM[1].trim();
+      const smokeM = lText.match(/Smoking\s*\n([^\n]+)/i);
+      if (smokeM) profile.smoking = smokeM[1].trim();
+      const workoutM = lText.match(/Workout\s*\n([^\n]+)/i);
+      if (workoutM) profile.workout = workoutM[1].trim();
+      const socialM = lText.match(/Social Media\s*\n([^\n]+)/i);
+      if (socialM) profile.socialMedia = socialM[1].trim();
+    }
+
+    // 10. Gender
+    const genderMatch = pageText.match(/GENDER\s*\n([^\n]+)/i);
+    if (genderMatch && !genderMatch[1].includes('Update your gender')) {
+      profile.gender = genderMatch[1].trim();
+    }
+
+    // 11. Living In / City
+    const cityMatch = pageText.match(/LIVING IN\s*\n([^\n]+)/i);
+    if (cityMatch && !cityMatch[1].includes('Add City')) {
+      profile.city = cityMatch[1].trim();
+    }
+
+    // If we got valid bio/name from the edit page, return immediately
+    if (profile.bio || profile.name || profile.interests.length > 0) {
+      console.log('[FlirtEasy] Successfully extracted profile from edit page:', profile);
+      return profile;
+    }
+  }
+
+  // ── LAYER 2: Auto-click Edit button and switch to Preview tab (legacy fallback) ──
+  let editButton = null;
+  for (let i = 0; i < 6; i++) {
+    editButton = document.querySelector('button[aria-label="Edit profile"]') ||
+      Array.from(document.querySelectorAll('button, a')).find(btn => btn.textContent.trim() === 'Edit' || btn.textContent.trim() === 'Edit Profile');
+    if (editButton) break;
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+
+  if (editButton) {
+    console.log('[FlirtEasy] Clicking Edit button to open profile editor');
+    editButton.click();
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Click Preview tab using role="tab" selector
+    let previewTab = null;
+    for (let i = 0; i < 6; i++) {
+      previewTab = document.querySelector('button[role="tab"][aria-selected="false"]') ||
+        Array.from(document.querySelectorAll('button[role="tab"]')).find(btn =>
+          btn.textContent.trim() === 'Preview'
+        );
+      if (previewTab) break;
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    if (previewTab) {
+      console.log('[FlirtEasy] Clicking Preview tab');
+      previewTab.click();
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      const viewAllButtons = document.querySelectorAll('button');
+      const expandButtons = Array.from(viewAllButtons).filter(btn => {
+        const text = btn.textContent.toLowerCase();
+        return text.includes('view all') || text.includes('view more');
+      });
+
+      for (const btn of expandButtons) {
+        btn.click();
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+  }
 
   // Extract name and age from profile preview
   const nameAgeSection = document.querySelector('h1');
@@ -1047,14 +1155,20 @@ async function updateTinderBio(newBio) {
     console.log('[FlirtEasy] updateTinderBio called with bio:', newBio);
     console.log('[FlirtEasy] Current URL:', window.location.href);
 
-    // Wait for bio textarea to load
+    // 1. Ensure on edit profile page
+    if (!window.location.pathname.includes('/app/profile/edit')) {
+      console.log('[FlirtEasy] Navigating to /app/profile/edit...');
+      window.location.href = 'https://tinder.com/app/profile/edit';
+      await new Promise(r => setTimeout(r, 2500));
+    }
+
+    // 2. Wait for bio textarea to load
     console.log('[FlirtEasy] Looking for bio textarea...');
     let bioTextarea = null;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 20; i++) {
       bioTextarea = document.querySelector('textarea[maxlength="500"]') || document.querySelector('textarea');
       if (bioTextarea) break;
-      console.log(`[FlirtEasy] Bio textarea not found, retry ${i + 1}/10...`);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
     if (!bioTextarea) {
@@ -1062,31 +1176,25 @@ async function updateTinderBio(newBio) {
       return { success: false, error: 'Bio field not found' };
     }
 
-    console.log('[FlirtEasy] Found bio textarea, clearing and updating...');
+    console.log('[FlirtEasy] Found bio textarea, updating value...');
 
-    // Visual typing animation
+    // 3. React-compatible native value setter
     bioTextarea.focus();
-    bioTextarea.select();
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    document.execCommand('selectAll', false, null);
-    document.execCommand('delete', false, null);
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    // Type character by character for visual effect
-    for (let i = 0; i < newBio.length; i++) {
-      document.execCommand('insertText', false, newBio[i]);
-      await new Promise(resolve => setTimeout(resolve, 20)); // 20ms per character
+    const proto = window.HTMLTextAreaElement.prototype;
+    const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (nativeSetter) {
+      nativeSetter.call(bioTextarea, newBio);
+    } else {
+      bioTextarea.value = newBio;
     }
-    console.log('[FlirtEasy] Bio value set to:', bioTextarea.value);
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    bioTextarea.dispatchEvent(new Event('input', { bubbles: true }));
     bioTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 300));
     bioTextarea.blur();
 
-    // Now save via API
+    // 4. Save via Tinder Web API
     console.log('[FlirtEasy] Visual update complete, saving via API...');
-
     let authToken = null;
     try {
       authToken = localStorage.getItem('TinderWeb/APIToken');
@@ -1109,49 +1217,47 @@ async function updateTinderBio(newBio) {
       authToken = document.cookie.split('; ').find(row => row.startsWith('x-auth-token='))?.split('=')[1];
     }
 
-    if (!authToken) {
-      console.error('[FlirtEasy] Auth token not found');
-      return { success: false, error: 'Authentication token not found' };
+    let apiSuccess = false;
+    if (authToken) {
+      try {
+        console.log('[FlirtEasy] Making profile API update call...');
+        const response = await fetch('https://api.gotinder.com/v2/profile?locale=en', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-auth-token': authToken,
+            'app-version': '1064501',
+            'platform': 'web',
+            'tinder-version': '6.45.1'
+          },
+          body: JSON.stringify({ user: { bio: newBio } })
+        });
+        const data = await response.json();
+        apiSuccess = data?.meta?.status === 200;
+        console.log('[FlirtEasy] API update result:', apiSuccess);
+      } catch (apiErr) {
+        console.warn('[FlirtEasy] API update warning:', apiErr.message);
+      }
     }
 
-    console.log('[FlirtEasy] Found auth token, making API call...');
-
-    const response = await fetch('https://api.gotinder.com/v2/profile?locale=en', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-auth-token': authToken,
-        'app-version': '1064501',
-        'platform': 'web',
-        'tinder-version': '6.45.1'
-      },
-      body: JSON.stringify({
-        user: {
-          bio: newBio
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[FlirtEasy] API call failed:', response.status, errorText);
-      return { success: false, error: `API error: ${response.status}` };
+    // 5. Commit UI by clicking 'Done' button
+    const doneBtn = Array.from(document.querySelectorAll('button')).find(b => b.innerText && b.innerText.trim() === 'Done');
+    if (doneBtn) {
+      console.log('[FlirtEasy] Clicking Done button to commit...');
+      doneBtn.click();
     }
 
-    const data = await response.json();
-    console.log('[FlirtEasy] API response:', data);
+    // 6. Update local extension storage
+    try {
+      const s = (await chrome.storage.local.get('settings')).settings || {};
+      s.userProfile = s.userProfile || {};
+      s.userProfile.bio = newBio;
+      await chrome.storage.local.set({ settings: s });
+    } catch (_) {}
 
-    if (data.meta?.status === 200) {
-      console.log('[FlirtEasy] Bio saved successfully via API, redirecting to preview...');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      window.location.href = 'https://tinder.com/app/profile';
-      return { success: true };
-    } else {
-      console.error('[FlirtEasy] Unexpected API response:', data);
-      return { success: false, error: 'Unexpected API response' };
-    }
-  } catch (error) {
-    console.error('[FlirtEasy] Exception in updateTinderBio:', error);
-    return { success: false, error: error.message };
+    return { success: true, apiSuccess, bio: newBio };
+  } catch (e) {
+    console.error('[FlirtEasy] updateTinderBio error:', e);
+    return { success: false, error: e.message };
   }
 }
