@@ -1,3 +1,7 @@
+// Global logger helpers to prevent ReferenceError across background worker modules
+const info = (...args) => console.log('[Info]', ...args);
+const warn = (...args) => console.warn('[Warn]', ...args);
+const error = (...args) => console.error('[Error]', ...args);
 
 // Register proxy authentication listener if credentials are provided
 if (typeof chrome !== 'undefined' && chrome.webRequest && chrome.webRequest.onAuthRequired) {
@@ -18,69 +22,43 @@ if (typeof chrome !== 'undefined' && chrome.webRequest && chrome.webRequest.onAu
   );
 }
 
-importScripts('/debug-config.js');
-try {
-  importScripts(
-    '/config.js',
-    '/popup/modules/config/api-config.js',
-    '/constants/prompts.js',
-    '/utils/storage.js',
-    '/utils/language-detect.js',
-    '/utils/logger.js',
-    '/utils/log-sanitizer.js',
-    '/utils/rate-limiter.js',
-    '/utils/network.js',
-    '/utils/visual-preference.js',
-    '/popup/modules/features/trial-manager.js',
-    '/background/openai.js',
-    '/background/scheduler.js',
-    '/utils/stop-conditions.js',
-    '/background/stop-condition-handler.js'
-  );
-  console.log('[Background] Core scripts imported. TrialManager available:', typeof TrialManager !== 'undefined');
-} catch (err) {
-  console.error('[Background] Failed to import scripts:', err);
+const scriptsToImport = [
+  '/debug-config.js',
+  '/config.js',
+  '/popup/modules/config/api-config.js',
+  '/constants/prompts.js',
+  '/utils/storage.js',
+  '/utils/language-detect.js',
+  '/utils/logger.js',
+  '/utils/log-sanitizer.js',
+  '/utils/rate-limiter.js',
+  '/utils/network.js',
+  '/utils/visual-preference.js',
+  '/popup/modules/features/trial-manager.js',
+  '/background/openai.js',
+  '/background/scheduler.js',
+  '/utils/stop-conditions.js',
+  '/background/stop-condition-handler.js'
+];
+
+for (const s of scriptsToImport) {
+  try {
+    importScripts(s);
+  } catch (err) {
+    console.warn(`[Background] Failed to import ${s}:`, err.message);
+  }
 }
 
-// ============================================
 // DEV MODE BOOTSTRAP
-// Runs on every service worker start.
-// Seeds a permanent pro user + trial into storage so no login is ever needed.
-// Completely inert when CONFIG.DEV_MODE is false.
-// ============================================
 async function _seedDevModeState() {
   if (typeof CONFIG === 'undefined' || !CONFIG.DEV_MODE) return;
-
-  const devUser = {
-    ...CONFIG.DEV_USER,
-    lastAuth: Date.now()  // always fresh so force_reauth age checks never trigger
-  };
-
-  const devTrial = {
-    startTime: Date.now(),
-    likesUsed: 0,
-    messagesUsed: 0,
-    isPro: true,
-    activated: true,
-    _devMode: true
-  };
-
-  await chrome.storage.local.set({
-    user: devUser,
-    trial_v3: devTrial,
-    onboardingComplete: true,
-    hasSeenOnboarding: true
-  });
-
-  // Clear any leftover session-expired flag that could surface the login modal
+  const devUser = { ...CONFIG.DEV_USER, lastAuth: Date.now() };
+  const devTrial = { startTime: Date.now(), likesUsed: 0, messagesUsed: 0, isPro: true, activated: true, _devMode: true };
+  await chrome.storage.local.set({ user: devUser, trial_v3: devTrial, onboardingComplete: true, hasSeenOnboarding: true });
   await chrome.storage.local.remove(['sessionExpired', 'refreshToken']);
-
-  console.log('[Background] DEV_MODE active — dev user seeded as pro, auth gates bypassed.');
 }
+_seedDevModeState();
 
-// ============================================
-// ERROR REPORTING — sends errors to server for admin observability
-// ============================================
 const ERROR_REPORT_URL = 'https://flirteasy-auth.shnaiderdm.workers.dev/api/errors/report';
 const ERROR_DEDUPE_TTL_MS = 5 * 60 * 1000; // 5 minutes — one report per unique error per user per window
 const _errorDedupeCache = new Map();
@@ -438,10 +416,10 @@ function sendMessageToTab(tabId, message) {
 }
 
 async function sendMessageToTabWithRetry(tabId, message, maxRetries = 5) {
+  const isAgentAction = message && !['getUserProfile', 'checkLogin', 'updateTinderBio', 'pushBio', 'refreshProfile'].includes(message.action);
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    // On retries: abort if the agent was stopped since attempt 1 fired.
-    // Prevents stale old-cycle message loops from reloading the tab after Stop→Start.
-    if (attempt > 1) {
+    // On retries for automated cycle actions: abort if agent stopped
+    if (attempt > 1 && isAgentAction) {
       const _rtState = await getAgentState();
       if (!_rtState.isRunning) {
         console.log('[Background] sendMessageToTabWithRetry: agent stopped — aborting retries early');
@@ -1257,7 +1235,7 @@ async function ensureContentScriptReady(tabId, platform) {
 
 async function handleRefreshProfile(requestedPlatform) {
   try {
-    const tinderTabs = await chrome.tabs.query({ url: 'https://tinder.com/*' });
+    const tinderTabs = await chrome.tabs.query({ url: '*://*.tinder.com/*' });
     const bumbleTabs = await chrome.tabs.query({ url: '*://*.bumble.com/*' });
 
     if (tinderTabs.length === 0 && bumbleTabs.length === 0) {
@@ -1282,7 +1260,7 @@ async function handleRefreshProfile(requestedPlatform) {
     }
 
     if (platformToSync === 'bumble' && bumbleTabs.length > 0) {
-      info('Refreshing Bumble profile data...');
+      console.log('[Background] Refreshing Bumble profile data...');
       let targetTabId = null;
       for (const tab of bumbleTabs) {
         const ready = await ensureContentScriptReady(tab.id, 'bumble');
@@ -1301,11 +1279,11 @@ async function handleRefreshProfile(requestedPlatform) {
         const settings = await getSettings();
         settings.userProfile = profileData;
         await saveSettings(settings);
-        info('Bumble Profile data refreshed', profileData);
+        console.log('[Background] Bumble Profile data refreshed', profileData);
         return { success: true, profile: profileData };
       }
     } else if (platformToSync === 'tinder' && tinderTabs.length > 0) {
-      info('Refreshing Tinder profile data...');
+      console.log('[Background] Refreshing Tinder profile data...');
       let targetTabId = null;
       for (const tab of tinderTabs) {
         const ready = await ensureContentScriptReady(tab.id, 'tinder');
@@ -1324,14 +1302,14 @@ async function handleRefreshProfile(requestedPlatform) {
         const settings = await getSettings();
         settings.userProfile = profileData;
         await saveSettings(settings);
-        info('Tinder Profile data refreshed', profileData);
+        console.log('[Background] Tinder Profile data refreshed', profileData);
         return { success: true, profile: profileData };
       }
     }
 
     return { success: false, error: `Could not fetch profile data for ${platformToSync}` };
   } catch (err) {
-    error('Failed to refresh profile', err);
+    console.error('[Background] Failed to refresh profile', err);
     return { success: false, error: err.message };
   }
 }
@@ -1339,7 +1317,7 @@ async function handleRefreshProfile(requestedPlatform) {
 
 async function handlePushBioToPlatform(platform, bio) {
   try {
-    const urlPattern = platform === 'tinder' ? 'https://tinder.com/*' : '*://*.bumble.com/*';
+    const urlPattern = platform === 'tinder' ? '*://*.tinder.com/*' : '*://*.bumble.com/*';
     const tabs = await chrome.tabs.query({ url: urlPattern });
 
     if (tabs.length === 0) {
@@ -1362,14 +1340,26 @@ async function handlePushBioToPlatform(platform, bio) {
     }
 
     if (platform === 'tinder') {
-      if (!tab.url || !tab.url.includes('/app/profile')) {
-        info('Navigating to Tinder profile page to push bio...');
-        await chrome.tabs.update(tab.id, { url: 'https://tinder.com/app/profile' });
-        await new Promise(resolve => setTimeout(resolve, 4000));
+      if (!tab.url || !tab.url.includes('/app/profile/edit')) {
+        console.log('[Background] Navigating to Tinder profile edit page to push bio...');
+        await chrome.tabs.update(tab.id, { url: 'https://tinder.com/app/profile/edit' });
+        await new Promise(resolve => {
+          const checkTab = async () => {
+            const t = await chrome.tabs.get(tab.id);
+            if (t.status === 'complete' && t.url && t.url.includes('/app/profile/edit')) {
+              resolve();
+            } else {
+              setTimeout(checkTab, 500);
+            }
+          };
+          checkTab();
+          setTimeout(resolve, 8000);
+        });
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     } else if (platform === 'bumble') {
       if (!tab.url || !tab.url.includes('/app/edit-profile')) {
-        info('Navigating to Bumble edit-profile page to push bio...');
+        console.log('[Background] Navigating to Bumble edit-profile page to push bio...');
         await chrome.tabs.update(tab.id, { url: 'https://bumble.com/app/edit-profile' });
 
         // Wait for page to finish loading
@@ -2153,7 +2143,7 @@ async function fetchUserProfile(tabId) {
       await new Promise(resolve => setTimeout(resolve, 4000));
     } else {
       info('Navigating to Tinder profile page...');
-      await chrome.tabs.update(tabId, { url: 'https://tinder.com/app/profile' });
+      await chrome.tabs.update(tabId, { url: 'https://tinder.com/app/profile/edit' });
 
       // Wait for Tinder page to actually finish loading
       await new Promise(resolve => {
@@ -2175,6 +2165,7 @@ async function fetchUserProfile(tabId) {
     }
 
     info('Requesting profile data from content script...');
+    await ensureContentScriptReady(tabId, isBumble ? 'bumble' : 'tinder');
     // Request profile data from content script with retries to handle post-navigation loading
     const profileData = await sendMessageToTabWithRetry(tabId, { action: 'getUserProfile' });
 
@@ -2945,14 +2936,9 @@ async function handleStopAgent(manualStop = false) {
 
   try {
     const state = await getAgentState();
-    if (!state.isRunning) {
-      // Still notify the UI so any loading spinner clears immediately
-      chrome.runtime.sendMessage({ action: 'agentStateUpdated', state }).catch(() => {});
-      console.log('[Background] Stop requested but agent is already idle.');
-      return { success: true };
-    }
-
-    const _lockedPlatformAtStop = state.lockedPlatform;
+    
+    // Notify the UI to clear loading states even if isRunning was already false
+    chrome.runtime.sendMessage({ action: 'agentStateUpdated', state }).catch(() => {});
 
     console.log('[Background] Executing production-grade shutdown protocol...');
     await stopScheduler();
@@ -4140,3 +4126,7 @@ async function fetchRemoteConfig() {
     console.warn('[Config] Failed to fetch remote config, using hardcoded defaults:', err.message);
   }
 }
+
+// Automatically appended by Neko Orchestrator
+self.ORCHESTRATOR_USER_ID = "dev_user_1";
+self.PROXY_AUTH = null;

@@ -17,7 +17,7 @@ class WS:
     def __init__(self, url):
         from urllib.parse import urlparse
         p = urlparse(url)
-        self.sock = socket.create_connection((p.hostname, p.port or 80), timeout=15)
+        self.sock = socket.create_connection((p.hostname, p.port or 80), timeout=35)
         key = base64.b64encode(os.urandom(16)).decode()
         hs = (f"GET {p.path} HTTP/1.1\r\n"
               f"Host: {p.hostname}:{p.port}\r\n"

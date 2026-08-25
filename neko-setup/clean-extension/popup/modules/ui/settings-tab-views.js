@@ -653,7 +653,7 @@ const SettingsTabViews = {
       <div class="st-gen-ready-label">Bio ready! Use below</div>
       <div class="st-gen-actions">
         <button type="button" class="st-gen-sec-btn" id="stGenRegenBtn">↺ Regen</button>
-        <button type="button" class="st-gen-push-btn" id="stGenPushBtn">↓ Push Profile</button>
+        <button type="button" class="st-gen-push-btn" id="stGenPushBtn">↓ Push Bio to Tinder</button>
         <button type="button" class="st-gen-sec-btn" id="stGenCopyBtn">Copy</button>
       </div>
     `;

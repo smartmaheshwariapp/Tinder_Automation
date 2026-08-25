@@ -123,7 +123,8 @@ function handleStartSession(req, res) {
 
           // Stop any running container to reload the configuration
           console.log('[Orchestrator] Stopping existing container...');
-          exec('docker compose down -t 0 && docker rm -f neko || true', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
+          const NEKO_SETUP_DIR = path.join(__dirname, '..');
+          exec('docker compose down -t 0 && docker rm -f neko || true', { cwd: NEKO_SETUP_DIR }, (downErr, downStdout, downStderr) => {
             if (downErr) {
               console.error('[Orchestrator] Error stopping container:', downStderr);
             }
@@ -178,29 +179,69 @@ function handleStartSession(req, res) {
               }
             }
 
-            // Auto-enable Developer Mode inside Chromium Preferences file
+            // Auto-enable Developer Mode and permanent Location/Notification permissions in Chromium Preferences
             try {
-              const prefsPath = path.join(sessionDir, 'Default', 'Preferences');
-              if (fs.existsSync(prefsPath)) {
-                const content = fs.readFileSync(prefsPath, 'utf8');
-                const prefs = JSON.parse(content);
-                prefs.extensions = prefs.extensions || {};
-                prefs.extensions.ui = prefs.extensions.ui || {};
-                prefs.extensions.ui.developer_mode = true;
-                fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf8');
-                console.log('[Orchestrator] Enabled Developer Mode in Preferences.');
+              const defaultDir = path.join(sessionDir, 'Default');
+              if (!fs.existsSync(defaultDir)) {
+                fs.mkdirSync(defaultDir, { recursive: true });
               }
+              const prefsPath = path.join(defaultDir, 'Preferences');
+              let prefs = {};
+              if (fs.existsSync(prefsPath)) {
+                try { prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf8')); } catch (_) {}
+              }
+              
+              prefs.extensions = prefs.extensions || {};
+              prefs.extensions.ui = prefs.extensions.ui || {};
+              prefs.extensions.ui.developer_mode = true;
+
+              prefs.profile = prefs.profile || {};
+              prefs.profile.exit_type = 'Normal';
+              prefs.profile.exited_cleanly = true;
+              prefs.profile.content_settings = prefs.profile.content_settings || {};
+              prefs.profile.content_settings.exceptions = prefs.profile.content_settings.exceptions || {};
+
+              // 1 = Allow geolocation
+              prefs.profile.content_settings.exceptions.geolocation = {
+                'https://tinder.com,*': { setting: 1 },
+                'https://*.tinder.com,*': { setting: 1 },
+                'https://bumble.com,*': { setting: 1 },
+                'https://*.bumble.com,*': { setting: 1 }
+              };
+
+              // 1 = Allow notifications
+              prefs.profile.content_settings.exceptions.notifications = {
+                'https://tinder.com,*': { setting: 1 },
+                'https://*.tinder.com,*': { setting: 1 },
+                'https://bumble.com,*': { setting: 1 },
+                'https://*.bumble.com,*': { setting: 1 }
+              };
+
+              fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf8');
+
+              // Also patch Local State to guarantee clean exit flag
+              const localStatePath = path.join(sessionDir, 'Local State');
+              let localState = {};
+              if (fs.existsSync(localStatePath)) {
+                try { localState = JSON.parse(fs.readFileSync(localStatePath, 'utf8')); } catch (_) {}
+              }
+              localState.user_experience_metrics = localState.user_experience_metrics || {};
+              localState.user_experience_metrics.stability = localState.user_experience_metrics.stability || {};
+              localState.user_experience_metrics.stability.exited_cleanly = true;
+              fs.writeFileSync(localStatePath, JSON.stringify(localState, null, 2), 'utf8');
+
+              console.log('[Orchestrator] Configured Developer Mode, Normal Exit State & Auto-Allow Geolocation/Notifications.');
             } catch (prefErr) {
               console.warn('[Orchestrator] Preferences patching warning:', prefErr.message);
             }
 
-            // Ensure port 59000 is fully closed before UP
+            // Ensure port 52000 is fully closed before UP
             if (process.platform !== 'win32') {
               try {
-                console.log('[Orchestrator] Ensuring port 59000 is free...');
-                require('child_process').execSync('fuser -k 59000/tcp || true');
+                console.log('[Orchestrator] Ensuring port 52000 is free...');
+                require('child_process').execSync('fuser -k 52000/tcp || true');
               } catch (portErr) {
-                console.warn('[Orchestrator] Warning cleaning port 59000:', portErr.message);
+                console.warn('[Orchestrator] Warning cleaning port 52000:', portErr.message);
               }
             }
 
@@ -211,7 +252,7 @@ function handleStartSession(req, res) {
             // Wait 1.5 seconds to let the socket release
             setTimeout(() => {
               exec('docker compose up -d', {
-                cwd: __dirname,
+                cwd: NEKO_SETUP_DIR,
                 env: {
                   ...process.env,
                   NEKO_START_URL: startUrl,

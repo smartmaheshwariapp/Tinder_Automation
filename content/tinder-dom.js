@@ -232,6 +232,14 @@ function clickLikeButton() {
     return true;
   }
 
+  // Keyboard shortcut fallback (Tinder web standard: ArrowRight = Like)
+  try {
+    const keyEvent = new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39, which: 39, bubbles: true, cancelable: true });
+    window.dispatchEvent(keyEvent);
+    document.dispatchEvent(keyEvent);
+    console.log('[FlirtEasy] Dispatched ArrowRight keydown for Like');
+  } catch (_) {}
+
   console.log('[FlirtEasy] Like button not found, attempting swipe right...');
   return swipeRight();
 }
@@ -331,6 +339,15 @@ function clickPassButton() {
     console.log('[FlirtEasy] Pass button clicked');
     return true;
   }
+
+  // Keyboard shortcut fallback (Tinder web standard: ArrowLeft = Pass)
+  try {
+    const keyEvent = new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37, which: 37, bubbles: true, cancelable: true });
+    window.dispatchEvent(keyEvent);
+    document.dispatchEvent(keyEvent);
+    console.log('[FlirtEasy] Dispatched ArrowLeft keydown for Pass');
+  } catch (_) {}
+
   console.log('[FlirtEasy] Pass button not found, attempting swipe left...');
   return swipeLeft();
 }
