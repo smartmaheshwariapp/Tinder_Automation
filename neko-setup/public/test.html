@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔥 Tinder / Neko Live Controller & Mobile Sync Simulator</title>
+  <style>
+    :root {
+      --bg: #0F0F13;
+      --card-bg: #16161E;
+      --border: #222230;
+      --primary: #FE3C72;
+      --accent-green: #10B981;
+      --accent-amber: #F59E0B;
+      --accent-blue: #818CF8;
+      --text: #F1F1F5;
+      --text-muted: #8B8BA0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    
+    .env-switcher {
+      display: flex;
+      background: #101017;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .env-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+    }
+    .env-btn.active {
+      background: var(--primary);
+      color: #FFF;
+      box-shadow: 0 2px 8px rgba(254, 60, 114, 0.3);
+    }
+    .env-btn:hover:not(.active) { color: #FFF; background: #20202C; }
+
+    header .status-badge {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); animation: pulseAnim 1.5s infinite; }
+    @keyframes pulseAnim { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+
+    .main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Left Stream Window */
+    .stream-pane {
+      flex: 1.1;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      position: relative;
+    }
+    .stream-header {
+      background: #121218;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .stream-pane iframe {
+      width: 100%;
+      flex: 1;
+      border: none;
+    }
+
+    /* Right Controller Pane */
+    .control-pane {
+      flex: 1;
+      max-width: 540px;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 14px;
+      gap: 12px;
+      background: var(--bg);
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-row { display: flex; gap: 8px; }
+    button {
+      background: #20202C;
+      color: var(--text);
+      border: 1px solid #2D2D3E;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    button:hover { background: #2A2A3A; border-color: #3D3D52; }
+    button.btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #FFF;
+      box-shadow: 0 4px 12px rgba(254, 60, 114, 0.25);
+    }
+    button.btn-primary:hover { background: #e03262; }
+    button.btn-success { background: #10B981; border-color: #10B981; color: #FFF; }
+    button.btn-success:hover { background: #059669; }
+    button.btn-accent {
+      background: rgba(129, 140, 248, 0.15);
+      border-color: rgba(129, 140, 248, 0.35);
+      color: var(--accent-blue);
+    }
+    button.btn-accent:hover { background: rgba(129, 140, 248, 0.25); }
+
+    input, select {
+      background: #111117;
+      border: 1px solid #2D2D3E;
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      width: 100%;
+    }
+    input:focus, select:focus { border-color: var(--primary); }
+
+    .state-pill {
+      font-size: 11.5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-amber);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      font-weight: 700;
+    }
+
+    /* Tab bar inside Controller Pane */
+    .mode-tabs {
+      display: flex;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 4px;
+    }
+    .mode-tab {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      border-radius: 7px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mode-tab.active {
+      background: #20202C;
+      color: #FFF;
+      border: 1px solid #2D2D3E;
+    }
+
+    /* Mini Log */
+    .log-box {
+      background: #0B0B0F;
+      border: 1px solid #1E1E28;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-family: monospace;
+      font-size: 11px;
+      max-height: 110px;
+      overflow-y: auto;
+      color: #A0A0B5;
+      line-height: 1.4;
+    }
+    .log-entry { margin-bottom: 3px; }
+    .log-time { color: #555566; }
+    .log-success { color: var(--accent-green); }
+    .log-err { color: #EF4444; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🔥 Tinder / Neko Live Mobile Sync Simulator</h1>
+
+    <!-- Environment Switcher -->
+    <div class="env-switcher">
+      <button class="env-btn active" id="btnLocal" onclick="setEnv('local')">💻 Local Dev</button>
+      <button class="env-btn" id="btnVps" onclick="setEnv('vps')">🌐 VPS Server</button>
+    </div>
+
+    <div class="status-badge">
+      <div class="pulse"></div>
+      Sync State: <span id="pageStateBadge">Checking...</span>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <!-- Stream Pane -->
+    <div class="stream-pane">
+      <div class="stream-header">
+        <span id="streamTitle">🖥️ Live Local Browser (localhost:8080)</span>
+        <button style="padding: 3px 8px; font-size: 11px;" onclick="reloadStream()">🔄 Reload Stream</button>
+      </div>
+      <iframe id="nekoIframe" src="http://localhost:8080/?usr=User&pwd=admin" allow="autoplay; camera; microphone; fullscreen; clipboard-read; clipboard-write; display-capture" allowfullscreen></iframe>
+    </div>
+
+    <!-- Controller Pane -->
+    <div class="control-pane">
+      
+      <!-- Controller Mode Tabs -->
+      <div class="mode-tabs">
+        <div class="mode-tab active" id="tabMobile" onclick="setMode('mobile')">📱 Live Mobile Card Sync</div>
+        <div class="mode-tab" id="tabV2" onclick="setMode('v2')">⚡ Automation V2</div>
+        <div class="mode-tab" id="tabManual" onclick="setMode('manual')">🛠️ All Raw Controls</div>
+      </div>
+
+      <!-- ─── 1. DYNAMIC MOBILE CARD (100% Mirrors React Native App) ─── -->
+      <div id="mobileSyncCard" class="card" style="border: 1.5px solid #FE3C7250; background: #181824;">
+        <div class="card-title" style="color: #FE3C72;">
+          <span id="wizardCardTitle">Choose Login Method</span>
+          <span class="state-pill" id="liveStatePill">options</span>
+        </div>
+        <p id="wizardCardDesc" style="font-size: 12.5px; color: #A0A0B5; line-height: 1.5;">
+          Select how you want to log into your Tinder account:
+        </p>
+
+        <!-- Dynamic Content injected via JS based on current page state -->
+        <div id="wizardDynamicContent" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Will automatically adapt to Options, Email, OTP, Phone, Captcha, Logged-In -->
+        </div>
+      </div>
+
+      <!-- ─── 2. FLIRTEASY AUTOMATION V2 CONFIG PANEL ─── -->
+      <div id="v2SettingsGroup" style="display: none; flex-direction: column; gap: 12px;">
+        
+        <!-- Dating Goal Card -->
+        <div class="card" style="border-color: #FE3C7250;">
+          <div class="card-title" style="color: #FE3C72;">🎯 Your Dating Goal</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <select id="v2GoalSelect" style="background:#0F0F13; color:#FFF; border:1px solid #2E2E42; padding:8px; border-radius:6px;">
+              <option value="date">☕ Set up a Date (Coffee / Drinks)</option>
+              <option value="phone">💬 Move to WhatsApp / Phone</option>
+              <option value="instagram">📸 Exchange Instagram</option>
+              <option value="move_to_telegram">✈️ Move to Telegram</option>
+              <option value="never">♾️ Continuous Engagement</option>
+            </select>
+            
+            <div style="display:flex; gap:6px; flex-direction:column; background:#1C1C28; padding:10px; border-radius:8px;">
+              <span style="font-size:11px; color:#8B8BA0; font-weight:bold;">Your Off-App Contact Info:</span>
+              <input type="text" id="v2WhatsappInput" placeholder="WhatsApp / Phone (e.g. +91 9961530000)" />
+              <input type="text" id="v2InstagramInput" placeholder="Instagram (e.g. @username)" />
+              <input type="text" id="v2TelegramInput" placeholder="Telegram (e.g. @telegram_handle)" />
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#A0A0B5;">
+              <span>Min msgs before pitch:</span>
+              <input type="number" id="v2MinMsgs" style="width:60px; text-align:center;" value="3" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Smart Swiping & Visual AI Card -->
+        <div class="card" style="border-color: #10B98150;">
+          <div class="card-title" style="color: #10B981;">❤️ Smart Swiping & AI Vision</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px;">👁️ Visual AI Preference Learning:</span>
+              <input type="checkbox" id="v2VisualEnabled" checked />
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#A0A0B5;">
+              <span>Match Threshold:</span>
+              <select id="v2VisualThreshold" style="background:#0F0F13; color:#FFF; border:1px solid #2E2E42; padding:4px 8px; border-radius:6px;">
+                <option value="60">60% (Broad)</option>
+                <option value="70">70% (Balanced)</option>
+                <option value="75" selected>75% (Selective)</option>
+                <option value="80">80% (Strict)</option>
+                <option value="90">90% (Ultra Strict)</option>
+              </select>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px;">🛡️ Anti-Ban Safety Shield:</span>
+              <input type="checkbox" id="v2SafetyMode" checked />
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Messaging Style Card -->
+        <div class="card" style="border-color: #EC489950;">
+          <div class="card-title" style="color: #EC4899;">💬 AI Persona & Conversation Tone</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <select id="v2ToneSelect" style="background:#0F0F13; color:#FFF; border:1px solid #2E2E42; padding:8px; border-radius:6px;">
+              <option value="Playful" selected>🎭 Playful & Teasing</option>
+              <option value="Flirty">💋 Charming & Flirty</option>
+              <option value="Direct">🎯 Confident & Direct</option>
+              <option value="Casual">☕ Relaxed & Casual</option>
+              <option value="Romantic">🌹 Romantic & Deep</option>
+              <option value="Intellectual">🧠 Witty & Intellectual</option>
+            </select>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#A0A0B5;">
+              <span>Follow-up after (hours):</span>
+              <input type="number" id="v2FollowupDelay" style="width:60px; text-align:center;" value="24" />
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px;">Double Texting (Consecutive msgs):</span>
+              <input type="checkbox" id="v2ConsecutiveMsgs" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Save Button -->
+        <button class="btn-primary" style="padding: 12px; font-size: 14px;" onclick="saveV2Settings()">
+          💾 Save & Apply to Live AI Wingman
+        </button>
+      </div>
+
+      <!-- ─── 3. RAW MANUAL CONTROLS (Always Available in Manual Tab) ─── -->
+      <div id="manualControlsGroup" style="display: none; flex-direction: column; gap: 12px;">
+        
+        <!-- Connection Config -->
+        <div class="card" style="border: 1px solid #818CF830; background: #818CF80A;">
+          <div class="card-title" style="color: #818CF8;">
+            <span>⚙️ Connection Endpoints</span>
+            <span id="activeEnvLabel" style="font-size:11px; color:#818CF8; font-weight:700;">Local Mode</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; gap:6px; align-items:center;">
+              <span style="font-size:11px; color:#8B8BA0; width:65px;">API URL:</span>
+              <input type="text" id="apiUrlInput" value="http://localhost:3001" onchange="updateCustomUrls()" />
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <span style="font-size:11px; color:#8B8BA0; width:65px;">Stream:</span>
+              <input type="text" id="streamUrlInput" value="http://localhost:8080/?usr=User&pwd=admin" onchange="updateCustomUrls()" />
+            </div>
+          </div>
+        </div>
+
+        <!-- FlirtEasy Remote Agent Trigger -->
+        <div class="card" style="background: #10B98110; border-color: #10B98140;">
+          <div class="card-title" style="color: #10B981;">
+            <span>🤖 FlirtEasy AI Agent Control</span>
+            <span class="state-pill" id="agentStatePill" style="background:#10B98120; border-color:#10B98140; color:#10B981;">Ready</span>
+          </div>
+          <div class="btn-row">
+            <button class="btn-success" style="flex: 1.5; font-size: 13px;" onclick="triggerAgent('start')">
+              ▶ Start FlirtEasy Agent
+            </button>
+            <button style="flex: 1; background: #EF444420; border-color: #EF444440; color: #EF4444;" onclick="triggerAgent('stop')">
+              ⏹ Stop Agent
+            </button>
+            <button class="btn-accent" style="flex: 1;" onclick="checkStats()">
+              📊 Stats
+            </button>
+          </div>
+        </div>
+
+        <!-- Universal Next / Enter -->
+        <div class="card" style="background: #FE3C7210; border-color: #FE3C7240;">
+          <div class="card-title" style="color: #FE3C72;">⚡ Direct Action Trigger</div>
+          <div class="btn-row">
+            <button class="btn-primary" style="flex: 1.4;" onclick="clickNext()">▶ Click "Next"</button>
+            <button class="btn-success" style="flex: 1;" onclick="pressEnter()">⏎ Send Enter</button>
+            <button style="flex: 1; background: #FFCB3720; border-color: #FFCB3740; color: #FFCB37;" onclick="resendCode()">📩 Resend Code</button>
+          </div>
+        </div>
+
+        <!-- Session Lifecycle -->
+        <div class="card">
+          <div class="card-title">🚀 Session Lifecycle</div>
+          <div class="btn-row">
+            <button class="btn-primary" style="flex: 1;" onclick="startSession('tinder')">🔥 Launch Tinder</button>
+            <button style="flex: 1;" onclick="startSession('bumble')">🐝 Launch Bumble</button>
+            <button style="background:#EF444420; border-color:#EF444440; color:#EF4444;" onclick="stopSession()">⏹ Stop</button>
+          </div>
+        </div>
+
+        <!-- Custom Click -->
+        <div class="card">
+          <div class="card-title">🎯 Click Any Text on Screen</div>
+          <div class="btn-row">
+            <input type="text" id="customTextInput" placeholder="Text to click e.g. Next, Continue, I Agree..." value="Next" />
+            <button class="btn-accent" onclick="clickCustomText()">Click 🎯</button>
+          </div>
+        </div>
+
+        <!-- Swipe Controls -->
+        <div class="card">
+          <div class="card-title">❤️ Swipe Controls</div>
+          <div class="btn-row">
+            <button style="flex: 1; background: #EF444420; border-color: #EF444440; color: #EF4444;" onclick="swipe('pass')">❌ Pass (Left)</button>
+            <button style="flex: 1; background: #10B98120; border-color: #10B98140; color: #10B981;" onclick="swipe('like')">❤️ Like (Right)</button>
+            <button style="flex: 1; background: #818CF820; border-color: #818CF840; color: #818CF8;" onclick="checkStats()">📊 Plugin Stats</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ─── 3. LIVE ACTION LOG ─── -->
+      <div class="card">
+        <div class="card-title">
+          <span>📜 Live Event Log</span>
+          <button style="padding: 2px 6px; font-size: 10px;" onclick="clearLogs()">Clear</button>
+        </div>
+        <div class="log-box" id="logBox"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let currentEnv = 'local'; // 'local' | 'vps'
+    let API = 'http://localhost:3001';
+    let currentMode = 'mobile';
+    let lastState = '';
+    let submittedEmail = 'sanket.sp.patil@gmail.com';
+    let submittedPhone = '';
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('tabMobile').className = 'mode-tab' + (mode === 'mobile' ? ' active' : '');
+      document.getElementById('tabV2').className = 'mode-tab' + (mode === 'v2' ? ' active' : '');
+      document.getElementById('tabManual').className = 'mode-tab' + (mode === 'manual' ? ' active' : '');
+      
+      document.getElementById('mobileSyncCard').style.display = mode === 'mobile' ? 'flex' : 'none';
+      document.getElementById('v2SettingsGroup').style.display = mode === 'v2' ? 'flex' : 'none';
+      document.getElementById('manualControlsGroup').style.display = mode === 'manual' ? 'flex' : 'none';
+
+      if (mode === 'v2') {
+        loadV2Settings();
+      }
+    }
+
+    async function loadV2Settings() {
+      log('Fetching Automation V2 settings...', 'info');
+      try {
+        const res = await fetch(`${API}/extension-settings`);
+        const data = await res.json();
+        if (data && data.success && data.settings) {
+          const s = data.settings;
+          if (s.goal) document.getElementById('v2GoalSelect').value = s.goal;
+          if (s.contactDetails?.whatsapp?.value) document.getElementById('v2WhatsappInput').value = s.contactDetails.whatsapp.value;
+          if (s.contactDetails?.instagram?.value) document.getElementById('v2InstagramInput').value = s.contactDetails.instagram.value;
+          if (s.contactDetails?.telegram?.value) document.getElementById('v2TelegramInput').value = s.contactDetails.telegram.value;
+          if (s.moveOffAppMinMessages) document.getElementById('v2MinMsgs').value = s.moveOffAppMinMessages;
+          
+          document.getElementById('v2VisualEnabled').checked = s.visualPreferences?.enabled !== false;
+          if (s.visualPreferences?.threshold) document.getElementById('v2VisualThreshold').value = String(s.visualPreferences.threshold);
+          document.getElementById('v2SafetyMode').checked = s.safetyMode !== false;
+          if (s.tone) document.getElementById('v2ToneSelect').value = s.tone;
+          if (s.promptModes?.followup?.delay) document.getElementById('v2FollowupDelay').value = s.promptModes.followup.delay;
+          document.getElementById('v2ConsecutiveMsgs').checked = s.consecutiveMessagesEnabled === true;
+          log('Automation V2 settings loaded successfully!', 'success');
+        }
+      } catch (e) {
+        log(`Failed to load V2 settings: ${e.message}`, 'err');
+      }
+    }
+
+    async function saveV2Settings() {
+      log('Saving Automation V2 settings to live extension...', 'info');
+      const updated = {
+        goal: document.getElementById('v2GoalSelect').value,
+        contactDetails: {
+          whatsapp: { value: document.getElementById('v2WhatsappInput').value.trim(), enabled: !!document.getElementById('v2WhatsappInput').value.trim() },
+          instagram: { value: document.getElementById('v2InstagramInput').value.trim(), enabled: !!document.getElementById('v2InstagramInput').value.trim() },
+          telegram: { value: document.getElementById('v2TelegramInput').value.trim(), enabled: !!document.getElementById('v2TelegramInput').value.trim() },
+        },
+        moveOffAppMinMessages: parseInt(document.getElementById('v2MinMsgs').value, 10) || 3,
+        visualPreferences: {
+          enabled: document.getElementById('v2VisualEnabled').checked,
+          threshold: parseInt(document.getElementById('v2VisualThreshold').value, 10) || 75
+        },
+        safetyMode: document.getElementById('v2SafetyMode').checked,
+        tone: document.getElementById('v2ToneSelect').value,
+        chattingStyle: document.getElementById('v2ToneSelect').value,
+        promptModes: {
+          followup: {
+            delay: String(document.getElementById('v2FollowupDelay').value || '24')
+          }
+        },
+        consecutiveMessagesEnabled: document.getElementById('v2ConsecutiveMsgs').checked
+      };
+
+      try {
+        const res = await fetch(`${API}/update-settings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ settings: updated })
+        });
+        const d = await res.json();
+        if (d.success) {
+          log('✓ Automation V2 settings saved and applied to live AI Wingman!', 'success');
+          alert('✓ Automation V2 settings saved & applied to live AI Wingman!');
+        } else {
+          log(`Save error: ${d.error || 'Failed'}`, 'err');
+        }
+      } catch (e) {
+        log(`Save error: ${e.message}`, 'err');
+      }
+    }
+
+    function setEnv(env) {
+      currentEnv = env;
+      const btnLocal = document.getElementById('btnLocal');
+      const btnVps = document.getElementById('btnVps');
+      const apiInput = document.getElementById('apiUrlInput');
+      const streamInput = document.getElementById('streamUrlInput');
+      const streamTitle = document.getElementById('streamTitle');
+      const activeEnvLabel = document.getElementById('activeEnvLabel');
+
+      if (env === 'local') {
+        btnLocal.classList.add('active');
+        btnVps.classList.remove('active');
+        API = 'http://localhost:3001';
+        apiInput.value = 'http://localhost:3001';
+        streamInput.value = 'http://localhost:8080/?usr=User&pwd=admin';
+        streamTitle.textContent = '🖥️ Live Local Browser (localhost:8080)';
+        activeEnvLabel.textContent = 'Local Mode';
+      } else {
+        btnVps.classList.add('active');
+        btnLocal.classList.remove('active');
+        API = 'https://api.smartmaheshwari.com';
+        apiInput.value = 'https://api.smartmaheshwari.com';
+        streamInput.value = 'https://stream.smartmaheshwari.com/?usr=User&pwd=admin';
+        streamTitle.textContent = '🖥️ Live VPS Browser (smartmaheshwari.com)';
+        activeEnvLabel.textContent = 'VPS Mode';
+      }
+
+      reloadStream();
+      log(`Switched to ${env.toUpperCase()} (${API})`, 'info');
+      checkPageState();
+    }
+
+    function updateCustomUrls() {
+      API = document.getElementById('apiUrlInput').value.trim();
+      reloadStream();
+      log(`Updated API URL to: ${API}`, 'info');
+    }
+
+    function log(msg, type = 'info') {
+      const box = document.getElementById('logBox');
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+      div.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${msg}</span>`;
+      box.prepend(div);
+    }
+
+    function clearLogs() {
+      document.getElementById('logBox').innerHTML = '';
+    }
+
+    function reloadStream() {
+      const streamUrl = document.getElementById('streamUrlInput').value.trim();
+      const iframe = document.getElementById('nekoIframe');
+      iframe.src = streamUrl;
+      log(`Stream URL: ${streamUrl}`, 'info');
+    }
+
+    // ─── Render Mobile Bottom Sheet Card Dynamically ───
+    function renderMobileCard(state, data = {}) {
+      if (state === lastState) {
+        if (data.email && data.email !== submittedEmail) {
+          submittedEmail = data.email;
+          const desc = document.getElementById('wizardCardDesc');
+          if (desc && (state === 'email_otp_screen' || state === 'otp_screen')) {
+            desc.textContent = `Enter the 6-digit passcode sent to ${submittedEmail}.`;
+          }
+        }
+        return;
+      }
+      lastState = state;
+
+      const title = document.getElementById('wizardCardTitle');
+      const desc = document.getElementById('wizardCardDesc');
+      const content = document.getElementById('wizardDynamicContent');
+
+      if (data.email) submittedEmail = data.email;
+      if (data.phone) submittedPhone = data.phone;
+
+      if (state === 'options' || state === 'login_options') {
+        title.textContent = 'Choose Login Method';
+        desc.textContent = 'Select how you want to log into your Tinder account:';
+        content.innerHTML = `
+          <button class="btn-primary" style="padding:12px;" onclick="clickText('email')">📧 Log in with Email Address</button>
+          <button class="btn-accent" style="padding:12px;" onclick="clickText('google')">🌐 Log in with Google</button>
+          <button class="btn-accent" style="padding:12px;" onclick="clickText('trouble logging in')">❓ Trouble Logging In? (Phone)</button>
+        `;
+      } else if (state === 'email_screen') {
+        title.textContent = 'Email Sign-In 📧';
+        desc.textContent = 'Enter your Tinder email address. We will send you a one-time passcode:';
+        content.innerHTML = `
+          <input type="email" id="emailInput" placeholder="Enter your email address..." value="${submittedEmail}" onkeydown="if(event.key==='Enter') submitEmail()" autofocus />
+          <div class="btn-row">
+            <button style="flex:1;" onclick="goBack()">⬅️ Back</button>
+            <button class="btn-primary" style="flex:2;" onclick="submitEmail()">Submit Email ➔</button>
+          </div>
+        `;
+      } else if (state === 'phone_screen') {
+        title.textContent = 'Phone Sign-In 📱';
+        desc.textContent = 'Enter your mobile phone number with country code:';
+        content.innerHTML = `
+          <input type="tel" id="phoneInput" placeholder="+91 9961530000" value="${submittedPhone}" onkeydown="if(event.key==='Enter') submitPhone()" autofocus />
+          <div class="btn-row">
+            <button style="flex:1;" onclick="goBack()">⬅️ Back</button>
+            <button class="btn-primary" style="flex:2;" onclick="submitPhone()">Send & Continue ➔</button>
+          </div>
+        `;
+      } else if (state === 'email_otp_screen' || state === 'sms_otp_screen' || state === 'otp_screen') {
+        const isSms = state === 'sms_otp_screen';
+        title.textContent = isSms ? 'Device Verification (SMS) 📱' : 'Email Verification 📧';
+        desc.textContent = isSms
+          ? `Enter the 6-digit passcode sent to ${submittedPhone || 'your phone (SMS)'}.`
+          : `Enter the 6-digit passcode sent to ${submittedEmail || 'your email'}.`;
+        content.innerHTML = `
+          <input type="text" id="otpInput" placeholder="6-digit passcode e.g. 077668" maxlength="6" style="font-size:18px; text-align:center; letter-spacing:4px; font-weight:bold;" onkeydown="if(event.key==='Enter') submitOtp()" autofocus />
+          <div class="btn-row" style="margin-top:4px;">
+            <button style="flex:1;" onclick="goBack()">⬅️ Back</button>
+            <button class="btn-primary" style="flex:2; font-size:14px;" onclick="submitOtp()">Verify & Log In ✓</button>
+          </div>
+          <div class="btn-row" style="margin-top:6px;">
+            <button style="flex:1; background:#FFCB3715; border-color:#FFCB3740; color:#FFCB37; font-size:11px;" onclick="resendCode()">
+              📩 Resend Passcode
+            </button>
+            <button class="btn-success" style="flex:1; font-size:11px;" onclick="clickNext()">
+              ▶ Click "Next"
+            </button>
+          </div>
+        `;
+      } else if (state === 'captcha') {
+        title.textContent = 'Solve Security Puzzle 🧩';
+        desc.textContent = 'Security check detected! Tap "Start Puzzle" on the live browser screen to solve it:';
+        content.innerHTML = `
+          <div class="btn-row">
+            <button class="btn-accent" style="flex:1;" onclick="clickNext()">Skip to OTP ➔</button>
+            <button class="btn-primary" style="flex:2;" onclick="clickNext()">I Solved the Puzzle ✓</button>
+          </div>
+        `;
+      } else if (state === 'logged_in') {
+        title.textContent = '🎉 Successfully Logged In!';
+        desc.textContent = 'FlirtEasy automated agent is now active and ready to swipe:';
+        content.innerHTML = `
+          <div class="btn-row">
+            <button style="flex:1; background:#EF444420; border-color:#EF444440; color:#EF4444;" onclick="swipe('pass')">❌ Pass (Left)</button>
+            <button class="btn-primary" style="flex:1; background:#10B981; border-color:#10B981;" onclick="swipe('like')">❤️ Like (Right)</button>
+            <button class="btn-accent" style="flex:1;" onclick="checkStats()">📊 Plugin Stats</button>
+          </div>
+        `;
+      } else {
+        title.textContent = '🚀 Start Session / Select Method';
+        desc.textContent = 'No active screen detected or session is idle. Launch Tinder or select an action:';
+        content.innerHTML = `
+          <button class="btn-primary" style="padding:12px; font-size:14px;" onclick="startSession('tinder')">🔥 Launch Tinder Session</button>
+          <div class="btn-row" style="margin-top:6px;">
+            <button class="btn-accent" style="flex:1;" onclick="clickText('email')">📧 Email Login</button>
+            <button class="btn-accent" style="flex:1;" onclick="clickText('trouble logging in')">📱 Phone Login</button>
+            <button class="btn-success" style="flex:1;" onclick="clickNext()">▶ Click Next</button>
+          </div>
+        `;
+      }
+    }
+
+
+    async function checkPageState() {
+      try {
+        const res = await fetch(`${API}/check-page-state`);
+        const data = await res.json();
+        const state = data.state || 'unknown';
+        document.getElementById('pageStateBadge').textContent = state;
+        document.getElementById('liveStatePill').textContent = state;
+        renderMobileCard(state, data);
+      } catch (e) {
+        document.getElementById('pageStateBadge').textContent = 'Connecting...';
+      }
+    }
+
+    setInterval(checkPageState, 1200);
+    checkPageState();
+
+    // ─── Actions ───
+    async function clickNext() {
+      log('Clicking "Next" / Confirming...', 'info');
+      try {
+        const res = await fetch(`${API}/click-text`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: 'next' })
+        });
+        const d = await res.json();
+        log(`Click Next: ${JSON.stringify(d)}`, 'success');
+        await fetch(`${API}/press-enter`, { method: 'POST' });
+      } catch (e) {
+        log(`Click Next error: ${e.message}`, 'err');
+      }
+    }
+
+    async function resendCode() {
+      log('Resending code...', 'info');
+      try {
+        const res = await fetch(`${API}/resend-code`, { method: 'POST' });
+        const d = await res.json();
+        log(`Resend code: ${JSON.stringify(d)}`, 'success');
+      } catch (e) {
+        log(`Resend error: ${e.message}`, 'err');
+      }
+    }
+
+    async function startSession(platform) {
+      log(`Starting ${platform} session on ${currentEnv.toUpperCase()}...`, 'info');
+      try {
+        const res = await fetch(`${API}/start-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform, userId: 'dev_user_1' })
+        });
+        const d = await res.json();
+        log(`Session started: ${JSON.stringify(d)}`, 'success');
+        setTimeout(reloadStream, 4000);
+      } catch (e) {
+        log(`Start session error: ${e.message}`, 'err');
+      }
+    }
+
+    async function stopSession() {
+      log('Stopping session...', 'info');
+      try {
+        const res = await fetch(`${API}/stop-session`, { method: 'POST' });
+        const d = await res.json();
+        log(`Session stopped: ${JSON.stringify(d)}`, 'success');
+      } catch (e) {
+        log(`Stop error: ${e.message}`, 'err');
+      }
+    }
+
+    async function clickText(text) {
+      log(`Clicking "${text}"...`, 'info');
+      try {
+        const res = await fetch(`${API}/click-text`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        const d = await res.json();
+        log(`Click result: ${JSON.stringify(d)}`, 'success');
+      } catch (e) {
+        log(`Click error: ${e.message}`, 'err');
+      }
+    }
+
+    async function clickCustomText() {
+      const text = document.getElementById('customTextInput').value.trim();
+      if (!text) return alert('Enter text to click');
+      await clickText(text);
+    }
+
+    async function submitEmail() {
+      const el = document.getElementById('emailInput');
+      const email = el ? el.value.trim() : submittedEmail;
+      if (!email) return alert('Please enter email');
+      submittedEmail = email;
+      log(`Submitting email: ${email}...`, 'info');
+      try {
+        const res = await fetch(`${API}/submit-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const d = await res.json();
+        log(`Email submitted: ${JSON.stringify(d)}`, 'success');
+      } catch (e) {
+        log(`Submit email error: ${e.message}`, 'err');
+      }
+    }
+
+    async function submitPhone() {
+      const el = document.getElementById('phoneInput');
+      const phone = el ? el.value.trim() : submittedPhone;
+      if (!phone) return alert('Please enter phone number');
+      submittedPhone = phone;
+      log(`Submitting phone: ${phone}...`, 'info');
+      try {
+        const res = await fetch(`${API}/submit-phone`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        const d = await res.json();
+        log(`Phone submitted: ${JSON.stringify(d)}`, 'success');
+      } catch (e) {
+        log(`Submit phone error: ${e.message}`, 'err');
+      }
+    }
+
+    async function submitOtp() {
+      const el = document.getElementById('otpInput');
+      const otp = el ? el.value.trim() : '';
+      if (!otp) return alert('Please enter OTP passcode');
+      log(`Submitting OTP: ${otp}...`, 'info');
+      try {
+        const res = await fetch(`${API}/submit-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ otp })
+        });
+        const d = await res.json();
+        log(`OTP submitted: ${JSON.stringify(d)}`, 'success');
+      } catch (e) {
+        log(`Submit OTP error: ${e.message}`, 'err');
+      }
+    }
+
+    async function swipe(direction) {
+      log(`Swiping ${direction}...`, 'info');
+      try {
+        const res = await fetch(`${API}/swipe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ direction })
+        });
+        const d = await res.json();
+        log(`Swipe ${direction}: ${JSON.stringify(d)}`, 'success');
+      } catch (e) {
+        log(`Swipe error: ${e.message}`, 'err');
+      }
+    }
+
+    async function goBack() {
+      log('Navigating back...', 'info');
+      try {
+        const res = await fetch(`${API}/go-back`, { method: 'POST' });
+        const d = await res.json();
+        log(`Go back: ${JSON.stringify(d)}`, 'success');
+      } catch (e) {
+        log(`Go back error: ${e.message}`, 'err');
+      }
+    }
+
+    async function pressEnter() {
+      log('Sending Enter key...', 'info');
+      try {
+        const res = await fetch(`${API}/press-enter`, { method: 'POST' });
+        const d = await res.json();
+        log(`Press enter: ${JSON.stringify(d)}`, 'success');
+      } catch (e) {
+        log(`Press enter error: ${e.message}`, 'err');
+      }
+    }
+
+    async function triggerAgent(action) {
+      log(`${action === 'start' ? 'Starting' : 'Stopping'} FlirtEasy agent remotely on ${currentEnv.toUpperCase()}...`, 'info');
+      try {
+        const endpoint = action === 'start' ? '/start-agent' : '/stop-agent';
+        const res = await fetch(`${API}${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: 'Tinder' })
+        });
+        const d = await res.json();
+        log(`Agent ${action} result: ${JSON.stringify(d)}`, 'success');
+        document.getElementById('agentStatePill').textContent = action === 'start' ? 'Running' : 'Stopped';
+        setTimeout(checkStats, 1500);
+      } catch (e) {
+        log(`Agent ${action} error: ${e.message}`, 'err');
+      }
+    }
+
+    async function checkStats() {
+      log('Fetching FlirtEasy plugin stats...', 'info');
+      try {
+        const res = await fetch(`${API}/extension-stats`);
+        const d = await res.json();
+        log(`Plugin Stats: ${JSON.stringify(d, null, 2)}`, 'success');
+      } catch (e) {
+        log(`Stats error: ${e.message}`, 'err');
+      }
+    }
+  </script>
+</body>
+</html>
