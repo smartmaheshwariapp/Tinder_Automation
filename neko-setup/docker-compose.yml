@@ -20,6 +20,7 @@ services:
       # --- General Settings ---
       NEKO_DESKTOP_SCREEN: "768x1024@30"
       NEKO_START_URL: ${NEKO_START_URL:-https://tinder.com}
+      NEKO_START_URL: ${NEKO_START_URL:-https://tinder.com}
       NEKO_MEMBER_MULTIUSER_USER_PASSWORD: "neko"
       NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD: "admin"
       NEKO_CAPTURE_VIDEO_SHOW_POINTER: "false"

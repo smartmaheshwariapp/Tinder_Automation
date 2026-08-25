@@ -64,8 +64,10 @@ function handleStartSession(req, res) {
         }, 500);
 
         function continueSessionStartup() {
+          const rootDir = path.join(__dirname, '..');
+
           // Resolve local session directory
-          const sessionsBaseDir = path.join(__dirname, 'sessions');
+          const sessionsBaseDir = path.join(rootDir, 'sessions');
           const sessionDir = path.join(sessionsBaseDir, userId).replace(/\\/g, '/');
 
           // Ensure session directory exists so Docker can write to it
@@ -74,13 +76,13 @@ function handleStartSession(req, res) {
           }
 
           // Prepare clean extension folder to speed up Neko Chromium startup
-          const cleanExtensionDir = path.join(__dirname, 'clean-extension');
+          const cleanExtensionDir = path.join(rootDir, 'clean-extension');
           try {
             if (!fs.existsSync(cleanExtensionDir)) {
               fs.mkdirSync(cleanExtensionDir, { recursive: true });
             }
 
-            const srcRoot = path.join(__dirname, '..');
+            const srcRoot = rootDir;
             const itemsToCopy = [
               'manifest.json',
               'debug-config.js',
@@ -99,7 +101,7 @@ function handleStartSession(req, res) {
             for (const item of itemsToCopy) {
               const srcPath = path.join(srcRoot, item);
               const destPath = path.join(cleanExtensionDir, item);
-              if (fs.existsSync(srcPath)) {
+              if (fs.existsSync(srcPath) && srcPath !== cleanExtensionDir) {
                 try { fs.cpSync(srcPath, destPath, { recursive: true, force: true }); } catch (_) {}
               }
             }
@@ -123,6 +125,8 @@ function handleStartSession(req, res) {
 
           // Stop any running container to reload the configuration
           console.log('[Orchestrator] Stopping existing container...');
+          const NEKO_SETUP_DIR = path.join(__dirname, '..');
+          exec('docker compose down -t 0 && docker rm -f neko || true', { cwd: NEKO_SETUP_DIR }, (downErr, downStdout, downStderr) => {
           const NEKO_SETUP_DIR = path.join(__dirname, '..');
           exec('docker compose down -t 0 && docker rm -f neko || true', { cwd: NEKO_SETUP_DIR }, (downErr, downStdout, downStderr) => {
             if (downErr) {
@@ -236,11 +240,15 @@ function handleStartSession(req, res) {
             }
 
             // Ensure port 52000 is fully closed before UP
+            // Ensure port 52000 is fully closed before UP
             if (process.platform !== 'win32') {
               try {
                 console.log('[Orchestrator] Ensuring port 52000 is free...');
                 require('child_process').execSync('fuser -k 52000/tcp || true');
+                console.log('[Orchestrator] Ensuring port 52000 is free...');
+                require('child_process').execSync('fuser -k 52000/tcp || true');
               } catch (portErr) {
+                console.warn('[Orchestrator] Warning cleaning port 52000:', portErr.message);
                 console.warn('[Orchestrator] Warning cleaning port 52000:', portErr.message);
               }
             }
@@ -252,6 +260,7 @@ function handleStartSession(req, res) {
             // Wait 1.5 seconds to let the socket release
             setTimeout(() => {
               exec('docker compose up -d', {
+                cwd: NEKO_SETUP_DIR,
                 cwd: NEKO_SETUP_DIR,
                 env: {
                   ...process.env,
@@ -300,7 +309,8 @@ function handleStartSession(req, res) {
 function handleStopSession(req, res) {
     console.log('[Orchestrator] Stop request received. Stopping container...');
     closeActiveProxyTunnel();
-    exec('docker compose down -t 0 && docker rm -f neko || true', { cwd: __dirname }, (downErr, downStdout, downStderr) => {
+    const rootDir = path.join(__dirname, '..');
+    exec('docker compose down -t 0 && docker rm -f neko || true', { cwd: rootDir }, (downErr, downStdout, downStderr) => {
       if (downErr) {
         console.error('[Orchestrator] Error stopping container:', downStderr);
         res.writeHead(500, { 'Content-Type': 'application/json' });

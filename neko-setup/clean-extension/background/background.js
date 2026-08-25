@@ -2,6 +2,10 @@
 const info = (...args) => console.log('[Info]', ...args);
 const warn = (...args) => console.warn('[Warn]', ...args);
 const error = (...args) => console.error('[Error]', ...args);
+// Global logger helpers to prevent ReferenceError across background worker modules
+const info = (...args) => console.log('[Info]', ...args);
+const warn = (...args) => console.warn('[Warn]', ...args);
+const error = (...args) => console.error('[Error]', ...args);
 
 // Register proxy authentication listener if credentials are provided
 if (typeof chrome !== 'undefined' && chrome.webRequest && chrome.webRequest.onAuthRequired) {
@@ -47,6 +51,31 @@ for (const s of scriptsToImport) {
   } catch (err) {
     console.warn(`[Background] Failed to import ${s}:`, err.message);
   }
+const scriptsToImport = [
+  '/debug-config.js',
+  '/config.js',
+  '/popup/modules/config/api-config.js',
+  '/constants/prompts.js',
+  '/utils/storage.js',
+  '/utils/language-detect.js',
+  '/utils/logger.js',
+  '/utils/log-sanitizer.js',
+  '/utils/rate-limiter.js',
+  '/utils/network.js',
+  '/utils/visual-preference.js',
+  '/popup/modules/features/trial-manager.js',
+  '/background/openai.js',
+  '/background/scheduler.js',
+  '/utils/stop-conditions.js',
+  '/background/stop-condition-handler.js'
+];
+
+for (const s of scriptsToImport) {
+  try {
+    importScripts(s);
+  } catch (err) {
+    console.warn(`[Background] Failed to import ${s}:`, err.message);
+  }
 }
 
 // DEV MODE BOOTSTRAP
@@ -55,8 +84,12 @@ async function _seedDevModeState() {
   const devUser = { ...CONFIG.DEV_USER, lastAuth: Date.now() };
   const devTrial = { startTime: Date.now(), likesUsed: 0, messagesUsed: 0, isPro: true, activated: true, _devMode: true };
   await chrome.storage.local.set({ user: devUser, trial_v3: devTrial, onboardingComplete: true, hasSeenOnboarding: true });
+  const devUser = { ...CONFIG.DEV_USER, lastAuth: Date.now() };
+  const devTrial = { startTime: Date.now(), likesUsed: 0, messagesUsed: 0, isPro: true, activated: true, _devMode: true };
+  await chrome.storage.local.set({ user: devUser, trial_v3: devTrial, onboardingComplete: true, hasSeenOnboarding: true });
   await chrome.storage.local.remove(['sessionExpired', 'refreshToken']);
 }
+_seedDevModeState();
 _seedDevModeState();
 
 const ERROR_REPORT_URL = 'https://flirteasy-auth.shnaiderdm.workers.dev/api/errors/report';
@@ -417,7 +450,10 @@ function sendMessageToTab(tabId, message) {
 
 async function sendMessageToTabWithRetry(tabId, message, maxRetries = 5) {
   const isAgentAction = message && !['getUserProfile', 'checkLogin', 'updateTinderBio', 'pushBio', 'refreshProfile'].includes(message.action);
+  const isAgentAction = message && !['getUserProfile', 'checkLogin', 'updateTinderBio', 'pushBio', 'refreshProfile'].includes(message.action);
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // On retries for automated cycle actions: abort if agent stopped
+    if (attempt > 1 && isAgentAction) {
     // On retries for automated cycle actions: abort if agent stopped
     if (attempt > 1 && isAgentAction) {
       const _rtState = await getAgentState();
@@ -1236,6 +1272,7 @@ async function ensureContentScriptReady(tabId, platform) {
 async function handleRefreshProfile(requestedPlatform) {
   try {
     const tinderTabs = await chrome.tabs.query({ url: '*://*.tinder.com/*' });
+    const tinderTabs = await chrome.tabs.query({ url: '*://*.tinder.com/*' });
     const bumbleTabs = await chrome.tabs.query({ url: '*://*.bumble.com/*' });
 
     if (tinderTabs.length === 0 && bumbleTabs.length === 0) {
@@ -1318,6 +1355,7 @@ async function handleRefreshProfile(requestedPlatform) {
 async function handlePushBioToPlatform(platform, bio) {
   try {
     const urlPattern = platform === 'tinder' ? '*://*.tinder.com/*' : '*://*.bumble.com/*';
+    const urlPattern = platform === 'tinder' ? '*://*.tinder.com/*' : '*://*.bumble.com/*';
     const tabs = await chrome.tabs.query({ url: urlPattern });
 
     if (tabs.length === 0) {
@@ -1340,6 +1378,22 @@ async function handlePushBioToPlatform(platform, bio) {
     }
 
     if (platform === 'tinder') {
+      if (!tab.url || !tab.url.includes('/app/profile/edit')) {
+        console.log('[Background] Navigating to Tinder profile edit page to push bio...');
+        await chrome.tabs.update(tab.id, { url: 'https://tinder.com/app/profile/edit' });
+        await new Promise(resolve => {
+          const checkTab = async () => {
+            const t = await chrome.tabs.get(tab.id);
+            if (t.status === 'complete' && t.url && t.url.includes('/app/profile/edit')) {
+              resolve();
+            } else {
+              setTimeout(checkTab, 500);
+            }
+          };
+          checkTab();
+          setTimeout(resolve, 8000);
+        });
+        await new Promise(resolve => setTimeout(resolve, 2000));
       if (!tab.url || !tab.url.includes('/app/profile/edit')) {
         console.log('[Background] Navigating to Tinder profile edit page to push bio...');
         await chrome.tabs.update(tab.id, { url: 'https://tinder.com/app/profile/edit' });
@@ -2144,6 +2198,7 @@ async function fetchUserProfile(tabId) {
     } else {
       info('Navigating to Tinder profile page...');
       await chrome.tabs.update(tabId, { url: 'https://tinder.com/app/profile/edit' });
+      await chrome.tabs.update(tabId, { url: 'https://tinder.com/app/profile/edit' });
 
       // Wait for Tinder page to actually finish loading
       await new Promise(resolve => {
@@ -2165,6 +2220,7 @@ async function fetchUserProfile(tabId) {
     }
 
     info('Requesting profile data from content script...');
+    await ensureContentScriptReady(tabId, isBumble ? 'bumble' : 'tinder');
     await ensureContentScriptReady(tabId, isBumble ? 'bumble' : 'tinder');
     // Request profile data from content script with retries to handle post-navigation loading
     const profileData = await sendMessageToTabWithRetry(tabId, { action: 'getUserProfile' });
@@ -2936,6 +2992,9 @@ async function handleStopAgent(manualStop = false) {
 
   try {
     const state = await getAgentState();
+    
+    // Notify the UI to clear loading states even if isRunning was already false
+    chrome.runtime.sendMessage({ action: 'agentStateUpdated', state }).catch(() => {});
     
     // Notify the UI to clear loading states even if isRunning was already false
     chrome.runtime.sendMessage({ action: 'agentStateUpdated', state }).catch(() => {});
