@@ -1261,6 +1261,7 @@ async function handleRefreshProfile(requestedPlatform) {
 
     if (platformToSync === 'bumble' && bumbleTabs.length > 0) {
       console.log('[Background] Refreshing Bumble profile data...');
+      console.log('[Background] Refreshing Bumble profile data...');
       let targetTabId = null;
       for (const tab of bumbleTabs) {
         const ready = await ensureContentScriptReady(tab.id, 'bumble');
@@ -1280,9 +1281,11 @@ async function handleRefreshProfile(requestedPlatform) {
         settings.userProfile = profileData;
         await saveSettings(settings);
         console.log('[Background] Bumble Profile data refreshed', profileData);
+        console.log('[Background] Bumble Profile data refreshed', profileData);
         return { success: true, profile: profileData };
       }
     } else if (platformToSync === 'tinder' && tinderTabs.length > 0) {
+      console.log('[Background] Refreshing Tinder profile data...');
       console.log('[Background] Refreshing Tinder profile data...');
       let targetTabId = null;
       for (const tab of tinderTabs) {
@@ -1303,12 +1306,14 @@ async function handleRefreshProfile(requestedPlatform) {
         settings.userProfile = profileData;
         await saveSettings(settings);
         console.log('[Background] Tinder Profile data refreshed', profileData);
+        console.log('[Background] Tinder Profile data refreshed', profileData);
         return { success: true, profile: profileData };
       }
     }
 
     return { success: false, error: `Could not fetch profile data for ${platformToSync}` };
   } catch (err) {
+    console.error('[Background] Failed to refresh profile', err);
     console.error('[Background] Failed to refresh profile', err);
     return { success: false, error: err.message };
   }
@@ -1359,6 +1364,7 @@ async function handlePushBioToPlatform(platform, bio) {
       }
     } else if (platform === 'bumble') {
       if (!tab.url || !tab.url.includes('/app/edit-profile')) {
+        console.log('[Background] Navigating to Bumble edit-profile page to push bio...');
         console.log('[Background] Navigating to Bumble edit-profile page to push bio...');
         await chrome.tabs.update(tab.id, { url: 'https://bumble.com/app/edit-profile' });
 

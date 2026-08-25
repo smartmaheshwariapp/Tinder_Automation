@@ -33,7 +33,11 @@ def get_all_targets():
 try:
     targets = get_all_targets()
 
+<<<<<<< HEAD
     # Find Extension Target (Service Worker or Popup Page)
+=======
+    # Find Extension Service Worker (MV3)
+>>>>>>> 1a7a271ff0d24d629ce18d9fc7daa1d038123f4a
     ext_target = next(
         (t for t in targets
          if t.get('type') == 'service_worker'
@@ -41,6 +45,7 @@ try:
         None
     ) or next(
         (t for t in targets
+<<<<<<< HEAD
          if 'chrome-extension://' in t.get('url', '')),
         None
     )
@@ -54,6 +59,13 @@ try:
         except Exception:
             pass
 
+=======
+         if t.get('type') == 'background_page'
+         and 'chrome-extension://' in t.get('url', '')),
+        None
+    )
+
+>>>>>>> 1a7a271ff0d24d629ce18d9fc7daa1d038123f4a
     if not ext_target or not ext_target.get('webSocketDebuggerUrl'):
         print(json.dumps({'success': False, 'error': 'Extension service worker not found'}))
     else:
@@ -63,6 +75,7 @@ try:
             (async function() {
               try {
                 if (typeof handleStartAgent === 'function') {
+<<<<<<< HEAD
                   var res = await handleStartAgent(""" + json.dumps(PLATFORM) + """);
                   return res || { success: true, started: true };
                 } else {
@@ -72,6 +85,13 @@ try:
                     });
                   });
                   return res;
+=======
+                  handleStartAgent(""" + json.dumps(PLATFORM) + """);
+                  return { success: true, started: true };
+                } else {
+                  chrome.runtime.sendMessage({ action: 'startAgent', platform: """ + json.dumps(PLATFORM) + """ });
+                  return { success: true, sent: true };
+>>>>>>> 1a7a271ff0d24d629ce18d9fc7daa1d038123f4a
                 }
               } catch (e) {
                 return { success: false, error: e.message };
@@ -83,6 +103,7 @@ try:
             (async function() {
               try {
                 if (typeof handleStopAgent === 'function') {
+<<<<<<< HEAD
                   try { await handleStopAgent(true); } catch (_) {}
                 }
                 try { chrome.runtime.sendMessage({ action: 'stopAgent' }); } catch (_) {}
@@ -102,6 +123,14 @@ try:
                   chrome.runtime.sendMessage({ action: 'agentStateUpdated', state: state });
                 } catch (_) {}
                 return { success: true, stopped: true };
+=======
+                  await handleStopAgent(true);
+                  return { success: true, stopped: true };
+                } else {
+                  chrome.runtime.sendMessage({ action: 'stopAgent' });
+                  return { success: true, sent: true };
+                }
+>>>>>>> 1a7a271ff0d24d629ce18d9fc7daa1d038123f4a
               } catch (e) {
                 return { success: false, error: e.message };
               }

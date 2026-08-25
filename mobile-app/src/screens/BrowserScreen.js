@@ -1,9 +1,15 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
+import { DashboardPanel } from '../components/dashboard';
+import { useExtensionStats } from '../hooks/useExtensionStats';
+
 import { DashboardPanel } from '../components/dashboard';
 import { useExtensionStats } from '../hooks/useExtensionStats';
 
@@ -45,6 +51,7 @@ export default function BrowserScreen({ route, navigation }) {
   const [submittedPhone, setSubmittedPhone] = useState('');
   const [rateLimitTimer, setRateLimitTimer] = useState(0);
   const [dummyText, setDummyText] = useState('');
+  const [showDashboard, setShowDashboard] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const appState = useRef(AppState.currentState);
 
@@ -552,6 +559,7 @@ export default function BrowserScreen({ route, navigation }) {
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="close" size={18} color="#D8D6E8" />
+            <Ionicons name="close" size={18} color="#D8D6E8" />
           </TouchableOpacity>
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{platform} Session</Text>
@@ -566,18 +574,29 @@ export default function BrowserScreen({ route, navigation }) {
                 onPress={() => setIsExpanded(!isExpanded)}
               >
                 <Ionicons name={isExpanded ? "contract-outline" : "expand-outline"} size={13} color="#D8D6E8" />
+                <Ionicons name={isExpanded ? "contract-outline" : "expand-outline"} size={13} color="#D8D6E8" />
                 <Text style={styles.toggleNekoBtnText}>
+                  {isExpanded ? 'Split' : 'Expand'}
                   {isExpanded ? 'Split' : 'Expand'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.toggleNekoBtn, { marginRight: 4 }]}
+                style={[styles.toggleNekoBtn, { marginRight: 4 }]}
                 onPress={() => setShowNeko(!showNeko)}
               >
                 <Ionicons name={showNeko ? "eye-off-outline" : "eye-outline"} size={13} color="#D8D6E8" />
+                <Ionicons name={showNeko ? "eye-off-outline" : "eye-outline"} size={13} color="#D8D6E8" />
                 <Text style={styles.toggleNekoBtnText}>
                   {showNeko ? 'Hide' : 'View'}
+                  {showNeko ? 'Hide' : 'View'}
                 </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dashboardBtn, { marginRight: 4 }]}
+                onPress={() => setShowDashboard(true)}
+              >
+                <Ionicons name="stats-chart-outline" size={15} color="#FE3C72" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.dashboardBtn, { marginRight: 4 }]}
@@ -605,8 +624,80 @@ export default function BrowserScreen({ route, navigation }) {
                 <Text style={[styles.menuBtnText, { color: '#FFF' }]}>Keyboard</Text>
               </TouchableOpacity>
             </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity
+                style={[styles.dashboardBtn, { marginRight: 6 }]}
+                onPress={() => setShowDashboard(true)}
+              >
+                <Ionicons name="stats-chart-outline" size={15} color="#FE3C72" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.menuBtn, { marginRight: 8, backgroundColor: '#3A3A4A15', borderColor: '#3A3A4A40' }]}
+                onPress={() => inputRef.current.focus()}
+              >
+                <Ionicons name="keypad-outline" size={13} color="#FFF" style={{ marginRight: 4 }} />
+                <Text style={[styles.menuBtnText, { color: '#FFF' }]}>Keyboard</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
+
+        {/* ─── Full-screen Dashboard Modal (accessible at any loginStep) ─── */}
+        <Modal
+          visible={showDashboard}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowDashboard(false)}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="stats-chart" size={16} color="#FE3C72" />
+                <Text style={styles.modalTitle}>FlirtEasy Dashboard</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowDashboard(false)}
+              >
+                <Ionicons name="close" size={16} color="#D8D6E8" />
+              </TouchableOpacity>
+            </View>
+            <DashboardPanel
+              stats={extensionStats}
+              loading={statsLoading}
+              error={statsError}
+              orchestratorUrl={orchestratorUrl}
+              onToggleAgent={handleToggleAgent}
+              controlsContent={
+                <View style={styles.inputPanel}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Paste Phone No. or OTP code here..."
+                    placeholderTextColor="#8E8E9F"
+                    value={inputText}
+                    onChangeText={setInputText}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity
+                    style={styles.sendBtn}
+                    onPress={handleSendText}
+                    disabled={sendingText}
+                  >
+                    {sendingText ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text style={styles.sendBtnText}>Send</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
+                    <Text style={styles.enterBtnText}>⏎ Enter</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+            />
+          </SafeAreaView>
+        </Modal>
 
         {/* ─── Full-screen Dashboard Modal (accessible at any loginStep) ─── */}
         <Modal
@@ -1428,6 +1519,40 @@ export default function BrowserScreen({ route, navigation }) {
               </View>
             }
           />
+          <DashboardPanel
+            stats={extensionStats}
+            loading={statsLoading}
+            error={statsError}
+            orchestratorUrl={orchestratorUrl}
+            onToggleAgent={handleToggleAgent}
+            controlsContent={
+              <View style={styles.inputPanel}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Paste Phone No. or OTP code here..."
+                  placeholderTextColor="#8E8E9F"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.sendBtn}
+                  onPress={handleSendText}
+                  disabled={sendingText}
+                >
+                  {sendingText ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.sendBtnText}>Send</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
+                  <Text style={styles.enterBtnText}>⏎ Enter</Text>
+                </TouchableOpacity>
+              </View>
+            }
+          />
         )}
 
         <TextInput
@@ -1729,6 +1854,51 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
   },
+  dashboardBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#818CF815',
+    borderWidth: 1,
+    borderColor: '#818CF840',
+  },
+  dashboardBtnText: {
+    fontSize: 15,
+  },
+  // ── Dashboard Modal ──
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#0F0F13',
+  },
+  modalHeader: {
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E1E2E',
+    backgroundColor: '#16161E',
+  },
+  modalTitle: {
+    color: '#F1F1F5',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalCloseBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#FE3C7215',
+    borderWidth: 1,
+    borderColor: '#FE3C7240',
+  },
+  modalCloseBtnText: {
+    color: '#FE3C72',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
   dashboardBtn: {
     paddingVertical: 7,
     paddingHorizontal: 10,
