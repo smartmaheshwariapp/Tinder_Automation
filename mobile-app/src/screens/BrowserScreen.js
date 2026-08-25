@@ -276,32 +276,6 @@ export default function BrowserScreen({ route, navigation }) {
     }
   };
 
-  // ─── Extension stats polling (always active — accessible before and after login) ───
-  const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-  const { stats: extensionStats, loading: statsLoading, error: statsError } = useExtensionStats(
-    orchestratorUrl,
-    true  // Always poll — dashboard is accessible at any loginStep
-  );
-
-  // Remotely start / stop FlirtEasy AI swiping & messaging agent via Orchestrator CDP bridge
-  const handleToggleAgent = async () => {
-    try {
-      const isRunning = Boolean(
-        extensionStats?.agentState?.isRunning ||
-        (extensionStats?.agentState?.currentPhase && extensionStats.agentState.currentPhase !== 'stopped')
-      );
-      const endpoint = isRunning ? '/stop-agent' : '/start-agent';
-      console.log(`[Browser] Remote agent toggle -> ${endpoint}`);
-      await fetch(`${orchestratorUrl}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: isBumble ? 'Bumble' : 'Tinder' }),
-      });
-    } catch (e) {
-      console.error('[Browser] handleToggleAgent error:', e);
-    }
-  };
-
   // Sends a mouse click at absolute (x, y) inside the Neko container via xdotool.
   const clickAt = async (x, y) => {
     try {
