@@ -127,8 +127,6 @@ function handleStartSession(req, res) {
           console.log('[Orchestrator] Stopping existing container...');
           const NEKO_SETUP_DIR = path.join(__dirname, '..');
           exec('docker compose down -t 0 && docker rm -f neko || true', { cwd: NEKO_SETUP_DIR }, (downErr, downStdout, downStderr) => {
-          const NEKO_SETUP_DIR = path.join(__dirname, '..');
-          exec('docker compose down -t 0 && docker rm -f neko || true', { cwd: NEKO_SETUP_DIR }, (downErr, downStdout, downStderr) => {
             if (downErr) {
               console.error('[Orchestrator] Error stopping container:', downStderr);
             }
@@ -240,15 +238,11 @@ function handleStartSession(req, res) {
             }
 
             // Ensure port 52000 is fully closed before UP
-            // Ensure port 52000 is fully closed before UP
             if (process.platform !== 'win32') {
               try {
                 console.log('[Orchestrator] Ensuring port 52000 is free...');
                 require('child_process').execSync('fuser -k 52000/tcp || true');
-                console.log('[Orchestrator] Ensuring port 52000 is free...');
-                require('child_process').execSync('fuser -k 52000/tcp || true');
               } catch (portErr) {
-                console.warn('[Orchestrator] Warning cleaning port 52000:', portErr.message);
                 console.warn('[Orchestrator] Warning cleaning port 52000:', portErr.message);
               }
             }
@@ -260,7 +254,6 @@ function handleStartSession(req, res) {
             // Wait 1.5 seconds to let the socket release
             setTimeout(() => {
               exec('docker compose up -d', {
-                cwd: NEKO_SETUP_DIR,
                 cwd: NEKO_SETUP_DIR,
                 env: {
                   ...process.env,

@@ -11,10 +11,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
+import { terminatePreviousSessions, registerActiveSession } from '../utils/sessionManager';
 
 const V2_GOALS = [
   { id: 'date', label: 'Set up a Date', icon: 'calendar-outline' },
@@ -50,8 +53,11 @@ export default function PlatformConfigScreen({ route, navigation }) {
     setter(prev => Math.max(prev - step, min));
   };
 
+  const HYPERBEAM_KEY = 'sk_test_fsuC8naqJLF2lGcL8Vak2ogGyhYFldLzqCEbX2zQYf0';
+
   const handleStartSession = async () => {
     setLoading(true);
+
     let host = 'api.smartmaheshwari.com';
     let protocol = vpsUrl.startsWith('https') ? 'https:' : 'http:';
     try {
@@ -63,6 +69,120 @@ export default function PlatformConfigScreen({ route, navigation }) {
       }
     } catch (_) {}
 
+    let apiHost = host.startsWith('stream.') ? host.replace('stream.', 'api.') : host;
+    const resolvedOrchestratorUrl = (apiHost.includes('localhost') || apiHost.includes('127.0.0.1'))
+      ? `http://${apiHost}:3001`
+      : `https://${apiHost}`;
+
+    // ─── Terminate any other currently active sessions first ───
+    await terminatePreviousSessions(resolvedOrchestratorUrl, HYPERBEAM_KEY);
+
+    const isHyperbeam = vpsUrl === 'hyperbeam' || route.params?.environment === 'hyperbeam';
+
+    // Desktop Web View resolution (1280x720) so full website Login buttons are visible
+    const webWidth = 1280;
+    const webHeight = 720;
+    console.log(`[Mobile] Desktop Web View Resolution: ${webWidth}x${webHeight}`);
+
+    if (isHyperbeam) {
+      try {
+        console.log('[Mobile] Starting Hyperbeam Desktop Web Browser session...');
+        const platformKey = platform.toLowerCase();
+        const startUrl = platformKey === 'bumble' ? 'https://bumble.com' : 'https://tinder.com';
+
+        let embedUrl = null;
+        let sessionId = null;
+
+        // 1. Try Orchestrator if running
+        try {
+          const resp = await fetch(`${resolvedOrchestratorUrl}/hyperbeam/start-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              platform: platformKey,
+              userId: 'dev_user_1',
+              proxyIp: proxyIp || '',
+              apiKey: HYPERBEAM_KEY,
+              width: webWidth,
+              height: webHeight,
+            })
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.embed_url) {
+              embedUrl = data.embed_url;
+              sessionId = data.session_id;
+            }
+          }
+        } catch (_) {}
+
+        // 2. Direct Cloud API Fallback (Serverless - Zero VPS required)
+        if (!embedUrl) {
+          console.log(`[Mobile] Calling Hyperbeam Cloud Engine for Desktop Web View (${webWidth}x${webHeight})...`);
+          const cloudResp = await fetch('https://engine.hyperbeam.com/v0/vm', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${HYPERBEAM_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              start_url: startUrl,
+              width: webWidth,
+              height: webHeight,
+            })
+          });
+          const cloudData = await cloudResp.json();
+          console.log('[Mobile] Hyperbeam Cloud response:', cloudResp.status, cloudData);
+
+          if (cloudResp.ok && cloudData && cloudData.embed_url) {
+            embedUrl = cloudData.embed_url;
+            sessionId = cloudData.session_id;
+          } else {
+            const errorMsg = cloudData?.message || cloudData?.error || `HTTP ${cloudResp.status}`;
+            console.error('[Mobile] Hyperbeam Cloud Error:', errorMsg);
+            setLoading(false);
+            Alert.alert(
+              'Hyperbeam Session Failed',
+              `Could not start Hyperbeam Cloud Browser: ${errorMsg}\n\nPlease check your Hyperbeam API key or switch to Local Docker environment.`
+            );
+            return;
+          }
+        }
+
+        if (embedUrl) {
+          console.log('[Mobile] Hyperbeam session ready:', embedUrl);
+          registerActiveSession({
+            sessionId,
+            embedUrl,
+            isHyperbeam: true,
+            platform,
+            orchestratorUrl: resolvedOrchestratorUrl
+          });
+          setLoading(false);
+          navigation.navigate('Browser', {
+            platform,
+            vpsUrl: embedUrl,
+            proxyIp,
+            isHyperbeam: true,
+            orchestratorUrl: resolvedOrchestratorUrl,
+          });
+          return;
+        } else {
+          setLoading(false);
+          Alert.alert(
+            'Hyperbeam Session Error',
+            'Could not retrieve streaming URL from Hyperbeam. Please check your API key or use Local Docker mode.'
+          );
+          return;
+        }
+      } catch (hbErr) {
+        console.error('[Mobile] Hyperbeam startup error:', hbErr);
+        setLoading(false);
+        Alert.alert('Hyperbeam Error', `Network error connecting to Hyperbeam: ${hbErr.message}`);
+        return;
+      }
+    }
+
     const payload = JSON.stringify({
       platform: platform.toLowerCase(),
       userId: 'dev_user_1',
@@ -71,7 +191,6 @@ export default function PlatformConfigScreen({ route, navigation }) {
       contactHandle: contactHandle,
     });
 
-    let apiHost = host.startsWith('stream.') ? host.replace('stream.', 'api.') : host;
     const urlsToTry = [
       `https://${apiHost}/start-session`,
       `http://${apiHost}:3001/start-session`,
@@ -93,11 +212,19 @@ export default function PlatformConfigScreen({ route, navigation }) {
       ? vpsUrl
       : `https://${host}/?usr=User&pwd=admin`;
 
+    registerActiveSession({
+      isHyperbeam: false,
+      platform,
+      vpsUrl: nekoPlayerUrl,
+      orchestratorUrl: resolvedOrchestratorUrl
+    });
+
     setLoading(false);
     navigation.navigate('Browser', {
       platform,
       vpsUrl: nekoPlayerUrl,
       proxyIp,
+      isHyperbeam: false
     });
   };
 

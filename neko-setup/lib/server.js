@@ -76,6 +76,47 @@ const server = http.createServer((req, res) => {
     handleExtensionStats(req, res);
   } else if (req.method === 'GET' && req.url === '/extension-settings') {
     handleGetSettings(req, res);
+  } else if (req.method === 'POST' && req.url === '/hyperbeam/start-session') {
+    let body = '';
+    req.on('data', chunk => body += chunk.toString());
+    req.on('end', async () => {
+      try {
+        const data = body && body.trim() ? JSON.parse(body) : {};
+        const { startHyperbeamSession } = require('./hyperbeam');
+        const session = await startHyperbeamSession({
+          platform: data.platform || 'tinder',
+          userId: data.userId || 'dev_user_1',
+          proxyIp: data.proxyIp || '',
+          apiKey: data.apiKey
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, ...session }));
+      } catch (err) {
+        console.error('[Orchestrator] Hyperbeam start error:', err);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+  } else if (req.method === 'POST' && req.url === '/hyperbeam/stop-session') {
+    let body = '';
+    req.on('data', chunk => body += chunk.toString());
+    req.on('end', async () => {
+      try {
+        const data = body && body.trim() ? JSON.parse(body) : {};
+        const { stopHyperbeamSession } = require('./hyperbeam');
+        const result = await stopHyperbeamSession(data.sessionId, data.apiKey);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, stopped: result }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+  } else if (req.method === 'GET' && req.url === '/hyperbeam/session-status') {
+    const { getActiveHyperbeamSession } = require('./hyperbeam');
+    const session = getActiveHyperbeamSession();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, session: session || null }));
   } else if (req.method === 'GET' && (req.url === '/test' || req.url === '/')) {
     const fs = require('fs');
     const path = require('path');

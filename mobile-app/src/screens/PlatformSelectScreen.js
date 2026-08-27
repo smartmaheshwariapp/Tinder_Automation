@@ -19,7 +19,7 @@ const TINDER_IMG = require('../../assets/flirteasy/tinder.jpg');
 const BUMBLE_IMG = require('../../assets/flirteasy/bumble.png');
 
 export default function PlatformSelectScreen({ navigation }) {
-  const [environment, setEnvironment] = useState('vps'); // 'vps' | 'local'
+  const [environment, setEnvironment] = useState('hyperbeam'); // 'hyperbeam' | 'vps' | 'local'
   const [userRegion, setUserRegion] = useState('israel'); // 'israel' | 'direct'
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -38,21 +38,25 @@ export default function PlatformSelectScreen({ navigation }) {
     }
   }, []);
 
-  const activeStreamUrl = environment === 'vps' ? vpsUrl : localUrl;
+  const activeStreamUrl = environment === 'hyperbeam'
+    ? 'hyperbeam'
+    : (environment === 'vps' ? vpsUrl : localUrl);
+
   const activeProxy = environment === 'vps'
     ? (userRegion === 'israel' ? 'http://*****:*****@46.203.181.164:43343' : '')
-    : localProxy;
+    : (environment === 'hyperbeam' ? '' : localProxy);
 
   const handleLaunch = (platformName) => {
     const realProxy = activeProxy === 'http://*****:*****@46.203.181.164:43343'
       ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
       : activeProxy;
 
-    const resolvedUrl = resolveLocalUrl(activeStreamUrl);
+    const resolvedUrl = environment === 'hyperbeam' ? 'hyperbeam' : resolveLocalUrl(activeStreamUrl);
 
     navigation.navigate('PlatformConfig', {
       platform: platformName,
       vpsUrl: resolvedUrl,
+      environment: environment,
       proxyIp: realProxy,
     });
   };
@@ -246,6 +250,21 @@ export default function PlatformSelectScreen({ navigation }) {
 
         <View style={styles.envSelector}>
           <TouchableOpacity
+            style={[styles.envOption, environment === 'hyperbeam' && styles.envOptionActive]}
+            onPress={() => setEnvironment('hyperbeam')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="flash-outline"
+              size={15}
+              color={environment === 'hyperbeam' ? '#FE3C72' : '#716E89'}
+            />
+            <Text style={[styles.envOptionText, environment === 'hyperbeam' && styles.envOptionTextActive]}>
+              ⚡ Hyperbeam Cloud
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.envOption, environment === 'vps' && styles.envOptionActive]}
             onPress={() => setEnvironment('vps')}
             activeOpacity={0.8}
@@ -256,7 +275,7 @@ export default function PlatformSelectScreen({ navigation }) {
               color={environment === 'vps' ? '#FFF' : '#716E89'}
             />
             <Text style={[styles.envOptionText, environment === 'vps' && styles.envOptionTextActive]}>
-              Cloud Server (VPS)
+              VPS Server
             </Text>
           </TouchableOpacity>
 
@@ -271,7 +290,7 @@ export default function PlatformSelectScreen({ navigation }) {
               color={environment === 'local' ? '#FFF' : '#716E89'}
             />
             <Text style={[styles.envOptionText, environment === 'local' && styles.envOptionTextActive]}>
-              Local Machine
+              Local Neko
             </Text>
           </TouchableOpacity>
         </View>

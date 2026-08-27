@@ -18,8 +18,7 @@ services:
       - SYS_ADMIN # Required for browser sandbox security
     environment:
       # --- General Settings ---
-      NEKO_DESKTOP_SCREEN: "768x1024@30"
-      NEKO_START_URL: ${NEKO_START_URL:-https://tinder.com}
+      NEKO_DESKTOP_SCREEN: "1280x720@30"
       NEKO_START_URL: ${NEKO_START_URL:-https://tinder.com}
       NEKO_MEMBER_MULTIUSER_USER_PASSWORD: "neko"
       NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD: "admin"
