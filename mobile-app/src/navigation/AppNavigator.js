@@ -11,7 +11,7 @@ const Stack = createNativeStackNavigator();
 export default function AppNavigator() {
   return (
     <Stack.Navigator
-      initialRouteName="PlatformSelect"
+      initialRouteName="Auth"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: '#08070D' },
