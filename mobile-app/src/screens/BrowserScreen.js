@@ -1,7 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { Ionicons } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
+import { DashboardPanel } from '../components/dashboard';
+import { useExtensionStats } from '../hooks/useExtensionStats';
+
 
 // Neko container screen resolution (must match NEKO_DESKTOP_SCREEN in docker-compose)
 // 768x1024 — HD tablet/desktop portrait aspect ratio for zero captcha cutoff
@@ -24,8 +29,7 @@ export default function BrowserScreen({ route, navigation }) {
   const webViewRef = useRef(null);
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(true);
-  const isBumble = platform?.toLowerCase() === 'bumble';
-  const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'options');
+  const [loginStep, setLoginStep] = useState('options');
   const [showNeko, setShowNeko] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false); // Fullscreen video toggle
   const [inputText, setInputText] = useState('');
@@ -40,6 +44,7 @@ export default function BrowserScreen({ route, navigation }) {
   const [submittedPhone, setSubmittedPhone] = useState('');
   const [rateLimitTimer, setRateLimitTimer] = useState(0);
   const [dummyText, setDummyText] = useState('');
+  const [showDashboard, setShowDashboard] = useState(false);
   const appState = useRef(AppState.currentState);
 
   const lastSwipeTime = useRef(0);
@@ -101,47 +106,10 @@ export default function BrowserScreen({ route, navigation }) {
     })
   ).current;
 
-  // Poll orchestrator /nav-status while on navigating step.
-  // Advances to phone when orchestrator signals phone input is ready.
-  // Safety auto-advance after 30s even if polling fails.
+
+
+  // Continuous /check-page-state polling (fast during login, slower when done)
   useEffect(() => {
-    if (!isBumble || loginStep !== 'navigating') return;
-
-    let cancelled = false;
-    const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-
-    const poll = async () => {
-      if (cancelled) return;
-      try {
-        const resp = await fetch(`${orchestratorUrl}/nav-status`);
-        const data = await resp.json();
-        if (data.ready && !cancelled) {
-          setLoginStep('phone');
-          return;
-        }
-      } catch (_) { }
-      if (!cancelled) setTimeout(poll, 500);
-    };
-
-    // Start polling after 500ms
-    const startTimer = setTimeout(poll, 500);
-
-    // Safety: auto-advance after 10s regardless
-    const safetyTimer = setTimeout(() => {
-      if (!cancelled) setLoginStep('phone');
-    }, 10000);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(startTimer);
-      clearTimeout(safetyTimer);
-    };
-  }, [loginStep, isBumble]);
-
-  // Poll /check-page-state while we are in the login process (any step other than 'done')
-  useEffect(() => {
-    if (loginStep === 'done') return;
-
     let cancelled = false;
     const orchestratorUrl = getOrchestratorUrl(vpsUrl);
 
@@ -153,73 +121,69 @@ export default function BrowserScreen({ route, navigation }) {
         const state = data.state;
         if (!cancelled) {
           if (state === 'logged_in') {
-            setLoginStep('done');
-            return;
-          } else if (state === 'captcha') {
-            setShowNeko(true); // Automatically show live browser when puzzle appears
-            setLoginStep('captcha');
-            return;
-          } else if (state === 'email_rate_limited') {
-            setEmailErrorText('⚠️ You\'ve made too many attempts. Please try again later.');
-            setRateLimitTimer(60);
-            if (loginStep !== 'email') {
+            if (loginStep !== 'done') {
+              setLoginStep('done');
+            }
+          } else {
+            // Not logged in! If we are in 'done' state, reset back to login wizard
+            if (loginStep === 'done') {
+              console.log('[Browser] Logout or logged-out state detected -> resetting to login options');
+              setLoginStep('options');
+              setShowDashboard(false);
+              setInputText('');
+            } else if (state === 'captcha') {
+              setShowNeko(true); // Automatically show live browser when puzzle appears
+              setLoginStep('captcha');
+            } else if (state === 'email_rate_limited') {
+              setEmailErrorText('⚠️ You\'ve made too many attempts. Please try again later.');
+              setRateLimitTimer(60);
+              if (loginStep !== 'email') {
+                setLoginStep('email');
+              }
+            } else if (state === 'email_screen' && loginStep !== 'email') {
+              setInputText('');
+              setEmailErrorText('');
               setLoginStep('email');
-            }
-            return;
-          } else if (state === 'email_screen' && loginStep !== 'email') {
-            // Found email input textbox! Clear inputText and set step to email.
-            setInputText('');
-            setEmailErrorText('');
-            setLoginStep('email');
-            return;
-          } else if (state === 'waiting_email' && loginStep !== 'waiting_email') {
-            setLoginStep('waiting_email');
-            return;
-          } else if (state === 'phone_screen' && loginStep !== 'phone') {
-            setInputText('');
-            setLoginStep('phone');
-            return;
-          } else if (state === 'google_email_screen' && loginStep !== 'google_email') {
-            setInputText('');
-            setLoginStep('google_email');
-            return;
-          } else if (state === 'google_password_screen' && loginStep !== 'google_password') {
-            setInputText('');
-            setLoginStep('google_password');
-            return;
-          } else if (state === 'email_otp_screen') {
-            setOtpSubtype('email');
-            if (data && data.email) setSubmittedEmail(data.email);
-            if (loginStep !== 'otp') {
+            } else if (state === 'waiting_email' && loginStep !== 'waiting_email') {
+              setLoginStep('waiting_email');
+            } else if (state === 'phone_screen' && loginStep !== 'phone') {
               setInputText('');
-              setLoginStep('otp');
-            }
-            return;
-          } else if (state === 'sms_otp_screen') {
-            if (data && data.phone) setSubmittedPhone(data.phone);
-            if (otpSubtype !== 'sms') {
-              setOtpSubtype('sms');
-              setInputText(''); // Clear email OTP from input when transitioning to SMS OTP
-            }
-            if (loginStep !== 'otp') {
+              setLoginStep('phone');
+            } else if (state === 'google_email_screen' && loginStep !== 'google_email') {
               setInputText('');
-              setLoginStep('otp');
-            }
-            return;
-          } else if (state === 'otp_screen') {
-            if (loginStep !== 'otp') {
+              setLoginStep('google_email');
+            } else if (state === 'google_password_screen' && loginStep !== 'google_password') {
               setInputText('');
-              setLoginStep('otp');
+              setLoginStep('google_password');
+            } else if (state === 'email_otp_screen') {
+              setOtpSubtype('email');
+              if (data && data.email) setSubmittedEmail(data.email);
+              if (loginStep !== 'otp') {
+                setInputText('');
+                setLoginStep('otp');
+              }
+            } else if (state === 'sms_otp_screen') {
+              if (data && data.phone) setSubmittedPhone(data.phone);
+              if (otpSubtype !== 'sms') {
+                setOtpSubtype('sms');
+                setInputText(''); // Clear email OTP from input when transitioning to SMS OTP
+              }
+              if (loginStep !== 'otp') {
+                setInputText('');
+                setLoginStep('otp');
+              }
+            } else if (state === 'otp_screen') {
+              if (loginStep !== 'otp') {
+                setInputText('');
+                setLoginStep('otp');
+              }
             }
-            return;
-          } else if (state === 'login_options' && loginStep !== 'options') {
-            setInputText('');
-            setLoginStep('options');
-            return;
           }
         }
       } catch (_) { }
-      if (!cancelled) setTimeout(poll, 1000); // Poll every 1 second
+      if (!cancelled) {
+        setTimeout(poll, loginStep === 'done' ? 2500 : 1000);
+      }
     };
 
     const pollTimer = setTimeout(poll, 500);
@@ -244,6 +208,32 @@ export default function BrowserScreen({ route, navigation }) {
     }
   };
 
+  // ─── Extension stats polling (always active — accessible before and after login) ───
+  const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+  const { stats: extensionStats, loading: statsLoading, error: statsError } = useExtensionStats(
+    orchestratorUrl,
+    true  // Always poll — dashboard is accessible at any loginStep
+  );
+
+  // Remotely start / stop FlirtEasy AI swiping & messaging agent via Orchestrator CDP bridge
+  const handleToggleAgent = async () => {
+    try {
+      const isRunning = Boolean(
+        extensionStats?.agentState?.isRunning ||
+        (extensionStats?.agentState?.currentPhase && extensionStats.agentState.currentPhase !== 'stopped')
+      );
+      const endpoint = isRunning ? '/stop-agent' : '/start-agent';
+      console.log(`[Browser] Remote agent toggle -> ${endpoint}`);
+      await fetch(`${orchestratorUrl}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: 'Tinder' }),
+      });
+    } catch (e) {
+      console.error('[Browser] handleToggleAgent error:', e);
+    }
+  };
+
   // Sends a mouse click at absolute (x, y) inside the Neko container via xdotool.
   const clickAt = async (x, y) => {
     try {
@@ -258,27 +248,23 @@ export default function BrowserScreen({ route, navigation }) {
     }
   };
 
-  // For Bumble: automatically clicks through the two-step method selection
-  // so the user lands directly on the phone number input screen.
-  // Sequence:
-  //   1. Wait 2s for Bumble's JS to finish rendering
-  //   2. Click "Continue with other methods"
-  //   3. Wait 1.5s for the next screen to render
-  //   4. Click "Use cell phone number"
-  //   5. Wait 1s for the phone input to appear
-  //   6. Advance wizard to 'phone' step
-  const autoNavigateBumbleLogin = async () => {
-    // Step 1 — let Bumble's page fully render before clicking
-    await new Promise(r => setTimeout(r, 2000));
-    await clickAt(BUMBLE_BTN_OTHER_METHODS.x, BUMBLE_BTN_OTHER_METHODS.y);
 
-    // Step 2 — wait for "Continue with other methods" screen to load
-    await new Promise(r => setTimeout(r, 1500));
-    await clickAt(BUMBLE_BTN_CELL_PHONE.x, BUMBLE_BTN_CELL_PHONE.y);
 
-    // Step 3 — wait for phone number input to appear, then show wizard
-    await new Promise(r => setTimeout(r, 1000));
-    setLoginStep('phone');
+  const handleLogout = async () => {
+    try {
+      setShowDashboard(false);
+      setLoginStep('options');
+      setInputText('');
+      setSubmittedEmail('');
+      setSubmittedPhone('');
+      setEmailErrorText('');
+      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+      await fetch(`${orchestratorUrl}/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: 'tinder' }),
+      });
+    } catch (_) {}
   };
 
   const handleGoBack = async () => {
@@ -429,25 +415,7 @@ export default function BrowserScreen({ route, navigation }) {
       }
     `;
 
-    // Listen for the extension's signal that Bumble's phone input is ready.
-    const listenerJs = isBumble ? `
-      (function() {
-        if (window.__flirteasyPhoneReadyListening) return;
-        window.__flirteasyPhoneReadyListening = true;
-        window.addEventListener('message', function(e) {
-          if (e.data && e.data.type === 'bumble:phoneInputReady') {
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
-              JSON.stringify({ type: 'bumble:phoneInputReady' })
-            );
-          }
-          if (e.data && e.data.type === 'bumble:otpInputReady') {
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
-              JSON.stringify({ type: 'bumble:otpInputReady' })
-            );
-          }
-        });
-      })();
-    ` : '';
+
 
     const jsCode = `
       (function() {
@@ -478,8 +446,6 @@ export default function BrowserScreen({ route, navigation }) {
               v.style.zoom = '1';
             }
           });
-
-          ${listenerJs}
         } catch(e) {}
       })();
     `;
@@ -517,48 +483,132 @@ export default function BrowserScreen({ route, navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
+        {/* ─── Upgraded Modern Glass Header ─── */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backBtnText}>✕ Close</Text>
-          </TouchableOpacity>
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{platform} Session</Text>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {proxyIp ? `IP: ${maskProxy(proxyIp)}` : 'Direct Connection'}
-            </Text>
-          </View>
-          {loginStep !== 'done' ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity
-                style={[styles.toggleNekoBtn, { marginRight: 4 }]}
-                onPress={() => setIsExpanded(!isExpanded)}
-              >
-                <Text style={styles.toggleNekoBtnText}>
-                  {isExpanded ? '📱 Split' : '🔍 Expand'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toggleNekoBtn, { marginRight: 6 }]}
-                onPress={() => setShowNeko(!showNeko)}
-              >
-                <Text style={styles.toggleNekoBtnText}>
-                  {showNeko ? '🙈 Hide' : '👁️ View'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.skipBtn} onPress={() => setLoginStep('done')}>
-                <Text style={styles.skipBtnText}>Skip</Text>
-              </TouchableOpacity>
+          <View style={styles.headerLeft}>
+            <View style={styles.statusIndicatorRow}>
+              <View style={styles.statusDotPulse} />
+              <Text style={styles.statusIndicatorText}>
+                {proxyIp ? 'ENCRYPTED TUNNEL ACTIVE' : 'DIRECT CONNECT ACTIVE'}
+              </Text>
             </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.menuBtn, { marginRight: 8, backgroundColor: '#3A3A4A15', borderColor: '#3A3A4A40' }]}
-              onPress={() => inputRef.current.focus()}
-            >
-              <Text style={[styles.menuBtnText, { color: '#FFF' }]}>⌨️ Keyboard</Text>
-            </TouchableOpacity>
-          )}
+            <Text style={styles.headerTitle}>Tinder Session</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.closeBtnCircular}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close" size={20} color="rgba(255, 255, 255, 0.75)" />
+          </TouchableOpacity>
         </View>
 
+        {/* ─── Top Action Bar (Dedicated Glass 4-Button Grid) ─── */}
+        <View style={styles.actionBarGrid}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnExpand, isExpanded && styles.actionBtnActive]}
+            onPress={() => setIsExpanded(!isExpanded)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={isExpanded ? 'contract-outline' : 'scan-outline'}
+              size={17}
+              color={isExpanded ? '#FD297B' : 'rgba(255, 255, 255, 0.85)'}
+            />
+            <Text style={[styles.actionBtnText, isExpanded && { color: '#FD297B' }]}>
+              {isExpanded ? 'Collapse' : 'Expand'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnIconOnly, !showNeko && styles.actionBtnActive]}
+            onPress={() => setShowNeko(!showNeko)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={showNeko ? 'eye-outline' : 'eye-off-outline'}
+              size={18}
+              color={!showNeko ? '#FFCB37' : 'rgba(255, 255, 255, 0.85)'}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnIconOnly]}
+            onPress={() => setShowDashboard(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="stats-chart-outline" size={17} color="#FD297B" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnIconOnly]}
+            onPress={() => setLoginStep('done')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="play-forward-outline" size={17} color="rgba(255, 255, 255, 0.85)" />
+          </TouchableOpacity>
+        </View>
+
+        {/* ─── Full-screen Dashboard Modal (accessible at any loginStep) ─── */}
+        <Modal
+          visible={showDashboard}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowDashboard(false)}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="stats-chart" size={16} color="#FD297B" />
+                <Text style={styles.modalTitle}>FlirtEasy Dashboard</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowDashboard(false)}
+              >
+                <Ionicons name="close" size={16} color="#D8D6E8" />
+              </TouchableOpacity>
+            </View>
+            <DashboardPanel
+              stats={extensionStats}
+              loading={statsLoading}
+              error={statsError}
+              orchestratorUrl={orchestratorUrl}
+              onToggleAgent={handleToggleAgent}
+              onLogout={handleLogout}
+              controlsContent={
+                <View style={styles.inputPanel}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Paste Phone No. or OTP code here..."
+                    placeholderTextColor="#8E8E9F"
+                    value={inputText}
+                    onChangeText={setInputText}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity
+                    style={styles.sendBtn}
+                    onPress={handleSendText}
+                    disabled={sendingText}
+                  >
+                    {sendingText ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text style={styles.sendBtnText}>Send</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
+                    <Text style={styles.enterBtnText}>⏎ Enter</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+            />
+          </SafeAreaView>
+        </Modal>
+
+        {/* ─── Rounded Glass Browser Container ─── */}
         <View
           {...panResponder.panHandlers}
           style={[
@@ -570,90 +620,83 @@ export default function BrowserScreen({ route, navigation }) {
             )
           ]}
         >
-          <WebView
-            ref={webViewRef}
-            source={{ uri: finalUrl }}
-            style={styles.webview}
-            scrollEnabled={false}
-            bounces={false}
-            scalesPageToFit={false}
-            setBuiltInZoomControls={false}
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-            onLoadEnd={() => {
-              setLoading(false);
-              injectConfigScript();
-            }}
-            onMessage={(event) => {
-              try {
-                const msg = JSON.parse(event.nativeEvent.data);
-                // Extension signals phone input is ready — advance wizard automatically to phone
-                if (msg.type === 'bumble:phoneInputReady' && loginStep === 'navigating') {
-                  console.log('[Browser] Bumble phone input ready — advancing wizard to phone');
-                  setLoginStep('phone');
-                }
-                // Extension signals OTP input is ready (we log it, but transition is handled by the 20s delay)
-                if (msg.type === 'bumble:otpInputReady') {
-                  console.log('[Browser] Bumble OTP input ready (waiting for 20s timer...)');
-                }
-              } catch (_) { }
-            }}
-            onError={() => {
-              setTimeout(() => {
-                if (webViewRef.current) webViewRef.current.reload();
-              }, 3000);
-            }}
-            allowsInlineMediaPlayback={true}
-            mediaPlaybackRequiresUserAction={false}
-            mediaCapturePermissionGrantType="grant"
-            originWhitelist={['*']}
-            mixedContentMode="always"
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            injectedJavaScript={`
-            (function() {
-              const css = "header, nav, #nav, .nav, .navbar, .header, .neko-nav, .neko-header, .neko-sidebar, .neko-chat, .neko-menu, .neko-controls, .neko-topbar, .v-app-bar, .v-toolbar, [class*='v-toolbar'], [class*='v-app-bar'], [class*='header'], [class*='nav'] { display: none !important; height: 0 !important; opacity: 0 !important; visibility: hidden !important; } html, body, #neko, #app, .v-application, .neko-main, .video-container, .neko-video, video, canvas { width: 100% !important; height: 100% !important; margin: 0 !important; padding: 0 !important; top: 0 !important; left: 0 !important; position: absolute !important; }";
-              const s = document.createElement('style');
-              s.innerHTML = css;
-              (document.head || document.documentElement).appendChild(s);
-              setInterval(function() {
-                document.querySelectorAll('div, header, nav').forEach(function(el) {
-                  const t = (el.innerText || el.textContent || '').trim().toLowerCase();
-                  if (t.includes('n.eko') || t.includes('neko')) {
-                    const r = el.getBoundingClientRect();
-                    if (r.top < 120 && r.height < 120 && r.height > 0) { el.style.display = 'none'; }
-                  }
-                });
-              }, 150);
-            })();
-            true;
-          `}
-            overScrollMode="never"
-            keyboardDisplayRequiresUserAction={false}
-            userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-          />
-          {loading && (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator size="large" color="#FE3C72" />
-              <Text style={styles.loaderText}>Connecting to Virtual Browser...</Text>
-            </View>
-          )}
+          <View style={styles.browserFrame}>
+            <WebView
+              ref={webViewRef}
+              source={{ uri: finalUrl }}
+              style={styles.webview}
+              containerStyle={styles.webviewInnerContainer}
+              scrollEnabled={false}
+              bounces={false}
+              scalesPageToFit={false}
+              setBuiltInZoomControls={false}
+              showsHorizontalScrollIndicator={false}
+              showsVerticalScrollIndicator={false}
+              onLoadEnd={() => {
+                setLoading(false);
+                injectConfigScript();
+              }}
+              onMessage={() => {}}
+              onError={() => {
+                setTimeout(() => {
+                  if (webViewRef.current) webViewRef.current.reload();
+                }, 3000);
+              }}
+              allowsInlineMediaPlayback={true}
+              mediaPlaybackRequiresUserAction={false}
+              mediaCapturePermissionGrantType="grant"
+              originWhitelist={['*']}
+              mixedContentMode="always"
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              injectedJavaScript={`
+              (function() {
+                const css = "header, nav, #nav, .nav, .navbar, .header, .neko-nav, .neko-header, .neko-sidebar, .neko-chat, .neko-menu, .neko-controls, .neko-topbar, .v-app-bar, .v-toolbar, [class*='v-toolbar'], [class*='v-app-bar'], [class*='header'], [class*='nav'] { display: none !important; height: 0 !important; opacity: 0 !important; visibility: hidden !important; } html, body, #neko, #app, .v-application, .neko-main, .video-container, .neko-video, video, canvas { width: 100% !important; height: 100% !important; margin: 0 !important; padding: 0 !important; top: 0 !important; left: 0 !important; position: absolute !important; }";
+                const s = document.createElement('style');
+                s.innerHTML = css;
+                (document.head || document.documentElement).appendChild(s);
+                setInterval(function() {
+                  document.querySelectorAll('div, header, nav').forEach(function(el) {
+                    const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    if (t.includes('n.eko') || t.includes('neko')) {
+                      const r = el.getBoundingClientRect();
+                      if (r.top < 120 && r.height < 120 && r.height > 0) { el.style.display = 'none'; }
+                    }
+                  });
+                }, 150);
+              })();
+              true;
+            `}
+              overScrollMode="never"
+              keyboardDisplayRequiresUserAction={false}
+              userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            />
+            {loading && (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color="#FD297B" />
+                <Text style={styles.loaderText}>Connecting to Virtual Browser...</Text>
+              </View>
+            )}
+          </View>
         </View>
 
+        {/* ─── Bottom Controls / Wizard Section ─── */}
         {loginStep !== 'done' && (
           <View style={[styles.wizardPanel, !showNeko && styles.wizardPanelFull]}>
             {loginStep === 'options' && (
               <View style={styles.wizardStep}>
-                <View style={styles.wizardHeaderRow}>
-                  <Text style={styles.wizardTitle}>Choose Login Method</Text>
+                <View style={styles.wizardOptionsHeader}>
+                  <Text style={styles.wizardOptionsTitle}>Choose Login Method</Text>
+                  <Text style={styles.wizardOptionsSubtitle}>
+                    Select how you want to log into your Tinder account
+                  </Text>
                 </View>
-                <Text style={styles.wizardDesc}>
-                  Select how you want to log into your {platform} account:
-                </Text>
 
+                {/* Primary Tinder Pink Gradient Card */}
                 <TouchableOpacity
-                  style={[styles.wizardBtn, { marginBottom: 10 }]}
+                  style={styles.tinderPrimaryCard}
                   disabled={sendingText}
+                  activeOpacity={0.88}
                   onPress={async () => {
                     setSendingText(true);
                     try {
@@ -668,12 +711,20 @@ export default function BrowserScreen({ route, navigation }) {
                     setLoginStep('email');
                   }}
                 >
-                  <Text style={styles.wizardBtnText}>📧 Log in with Email Address</Text>
+                  <View style={styles.cardLeftGroup}>
+                    <View style={styles.tinderIconSquare}>
+                      <Ionicons name="mail" size={20} color="#FFF" />
+                    </View>
+                    <Text style={styles.tinderPrimaryCardText}>Log in with Email</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.6)" />
                 </TouchableOpacity>
 
+                {/* Secondary Google Glass Card */}
                 <TouchableOpacity
-                  style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
+                  style={styles.googleGlassCard}
                   disabled={sendingText}
+                  activeOpacity={0.88}
                   onPress={async () => {
                     setSendingText(true);
                     try {
@@ -688,12 +739,20 @@ export default function BrowserScreen({ route, navigation }) {
                     setLoginStep('google_email');
                   }}
                 >
-                  <Text style={styles.wizardBtnSecondaryText}>🌐 Log in with Google</Text>
+                  <View style={styles.cardLeftGroup}>
+                    <View style={styles.glassIconSquare}>
+                      <Ionicons name="logo-google" size={18} color="rgba(255, 255, 255, 0.9)" />
+                    </View>
+                    <Text style={styles.googleCardText}>Log in with Google</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.3)" />
                 </TouchableOpacity>
 
+                {/* Tertiary Trouble Logging In Link */}
                 <TouchableOpacity
-                  style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
+                  style={styles.troubleLinkBtn}
                   disabled={sendingText}
+                  activeOpacity={0.7}
                   onPress={async () => {
                     setSendingText(true);
                     try {
@@ -708,7 +767,7 @@ export default function BrowserScreen({ route, navigation }) {
                     setLoginStep('phone');
                   }}
                 >
-                  <Text style={styles.wizardBtnSecondaryText}>❓ Trouble Logging In?</Text>
+                  <Text style={styles.troubleLinkText}>Trouble Logging In?</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -717,9 +776,14 @@ export default function BrowserScreen({ route, navigation }) {
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
+                    <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Google Sign-In 🌐</Text>
+                  <TouchableOpacity style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                    <Text style={styles.wizardDoneBtnText}>Logged In</Text>
+                  </TouchableOpacity>
                 </View>
                 <Text style={styles.wizardDesc}>
                   Enter your Google Email Address or Phone Number to log into Tinder.
@@ -728,7 +792,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <TextInput
                   style={styles.wizardInput}
                   placeholder="Email or Phone..."
-                  placeholderTextColor="#6E6E7F"
+                  placeholderTextColor="#8E8DA3"
                   value={inputText}
                   onChangeText={setInputText}
                   keyboardType="email-address"
@@ -738,6 +802,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <TouchableOpacity
                   style={styles.wizardBtn}
                   disabled={sendingText}
+                  activeOpacity={0.88}
                   onPress={async () => {
                     if (!inputText.trim()) return;
                     setSendingText(true);
@@ -768,9 +833,14 @@ export default function BrowserScreen({ route, navigation }) {
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
+                    <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Enter Google Password 🔒</Text>
+                  <TouchableOpacity style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                    <Text style={styles.wizardDoneBtnText}>Logged In</Text>
+                  </TouchableOpacity>
                 </View>
                 <Text style={styles.wizardDesc}>
                   Enter your Google Account Password to complete sign-in.
@@ -779,7 +849,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <TextInput
                   style={styles.wizardInput}
                   placeholder="Google Password..."
-                  placeholderTextColor="#6E6E7F"
+                  placeholderTextColor="#8E8DA3"
                   value={inputText}
                   onChangeText={setInputText}
                   secureTextEntry
@@ -788,6 +858,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <TouchableOpacity
                   style={styles.wizardBtn}
                   disabled={sendingText}
+                  activeOpacity={0.88}
                   onPress={async () => {
                     if (!inputText.trim()) return;
                     setSendingText(true);
@@ -818,19 +889,20 @@ export default function BrowserScreen({ route, navigation }) {
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
+                    <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Opening Phone Login...</Text>
                 </View>
-                <ActivityIndicator size="large" color="#FFCB37" style={{ marginVertical: 12 }} />
+                <ActivityIndicator size="large" color="#FFCB37" style={{ marginVertical: 10 }} />
                 <Text style={styles.wizardDesc}>
                   Automatically navigating to the phone number screen. Just a moment.
                 </Text>
                 <TouchableOpacity
-                  style={[styles.wizardBtn, { backgroundColor: '#2A2A35', borderWidth: 1, borderColor: '#3A3A4A' }]}
+                  style={styles.wizardGhostBtn}
                   onPress={() => setLoginStep('phone')}
                 >
-                  <Text style={[styles.wizardBtnText, { color: '#8E8E9F' }]}>Skip — I'll navigate manually</Text>
+                  <Text style={styles.wizardGhostBtnText}>Skip — I'll navigate manually</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -839,7 +911,8 @@ export default function BrowserScreen({ route, navigation }) {
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
+                    <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Enter Email Address</Text>
                 </View>
@@ -848,8 +921,8 @@ export default function BrowserScreen({ route, navigation }) {
                 </Text>
 
                 {emailErrorText ? (
-                  <View style={{ backgroundColor: 'rgba(255, 75, 75, 0.15)', borderWidth: 1, borderColor: '#FF4B4B', padding: 10, borderRadius: 8, marginBottom: 12 }}>
-                    <Text style={{ color: '#FF6B6B', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+                  <View style={styles.wizardErrorBox}>
+                    <Text style={styles.wizardErrorText}>
                       {emailErrorText}
                     </Text>
                   </View>
@@ -858,7 +931,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <TextInput
                   style={styles.wizardInput}
                   placeholder="email@example.com"
-                  placeholderTextColor="#6E6E7F"
+                  placeholderTextColor="#8E8DA3"
                   value={inputText}
                   onChangeText={(txt) => {
                     setInputText(txt);
@@ -869,20 +942,21 @@ export default function BrowserScreen({ route, navigation }) {
                   autoComplete="email"
                 />
 
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                <View style={styles.wizardActionRow}>
                   <TouchableOpacity
-                    style={[styles.resendBtn, { flex: 1, marginVertical: 0, paddingVertical: 12, backgroundColor: '#2A2A3A', borderColor: '#3A3A4D' }]}
+                    style={[styles.wizardBtnSecondary, { flex: 1 }]}
                     onPress={() => {
                       setInputText('');
                       setEmailErrorText('');
                     }}
                   >
-                    <Text style={[styles.resendBtnText, { color: '#B0B0C0' }]}>🧹 Clear Email</Text>
+                    <Text style={[styles.wizardBtnSecondaryText, { color: '#8E8DA3' }]}>🧹 Clear</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[styles.wizardBtn, { flex: 1, marginTop: 0 }]}
                     disabled={sendingText}
+                    activeOpacity={0.88}
                     onPress={async () => {
                       if (!inputText.trim()) return;
                       setSubmittedEmail(inputText.trim());
@@ -922,9 +996,14 @@ export default function BrowserScreen({ route, navigation }) {
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
+                    <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Enter Mobile Number</Text>
+                  <TouchableOpacity style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                    <Text style={styles.wizardDoneBtnText}>Logged In</Text>
+                  </TouchableOpacity>
                 </View>
                 <Text style={styles.wizardDesc}>
                   Enter your country code and mobile number to log into your account.
@@ -934,7 +1013,7 @@ export default function BrowserScreen({ route, navigation }) {
                   <TextInput
                     style={styles.countryCodeInput}
                     placeholder="+91"
-                    placeholderTextColor="#6E6E7F"
+                    placeholderTextColor="#8E8DA3"
                     value={countryCode}
                     onChangeText={setCountryCode}
                     keyboardType="phone-pad"
@@ -942,7 +1021,7 @@ export default function BrowserScreen({ route, navigation }) {
                   <TextInput
                     style={styles.phoneNumberInput}
                     placeholder="Mobile Number"
-                    placeholderTextColor="#6E6E7F"
+                    placeholderTextColor="#8E8DA3"
                     value={inputText}
                     onChangeText={setInputText}
                     keyboardType="phone-pad"
@@ -953,6 +1032,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <TouchableOpacity
                   style={styles.wizardBtn}
                   disabled={sendingText}
+                  activeOpacity={0.88}
                   onPress={async () => {
                     if (!inputText.trim()) return;
                     setSubmittedPhone(`${countryCode.trim()} ${inputText.trim()}`);
@@ -993,7 +1073,8 @@ export default function BrowserScreen({ route, navigation }) {
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
+                    <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Check Your Email! 📩</Text>
                 </View>
@@ -1001,8 +1082,8 @@ export default function BrowserScreen({ route, navigation }) {
                   If we found an account with your email, an email has been sent. Please check your email inbox to log in.
                 </Text>
 
-                <View style={{ marginTop: 10, padding: 12, backgroundColor: '#1E1E28', borderRadius: 8, marginBottom: 14 }}>
-                  <Text style={{ color: '#8E8E9F', fontSize: 13, fontWeight: '600', marginBottom: 10 }}>Didn't receive a link?</Text>
+                <View style={styles.wizardHelpBox}>
+                  <Text style={styles.wizardHelpLabel}>Didn't receive a link?</Text>
                   
                   <TouchableOpacity
                     style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
@@ -1051,19 +1132,20 @@ export default function BrowserScreen({ route, navigation }) {
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
+                    <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Sending OTP...</Text>
                 </View>
-                <ActivityIndicator size="large" color="#FFCB37" style={{ marginVertical: 12 }} />
+                <ActivityIndicator size="large" color="#FFCB37" style={{ marginVertical: 10 }} />
                 <Text style={styles.wizardDesc}>
                   A verification code is being sent to your phone. This may take a few seconds.
                 </Text>
                 <TouchableOpacity
-                  style={[styles.wizardBtn, { backgroundColor: '#2A2A35', borderWidth: 1, borderColor: '#3A3A4A', marginTop: 8 }]}
+                  style={styles.wizardGhostBtn}
                   onPress={() => setLoginStep('otp')}
                 >
-                  <Text style={[styles.wizardBtnText, { color: '#8E8E9F' }]}>I already got the code →</Text>
+                  <Text style={styles.wizardGhostBtnText}>I already got the code →</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1072,11 +1154,16 @@ export default function BrowserScreen({ route, navigation }) {
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
+                    <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>
-                    {otpSubtype === 'sms' ? 'Device Verification (SMS) 📱' : 'Email Verification 📧'}
+                    {otpSubtype === 'sms' ? 'Device Verification 📱' : 'Email Verification 📧'}
                   </Text>
+                  <TouchableOpacity style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                    <Text style={styles.wizardDoneBtnText}>Logged In</Text>
+                  </TouchableOpacity>
                 </View>
                 <Text style={styles.wizardDesc}>
                   {otpSubtype === 'sms'
@@ -1091,16 +1178,16 @@ export default function BrowserScreen({ route, navigation }) {
                 <TextInput
                   style={styles.wizardInput}
                   placeholder="Enter 6-digit OTP..."
-                  placeholderTextColor="#6E6E7F"
+                  placeholderTextColor="#8E8DA3"
                   value={inputText}
                   onChangeText={setInputText}
                   keyboardType="number-pad"
                   maxLength={6}
                 />
 
-                <View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>
+                <View style={styles.wizardActionRow}>
                   <TouchableOpacity
-                    style={[styles.resendBtn, { flex: 1, marginVertical: 0, paddingVertical: 10 }]}
+                    style={styles.resendBtn}
                     disabled={sendingText || resendingCode}
                     onPress={async () => {
                       setResendingCode(true);
@@ -1129,17 +1216,7 @@ export default function BrowserScreen({ route, navigation }) {
 
                   {otpSubtype === 'sms' && (
                     <TouchableOpacity
-                      style={{
-                        flex: 1,
-                        backgroundColor: '#2A2A3A',
-                        borderRadius: 10,
-                        paddingVertical: 10,
-                        paddingHorizontal: 8,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderWidth: 1,
-                        borderColor: '#3A3A4D',
-                      }}
+                      style={styles.wizardTroubleBtn}
                       disabled={sendingText}
                       onPress={async () => {
                         setSendingText(true);
@@ -1151,7 +1228,6 @@ export default function BrowserScreen({ route, navigation }) {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ text: 'trouble logging in' }),
                           });
-                          // Immediately update step to email for instant UI feedback
                           setLoginStep('email');
                         } catch (e) {
                           console.error('Error clicking trouble logging in:', e);
@@ -1160,29 +1236,22 @@ export default function BrowserScreen({ route, navigation }) {
                         }
                       }}
                     >
-                      <Text style={{ color: '#FFCB37', fontSize: 12, fontWeight: '600' }}>❓ Trouble Logging In?</Text>
+                      <Text style={styles.wizardTroubleBtnText}>❓ Trouble Logging In?</Text>
                     </TouchableOpacity>
                   )}
                 </View>
 
                 {resendStatusText ? (
-                  <Text style={{ color: resendStatusText.includes('✅') ? '#4CAF50' : '#FF9800', fontSize: 12, marginBottom: 8, fontWeight: '600', marginLeft: 2 }}>
+                  <Text style={[styles.resendStatusText, { color: resendStatusText.includes('✅') ? '#10B981' : '#FFCB37' }]}>
                     {resendStatusText}
                   </Text>
                 ) : null}
 
-                <View style={[styles.wizardBtnRow, { marginTop: 8 }]}>
-                  <TouchableOpacity
-                    style={[styles.wizardBtnSecondary, { marginRight: 8 }]}
-                    disabled={sendingText}
-                    onPress={handleGoBack}
-                  >
-                    <Text style={styles.wizardBtnSecondaryText}>↩ Back</Text>
-                  </TouchableOpacity>
-
+                <View style={styles.wizardBtnRow}>
                   <TouchableOpacity
                     style={[styles.wizardBtnPrimary, { flex: 1 }]}
                     disabled={sendingText || !inputText.trim()}
+                    activeOpacity={0.88}
                     onPress={async () => {
                       if (!inputText.trim()) return;
                       setSendingText(true);
@@ -1192,6 +1261,18 @@ export default function BrowserScreen({ route, navigation }) {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ otp: inputText.trim() }),
+                        });
+                        // Accelerated check cycles to catch logged-in transition immediately
+                        [600, 1200, 2000, 3500, 5000].forEach(delay => {
+                          setTimeout(async () => {
+                            try {
+                              const r = await fetch(`${orchestratorUrl}/check-page-state`);
+                              const d = await r.json();
+                              if (d.state === 'logged_in') {
+                                setLoginStep('done');
+                              }
+                            } catch (_) {}
+                          }, delay);
                         });
                       } catch (e) {
                         console.error('Error submitting OTP:', e);
@@ -1214,7 +1295,8 @@ export default function BrowserScreen({ route, navigation }) {
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
                   <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Text style={styles.wizardBackBtnText}>⬅️ Back</Text>
+                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
+                    <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Solve Security Puzzle</Text>
                 </View>
@@ -1228,11 +1310,11 @@ export default function BrowserScreen({ route, navigation }) {
                   </Text>
                 </View>
 
-                <View style={{ marginBottom: 12 }}>
+                <View style={{ marginBottom: 8 }}>
                   <TextInput
                     style={styles.wizardInput}
                     placeholder="Enter captcha text (if text-based)..."
-                    placeholderTextColor="#6E6E7F"
+                    placeholderTextColor="#8E8DA3"
                     value={captchaText}
                     onChangeText={setCaptchaText}
                     autoCapitalize="none"
@@ -1242,7 +1324,7 @@ export default function BrowserScreen({ route, navigation }) {
 
                 <View style={styles.wizardBtnRow}>
                   <TouchableOpacity
-                    style={[styles.wizardBtnSecondary, { marginRight: 8 }]}
+                    style={[styles.wizardBtnSecondary, { flex: 1 }]}
                     disabled={sendingText}
                     onPress={() => {
                       setCaptchaText('');
@@ -1254,6 +1336,7 @@ export default function BrowserScreen({ route, navigation }) {
                   <TouchableOpacity
                     style={[styles.wizardBtn, { flex: 1 }]}
                     disabled={sendingText}
+                    activeOpacity={0.88}
                     onPress={async () => {
                       if (captchaText.trim()) {
                         setSendingText(true);
@@ -1288,31 +1371,41 @@ export default function BrowserScreen({ route, navigation }) {
         )}
 
         {loginStep === 'done' && (
-          <View style={styles.inputPanel}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Paste Phone No. or OTP code here..."
-              placeholderTextColor="#8E8E9F"
-              value={inputText}
-              onChangeText={setInputText}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={styles.sendBtn}
-              onPress={handleSendText}
-              disabled={sendingText}
-            >
-              {sendingText ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <Text style={styles.sendBtnText}>Send</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
-              <Text style={styles.enterBtnText}>⏎ Enter</Text>
-            </TouchableOpacity>
-          </View>
+          <DashboardPanel
+            stats={extensionStats}
+            loading={statsLoading}
+            error={statsError}
+            orchestratorUrl={orchestratorUrl}
+            onToggleAgent={handleToggleAgent}
+            onLogout={handleLogout}
+            controlsContent={
+              <View style={styles.inputPanel}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Paste Phone No. or OTP code here..."
+                  placeholderTextColor="#8E8E9F"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.sendBtn}
+                  onPress={handleSendText}
+                  disabled={sendingText}
+                >
+                  {sendingText ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.sendBtnText}>Send</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
+                  <Text style={styles.enterBtnText}>⏎ Enter</Text>
+                </TouchableOpacity>
+              </View>
+            }
+          />
         )}
 
         <TextInput
@@ -1333,76 +1426,524 @@ export default function BrowserScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0F13',
+    backgroundColor: '#050505',
   },
   header: {
-    height: 56,
-    marginTop: 35,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 38 : 6,
+    paddingBottom: 10,
+  },
+  headerLeft: {
+    flexDirection: 'column',
+  },
+  statusIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  statusDotPulse: {
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 3.5,
+    backgroundColor: '#22C55E',
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  statusIndicatorText: {
+    color: 'rgba(255, 255, 255, 0.45)',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 21,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  closeBtnCircular: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBarGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 10,
+    gap: 8,
+  },
+  actionBtn: {
+    height: 42,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  actionBtnExpand: {
+    flex: 2,
+  },
+  actionBtnIconOnly: {
+    flex: 1,
+  },
+  actionBtnActive: {
+    backgroundColor: 'rgba(253, 41, 123, 0.12)',
+    borderColor: 'rgba(253, 41, 123, 0.3)',
+  },
+  actionBtnText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  webviewContainer: {
+    marginHorizontal: 16,
+    position: 'relative',
+  },
+  webviewContainerSplit: {
+    flex: 0.62,
+  },
+  webviewContainerFull: {
+    flex: 1,
+  },
+  webviewContainerHidden: {
+    height: 0,
+    flex: 0,
+    opacity: 0,
+  },
+  browserFrame: {
+    flex: 1,
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: '#000000',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+  webviewInnerContainer: {
+    borderRadius: 21,
+    overflow: 'hidden',
+    backgroundColor: '#000000',
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  loaderContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#050505',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderText: {
+    color: '#8E8DA3',
+    marginTop: 15,
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  wizardPanel: {
+    flex: 0.38,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+    justifyContent: 'center',
+  },
+  wizardPanelFull: {
+    flex: 1,
+  },
+  wizardStep: {
+    width: '100%',
+  },
+  wizardOptionsHeader: {
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  wizardOptionsTitle: {
+    color: '#FFFFFF',
+    fontSize: 21,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  wizardOptionsSubtitle: {
+    color: 'rgba(255, 255, 255, 0.45)',
+    fontSize: 12.5,
+    marginTop: 3,
+    textAlign: 'center',
+  },
+  tinderPrimaryCard: {
+    width: '100%',
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: '#FD297B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    marginBottom: 10,
+    shadowColor: '#FD297B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 7,
+  },
+  cardLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  tinderIconSquare: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tinderPrimaryCardText: {
+    color: '#FFFFFF',
+    fontSize: 15.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  googleGlassCard: {
+    width: '100%',
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    marginBottom: 6,
+  },
+  glassIconSquare: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleCardText: {
+    color: 'rgba(255, 255, 255, 0.92)',
+    fontSize: 15.5,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+  },
+  troubleLinkBtn: {
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  troubleLinkText: {
+    color: 'rgba(255, 255, 255, 0.45)',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+  },
+  wizardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  wizardDoneBtn: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  wizardDoneBtnText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  wizardBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  wizardBackBtnText: {
+    color: '#E0E0E6',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  wizardTitle: {
+    color: '#FFFFFF',
+    fontSize: 15.5,
+    fontWeight: '800',
+    letterSpacing: 0.15,
+    flexShrink: 1,
+  },
+  wizardDesc: {
+    color: '#8E8DA3',
+    fontSize: 12,
+    marginBottom: 10,
+    lineHeight: 16.5,
+  },
+  wizardInput: {
+    height: 46,
+    backgroundColor: '#161424',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    color: '#FFF',
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 10,
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 8,
+  },
+  countryCodeInput: {
+    width: 72,
+    height: 46,
+    backgroundColor: '#161424',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    textAlign: 'center',
+  },
+  phoneNumberInput: {
+    flex: 1,
+    height: 46,
+    backgroundColor: '#161424',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    color: '#FFF',
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  wizardBtn: {
+    height: 48,
+    backgroundColor: '#FD297B',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FD297B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  wizardBtnText: {
+    color: '#FFF',
+    fontSize: 13.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  wizardBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  wizardBtnSecondary: {
+    height: 48,
+    paddingHorizontal: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  wizardBtnSecondaryText: {
+    color: '#FFF',
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  wizardBtnPrimary: {
+    height: 48,
+    backgroundColor: '#FD297B',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FD297B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  wizardActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  wizardErrorBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.30)',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  wizardErrorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  wizardHelpBox: {
+    backgroundColor: '#0D0B14',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  wizardHelpLabel: {
+    color: '#8E8DA3',
+    fontSize: 11.5,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  wizardGhostBtn: {
+    height: 46,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  wizardGhostBtnText: {
+    color: '#8E8DA3',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  wizardTroubleBtn: {
+    flex: 1,
+    height: 42,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 203, 55, 0.20)',
+  },
+  wizardTroubleBtnText: {
+    color: '#FFCB37',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  // ── Dashboard Modal ──
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#0F0F13',
+  },
+  modalHeader: {
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderColor: '#2A2A35',
-    backgroundColor: '#181820',
+    borderBottomColor: '#1E1E2E',
+    backgroundColor: '#16161E',
   },
-  backBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: '#2A2A35',
-  },
-  backBtnText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  titleContainer: {
-    alignItems: 'center',
-    flex: 1,
-    paddingHorizontal: 10,
-  },
-  title: {
-    color: '#FFF',
+  modalTitle: {
+    color: '#F1F1F5',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-  subtitle: {
-    color: '#8E8E9F',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  menuBtn: {
+  modalCloseBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: '#FE3C7215',
+    backgroundColor: 'rgba(253, 41, 123, 0.10)',
     borderWidth: 1,
-    borderColor: '#FE3C7240',
+    borderColor: 'rgba(253, 41, 123, 0.25)',
   },
-  menuBtnText: {
-    color: '#FE3C72',
-    fontSize: 13,
-    fontWeight: 'bold',
+  puzzleWarningBox: {
+    backgroundColor: 'rgba(255, 203, 55, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 203, 55, 0.25)',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
   },
-  webviewContainer: {
+  puzzleWarningTitle: {
+    color: '#FFCB37',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  puzzleWarningDesc: {
+    color: '#C8C8D0',
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  puzzleInstructionText: {
+    color: '#FFF',
+    fontSize: 12.5,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  resendBtn: {
     flex: 1,
-    position: 'relative',
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: '#0F0F13',
-  },
-  loaderContainer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0F0F13',
-    justifyContent: 'center',
+    height: 42,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  loaderText: {
-    color: '#8E8E9F',
-    marginTop: 15,
-    fontSize: 14,
+  resendBtnText: {
+    color: '#FFCB37',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  resendStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 6,
+    marginLeft: 2,
   },
   inputPanel: {
     height: 64,
@@ -1428,7 +1969,7 @@ const styles = StyleSheet.create({
   sendBtn: {
     height: 40,
     paddingHorizontal: 14,
-    backgroundColor: '#FE3C72',
+    backgroundColor: '#FD297B',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1459,203 +2000,5 @@ const styles = StyleSheet.create({
     width: 0,
     height: 0,
     opacity: 0,
-  },
-  webviewContainerSplit: {
-    flex: 0.65,
-    borderBottomWidth: 1,
-    borderColor: '#232332',
-  },
-  webviewContainerFull: {
-    flex: 1,
-  },
-  wizardPanel: {
-    flex: 0.35,
-    backgroundColor: '#13131C',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    justifyContent: 'center',
-  },
-  wizardStep: {
-    width: '100%',
-  },
-  wizardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  wizardBackBtn: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: '#262636',
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#36364A',
-  },
-  wizardBackBtnText: {
-    color: '#E0E0E6',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  wizardTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-    letterSpacing: 0.2,
-  },
-  wizardDesc: {
-    color: '#9A9AB0',
-    fontSize: 12.5,
-    marginBottom: 12,
-    lineHeight: 16,
-  },
-  wizardInput: {
-    height: 44,
-    backgroundColor: '#0A0A0F',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    color: '#FFF',
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: '#2D2D3E',
-    marginBottom: 12,
-  },
-  phoneInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  countryCodeInput: {
-    width: 76,
-    height: 44,
-    backgroundColor: '#0A0A0F',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '600',
-    borderWidth: 1,
-    borderColor: '#2D2D3E',
-    marginRight: 8,
-    textAlign: 'center',
-  },
-  phoneNumberInput: {
-    flex: 1,
-    height: 44,
-    backgroundColor: '#0A0A0F',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    color: '#FFF',
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: '#2D2D3E',
-  },
-  wizardBtn: {
-    height: 44,
-    backgroundColor: '#FE3C72',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  wizardBtnText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: 'bold',
-    letterSpacing: 0.2,
-  },
-  wizardBtnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  wizardBtnSecondary: {
-    height: 52,
-    paddingHorizontal: 20,
-    backgroundColor: '#20202C',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2D2D3E',
-  },
-  wizardBtnSecondaryText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  skipBtn: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: '#FE3C7215',
-    borderWidth: 1,
-    borderColor: '#FE3C7240',
-  },
-  skipBtnText: {
-    color: '#FE3C72',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  toggleNekoBtn: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: '#FFCB3715',
-    borderWidth: 1,
-    borderColor: '#FFCB3740',
-  },
-  toggleNekoBtnText: {
-    color: '#FFCB37',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  webviewContainerHidden: {
-    height: 0,
-    flex: 0,
-    opacity: 0,
-  },
-  wizardPanelFull: {
-    flex: 1,
-  },
-  puzzleWarningBox: {
-    backgroundColor: '#FFCB3715',
-    borderWidth: 1,
-    borderColor: '#FFCB3740',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-  },
-  puzzleWarningTitle: {
-    color: '#FFCB37',
-    fontSize: 17.5,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-  puzzleWarningDesc: {
-    color: '#E0E0E5',
-    fontSize: 13.5,
-    lineHeight: 19,
-    marginBottom: 8,
-  },
-  puzzleInstructionText: {
-    color: '#FFF',
-    fontSize: 13.5,
-    fontWeight: '600',
-    lineHeight: 19,
-  },
-  resendBtn: {
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-  },
-  resendBtnText: {
-    color: '#FFCB37',
-    fontSize: 13.5,
-    fontWeight: '600',
   },
 });

@@ -35,7 +35,7 @@ function parsePhoneNumber(input) {
 
 // ─── Platform URLs ───
 const PLATFORMS = {
-  tinder: 'https://tinder.com',
+  tinder: 'https://tinder.com/',
   bumble: 'https://bumble.com/get-started',
   hinge: 'https://hinge.co',
   aisle: 'https://aisle.co'

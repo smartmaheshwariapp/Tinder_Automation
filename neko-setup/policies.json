@@ -8,9 +8,33 @@
   ],
   "ExtensionDeveloperModeSettings": 1,
   "DeveloperToolsAvailability": 1,
+  "CommandLineFlagSecurityWarningsEnabled": false,
+  "DefaultGeolocationSetting": 1,
+  "GeolocationAllowedForUrls": [
+    "https://tinder.com",
+    "https://*.tinder.com",
+    "https://bumble.com",
+    "https://*.bumble.com",
+    "https://*.hinge.co"
+  ],
+  "DefaultNotificationsSetting": 1,
+  "NotificationsAllowedForUrls": [
+    "https://tinder.com",
+    "https://*.tinder.com",
+    "https://bumble.com",
+    "https://*.bumble.com"
+  ],
+  "RestoreOnStartup": 1,
+  "HideCrashRestoreBubble": true,
+  "MetricsReportingEnabled": false,
+  "PromotionsEnabled": false,
   "ExtensionSettings": {
     "*": {
       "installation_mode": "allowed"
+    },
+    "kpmmkcndeankkhfljfbaflhiogkfmhnk": {
+      "installation_mode": "normal_installed",
+      "toolbar_pin": "force_pinned"
     }
   }
 }

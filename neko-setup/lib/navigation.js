@@ -117,6 +117,14 @@ if not page: print('ERROR:no_page'); sys.exit(1)
 ws = WS(page['webSocketDebuggerUrl'])
 print('CDP_CONNECTED', flush=True)
 
+try:
+    ws.call('Browser.grantPermissions', {
+        'permissions': ['geolocation', 'notifications', 'audioCapture', 'videoCapture'],
+        'origin': 'https://bumble.com'
+    })
+except Exception:
+    pass
+
 # Already on phone input?
 if eval_js(ws, "!!document.querySelector('input[type=\"tel\"],#phone-country-code')"):
     print('ALREADY_ON_PHONE', flush=True); ws.close(); sys.exit(0)
@@ -258,13 +266,32 @@ if not page: print('ERROR:no_page'); sys.exit(1)
 ws = WS(page['webSocketDebuggerUrl'])
 print('CDP_CONNECTED', flush=True)
 
-# Navigation state loop (runs up to 25 seconds)
+try:
+    ws.call('Browser.grantPermissions', {
+        'permissions': ['geolocation', 'notifications', 'audioCapture', 'videoCapture'],
+        'origin': 'https://tinder.com'
+    })
+except Exception:
+    pass
+
+# Navigation state loop (runs up to 30 seconds)
 start_time = time.time()
 found_status = None
+faq_bounce_count = 0
 
-while time.time() - start_time < 25:
-    url_now = eval_js(ws, 'window.location.href') or ''
-    
+while time.time() - start_time < 30:
+    url_now = eval_js(ws, 'window.location.href')
+    if not url_now:
+        time.sleep(0.5)
+        continue
+
+    # 0. If stranded on /faq, navigate back to Tinder home
+    if '/faq' in url_now:
+        print('REDIRECTING_AWAY_FROM_FAQ', flush=True)
+        eval_js(ws, "window.location.replace('https://tinder.com/')")
+        time.sleep(2.5)
+        continue
+
     # 1. Action A: Clear Cookie Consent Banner if visible
     cookie_res = eval_js(ws, """(function(){
         var btns = Array.from(document.querySelectorAll('button, a, div[role="button"]'));
@@ -290,10 +317,15 @@ while time.time() - start_time < 25:
         if (document.querySelector('input[type="tel"], input[name="phone_number"]')) return 'phone';
         if (document.querySelector('input[type="email"], input[id="email"]')) return 'email';
         if (document.querySelector('input[autocomplete="one-time-code"], input[inputmode="numeric"][maxlength="1"]')) return 'otp';
-        var btns = Array.from(document.querySelectorAll('button, a'));
+        var btns = Array.from(document.querySelectorAll('button, a, div[role="button"], div[role="dialog"] button'));
         var hasModal = btns.some(function(b){
             var txt = (b.innerText || b.textContent || '').trim().toLowerCase();
-            return txt.indexOf('trouble logging in') !== -1 || txt.indexOf('log in with phone') !== -1 || txt.indexOf('log in with google') !== -1 || txt.indexOf('log in with facebook') !== -1;
+            return txt.indexOf('trouble logging in') !== -1 || 
+                   txt.indexOf('log in with phone') !== -1 || 
+                   txt.indexOf('log in with google') !== -1 || 
+                   txt.indexOf('log in with facebook') !== -1 || 
+                   txt.indexOf('more options') !== -1 ||
+                   txt.indexOf('log in with email') !== -1;
         });
         if (hasModal) return 'modal';
         return null;
@@ -308,22 +340,22 @@ while time.time() - start_time < 25:
     elif input_check == 'modal':
         found_status = 'MODAL_READY'; break
 
-    # 4. Action B: Open Login Modal by clicking "Get Started", "Create account", or "Log in"
+    # 4. Action B: Open Login Modal by clicking "Log In", "Create account", or "Get started"
     open_res = eval_js(ws, """(function(){
-        var btns = Array.from(document.querySelectorAll('button, a'));
+        var btns = Array.from(document.querySelectorAll('button, a, div[role="button"]'));
         var btn = btns.find(function(b){
             var txt = (b.innerText || b.textContent || '').trim().toLowerCase();
-            return txt === 'get started' || txt === 'create account' || txt === 'log in' || txt === 'login';
+            return txt === 'log in' || txt === 'login' || txt === 'create account' || txt === 'get started';
         });
         if (btn) { btn.click(); return 'clicked_open:' + (btn.innerText||btn.textContent).trim(); }
         return null;
     })()""")
     if open_res:
         print('CLICKED:' + open_res, flush=True)
-        time.sleep(1.2)
+        time.sleep(1.5)
         continue
 
-    time.sleep(0.4)
+    time.sleep(0.5)
 
 if found_status:
     print(found_status, flush=True)

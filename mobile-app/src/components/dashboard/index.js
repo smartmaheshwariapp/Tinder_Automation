@@ -1,0 +1,9 @@
+// src/components/dashboard/index.js — Barrel export for Dashboard components
+export { default as DashboardPanel } from './DashboardPanel';
+export { default as MasterHeroController } from './MasterHeroController';
+export { default as QuickTelemetryCapsule } from './QuickTelemetryCapsule';
+export { default as SegmentedTabControl } from './SegmentedTabControl';
+export { default as ActivityTimeline } from './ActivityTimeline';
+export { default as AutomationV2Panel } from './AutomationV2Panel';
+export { default as SettingsPanel } from './SettingsPanel';
+export { default as FloatingSaveBar } from './FloatingSaveBar';

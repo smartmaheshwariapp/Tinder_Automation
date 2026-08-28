@@ -101,12 +101,10 @@
     "card": [
       ".recsCardboard__cards .Bxsh\\(\\$bxsh-card\\)",
       ".recsCardboard__cardsContainer [data-keyboard-gamepad='true']",
-      ".recsCardboard__cards [draggable='false']",
-      ".recsCardboard__cardsContainer .StretchedBox",
       "div[data-testid='recsCard']",
+      "div[data-testid='recCard']",
       "div.recCard",
       "div.profileCard",
-      ".Expand.enterAnimationContainer > div:nth-child(1)",
       ".keen-slider__slide[aria-hidden='false']",
       "[class*='profileCard' i]",
       "div[aria-label='Profile Card']",

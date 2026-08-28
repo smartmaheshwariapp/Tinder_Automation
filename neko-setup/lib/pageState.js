@@ -81,6 +81,23 @@ try:
             return el && el.offsetParent !== null && el.offsetWidth > 0 && el.offsetHeight > 0 && el.getAttribute('aria-hidden') !== 'true';
         };
 
+        // 0. FAQ Screen Bypass (Redirect immediately to login SPA)
+        if (url.indexOf('/faq') !== -1) {
+            window.location.replace('https://tinder.com/');
+            return 'navigating';
+        }
+
+        // 0.1 Cookie Consent Auto-Dismiss
+        try {
+            var cookieBtn = Array.from(document.querySelectorAll('button, a, div[role="button"]')).find(function(b) {
+                var t = (b.innerText || b.textContent || '').trim().toLowerCase();
+                return t === 'i accept' || t === 'accept all' || t === 'accept' || t === 'i agree';
+            });
+            if (cookieBtn && isVisible(cookieBtn)) {
+                cookieBtn.click();
+            }
+        } catch (_) {}
+
         // 1. Google Sign-In Detection
         if (url.indexOf('accounts.google.com') !== -1) {
             var pwdInp = document.querySelector('input[type="password"]') || document.querySelector('input[name="Passwd"]');
@@ -98,11 +115,38 @@ try:
             document.querySelector('.encounters-main') !== null ||
             document.querySelector('button[aria-label="Like"]') !== null ||
             document.querySelector('button[aria-label="Pass"]') !== null ||
+            document.querySelector('button[aria-label="Super Like"]') !== null ||
+            document.querySelector('[data-testid="gamepad-like"]') !== null ||
+            document.querySelector('[data-testid="gamepad-pass"]') !== null ||
+            document.querySelector('[data-testid="recs-card"]') !== null ||
             document.querySelector('a[href="/app/recs"]') !== null ||
             document.querySelector('a[href="/app/messages"]') !== null ||
+            document.querySelector('a[href="/app/matches"]') !== null ||
+            document.querySelector('a[href="/app/explore"]') !== null ||
+            document.querySelector('a[href="/app/profile"]') !== null ||
+            document.querySelector('a[href="/app/my-profile"]') !== null ||
             url.indexOf('/app/recs') !== -1 ||
             url.indexOf('/app/messages') !== -1 ||
-            (url.indexOf('/app/') !== -1 && url.indexOf('/app/login') === -1)
+            url.indexOf('/app/matches') !== -1 ||
+            url.indexOf('/app/explore') !== -1 ||
+            url.indexOf('/app/profile') !== -1 ||
+            url.indexOf('/app/onboarding') !== -1 ||
+            url.indexOf('/app/settings') !== -1 ||
+            url.indexOf('/app/safety') !== -1 ||
+            (url.indexOf('/app/') !== -1 && url.indexOf('/app/login') === -1) ||
+            // Check auth token in storage when login dialog is gone
+            (function() {
+                try {
+                    var token = localStorage.getItem('TinderWeb/APIToken') || localStorage.getItem('persist:auth') || localStorage.getItem('auth.session') || (document.cookie && document.cookie.indexOf('tok=') !== -1 ? 'valid_cookie' : null);
+                    var hasLoginInput = document.querySelector('input[type="tel"]') !== null || 
+                                       document.querySelector('input[autocomplete="one-time-code"]') !== null || 
+                                       document.querySelector('input[name="phone_number"]') !== null || 
+                                       document.querySelector('input[type="email"]') !== null ||
+                                       document.querySelector('input[name="code"]') !== null;
+                    if (token && typeof token === 'string' && token.trim().length > 10 && !hasLoginInput) return true;
+                } catch(e) {}
+                return false;
+            })()
         );
         if (isLoggedIn) return 'logged_in';
 
@@ -133,35 +177,23 @@ try:
         if (hasExplicitPhoneHeading) return 'phone_screen';
 
         // 5. Email OTP vs SMS OTP Check (HIGH PRIORITY: "My code is" / OTP screen)
-        var emailAddress = '';
         var hasEmailOtpInput = (function() {
             var els = Array.from(document.querySelectorAll('h1, h2, h3, p, span, label, div'));
             return els.some(function(el) {
                 if (!isVisible(el)) return false;
                 var txt = (el.innerText || el.textContent || '').toLowerCase();
-                var rawTxt = (el.innerText || el.textContent || '');
-                if (rawTxt.indexOf('@') !== -1) {
-                    var m = rawTxt.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-                    if (m) emailAddress = m[0];
-                }
                 return txt.indexOf('my code is') !== -1 ||
                        txt.indexOf('resend via email') !== -1 ||
                        (txt.indexOf('passcode to') !== -1 && txt.indexOf('@') !== -1);
             });
         })();
-        if (hasEmailOtpInput) return JSON.stringify({ state: 'email_otp_screen', email: emailAddress });
+        if (hasEmailOtpInput) return 'email_otp_screen';
 
-        var phoneAddress = '';
         var hasSmsOtpInput = (function() {
             var els = Array.from(document.querySelectorAll('h1, h2, h3, p, span, label, div, button'));
             return els.some(function(el) {
                 if (!isVisible(el)) return false;
                 var txt = (el.innerText || el.textContent || '').toLowerCase();
-                var rawTxt = (el.innerText || el.textContent || '');
-                if (rawTxt.indexOf('+') !== -1 || rawTxt.indexOf('****') !== -1) {
-                    var m = rawTxt.match(/(\+\d{1,4}\s*\d{6,12}|\*{4}\s*\d{2,4})/);
-                    if (m) phoneAddress = m[0];
-                }
                 return txt.indexOf('recognize your device') !== -1 ||
                        txt.indexOf('resend via sms') !== -1 ||
                        txt.indexOf('passcode to ****') !== -1 ||
@@ -169,7 +201,7 @@ try:
                        (txt.indexOf('trouble logging in') !== -1 && document.querySelectorAll('input').length >= 4);
             });
         })();
-        if (hasSmsOtpInput) return JSON.stringify({ state: 'sms_otp_screen', phone: phoneAddress });
+        if (hasSmsOtpInput) return 'sms_otp_screen';
 
         // 6. Email Rate Limit Check (on Email Input screen)
         var hasEmailRateLimit = (function() {
@@ -177,11 +209,9 @@ try:
             return els.some(function(e) {
                 if (!isVisible(e)) return false;
                 var txt = (e.innerText || e.textContent || '').toLowerCase();
-                return txt.indexOf('too many attempts') !== -1 ||
-                       txt.indexOf('wait up to one minute') !== -1 ||
+                return txt.indexOf('wait up to one minute') !== -1 ||
                        txt.indexOf('wait a minute') !== -1 ||
-                       txt.indexOf('please wait') !== -1 ||
-                       txt.indexOf('try again later') !== -1;
+                       txt.indexOf('please wait up to') !== -1;
             });
         })();
         if (hasEmailRateLimit) return 'email_rate_limited';
@@ -271,38 +301,39 @@ except Exception as e:
     const tmpPath = path.join(__dirname, '..', `_state_check_${uniqueId}.py`);
     fs.writeFileSync(tmpPath, pyCheck, 'utf8');
     exec(`docker cp "${tmpPath}" neko:/tmp/state_check_${uniqueId}.py`, (cpErr) => {
-      try { fs.unlinkSync(tmpPath); } catch (_) {}
-      if (cpErr) {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ state: 'unknown' }));
-        return;
-      }
-      exec(`docker exec neko python3 /tmp/state_check_${uniqueId}.py`, (err, stdout) => {
-        exec(`docker exec neko rm -f /tmp/state_check_${uniqueId}.py`, () => {});
-        const lines = (stdout || '').split('\n').filter(Boolean);
-        let stateObj = { state: 'unknown', email: '' };
-        lines.forEach(line => {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('DEBUG_INFO:')) {
-            try {
-              if (trimmed.startsWith('{')) {
-                stateObj = JSON.parse(trimmed);
-              } else {
-                stateObj = { state: trimmed, email: '' };
-              }
-            } catch (_) {
-              stateObj = { state: trimmed, email: '' };
+        try { fs.unlinkSync(tmpPath); } catch (_) { }
+        if (cpErr) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ state: 'unknown' }));
+            return;
+        }
+        exec(`docker exec neko python3 /tmp/state_check_${uniqueId}.py`, (err, stdout) => {
+            exec(`docker exec neko rm -f /tmp/state_check_${uniqueId}.py`, () => { });
+            const lines = (stdout || '').split('\n').filter(Boolean);
+            let state = 'unknown';
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('DEBUG_INFO:')) {
+                    state = trimmed;
+                }
+            });
+
+            // If session flag exists on disk and state is unknown, verify logged_in
+            if (state === 'unknown') {
+                const flagPath = path.join(__dirname, 'sessions', 'dev_user_1', 'logged_in.flag');
+                if (fs.existsSync(flagPath)) {
+                    state = 'logged_in';
+                }
             }
-          }
+
+            console.log(`[Orchestrator] Page state check: ${state}`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ state }));
         });
-        console.log(`[Orchestrator] Page state check: ${stateObj.state} ${stateObj.email ? '(' + stateObj.email + ')' : ''}`);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(stateObj));
-      });
     });
 }
 
 module.exports = {
-  handleNavStatus,
-  handleCheckPageState,
+    handleNavStatus,
+    handleCheckPageState,
 };

@@ -51,4 +51,14 @@ Thumbs.db
 
 # Neko Chrome profile sessions (large runtime cache, not source)
 neko-setup/sessions/
+neko-setup/lib/sessions/
 neko-setup/clean-extension/
+
+# Mobile App & Build artifacts
+.expo/
+*.zip
+*.rar
+*.dmp
+*.pma
+*.ldb
+*Singleton*

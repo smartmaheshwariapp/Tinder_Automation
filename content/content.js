@@ -1,3 +1,40 @@
+// Auto-redirect away from /faq directly to Tinder home
+if (window.location.pathname.startsWith('/faq') || window.location.href.includes('/faq')) {
+  window.location.replace('https://tinder.com/');
+}
+
+// ─── Automated Cookie Consent Auto-Dismiss ───
+function autoDismissCookies() {
+  try {
+    const btns = Array.from(document.querySelectorAll('button, a, div[role="button"]'));
+    for (let i = 0; i < btns.length; i++) {
+      const b = btns[i];
+      const txt = (b.innerText || b.textContent || '').trim().toLowerCase();
+      if (txt === 'i accept' || txt === 'accept all' || txt === 'accept' || txt === 'i agree') {
+        b.click();
+        return true;
+      }
+    }
+  } catch (_) {}
+  return false;
+}
+
+if (typeof document !== 'undefined') {
+  autoDismissCookies();
+  const cookieObserver = new MutationObserver(() => {
+    autoDismissCookies();
+  });
+  if (document.body) {
+    cookieObserver.observe(document.body, { childList: true, subtree: true });
+  } else {
+    document.addEventListener('DOMContentLoaded', () => {
+      if (document.body) {
+        cookieObserver.observe(document.body, { childList: true, subtree: true });
+      }
+    });
+  }
+}
+
 // Inject interceptor into page context (only once)
 if (!document.querySelector('script[data-flirteasy-interceptor]')) {
   const script = document.createElement('script');
@@ -1065,21 +1102,45 @@ async function autoLike(count) {
           break;
         }
 
-        const profileVisible = isProfileVisible();
+        let profileVisible = isProfileVisible();
         console.log(`[FlirtEasy] Profile visible: ${profileVisible}`);
 
         if (!profileVisible) {
-          console.warn(`[FlirtEasy] No profile visible at check ${profilesChecked}, waiting...`);
-          await waitRandom(4000, 6000); // Wait longer for loading
+          console.warn(`[FlirtEasy] No profile card loaded at check ${profilesChecked} — Tinder is searching/loading recs`);
+          try {
+            chrome.runtime.sendMessage({
+              action: 'updateAgentState',
+              state: { activeSubPhase: 'lead_scan' }
+            });
+          } catch (_) {}
 
-          if (!isProfileVisible()) {
+          // Wait up to 12 seconds in 2.5s increments for candidate cards to populate
+          let attempts = 0;
+          while (!profileVisible && attempts < 5) {
+            await waitRandom(2000, 3000);
+            attempts++;
+            profileVisible = isProfileVisible();
             if (isStackEmpty()) {
-              console.log('[FlirtEasy] Stack confirmed empty after wait, stopping');
+              console.log('[FlirtEasy] Stack confirmed empty while waiting for profiles, stopping cycle');
               break;
             }
-            errors.push(`No profile at check ${profilesChecked}`);
+          }
+
+          if (!profileVisible) {
+            if (isStackEmpty()) {
+              console.log('[FlirtEasy] No more profiles in deck, ending swipe cycle');
+              break;
+            }
+            console.log(`[FlirtEasy] Still no profile loaded after wait at check ${profilesChecked}, skipping click`);
+            errors.push(`Deck loading timeout at check ${profilesChecked}`);
             continue;
           }
+        }
+
+        // Final guard: NEVER click or count swipes if no real card is present
+        if (!isProfileVisible()) {
+          console.warn('[FlirtEasy] Strict Guard: Card not visible, skipping swipe to prevent false likes');
+          continue;
         }
 
         // Check age filter BEFORE liking
@@ -1145,9 +1206,13 @@ async function autoLike(count) {
           }
         }
 
+        // Final candidate validation before liking
+        if (!isProfileVisible()) {
+          console.warn('[FlirtEasy] Candidate disappeared before click, aborting like');
+          continue;
+        }
+
         // STREAMING: Get name for personalized feed BEFORE clicking
-        // Extracting name after click causes a 1-2 swipe delay because 
-        // Tinder immediately updates the DOM stack to show the next card.
         const currentName = (typeof getSwipeCardName === 'function' ? getSwipeCardName() : getMatchName()) || 'Someone';
 
         const clicked = clickLikeButton();

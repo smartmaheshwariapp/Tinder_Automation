@@ -213,14 +213,54 @@ function detectTinderAccountTier() {
 }
 
 function isStackEmpty() {
-  const text = (document.body.innerText || document.body.textContent).toLowerCase();
+  const text = (document.body.innerText || document.body.textContent || '').toLowerCase();
   return text.includes("unable to find any potential matches") ||
     text.includes("checking out the profiles") ||
     text.includes("try changing your preferences") ||
     text.includes("people looking for") ||
     text.includes("we've run out of potential matches") ||
     text.includes("run out of potential matches") ||
+    text.includes("there's no one new around you") ||
+    text.includes("no one new around you") ||
     text.includes("go global");
+}
+
+function isProfileVisible() {
+  if (!window.SELECTORS) return false;
+
+  // Layer 1: Check for "No matches" or "Searching" text
+  const bodyText = (document.body.innerText || document.body.textContent || '').toLowerCase();
+  if (
+    bodyText.includes("unable to find any potential matches") ||
+    bodyText.includes("people looking for") ||
+    bodyText.includes("out of likes") ||
+    bodyText.includes("checking out the profiles") ||
+    bodyText.includes("looking for people near you") ||
+    bodyText.includes("searching for people") ||
+    bodyText.includes("there's no one new around you") ||
+    bodyText.includes("no one new around you") ||
+    bodyText.includes("finding people near you") ||
+    bodyText.includes("looking for potential matches")
+  ) {
+    console.log('[FlirtEasy] No matches, searching, or out of likes screen detected in text');
+    return false;
+  }
+
+  // Layer 2: A valid Tinder candidate card MUST have either a candidate name or a photo URL
+  const cardName = typeof getSwipeCardName === 'function' ? getSwipeCardName() : null;
+  const photoUrl = typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl() : null;
+
+  if (!cardName && !photoUrl) {
+    console.log('[FlirtEasy] No candidate card name or photo found — Tinder is in searching/radar state');
+    return false;
+  }
+
+  // Layer 3: Ensure card element is actually rendered and visible in viewport
+  const profileCard = findElement(window.SELECTORS.profile.card);
+  if (!profileCard) return false;
+
+  const rect = profileCard.getBoundingClientRect();
+  return rect.width >= 100 && rect.height >= 100;
 }
 
 function clickLikeButton() {
@@ -231,6 +271,14 @@ function clickLikeButton() {
     console.log('[FlirtEasy] Like button clicked');
     return true;
   }
+
+  // Keyboard shortcut fallback (Tinder web standard: ArrowRight = Like)
+  try {
+    const keyEvent = new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39, which: 39, bubbles: true, cancelable: true });
+    window.dispatchEvent(keyEvent);
+    document.dispatchEvent(keyEvent);
+    console.log('[FlirtEasy] Dispatched ArrowRight keydown for Like');
+  } catch (_) {}
 
   console.log('[FlirtEasy] Like button not found, attempting swipe right...');
   return swipeRight();
@@ -331,6 +379,15 @@ function clickPassButton() {
     console.log('[FlirtEasy] Pass button clicked');
     return true;
   }
+
+  // Keyboard shortcut fallback (Tinder web standard: ArrowLeft = Pass)
+  try {
+    const keyEvent = new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37, which: 37, bubbles: true, cancelable: true });
+    window.dispatchEvent(keyEvent);
+    document.dispatchEvent(keyEvent);
+    console.log('[FlirtEasy] Dispatched ArrowLeft keydown for Pass');
+  } catch (_) {}
+
   console.log('[FlirtEasy] Pass button not found, attempting swipe left...');
   return swipeLeft();
 }
@@ -386,25 +443,7 @@ function getCurrentProfile() {
   };
 }
 
-function isProfileVisible() {
-  if (!window.SELECTORS) return false;
 
-  // Check for "No matches" text specifically
-  const bodyText = document.body.innerText;
-  if (bodyText.includes("unable to find any potential matches") ||
-    bodyText.includes("people looking for") ||
-    bodyText.includes("out of likes")) {
-    console.log('[FlirtEasy] "No matches" or "Out of likes" screen detected');
-    return false;
-  }
-
-  const profileCard = findElement(window.SELECTORS.profile.card);
-  if (!profileCard) return false;
-
-  // Ensure card has dimensions (is actually visible)
-  const rect = profileCard.getBoundingClientRect();
-  return rect.width > 0 && rect.height > 0;
-}
 
 function hasMatchModal() {
   if (!window.SELECTORS) return false;

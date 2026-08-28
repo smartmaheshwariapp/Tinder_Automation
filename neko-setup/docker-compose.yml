@@ -9,21 +9,26 @@ services:
       - seccomp:unconfined
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    network_mode: host
+    ports:
+      - "8080:8080"
+      - "9222:9222"
+      - "55000:55000/tcp"
+      - "55000:55000/udp"
     cap_add:
       - SYS_ADMIN # Required for browser sandbox security
     environment:
       # --- General Settings ---
       NEKO_DESKTOP_SCREEN: "768x1024@30"
-      NEKO_START_URL: ${NEKO_START_URL:-https://bumble.com/get-started}
+      NEKO_DESKTOP_SCREENS: "768x1024@30,416x912@30,1024x768@30,1280x720@30,1920x1080@30"
+      NEKO_START_URL: ${NEKO_START_URL:-https://tinder.com/}
       NEKO_MEMBER_MULTIUSER_USER_PASSWORD: "neko"
       NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD: "admin"
       NEKO_CAPTURE_VIDEO_SHOW_POINTER: "false"
       # --- WebRTC Configuration ---
-      NEKO_WEBRTC_NAT1TO1: ${NEKO_WEBRTC_NAT1TO1}
-      NEKO_EPR: "59000-59099"
-      NEKO_WEBRTC_UDPMUX: "59000"
-      NEKO_WEBRTC_TCPMUX: "59000"
+      NEKO_WEBRTC_NAT1TO1: ${NEKO_WEBRTC_NAT1TO1:-127.0.0.1}
+      NEKO_EPR: "55000-55000"
+      NEKO_WEBRTC_UDPMUX: "55000"
+      NEKO_WEBRTC_TCPMUX: "55000"
       NEKO_WEBRTC_ICELITE: "true"
       NEKO_SESSION_IMPLICIT_HOSTING: "true"
       NEKO_PROXY: ${NEKO_PROXY:-}
@@ -32,4 +37,5 @@ services:
       - ${NEKO_SESSION_DIR:-./sessions/default}:/home/neko/.config/chromium
       - ./chromium.conf:/etc/neko/supervisord/chromium.conf:ro
       - ./policies.json:/etc/chromium/policies/managed/policies.json:ro
+      - ./xorg.conf:/etc/neko/xorg.conf:ro
       - ./clean-extension:/src/extension:ro
