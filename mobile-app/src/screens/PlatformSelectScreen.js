@@ -228,16 +228,6 @@ export default function PlatformSelectScreen({ navigation }) {
         </View>
 
         <View style={styles.headerActions}>
-          {/* Live Screen Peek Button */}
-          <TouchableOpacity
-            style={styles.liveBtn}
-            onPress={handleOpenLiveFeed}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="videocam-outline" size={14} color="#FE3C72" />
-            <Text style={styles.liveBtnText}>Live</Text>
-          </TouchableOpacity>
-
           {/* Connection Settings Gear */}
           <TouchableOpacity
             style={styles.gearBtn}
@@ -629,22 +619,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  liveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
-  },
-  liveBtnText: {
-    color: '#FE3C72',
-    fontSize: 12,
-    fontWeight: '700',
   },
   gearBtn: {
     width: 34,
