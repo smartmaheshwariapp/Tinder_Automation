@@ -45,6 +45,8 @@ export default function BrowserScreen({ route, navigation }) {
   const [rateLimitTimer, setRateLimitTimer] = useState(0);
   const [dummyText, setDummyText] = useState('');
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const appState = useRef(AppState.currentState);
 
   const lastSwipeTime = useRef(0);
@@ -248,6 +250,7 @@ export default function BrowserScreen({ route, navigation }) {
 
 
   const handleLogout = async () => {
+    setLoggingOut(true);
     try {
       setShowDashboard(false);
       setLoginStep('options');
@@ -262,21 +265,12 @@ export default function BrowserScreen({ route, navigation }) {
         body: JSON.stringify({ platform: 'tinder' }),
       });
     } catch (_) {}
+    setLoggingOut(false);
+    setShowLogoutConfirm(false);
   };
 
   const confirmLogout = () => {
-    Alert.alert(
-      'Log Out of Tinder?',
-      'Are you sure you want to log out? This will terminate the active session and return you to the login screen.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: handleLogout,
-        },
-      ]
-    );
+    setShowLogoutConfirm(true);
   };
 
   const handleGoBack = async () => {
@@ -621,6 +615,55 @@ export default function BrowserScreen({ route, navigation }) {
               }
             />
           </SafeAreaView>
+        </Modal>
+
+        {/* ─── Custom Logout Confirmation Modal ─── */}
+        <Modal
+          visible={showLogoutConfirm}
+          transparent
+          animationType="fade"
+          onRequestClose={() => !loggingOut && setShowLogoutConfirm(false)}
+          statusBarTranslucent
+        >
+          <View style={styles.logoutModalOverlay}>
+            <View style={styles.logoutModalCard}>
+              <View style={styles.logoutIconBadge}>
+                <Ionicons name="log-out" size={28} color="#EF4444" />
+              </View>
+
+              <Text style={styles.logoutModalTitle}>Log Out of Tinder?</Text>
+              <Text style={styles.logoutModalSubtitle}>
+                This will terminate the active session, clear browser state, and return you to the login screen.
+              </Text>
+
+              <View style={styles.logoutModalBtnRow}>
+                <TouchableOpacity
+                  style={styles.logoutModalCancelBtn}
+                  onPress={() => setShowLogoutConfirm(false)}
+                  disabled={loggingOut}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.logoutModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.logoutModalConfirmBtn}
+                  onPress={handleLogout}
+                  disabled={loggingOut}
+                  activeOpacity={0.85}
+                >
+                  {loggingOut ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="log-out-outline" size={16} color="#FFF" />
+                      <Text style={styles.logoutModalConfirmText}>Log Out</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         </Modal>
 
         {/* ─── Rounded Glass Browser Container ─── */}
@@ -2040,5 +2083,96 @@ const styles = StyleSheet.create({
     width: 0,
     height: 0,
     opacity: 0,
+  },
+
+  // ── Custom Logout Confirmation Modal ──
+  logoutModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(5, 4, 10, 0.80)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  logoutModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#141220',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.28)',
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  logoutIconBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.32)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  logoutModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  logoutModalSubtitle: {
+    color: '#8E8DA3',
+    fontSize: 12.5,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 22,
+  },
+  logoutModalBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+  },
+  logoutModalCancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoutModalCancelText: {
+    color: '#D8D6E8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  logoutModalConfirmBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  logoutModalConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });
