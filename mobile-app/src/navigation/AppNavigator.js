@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AuthScreen from '../screens/AuthScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 import PlatformSelectScreen from '../screens/PlatformSelectScreen';
 import PlatformConfigScreen from '../screens/PlatformConfigScreen';
 import BrowserScreen from '../screens/BrowserScreen';
@@ -19,6 +20,7 @@ export default function AppNavigator() {
       }}
     >
       <Stack.Screen name="Auth" component={AuthScreen} />
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="PlatformSelect" component={PlatformSelectScreen} />
       <Stack.Screen name="CloudDashboard" component={CloudDashboardScreen} />
       <Stack.Screen name="PlatformConfig" component={PlatformConfigScreen} />
@@ -26,4 +28,3 @@ export default function AppNavigator() {
     </Stack.Navigator>
   );
 }
-

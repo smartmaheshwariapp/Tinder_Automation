@@ -331,7 +331,11 @@ export default function AuthScreen({ navigation }) {
     safeHaptic('success');
     setTimeout(() => {
       setIsLoading(false);
-      navigation.replace('PlatformSelect');
+      if (authMode === 'signup') {
+        navigation.replace('Onboarding');
+      } else {
+        navigation.replace('PlatformSelect');
+      }
     }, 850);
   };
 
