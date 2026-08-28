@@ -152,6 +152,7 @@ export default function DashboardPanel({
             onLogout={onLogout}
             rawControlsContent={controlsContent}
             orchestratorUrl={orchestratorUrl}
+            stats={stats}
           />
         )}
       </ScrollView>
