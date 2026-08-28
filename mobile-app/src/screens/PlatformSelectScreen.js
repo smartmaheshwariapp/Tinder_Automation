@@ -279,26 +279,84 @@ export default function PlatformSelectScreen({ navigation }) {
         </View>
       </View>
 
-      {/* ═══════════════════ LOGIN BANNER (contextual) ═══════════════════ */}
-      {isLoggedIn === false && !checkingAuth && (
-        <Animated.View style={[styles.loginBanner, { transform: [{ translateY: bannerSlide }] }]}>
-          <View style={styles.loginBannerContent}>
-            <Image source={TINDER_IMG} style={styles.loginBannerIcon} />
-            <View style={styles.loginBannerTextWrap}>
-              <Text style={styles.loginBannerTitle}>Connect Tinder Account</Text>
-              <Text style={styles.loginBannerSub}>Log in once to activate full AI automation</Text>
+      {/* ═══════════════════ UPGRADED ACCOUNT & SESSION HUB ═══════════════════ */}
+      <View style={styles.accountHubCard}>
+        {/* Top Account Header Row */}
+        <View style={styles.accountHubHeader}>
+          <View style={styles.accountHubHeaderLeft}>
+            <View style={styles.platformLogoWrap}>
+              <Image source={TINDER_IMG} style={styles.platformLogo} />
+              {isLoggedIn && <View style={styles.onlinePulseBadge} />}
             </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.accountTitleRow}>
+                <Text style={styles.accountName}>Tinder Account</Text>
+                <View style={[
+                  styles.planBadge,
+                  isLoggedIn ? styles.planBadgeActive : styles.planBadgeInactive
+                ]}>
+                  <Text style={[
+                    styles.planBadgeText,
+                    isLoggedIn ? styles.planBadgeTextActive : styles.planBadgeTextInactive
+                  ]}>
+                    {isLoggedIn ? 'PRO PLAN ✦' : 'NOT CONNECTED'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.accountStatusSub} numberOfLines={1}>
+                {checkingAuth
+                  ? 'Verifying session status…'
+                  : (isLoggedIn ? 'Active & synced with AI assistant' : 'Log in to enable AI automations')}
+              </Text>
+            </View>
+          </View>
+
+          {/* Action Button: Log Out (if logged in) or Connect (if logged out) */}
+          {isLoggedIn ? (
             <TouchableOpacity
-              style={styles.loginBannerBtn}
+              style={styles.accountLogoutGlassBtn}
+              onPress={confirmLogout}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="log-out-outline" size={13} color="#EF4444" />
+              <Text style={styles.accountLogoutGlassBtnText}>Log Out</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.accountConnectBtn}
               onPress={handleOpenLiveFeed}
               activeOpacity={0.85}
             >
-              <Text style={styles.loginBannerBtnText}>Connect</Text>
-              <Ionicons name="arrow-forward" size={13} color="#FFF" />
+              <Text style={styles.accountConnectBtnText}>Log In</Text>
+              <Ionicons name="arrow-forward" size={12} color="#FFF" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Quick Details & Live Stream Peek Bar (when logged in) */}
+        {isLoggedIn && (
+          <View style={styles.accountDetailsRow}>
+            <View style={styles.accountDetailItem}>
+              <Ionicons name="shield-checkmark-outline" size={12} color="#10B981" />
+              <Text style={styles.accountDetailText}>Tunnel Secured</Text>
+            </View>
+            <View style={styles.accountDetailDivider} />
+            <View style={styles.accountDetailItem}>
+              <Ionicons name="pulse-outline" size={12} color="#FD297B" />
+              <Text style={styles.accountDetailText}>AI Autopilot Ready</Text>
+            </View>
+            <View style={styles.accountDetailDivider} />
+            <TouchableOpacity
+              style={styles.accountDetailItemInteractive}
+              onPress={handleOpenLiveFeed}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="videocam-outline" size={12} color="#60A5FA" />
+              <Text style={[styles.accountDetailText, { color: '#60A5FA', fontWeight: '700' }]}>Live Feed ➔</Text>
             </TouchableOpacity>
           </View>
-        </Animated.View>
-      )}
+        )}
+      </View>
 
       {/* ═══════════════════ MAIN DASHBOARD BODY ═══════════════════ */}
       <Animated.View style={[styles.dashboardWrap, { opacity: fadeAnim }]}>
@@ -332,17 +390,6 @@ export default function PlatformSelectScreen({ navigation }) {
                   <Ionicons name="phone-portrait-outline" size={15} color="#FFF" />
                   <Text style={styles.openStreamBtnText}>View Live Tinder Stream</Text>
                 </TouchableOpacity>
-
-                {isLoggedIn && (
-                  <TouchableOpacity
-                    style={styles.mainLogoutBtn}
-                    onPress={confirmLogout}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="log-out-outline" size={15} color="#EF4444" />
-                    <Text style={styles.mainLogoutBtnText}>Log Out of Tinder</Text>
-                  </TouchableOpacity>
-                )}
               </View>
             </View>
           }
@@ -600,51 +647,157 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Login Banner ──
-  loginBanner: {
-    backgroundColor: '#161324',
-    borderBottomWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+  // ── Upgraded Account Hub Card ──
+  accountHubCard: {
+    marginHorizontal: 14,
+    marginTop: 10,
+    marginBottom: 4,
+    backgroundColor: '#120F1D',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  loginBannerContent: {
+  accountHubHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    justifyContent: 'space-between',
   },
-  loginBannerIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-  },
-  loginBannerTextWrap: {
+  accountHubHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     flex: 1,
+    marginRight: 8,
   },
-  loginBannerTitle: {
-    color: '#F59E0B',
-    fontSize: 12.5,
+  platformLogoWrap: {
+    position: 'relative',
+  },
+  platformLogo: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+  },
+  onlinePulseBadge: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#120F1D',
+  },
+  accountTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  accountName: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
     fontWeight: '800',
+    letterSpacing: -0.2,
   },
-  loginBannerSub: {
+  planBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  planBadgeActive: {
+    backgroundColor: 'rgba(253, 41, 123, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(253, 41, 123, 0.3)',
+  },
+  planBadgeInactive: {
+    backgroundColor: 'rgba(113, 110, 137, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(113, 110, 137, 0.25)',
+  },
+  planBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  planBadgeTextActive: {
+    color: '#FD297B',
+  },
+  planBadgeTextInactive: {
     color: '#8E8DA3',
-    fontSize: 10.5,
-    fontWeight: '500',
-    marginTop: 1,
   },
-  loginBannerBtn: {
+  accountStatusSub: {
+    color: '#8E8DA3',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  accountLogoutGlassBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: 'rgba(239, 68, 68, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.28)',
+    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  accountLogoutGlassBtnText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  accountConnectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     backgroundColor: '#FE3C72',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 8,
   },
-  loginBannerBtnText: {
-    color: '#FFF',
+  accountConnectBtnText: {
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '800',
+  },
+  accountDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  accountDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4.5,
+  },
+  accountDetailItemInteractive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4.5,
+  },
+  accountDetailText: {
+    color: '#9E9DAF',
+    fontSize: 10.5,
+    fontWeight: '600',
+  },
+  accountDetailDivider: {
+    width: 1,
+    height: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
 
   // ── Dashboard Body ──
@@ -693,22 +846,6 @@ const styles = StyleSheet.create({
   },
   openStreamBtnText: {
     color: '#FFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  mainLogoutBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.28)',
-    borderRadius: 10,
-    paddingVertical: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  mainLogoutBtnText: {
-    color: '#EF4444',
     fontSize: 13,
     fontWeight: '700',
   },
