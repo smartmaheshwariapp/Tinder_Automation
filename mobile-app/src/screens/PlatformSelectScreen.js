@@ -226,33 +226,7 @@ export default function PlatformSelectScreen({ navigation }) {
         <View style={styles.headerLeft}>
           <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" />
           <View>
-            <View style={styles.headerTitleRow}>
-              <Text style={styles.headerTitle}>FlirtEasy</Text>
-              <View style={[
-                styles.statusDotWrap,
-                {
-                  backgroundColor: checkingAuth
-                    ? 'rgba(113,110,137,0.12)'
-                    : (isLoggedIn ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)')
-                },
-                {
-                  borderColor: checkingAuth
-                    ? 'rgba(113,110,137,0.25)'
-                    : (isLoggedIn ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)')
-                },
-              ]}>
-                <View style={[
-                  styles.statusDot,
-                  { backgroundColor: checkingAuth ? '#716E89' : (isLoggedIn ? '#10B981' : '#F59E0B') },
-                ]} />
-                <Text style={[
-                  styles.statusDotText,
-                  { color: checkingAuth ? '#716E89' : (isLoggedIn ? '#10B981' : '#F59E0B') },
-                ]}>
-                  {checkingAuth ? 'Connecting' : (isLoggedIn ? 'Tinder Active' : 'Setup Required')}
-                </Text>
-              </View>
-            </View>
+            <Text style={styles.headerTitle}>FlirtEasy</Text>
             <Text style={styles.headerSub}>AI Dating Assistant</Text>
           </View>
         </View>
@@ -594,11 +568,6 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 10,
   },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   headerTitle: {
     color: '#FFF',
     fontSize: 16.5,
@@ -610,25 +579,6 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '600',
     marginTop: 1,
-  },
-  statusDotWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4.5,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  statusDotText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.2,
   },
   headerActions: {
     flexDirection: 'row',
