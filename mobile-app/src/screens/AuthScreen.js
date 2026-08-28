@@ -16,6 +16,7 @@ import {
   StatusBar,
   ScrollView,
   Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +34,7 @@ export default function AuthScreen({ navigation, route }) {
   const [isFocused, setIsFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successNotice, setSuccessNotice] = useState('');
   const [countdown, setCountdown] = useState(45);
   const [resendActive, setResendActive] = useState(false);
 
@@ -40,12 +42,12 @@ export default function AuthScreen({ navigation, route }) {
   const orbScale1 = useRef(new Animated.Value(1)).current;
   const orbScale2 = useRef(new Animated.Value(1)).current;
   const orbOpacity = useRef(new Animated.Value(0.6)).current;
-  
+
   const contentFade = useRef(new Animated.Value(0)).current;
   const contentSlide = useRef(new Animated.Value(30)).current;
   const logoFloat = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
-  const stepSlide = useRef(new Animated.Value(0)).current;
+  const stepTransition = useRef(new Animated.Value(0)).current; // 0: email, 1: otp
 
   const otpInputs = useRef([]);
 
@@ -154,14 +156,14 @@ export default function AuthScreen({ navigation, route }) {
       base = base.split('@')[0];
     }
     if (!base) base = 'user';
-    setEmail(`${base}${domain}`);
+    setEmail(`${base}${domain}`.toLowerCase());
     setErrorMessage('');
   };
 
   // ── Submit Email Step ──
   const handleEmailSubmit = async () => {
     Keyboard.dismiss();
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !isValidEmail(cleanEmail)) {
       setErrorMessage('Please enter a valid email address.');
       triggerShake();
@@ -170,31 +172,50 @@ export default function AuthScreen({ navigation, route }) {
     setErrorMessage('');
     setIsLoading(true);
 
-    // Simulate / Trigger verification code
+    // Simulate verification code dispatch
     setTimeout(() => {
       setIsLoading(false);
-      // Animate transition to OTP step
-      Animated.timing(stepSlide, {
+      setStep('otp');
+      setCountdown(45);
+      setResendActive(false);
+      setSuccessNotice(`Security code sent to ${cleanEmail}`);
+      Animated.timing(stepTransition, {
         toValue: 1,
-        duration: 300,
+        duration: 350,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }).start(() => {
-        setStep('otp');
-        setCountdown(45);
-        setResendActive(false);
-        // Focus first OTP cell
-        setTimeout(() => otpInputs.current[0]?.focus(), 150);
-      });
-    }, 900);
+      }).start();
+
+      setTimeout(() => otpInputs.current[0]?.focus(), 150);
+    }, 700);
   };
 
-  // ── OTP Digit Input Handler ──
+  // ── OTP Digit Input Handler with Paste Support ──
   const handleOtpChange = (text, index) => {
+    setErrorMessage('');
+    setSuccessNotice('');
+
+    // Handle full 6-digit paste
+    if (text && text.length > 1) {
+      const cleanDigits = text.replace(/[^0-9]/g, '').slice(0, 6);
+      const newOtp = ['', '', '', '', '', ''];
+      for (let i = 0; i < cleanDigits.length; i++) {
+        newOtp[i] = cleanDigits[i];
+      }
+      setOtp(newOtp);
+      if (cleanDigits.length === 6) {
+        otpInputs.current[5]?.focus();
+        verifyOtp(cleanDigits);
+      } else {
+        const nextIdx = Math.min(cleanDigits.length, 5);
+        otpInputs.current[nextIdx]?.focus();
+      }
+      return;
+    }
+
     const newOtp = [...otp];
     newOtp[index] = text;
     setOtp(newOtp);
-    setErrorMessage('');
 
     if (text && index < 5) {
       otpInputs.current[index + 1]?.focus();
@@ -207,8 +228,13 @@ export default function AuthScreen({ navigation, route }) {
   };
 
   const handleOtpKeyPress = (e, index) => {
-    if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
-      otpInputs.current[index - 1]?.focus();
+    if (e.nativeEvent.key === 'Backspace') {
+      if (!otp[index] && index > 0) {
+        const newOtp = [...otp];
+        newOtp[index - 1] = '';
+        setOtp(newOtp);
+        otpInputs.current[index - 1]?.focus();
+      }
     }
   };
 
@@ -220,7 +246,7 @@ export default function AuthScreen({ navigation, route }) {
       setIsLoading(false);
       // Navigate to Main Cockpit Screen
       navigation.replace('PlatformSelect');
-    }, 1000);
+    }, 850);
   };
 
   // ── Resend Code ──
@@ -229,19 +255,21 @@ export default function AuthScreen({ navigation, route }) {
     setCountdown(45);
     setResendActive(false);
     setErrorMessage('');
-    // Trigger resend
+    setSuccessNotice('A fresh verification code has been dispatched!');
   };
 
   // ── Back to Email Step ──
   const handleBackToEmail = () => {
-    Animated.timing(stepSlide, {
+    Animated.timing(stepTransition, {
       toValue: 0,
       duration: 250,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
       setStep('email');
       setOtp(['', '', '', '', '', '']);
       setErrorMessage('');
+      setSuccessNotice('');
     });
   };
 
@@ -275,272 +303,297 @@ export default function AuthScreen({ navigation, route }) {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         style={{ flex: 1 }}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View
-            style={[
-              styles.contentWrap,
-              {
-                opacity: contentFade,
-                transform: [{ translateY: contentSlide }],
-              },
-            ]}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {/* ─── Hero Header & Floating Logo ─── */}
-            <View style={styles.heroSection}>
-              <Animated.View
-                style={[
-                  styles.logoBadgeWrap,
-                  { transform: [{ translateY: logoFloat }] },
-                ]}
-              >
-                <View style={styles.logoGlowRing} />
-                <Image source={LOGO_IMG} style={styles.logoImage} resizeMode="contain" />
-              </Animated.View>
-
-              <Text style={styles.appTitle}>FlirtEasy</Text>
-              <View style={styles.taglinePill}>
-                <Ionicons name="sparkles" size={12} color="#FE3C72" />
-                <Text style={styles.taglineText}>AI DATING COPILOT</Text>
-              </View>
-
-              <Text style={styles.headline}>
-                {step === 'email' ? 'Welcome Back' : 'Verify Identity'}
-              </Text>
-              <Text style={styles.subHeadline}>
-                {step === 'email'
-                  ? 'Sign in to access your automated matches, intelligent auto-chats, and live telemetry.'
-                  : `Enter the 6-digit security code sent to\n${email}`}
-              </Text>
-            </View>
-
-            {/* ─── Animated Card Form Section ─── */}
             <Animated.View
               style={[
-                styles.glassCard,
-                { transform: [{ translateX: shakeAnim }] },
+                styles.contentWrap,
+                {
+                  opacity: contentFade,
+                  transform: [{ translateY: contentSlide }],
+                },
               ]}
             >
-              {step === 'email' ? (
-                /* ═══════════ STEP 1: EMAIL ENTRY ═══════════ */
-                <View style={styles.formStep}>
-                  <Text style={styles.fieldLabel}>YOUR EMAIL ADDRESS</Text>
-                  
-                  {/* Email Input with Active Pink Glow */}
-                  <View
-                    style={[
-                      styles.inputContainer,
-                      isFocused && styles.inputContainerFocused,
-                      Boolean(errorMessage) && styles.inputContainerError,
-                    ]}
-                  >
-                    <Ionicons
-                      name={isFocused ? 'mail' : 'mail-outline'}
-                      size={18}
-                      color={isFocused ? '#FE3C72' : '#8E8DA3'}
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="name@example.com"
-                      placeholderTextColor="#5A586E"
-                      value={email}
-                      onChangeText={(text) => {
-                        setEmail(text);
-                        if (errorMessage) setErrorMessage('');
-                      }}
-                      onFocus={() => setIsFocused(true)}
-                      onBlur={() => setIsFocused(false)}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="email-address"
-                      returnKeyType="done"
-                      onSubmitEditing={handleEmailSubmit}
-                    />
-                    {isValidEmail(email) && (
-                      <View style={styles.validBadge}>
-                        <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+              {/* ─── Hero Header & Floating Logo ─── */}
+              <View style={styles.heroSection}>
+                <Animated.View
+                  style={[
+                    styles.logoBadgeWrap,
+                    { transform: [{ translateY: logoFloat }] },
+                  ]}
+                >
+                  <View style={styles.logoGlowRing} />
+                  <Image source={LOGO_IMG} style={styles.logoImage} resizeMode="contain" />
+                </Animated.View>
+
+                <Text style={styles.appTitle}>FlirtEasy</Text>
+                <View style={styles.taglinePill}>
+                  <Ionicons name="sparkles" size={12} color="#FE3C72" />
+                  <Text style={styles.taglineText}>AI DATING COPILOT</Text>
+                </View>
+
+                <Text style={styles.headline}>
+                  {step === 'email' ? 'Welcome Back' : 'Verify Identity'}
+                </Text>
+                <Text style={styles.subHeadline}>
+                  {step === 'email'
+                    ? 'Sign in to access your automated matches, intelligent auto-chats, and live telemetry.'
+                    : `Enter the 6-digit security code sent to\n${email}`}
+                </Text>
+              </View>
+
+              {/* ─── Animated Glass Card ─── */}
+              <Animated.View
+                style={[
+                  styles.glassCard,
+                  { transform: [{ translateX: shakeAnim }] },
+                ]}
+              >
+                {step === 'email' ? (
+                  /* ═══════════ STEP 1: EMAIL ENTRY ═══════════ */
+                  <View style={styles.formStep}>
+                    <Text style={styles.fieldLabel}>YOUR EMAIL ADDRESS</Text>
+
+                    {/* Email Input with Active Pink Glow & Clear Button */}
+                    <View
+                      style={[
+                        styles.inputContainer,
+                        isFocused && styles.inputContainerFocused,
+                        Boolean(errorMessage) && styles.inputContainerError,
+                      ]}
+                    >
+                      <Ionicons
+                        name={isFocused ? 'mail' : 'mail-outline'}
+                        size={18}
+                        color={isFocused ? '#FE3C72' : '#8E8DA3'}
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="name@example.com"
+                        placeholderTextColor="#5A586E"
+                        value={email}
+                        onChangeText={(text) => {
+                          setEmail(text.toLowerCase());
+                          if (errorMessage) setErrorMessage('');
+                        }}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setIsFocused(false)}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="email-address"
+                        returnKeyType="done"
+                        onSubmitEditing={handleEmailSubmit}
+                      />
+
+                      {Boolean(email) && (
+                        <TouchableOpacity
+                          onPress={() => {
+                            setEmail('');
+                            setErrorMessage('');
+                          }}
+                          style={styles.clearBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="close-circle" size={16} color="#716E89" />
+                        </TouchableOpacity>
+                      )}
+
+                      {isValidEmail(email) && (
+                        <View style={styles.validBadge}>
+                          <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Error Message */}
+                    {Boolean(errorMessage) && (
+                      <View style={styles.errorRow}>
+                        <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                        <Text style={styles.errorText}>{errorMessage}</Text>
                       </View>
                     )}
-                  </View>
 
-                  {/* Error Message */}
-                  {Boolean(errorMessage) && (
-                    <View style={styles.errorRow}>
-                      <Ionicons name="alert-circle" size={14} color="#EF4444" />
-                      <Text style={styles.errorText}>{errorMessage}</Text>
-                    </View>
-                  )}
-
-                  {/* Smart Domain Quick-Picker Chips */}
-                  <View style={styles.domainChipsWrap}>
-                    <Text style={styles.domainChipsTitle}>Quick Fill:</Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.domainChipsScroll}
-                    >
-                      {DOMAIN_SUGGESTIONS.map((domain) => (
-                        <TouchableOpacity
-                          key={domain}
-                          style={styles.domainChip}
-                          onPress={() => handleSelectDomain(domain)}
-                          activeOpacity={0.75}
-                        >
-                          <Text style={styles.domainChipText}>{domain}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-
-                  {/* Primary CTA Button */}
-                  <TouchableOpacity
-                    style={styles.primaryButton}
-                    onPress={handleEmailSubmit}
-                    disabled={isLoading}
-                    activeOpacity={0.88}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                      <>
-                        <Text style={styles.primaryButtonText}>Continue with Email</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#FFF" />
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                /* ═══════════ STEP 2: 6-DIGIT OTP VERIFICATION ═══════════ */
-                <View style={styles.formStep}>
-                  <View style={styles.otpHeaderRow}>
-                    <Text style={styles.fieldLabel}>ENTER 6-DIGIT CODE</Text>
-                    <TouchableOpacity onPress={handleBackToEmail} activeOpacity={0.7}>
-                      <Text style={styles.editEmailText}>Change Email</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* 6 Digit Cells */}
-                  <View style={styles.otpCellsRow}>
-                    {otp.map((digit, idx) => (
-                      <TextInput
-                        key={idx}
-                        ref={(ref) => (otpInputs.current[idx] = ref)}
-                        style={[
-                          styles.otpCell,
-                          digit ? styles.otpCellFilled : null,
-                        ]}
-                        value={digit}
-                        onChangeText={(text) => handleOtpChange(text, idx)}
-                        onKeyPress={(e) => handleOtpKeyPress(e, idx)}
-                        keyboardType="number-pad"
-                        maxLength={1}
-                        selectTextOnFocus
-                      />
-                    ))}
-                  </View>
-
-                  {/* Error Message */}
-                  {Boolean(errorMessage) && (
-                    <View style={styles.errorRow}>
-                      <Ionicons name="alert-circle" size={14} color="#EF4444" />
-                      <Text style={styles.errorText}>{errorMessage}</Text>
-                    </View>
-                  )}
-
-                  {/* Resend Code Section */}
-                  <View style={styles.resendRow}>
-                    <Text style={styles.resendInfoText}>Didn't receive a code?</Text>
-                    <TouchableOpacity
-                      onPress={handleResendCode}
-                      disabled={!resendActive}
-                      activeOpacity={0.8}
-                    >
-                      <Text
-                        style={[
-                          styles.resendBtnText,
-                          resendActive && styles.resendBtnTextActive,
-                        ]}
+                    {/* Smart Domain Quick-Picker Chips */}
+                    <View style={styles.domainChipsWrap}>
+                      <Text style={styles.domainChipsTitle}>Quick Domain:</Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.domainChipsScroll}
                       >
-                        {resendActive ? 'Resend Code' : `Resend in ${countdown}s`}
-                      </Text>
+                        {DOMAIN_SUGGESTIONS.map((domain) => (
+                          <TouchableOpacity
+                            key={domain}
+                            style={styles.domainChip}
+                            onPress={() => handleSelectDomain(domain)}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={styles.domainChipText}>{domain}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+
+                    {/* Primary CTA Button */}
+                    <TouchableOpacity
+                      style={styles.primaryButton}
+                      onPress={handleEmailSubmit}
+                      disabled={isLoading}
+                      activeOpacity={0.88}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <>
+                          <Text style={styles.primaryButtonText}>Continue with Email</Text>
+                          <Ionicons name="arrow-forward" size={16} color="#FFF" />
+                        </>
+                      )}
                     </TouchableOpacity>
                   </View>
+                ) : (
+                  /* ═══════════ STEP 2: 6-DIGIT OTP VERIFICATION ═══════════ */
+                  <View style={styles.formStep}>
+                    <View style={styles.otpHeaderRow}>
+                      <Text style={styles.fieldLabel}>ENTER 6-DIGIT CODE</Text>
+                      <TouchableOpacity onPress={handleBackToEmail} activeOpacity={0.7}>
+                        <Text style={styles.editEmailText}>Change Email</Text>
+                      </TouchableOpacity>
+                    </View>
 
-                  {/* Verify CTA Button */}
-                  <TouchableOpacity
-                    style={styles.primaryButton}
-                    onPress={() => verifyOtp(otp.join(''))}
-                    disabled={isLoading || otp.some((d) => !d)}
-                    activeOpacity={0.88}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                      <>
-                        <Text style={styles.primaryButtonText}>Verify & Enter Cockpit</Text>
-                        <Ionicons name="checkmark-circle-outline" size={17} color="#FFF" />
-                      </>
+                    {/* Success Notice */}
+                    {Boolean(successNotice) && (
+                      <View style={styles.successRow}>
+                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                        <Text style={styles.successText}>{successNotice}</Text>
+                      </View>
                     )}
+
+                    {/* 6 Digit Cells */}
+                    <View style={styles.otpCellsRow}>
+                      {otp.map((digit, idx) => (
+                        <TextInput
+                          key={idx}
+                          ref={(ref) => (otpInputs.current[idx] = ref)}
+                          style={[
+                            styles.otpCell,
+                            digit ? styles.otpCellFilled : null,
+                          ]}
+                          value={digit}
+                          onChangeText={(text) => handleOtpChange(text, idx)}
+                          onKeyPress={(e) => handleOtpKeyPress(e, idx)}
+                          keyboardType="number-pad"
+                          maxLength={6}
+                          selectTextOnFocus
+                        />
+                      ))}
+                    </View>
+
+                    {/* Error Message */}
+                    {Boolean(errorMessage) && (
+                      <View style={styles.errorRow}>
+                        <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                        <Text style={styles.errorText}>{errorMessage}</Text>
+                      </View>
+                    )}
+
+                    {/* Resend Code Section */}
+                    <View style={styles.resendRow}>
+                      <Text style={styles.resendInfoText}>Didn't receive a code?</Text>
+                      <TouchableOpacity
+                        onPress={handleResendCode}
+                        disabled={!resendActive}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.resendBtnText,
+                            resendActive && styles.resendBtnTextActive,
+                          ]}
+                        >
+                          {resendActive ? 'Resend Code' : `Resend in ${countdown}s`}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Verify CTA Button */}
+                    <TouchableOpacity
+                      style={styles.primaryButton}
+                      onPress={() => verifyOtp(otp.join(''))}
+                      disabled={isLoading || otp.some((d) => !d)}
+                      activeOpacity={0.88}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <>
+                          <Text style={styles.primaryButtonText}>Verify & Enter Cockpit</Text>
+                          <Ionicons name="checkmark-circle-outline" size={17} color="#FFF" />
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* ─── Divider ─── */}
+                <View style={styles.dividerRow}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>OR EXPLORE</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                {/* ─── Alternative Quick Actions ─── */}
+                <View style={styles.socialOptionsRow}>
+                  <TouchableOpacity
+                    style={styles.secondarySocialBtn}
+                    onPress={() => navigation.replace('PlatformSelect')}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="speedometer-outline" size={17} color="#FE3C72" />
+                    <Text style={styles.secondarySocialBtnText}>Direct Cockpit Peek</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.secondarySocialBtn}
+                    onPress={() => {
+                      navigation.navigate('Browser', {
+                        platform: 'Tinder',
+                        vpsUrl: 'https://stream.smartmaheshwari.com/?usr=User&pwd=admin',
+                        proxyIp: '',
+                      });
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="logo-google" size={16} color="#4285F4" />
+                    <Text style={styles.secondarySocialBtnText}>Tinder Web Sign-In</Text>
                   </TouchableOpacity>
                 </View>
-              )}
+              </Animated.View>
 
-              {/* ─── Divider ─── */}
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>OR EXPLORE</Text>
-                <View style={styles.dividerLine} />
-              </View>
+              {/* ─── Security & Privacy Footer ─── */}
+              <View style={styles.footerWrap}>
+                <View style={styles.securityPill}>
+                  <Ionicons name="lock-closed" size={12} color="#10B981" />
+                  <Text style={styles.securityPillText}>256-Bit Encrypted Automation Tunnel</Text>
+                </View>
 
-              {/* ─── Alternative Quick Actions ─── */}
-              <View style={styles.socialOptionsRow}>
-                <TouchableOpacity
-                  style={styles.secondarySocialBtn}
-                  onPress={() => navigation.replace('PlatformSelect')}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="speedometer-outline" size={17} color="#FE3C72" />
-                  <Text style={styles.secondarySocialBtnText}>Direct Cockpit Peek</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.secondarySocialBtn}
-                  onPress={() => {
-                    navigation.navigate('Browser', {
-                      platform: 'Tinder',
-                      vpsUrl: 'https://stream.smartmaheshwari.com/?usr=User&pwd=admin',
-                      proxyIp: '',
-                    });
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="logo-google" size={16} color="#4285F4" />
-                  <Text style={styles.secondarySocialBtnText}>Tinder Web Sign-In</Text>
-                </TouchableOpacity>
+                <Text style={styles.termsText}>
+                  By signing in, you agree to FlirtEasy's{' '}
+                  <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
+                  <Text style={styles.termsLink}>Privacy Policy</Text>.
+                </Text>
               </View>
             </Animated.View>
-
-            {/* ─── Security & Privacy Footer ─── */}
-            <View style={styles.footerWrap}>
-              <View style={styles.securityPill}>
-                <Ionicons name="lock-closed" size={12} color="#10B981" />
-                <Text style={styles.securityPillText}>256-Bit Encrypted Automation Tunnel</Text>
-              </View>
-
-              <Text style={styles.termsText}>
-                By signing in, you agree to FlirtEasy's{' '}
-                <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-                <Text style={styles.termsLink}>Privacy Policy</Text>.
-              </Text>
-            </View>
-          </Animated.View>
-        </ScrollView>
+          </ScrollView>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -598,7 +651,7 @@ const styles = StyleSheet.create({
   },
   heroSection: {
     alignItems: 'center',
-    marginBottom: 26,
+    marginBottom: 24,
   },
   logoBadgeWrap: {
     width: 68,
@@ -645,7 +698,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 3,
     marginTop: 6,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   taglineText: {
     color: '#FE3C72',
@@ -722,8 +775,12 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     fontWeight: '600',
   },
+  clearBtn: {
+    padding: 4,
+    marginRight: 4,
+  },
   validBadge: {
-    marginLeft: 6,
+    marginLeft: 4,
   },
   errorRow: {
     flexDirection: 'row',
@@ -734,6 +791,18 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  successRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 10,
+    marginLeft: 2,
+  },
+  successText: {
+    color: '#10B981',
     fontSize: 12,
     fontWeight: '600',
   },
