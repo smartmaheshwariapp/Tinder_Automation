@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -189,6 +190,21 @@ export default function PlatformSelectScreen({ navigation }) {
       setTimeout(refreshStats, 1500);
     } catch (_) {}
   }, [orchestratorUrl, refreshStats]);
+
+  const confirmLogout = useCallback(() => {
+    Alert.alert(
+      'Log Out of Tinder?',
+      'Are you sure you want to log out? This will end the active Tinder session and require you to sign in again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: handleLogout,
+        },
+      ]
+    );
+  }, [handleLogout]);
   const handleOpenLiveFeed = useCallback(() => {
     const realProxy = activeProxy === 'http://*****:*****@46.203.181.164:43343'
       ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
@@ -306,14 +322,28 @@ export default function PlatformSelectScreen({ navigation }) {
                   ? 'Your assistant finds compatible matches and engages in your personal tone 24/7.'
                   : 'Link your Tinder profile to start finding matches and chatting automatically.'}
               </Text>
-              <TouchableOpacity
-                style={styles.openStreamBtn}
-                onPress={handleOpenLiveFeed}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="phone-portrait-outline" size={15} color="#FFF" />
-                <Text style={styles.openStreamBtnText}>View Live Tinder Stream</Text>
-              </TouchableOpacity>
+              
+              <View style={styles.sessionControlColumn}>
+                <TouchableOpacity
+                  style={styles.openStreamBtn}
+                  onPress={handleOpenLiveFeed}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="phone-portrait-outline" size={15} color="#FFF" />
+                  <Text style={styles.openStreamBtnText}>View Live Tinder Stream</Text>
+                </TouchableOpacity>
+
+                {isLoggedIn && (
+                  <TouchableOpacity
+                    style={styles.mainLogoutBtn}
+                    onPress={confirmLogout}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="log-out-outline" size={15} color="#EF4444" />
+                    <Text style={styles.mainLogoutBtnText}>Log Out of Tinder</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           }
         />
@@ -648,8 +678,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
   },
-  openStreamBtn: {
+  sessionControlColumn: {
+    gap: 8,
     marginTop: 14,
+  },
+  openStreamBtn: {
     backgroundColor: '#FE3C72',
     borderRadius: 10,
     paddingVertical: 11,
@@ -660,6 +693,22 @@ const styles = StyleSheet.create({
   },
   openStreamBtnText: {
     color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  mainLogoutBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.28)',
+    borderRadius: 10,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  mainLogoutBtnText: {
+    color: '#EF4444',
     fontSize: 13,
     fontWeight: '700',
   },
