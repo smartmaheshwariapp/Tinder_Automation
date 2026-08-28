@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
@@ -163,11 +163,8 @@ export default function BrowserScreen({ route, navigation }) {
                 setLoginStep('otp');
               }
             } else if (state === 'sms_otp_screen') {
+              setOtpSubtype('sms');
               if (data && data.phone) setSubmittedPhone(data.phone);
-              if (otpSubtype !== 'sms') {
-                setOtpSubtype('sms');
-                setInputText(''); // Clear email OTP from input when transitioning to SMS OTP
-              }
               if (loginStep !== 'otp') {
                 setInputText('');
                 setLoginStep('otp');
@@ -265,6 +262,21 @@ export default function BrowserScreen({ route, navigation }) {
         body: JSON.stringify({ platform: 'tinder' }),
       });
     } catch (_) {}
+  };
+
+  const confirmLogout = () => {
+    Alert.alert(
+      'Log Out of Tinder',
+      'Are you sure you want to log out? This will clear your active credentials, delete browser session cookies, and return to the login screen.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: handleLogout,
+        },
+      ]
+    );
   };
 
   const handleGoBack = async () => {
@@ -495,13 +507,25 @@ export default function BrowserScreen({ route, navigation }) {
             <Text style={styles.headerTitle}>Tinder Session</Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.closeBtnCircular}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="close" size={20} color="rgba(255, 255, 255, 0.75)" />
-          </TouchableOpacity>
+          <View style={styles.headerRightGroup}>
+            {loginStep === 'done' && (
+              <TouchableOpacity
+                style={styles.headerLogoutBtn}
+                onPress={confirmLogout}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="log-out-outline" size={14} color="#FF4458" />
+                <Text style={styles.headerLogoutBtnText}>Log Out</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.closeBtnCircular}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={20} color="rgba(255, 255, 255, 0.75)" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ─── Top Action Bar (Dedicated Glass 4-Button Grid) ─── */}
@@ -542,11 +566,19 @@ export default function BrowserScreen({ route, navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnIconOnly]}
-            onPress={() => setLoginStep('done')}
+            style={[
+              styles.actionBtn,
+              styles.actionBtnIconOnly,
+              loginStep === 'done' && styles.actionBtnLogout
+            ]}
+            onPress={loginStep === 'done' ? confirmLogout : () => setLoginStep('done')}
             activeOpacity={0.8}
           >
-            <Ionicons name="play-forward-outline" size={17} color="rgba(255, 255, 255, 0.85)" />
+            <Ionicons
+              name={loginStep === 'done' ? 'log-out-outline' : 'play-forward-outline'}
+              size={17}
+              color={loginStep === 'done' ? '#FF4458' : 'rgba(255, 255, 255, 0.85)'}
+            />
           </TouchableOpacity>
         </View>
 
@@ -613,11 +645,13 @@ export default function BrowserScreen({ route, navigation }) {
           {...panResponder.panHandlers}
           style={[
             styles.webviewContainer,
-            loginStep !== 'done' && (
-              showNeko
-                ? (isExpanded || loginStep === 'captcha' ? styles.webviewContainerFull : styles.webviewContainerSplit)
-                : styles.webviewContainerHidden
-            )
+            loginStep === 'done'
+              ? (showNeko ? styles.webviewContainerFull : styles.webviewContainerHidden)
+              : (
+                showNeko
+                  ? (isExpanded || loginStep === 'captcha' ? styles.webviewContainerFull : styles.webviewContainerSplit)
+                  : styles.webviewContainerHidden
+              )
           ]}
         >
           <View style={styles.browserFrame}>
@@ -1408,6 +1442,46 @@ export default function BrowserScreen({ route, navigation }) {
           />
         )}
 
+        {/* ─── Bottom Floating Action Bar (when logged in / done) ─── */}
+        {loginStep === 'done' && (
+          <View style={styles.floatingSessionBar}>
+            <TouchableOpacity
+              style={[
+                styles.floatingSessionPill,
+                extensionStats?.agentState?.isRunning && styles.floatingSessionPillActive
+              ]}
+              onPress={handleToggleAgent}
+              activeOpacity={0.85}
+            >
+              <View style={[
+                styles.floatingAgentDot,
+                { backgroundColor: extensionStats?.agentState?.isRunning ? '#10B981' : '#6B7280' }
+              ]} />
+              <Text style={styles.floatingSessionPillText}>
+                {extensionStats?.agentState?.isRunning ? 'AI Swiping ON' : 'AI Swiper OFF'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.floatingSessionBtn}
+              onPress={() => setShowDashboard(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="stats-chart" size={15} color="#FD297B" />
+              <Text style={styles.floatingSessionBtnText}>Dashboard</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.floatingLogoutBtn}
+              onPress={confirmLogout}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="log-out-outline" size={15} color="#FF4458" />
+              <Text style={styles.floatingLogoutBtnText}>Log Out</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <TextInput
           ref={inputRef}
           style={styles.hiddenInput}
@@ -1438,6 +1512,28 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flexDirection: 'column',
+  },
+  headerRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 68, 88, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 88, 0.28)',
+  },
+  headerLogoutBtnText: {
+    color: '#FF4458',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   statusIndicatorRow: {
     flexDirection: 'row',
@@ -1506,6 +1602,93 @@ const styles = StyleSheet.create({
   actionBtnActive: {
     backgroundColor: 'rgba(253, 41, 123, 0.12)',
     borderColor: 'rgba(253, 41, 123, 0.3)',
+  },
+  actionBtnLogout: {
+    backgroundColor: 'rgba(255, 68, 88, 0.12)',
+    borderColor: 'rgba(255, 68, 88, 0.3)',
+  },
+  floatingSessionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: Platform.OS === 'ios' ? 12 : 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#0D0B14',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+    gap: 8,
+  },
+  floatingSessionPill: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  floatingSessionPillActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  floatingAgentDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  floatingSessionPillText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  floatingSessionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(253, 41, 123, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(253, 41, 123, 0.25)',
+  },
+  floatingSessionBtnText: {
+    color: '#FD297B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  floatingLogoutBtn: {
+    flex: 0.9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 68, 88, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 88, 0.25)',
+  },
+  floatingLogoutBtnText: {
+    color: '#FF4458',
+    fontSize: 12,
+    fontWeight: '700',
   },
   actionBtnText: {
     color: 'rgba(255, 255, 255, 0.85)',
