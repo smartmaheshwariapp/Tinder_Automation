@@ -1002,6 +1002,28 @@ export default function BrowserScreen({ route, navigation }) {
                   autoComplete="email"
                 />
 
+                {/* Domain Quick Fill Chips */}
+                <View style={{ marginBottom: 14 }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'].map((domain) => (
+                      <TouchableOpacity
+                        key={domain}
+                        style={styles.wizardDomainChip}
+                        onPress={() => {
+                          let base = inputText.trim();
+                          if (base.includes('@')) base = base.split('@')[0];
+                          if (!base) base = 'user';
+                          setInputText(`${base}${domain}`);
+                          if (emailErrorText) setEmailErrorText('');
+                        }}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={styles.wizardDomainChipText}>{domain}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
                 <View style={styles.wizardActionRow}>
                   <TouchableOpacity
                     style={[styles.wizardBtnSecondary, { flex: 1 }]}
@@ -1809,6 +1831,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: 10,
+  },
+  wizardDomainChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  wizardDomainChipText: {
+    color: '#D8D6E8',
+    fontSize: 11,
+    fontWeight: '700',
   },
   phoneInputRow: {
     flexDirection: 'row',
