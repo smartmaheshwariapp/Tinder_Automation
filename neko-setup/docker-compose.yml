@@ -12,8 +12,8 @@ services:
     ports:
       - "8080:8080"
       - "9222:9222"
-      - "55000:55000/tcp"
-      - "55000:55000/udp"
+      - "35000:35000/tcp"
+      - "35000:35000/udp"
     cap_add:
       - SYS_ADMIN # Required for browser sandbox security
     environment:
@@ -26,9 +26,9 @@ services:
       NEKO_CAPTURE_VIDEO_SHOW_POINTER: "false"
       # --- WebRTC Configuration ---
       NEKO_WEBRTC_NAT1TO1: ${NEKO_WEBRTC_NAT1TO1:-127.0.0.1}
-      NEKO_EPR: "55000-55000"
-      NEKO_WEBRTC_UDPMUX: "55000"
-      NEKO_WEBRTC_TCPMUX: "55000"
+      NEKO_EPR: "35000-35000"
+      NEKO_WEBRTC_UDPMUX: "35000"
+      NEKO_WEBRTC_TCPMUX: "35000"
       NEKO_WEBRTC_ICELITE: "true"
       NEKO_SESSION_IMPLICIT_HOSTING: "true"
       NEKO_PROXY: ${NEKO_PROXY:-}
