@@ -1,7 +1,6 @@
-// src/screens/AuthScreen.js — Industry-Grade 3-Phase Auth Flow
-// Uses react-native-reanimated for 60fps UI-thread animations
-// Uses expo-linear-gradient, expo-blur, expo-haptics for premium feel
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+// src/screens/AuthScreen.js — 3-Phase Auth Flow (Welcome -> Form -> OTP)
+// Powered by Expo Linear Gradient, Native Driver Animations & iOS Haptics
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,6 +8,8 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Platform,
   Dimensions,
@@ -20,37 +21,29 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import * as Haptics from 'expo-haptics';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  withRepeat,
-  withSequence,
-  withDelay,
-  interpolate,
-  Easing,
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeOut,
-  SlideInRight,
-  SlideOutLeft,
-  SlideInLeft,
-  SlideOutRight,
-  runOnJS,
-} from 'react-native-reanimated';
+
+// Optional safe haptics
+let Haptics;
+try {
+  Haptics = require('expo-haptics');
+} catch (_) {
+  Haptics = null;
+}
+
+const safeHaptic = (type) => {
+  try {
+    if (!Haptics) return;
+    if (type === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    else if (type === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+  } catch (_) {}
+};
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
-
 const DOMAIN_SUGGESTIONS = ['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'];
 
-// ═══════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════
 export default function AuthScreen({ navigation }) {
   // ── Core State Machine ──
   const [phase, setPhase] = useState('welcome'); // 'welcome' | 'form' | 'otp'
@@ -68,41 +61,93 @@ export default function AuthScreen({ navigation }) {
   const [successNotice, setSuccessNotice] = useState('');
   const [countdown, setCountdown] = useState(45);
   const [resendActive, setResendActive] = useState(false);
-  const [phaseKey, setPhaseKey] = useState(0); // forces re-mount for animations
 
   // ── Refs ──
   const otpInputs = useRef([]);
   const emailInputRef = useRef(null);
   const nameInputRef = useRef(null);
 
-  // ── Reanimated Shared Values ──
-  const logoGlow = useSharedValue(0);
-  const logoFloat = useSharedValue(0);
+  // ── Native Animation Values ──
+  const logoFloat = useRef(new Animated.Value(0)).current;
+  const logoGlowScale = useRef(new Animated.Value(1)).current;
+  const logoGlowOpacity = useRef(new Animated.Value(0.3)).current;
 
-  // ── Ambient Logo Animations (Welcome Phase) ──
+  const welcomeFade = useRef(new Animated.Value(0)).current;
+  const welcomeSlide = useRef(new Animated.Value(25)).current;
+
+  const phaseSlide = useRef(new Animated.Value(0)).current; // 0: in place, >0: offset
+  const phaseFade = useRef(new Animated.Value(1)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  // ── Ambient Logo Animations ──
   useEffect(() => {
-    // Breathing glow
-    logoGlow.value = withRepeat(
-      withTiming(1, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true
-    );
-    // Gentle float
-    logoFloat.value = withRepeat(
-      withTiming(-8, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true
-    );
+    // Gentle Float Loop
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoFloat, {
+          toValue: -8,
+          duration: 2600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoFloat, {
+          toValue: 0,
+          duration: 2600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Breathing Glow Loop
+    Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(logoGlowScale, {
+            toValue: 1.25,
+            duration: 2800,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(logoGlowOpacity, {
+            toValue: 0.65,
+            duration: 2800,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(logoGlowScale, {
+            toValue: 1,
+            duration: 2800,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(logoGlowOpacity, {
+            toValue: 0.3,
+            duration: 2800,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    ).start();
+
+    // Welcome Screen Initial Entrance
+    Animated.parallel([
+      Animated.timing(welcomeFade, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(welcomeSlide, {
+        toValue: 0,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
-
-  const logoGlowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(logoGlow.value, [0, 1], [0.3, 0.7]),
-    transform: [{ scale: interpolate(logoGlow.value, [0, 1], [1, 1.15]) }],
-  }));
-
-  const logoFloatStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: logoFloat.value }],
-  }));
 
   // ── OTP Countdown Timer ──
   useEffect(() => {
@@ -118,45 +163,84 @@ export default function AuthScreen({ navigation }) {
   // ── Validation ──
   const isValidEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
 
+  const triggerShake = () => {
+    safeHaptic('error');
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
+    ]).start();
+  };
+
   // ── Phase Transitions ──
+  const animateTransition = (nextPhaseCallback) => {
+    Animated.timing(phaseFade, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      nextPhaseCallback();
+      phaseSlide.setValue(35);
+      Animated.parallel([
+        Animated.timing(phaseFade, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(phaseSlide, {
+          toValue: 0,
+          friction: 8,
+          tension: 50,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  };
+
   const goToForm = (mode) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    safeHaptic('light');
     setAuthMode(mode);
     setErrorMessage('');
     setSuccessNotice('');
-    setPhaseKey((k) => k + 1);
-    setPhase('form');
+    animateTransition(() => {
+      setPhase('form');
+    });
   };
 
   const goBackToWelcome = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    safeHaptic('light');
     setErrorMessage('');
     setSuccessNotice('');
     setName('');
     setEmail('');
-    setPhaseKey((k) => k + 1);
-    setPhase('welcome');
+    animateTransition(() => {
+      setPhase('welcome');
+    });
   };
 
   const goToOtp = () => {
-    setPhaseKey((k) => k + 1);
-    setPhase('otp');
+    animateTransition(() => {
+      setPhase('otp');
+    });
   };
 
   const goBackToForm = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    safeHaptic('light');
     setOtp(['', '', '', '', '', '']);
     setErrorMessage('');
     setSuccessNotice('');
     setCountdown(45);
     setResendActive(false);
-    setPhaseKey((k) => k + 1);
-    setPhase('form');
+    animateTransition(() => {
+      setPhase('form');
+    });
   };
 
   // ── Domain Chip Handler ──
   const handleSelectDomain = (domain) => {
-    Haptics.selectionAsync();
+    safeHaptic('light');
     let base = email.trim();
     if (base.includes('@')) base = base.split('@')[0];
     if (!base) base = 'user';
@@ -170,20 +254,20 @@ export default function AuthScreen({ navigation }) {
     const cleanEmail = email.trim().toLowerCase();
 
     if (authMode === 'signup' && !name.trim()) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setErrorMessage('Please enter your name.');
+      triggerShake();
       return;
     }
 
     if (!cleanEmail || !isValidEmail(cleanEmail)) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setErrorMessage('Please enter a valid email address.');
+      triggerShake();
       return;
     }
 
     setErrorMessage('');
     setIsLoading(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    safeHaptic('medium');
 
     setTimeout(() => {
       setIsLoading(false);
@@ -196,7 +280,7 @@ export default function AuthScreen({ navigation }) {
       );
       goToOtp();
       setTimeout(() => otpInputs.current[0]?.focus(), 300);
-    }, 700);
+    }, 600);
   };
 
   // ── OTP Handling ──
@@ -209,7 +293,7 @@ export default function AuthScreen({ navigation }) {
       const newOtp = ['', '', '', '', '', ''];
       for (let i = 0; i < digits.length; i++) newOtp[i] = digits[i];
       setOtp(newOtp);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      safeHaptic('light');
       if (digits.length === 6) {
         otpInputs.current[5]?.focus();
         verifyOtp(digits);
@@ -224,7 +308,7 @@ export default function AuthScreen({ navigation }) {
     setOtp(newOtp);
 
     if (text) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      safeHaptic('light');
       if (index < 5) otpInputs.current[index + 1]?.focus();
       if (index === 5 && newOtp.every((d) => d.length === 1)) {
         verifyOtp(newOtp.join(''));
@@ -244,7 +328,7 @@ export default function AuthScreen({ navigation }) {
   const verifyOtp = async (code) => {
     Keyboard.dismiss();
     setIsLoading(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    safeHaptic('success');
     setTimeout(() => {
       setIsLoading(false);
       navigation.replace('PlatformSelect');
@@ -253,11 +337,11 @@ export default function AuthScreen({ navigation }) {
 
   const handleResendCode = () => {
     if (!resendActive) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    safeHaptic('medium');
     setCountdown(45);
     setResendActive(false);
     setErrorMessage('');
-    setSuccessNotice('A fresh code has been sent!');
+    setSuccessNotice('A fresh verification code has been dispatched!');
   };
 
   // ═════════════════════════════════════════════════════════════════
@@ -267,16 +351,16 @@ export default function AuthScreen({ navigation }) {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* ─── Full-Screen Gradient Background ─── */}
+      {/* ── Full-Screen Seamless Gradient Background ── */}
       <LinearGradient
-        colors={['#1A0A1E', '#120818', '#0A0612', '#08070D']}
+        colors={['#1E0A22', '#140718', '#0A0612', '#08070D']}
         locations={[0, 0.35, 0.7, 1]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* ─── Ambient Gradient Orbs (decorative) ─── */}
+      {/* ── Ambient Background Glows ── */}
       <View style={styles.orbContainer} pointerEvents="none">
-        <Animated.View style={[styles.orbPink, logoGlowStyle]} />
+        <View style={styles.orbPink} />
         <View style={styles.orbPurple} />
       </View>
 
@@ -294,50 +378,52 @@ export default function AuthScreen({ navigation }) {
               {/* ═══════════════════════════════════════════════════ */}
               {phase === 'welcome' && (
                 <Animated.View
-                  key={`welcome-${phaseKey}`}
-                  entering={FadeIn.duration(500)}
-                  exiting={FadeOut.duration(200)}
-                  style={styles.welcomeContainer}
+                  style={[
+                    styles.welcomeContainer,
+                    {
+                      opacity: welcomeFade,
+                      transform: [{ translateY: welcomeSlide }],
+                    },
+                  ]}
                 >
-                  {/* Hero: Logo + Brand */}
+                  {/* Hero: Floating Logo + Brand */}
                   <View style={styles.welcomeHero}>
-                    <Animated.View style={[styles.logoOuter, logoFloatStyle]}>
+                    <Animated.View
+                      style={[
+                        styles.logoOuter,
+                        { transform: [{ translateY: logoFloat }] },
+                      ]}
+                    >
                       {/* Glow ring behind logo */}
-                      <Animated.View style={[styles.logoGlowRing, logoGlowStyle]} />
+                      <Animated.View
+                        style={[
+                          styles.logoGlowRing,
+                          {
+                            transform: [{ scale: logoGlowScale }],
+                            opacity: logoGlowOpacity,
+                          },
+                        ]}
+                      />
                       <View style={styles.logoBadge}>
                         <Image source={LOGO_IMG} style={styles.logoImg} resizeMode="contain" />
                       </View>
                     </Animated.View>
 
-                    <Animated.Text
-                      entering={FadeInDown.delay(150).duration(500)}
-                      style={styles.brandTitle}
-                    >
-                      FlirtEasy
-                    </Animated.Text>
+                    <Text style={styles.brandTitle}>FlirtEasy</Text>
 
-                    <Animated.View
-                      entering={FadeInDown.delay(250).duration(500)}
-                      style={styles.taglinePill}
-                    >
+                    <View style={styles.taglinePill}>
                       <Ionicons name="sparkles" size={11} color="#FE3C72" />
                       <Text style={styles.taglineText}>AI DATING COPILOT</Text>
-                    </Animated.View>
+                    </View>
 
-                    <Animated.Text
-                      entering={FadeInDown.delay(350).duration(500)}
-                      style={styles.welcomeSubtitle}
-                    >
+                    <Text style={styles.welcomeSubtitle}>
                       3x more matches.{'\n'}Intelligent conversations.{'\n'}Zero effort.
-                    </Animated.Text>
+                    </Text>
                   </View>
 
                   {/* Bottom CTAs */}
-                  <Animated.View
-                    entering={FadeInUp.delay(450).duration(500)}
-                    style={styles.welcomeBottomCtas}
-                  >
-                    {/* Primary: Create Account */}
+                  <View style={styles.welcomeBottomCtas}>
+                    {/* Primary: Create Free Account */}
                     <TouchableOpacity
                       style={styles.primaryPill}
                       onPress={() => goToForm('signup')}
@@ -363,27 +449,27 @@ export default function AuthScreen({ navigation }) {
                       <Text style={styles.secondaryPillText}>I already have an account</Text>
                     </TouchableOpacity>
 
-                    {/* Tertiary: Guest */}
+                    {/* Tertiary: Continue as Guest */}
                     <TouchableOpacity
                       style={styles.guestLink}
-                      onPress={() => navigation.replace('PlatformSelect')}
+                      onPress={() => {
+                        safeHaptic('light');
+                        navigation.replace('PlatformSelect');
+                      }}
                       activeOpacity={0.7}
                     >
                       <Text style={styles.guestLinkText}>Continue as Guest</Text>
                       <Ionicons name="arrow-forward" size={13} color="#716E89" />
                     </TouchableOpacity>
-                  </Animated.View>
+                  </View>
 
-                  {/* Footer */}
-                  <Animated.View
-                    entering={FadeIn.delay(600).duration(400)}
-                    style={styles.welcomeFooter}
-                  >
+                  {/* Security Footer */}
+                  <View style={styles.welcomeFooter}>
                     <View style={styles.securityBadge}>
                       <Ionicons name="shield-checkmark" size={12} color="#10B981" />
-                      <Text style={styles.securityBadgeText}>End-to-end encrypted</Text>
+                      <Text style={styles.securityBadgeText}>256-Bit Encrypted Automation</Text>
                     </View>
-                  </Animated.View>
+                  </View>
                 </Animated.View>
               )}
 
@@ -392,10 +478,16 @@ export default function AuthScreen({ navigation }) {
               {/* ═══════════════════════════════════════════════════ */}
               {phase === 'form' && (
                 <Animated.View
-                  key={`form-${phaseKey}`}
-                  entering={SlideInRight.duration(350).easing(Easing.out(Easing.cubic))}
-                  exiting={SlideOutLeft.duration(250)}
-                  style={styles.formContainer}
+                  style={[
+                    styles.formContainer,
+                    {
+                      opacity: phaseFade,
+                      transform: [
+                        { translateX: phaseSlide },
+                        { translateX: shakeAnim },
+                      ],
+                    },
+                  ]}
                 >
                   {/* Back Button */}
                   <TouchableOpacity
@@ -419,16 +511,13 @@ export default function AuthScreen({ navigation }) {
                     </Text>
                   </View>
 
-                  {/* Glass Card */}
-                  <BlurView intensity={20} tint="dark" style={styles.glassCard}>
+                  {/* Form Card */}
+                  <View style={styles.glassCard}>
                     <View style={styles.glassCardInner}>
                       {/* Name Field (signup only) */}
                       {authMode === 'signup' && (
-                        <Animated.View
-                          entering={FadeInDown.duration(300)}
-                          style={styles.fieldGroup}
-                        >
-                          <Text style={styles.fieldLabel}>YOUR NAME</Text>
+                        <View style={styles.fieldGroup}>
+                          <Text style={styles.fieldLabel}>YOUR NAME / NICKNAME</Text>
                           <View
                             style={[
                               styles.inputWrap,
@@ -444,10 +533,13 @@ export default function AuthScreen({ navigation }) {
                             <TextInput
                               ref={nameInputRef}
                               style={styles.textInput}
-                              placeholder="What should we call you?"
-                              placeholderTextColor="#4A4860"
+                              placeholder="e.g. Alex"
+                              placeholderTextColor="#504E64"
                               value={name}
-                              onChangeText={(t) => { setName(t); setErrorMessage(''); }}
+                              onChangeText={(t) => {
+                                setName(t);
+                                setErrorMessage('');
+                              }}
                               onFocus={() => setFocusedField('name')}
                               onBlur={() => setFocusedField(null)}
                               autoCapitalize="words"
@@ -459,7 +551,7 @@ export default function AuthScreen({ navigation }) {
                               <Ionicons name="checkmark-circle" size={18} color="#10B981" />
                             )}
                           </View>
-                        </Animated.View>
+                        </View>
                       )}
 
                       {/* Email Field */}
@@ -482,9 +574,12 @@ export default function AuthScreen({ navigation }) {
                             ref={emailInputRef}
                             style={styles.textInput}
                             placeholder="name@example.com"
-                            placeholderTextColor="#4A4860"
+                            placeholderTextColor="#504E64"
                             value={email}
-                            onChangeText={(t) => { setEmail(t.toLowerCase()); setErrorMessage(''); }}
+                            onChangeText={(t) => {
+                              setEmail(t.toLowerCase());
+                              setErrorMessage('');
+                            }}
                             onFocus={() => setFocusedField('email')}
                             onBlur={() => setFocusedField(null)}
                             autoCapitalize="none"
@@ -495,7 +590,10 @@ export default function AuthScreen({ navigation }) {
                           />
                           {Boolean(email) && (
                             <TouchableOpacity
-                              onPress={() => { setEmail(''); setErrorMessage(''); }}
+                              onPress={() => {
+                                setEmail('');
+                                setErrorMessage('');
+                              }}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                               style={{ padding: 4 }}
                             >
@@ -503,17 +601,22 @@ export default function AuthScreen({ navigation }) {
                             </TouchableOpacity>
                           )}
                           {isValidEmail(email) && (
-                            <Ionicons name="checkmark-circle" size={18} color="#10B981" style={{ marginLeft: 4 }} />
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={18}
+                              color="#10B981"
+                              style={{ marginLeft: 4 }}
+                            />
                           )}
                         </View>
                       </View>
 
                       {/* Error */}
                       {Boolean(errorMessage) && (
-                        <Animated.View entering={FadeIn.duration(200)} style={styles.errorRow}>
+                        <View style={styles.errorRow}>
                           <Ionicons name="alert-circle" size={14} color="#EF4444" />
                           <Text style={styles.errorText}>{errorMessage}</Text>
-                        </Animated.View>
+                        </View>
                       )}
 
                       {/* Domain Quick-Picks */}
@@ -559,7 +662,7 @@ export default function AuthScreen({ navigation }) {
                         </LinearGradient>
                       </TouchableOpacity>
                     </View>
-                  </BlurView>
+                  </View>
 
                   {/* Mode Toggle */}
                   <View style={styles.modeToggleRow}>
@@ -568,7 +671,7 @@ export default function AuthScreen({ navigation }) {
                     </Text>
                     <TouchableOpacity
                       onPress={() => {
-                        Haptics.selectionAsync();
+                        safeHaptic('light');
                         setAuthMode(authMode === 'signup' ? 'login' : 'signup');
                         setErrorMessage('');
                       }}
@@ -594,10 +697,16 @@ export default function AuthScreen({ navigation }) {
               {/* ═══════════════════════════════════════════════════ */}
               {phase === 'otp' && (
                 <Animated.View
-                  key={`otp-${phaseKey}`}
-                  entering={SlideInRight.duration(350).easing(Easing.out(Easing.cubic))}
-                  exiting={SlideOutLeft.duration(250)}
-                  style={styles.formContainer}
+                  style={[
+                    styles.formContainer,
+                    {
+                      opacity: phaseFade,
+                      transform: [
+                        { translateX: phaseSlide },
+                        { translateX: shakeAnim },
+                      ],
+                    },
+                  ]}
                 >
                   {/* Back Button */}
                   <TouchableOpacity
@@ -620,20 +729,16 @@ export default function AuthScreen({ navigation }) {
 
                   {/* Success Notice */}
                   {Boolean(successNotice) && (
-                    <Animated.View entering={FadeIn.duration(200)} style={styles.successRow}>
+                    <View style={styles.successRow}>
                       <Ionicons name="checkmark-circle" size={14} color="#10B981" />
                       <Text style={styles.successText}>{successNotice}</Text>
-                    </Animated.View>
+                    </View>
                   )}
 
                   {/* OTP Cells */}
                   <View style={styles.otpRow}>
                     {otp.map((digit, idx) => (
-                      <Animated.View
-                        key={idx}
-                        entering={FadeInDown.delay(idx * 60).duration(300)}
-                        style={styles.otpCellWrap}
-                      >
+                      <View key={idx} style={styles.otpCellWrap}>
                         <TextInput
                           ref={(ref) => (otpInputs.current[idx] = ref)}
                           style={[
@@ -647,16 +752,16 @@ export default function AuthScreen({ navigation }) {
                           maxLength={6}
                           selectTextOnFocus
                         />
-                      </Animated.View>
+                      </View>
                     ))}
                   </View>
 
                   {/* Error */}
                   {Boolean(errorMessage) && (
-                    <Animated.View entering={FadeIn.duration(200)} style={styles.errorRow}>
+                    <View style={styles.errorRow}>
                       <Ionicons name="alert-circle" size={14} color="#EF4444" />
                       <Text style={styles.errorText}>{errorMessage}</Text>
-                    </Animated.View>
+                    </View>
                   )}
 
                   {/* Resend */}
@@ -667,7 +772,12 @@ export default function AuthScreen({ navigation }) {
                       disabled={!resendActive}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.resendBtnText, resendActive && styles.resendBtnActive]}>
+                      <Text
+                        style={[
+                          styles.resendBtnText,
+                          resendActive && styles.resendBtnActive,
+                        ]}
+                      >
                         {resendActive ? 'Resend Code' : `Resend in ${countdown}s`}
                       </Text>
                     </TouchableOpacity>
@@ -777,7 +887,7 @@ const styles = StyleSheet.create({
     width: 110,
     height: 110,
     borderRadius: 36,
-    backgroundColor: 'rgba(254, 60, 114, 0.15)',
+    backgroundColor: 'rgba(254, 60, 114, 0.25)',
   },
   logoBadge: {
     width: 80,
@@ -785,12 +895,12 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     backgroundColor: '#161324',
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
+    borderColor: 'rgba(254, 60, 114, 0.35)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#FE3C72',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 24,
     elevation: 10,
   },
@@ -809,9 +919,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(254, 60, 114, 0.08)',
+    backgroundColor: 'rgba(254, 60, 114, 0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.2)',
+    borderColor: 'rgba(254, 60, 114, 0.25)',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -866,7 +976,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
   secondaryPillText: {
     color: '#D8D6E8',
@@ -919,7 +1029,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -941,17 +1051,17 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
 
-  // ── Glass Card ──
+  // ── Form Card ──
   glassCard: {
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: 20,
+    backgroundColor: '#12101E',
   },
   glassCardInner: {
     padding: 20,
-    backgroundColor: 'rgba(18, 16, 28, 0.85)',
   },
 
   // ── Form Fields ──
@@ -968,7 +1078,7 @@ const styles = StyleSheet.create({
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16132A',
+    backgroundColor: '#18152A',
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.06)',
@@ -976,12 +1086,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   inputWrapFocused: {
-    borderColor: 'rgba(254, 60, 114, 0.5)',
-    backgroundColor: '#1A1630',
+    borderColor: '#FE3C72',
+    backgroundColor: '#1E1933',
     shadowColor: '#FE3C72',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     elevation: 4,
   },
   inputWrapError: {
@@ -1062,7 +1172,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#FE3C72',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 16,
     elevation: 6,
   },
@@ -1112,7 +1222,7 @@ const styles = StyleSheet.create({
   },
   otpCell: {
     height: 56,
-    backgroundColor: '#16132A',
+    backgroundColor: '#18152A',
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.06)',
@@ -1122,7 +1232,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   otpCellFilled: {
-    borderColor: 'rgba(254, 60, 114, 0.5)',
+    borderColor: '#FE3C72',
     backgroundColor: '#1E1933',
   },
 
