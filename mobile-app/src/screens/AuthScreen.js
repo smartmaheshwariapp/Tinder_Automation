@@ -1,5 +1,7 @@
-// src/screens/AuthScreen.js — World-Class Ambient Animated Authentication & Registration Screen
-import React, { useState, useRef, useEffect } from 'react';
+// src/screens/AuthScreen.js — Industry-Grade 3-Phase Auth Flow
+// Uses react-native-reanimated for 60fps UI-thread animations
+// Uses expo-linear-gradient, expo-blur, expo-haptics for premium feel
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,236 +9,212 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Animated,
-  Easing,
   KeyboardAvoidingView,
   Platform,
   Dimensions,
   Image,
   StatusBar,
-  ScrollView,
   Keyboard,
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  withRepeat,
+  withSequence,
+  withDelay,
+  interpolate,
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  SlideInRight,
+  SlideOutLeft,
+  SlideInLeft,
+  SlideOutRight,
+  runOnJS,
+} from 'react-native-reanimated';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 
 const DOMAIN_SUGGESTIONS = ['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'];
-const PLATFORM_OPTIONS = [
-  { id: 'tinder', label: 'Tinder', icon: 'flame', color: '#FD297B' },
-  { id: 'bumble', label: 'Bumble', icon: 'sparkles', color: '#FFCB37' },
-  { id: 'hinge', label: 'Hinge', icon: 'heart', color: '#8E8DA3' },
-];
 
-export default function AuthScreen({ navigation, route }) {
-  // ── Mode: 'login' | 'signup' ──
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
-  
-  // ── Step: 'form' | 'otp' ──
-  const [step, setStep] = useState('form');
-  
-  // Form fields
+// ═══════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════
+export default function AuthScreen({ navigation }) {
+  // ── Core State Machine ──
+  const [phase, setPhase] = useState('welcome'); // 'welcome' | 'form' | 'otp'
+  const [authMode, setAuthMode] = useState('signup'); // 'login' | 'signup'
+
+  // ── Form Data ──
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [selectedPlatform, setSelectedPlatform] = useState('tinder');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  
-  // States
-  const [focusedField, setFocusedField] = useState(null); // 'name' | 'email' | null
+
+  // ── UI States ──
+  const [focusedField, setFocusedField] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successNotice, setSuccessNotice] = useState('');
   const [countdown, setCountdown] = useState(45);
   const [resendActive, setResendActive] = useState(false);
+  const [phaseKey, setPhaseKey] = useState(0); // forces re-mount for animations
 
-  // ── Animation References ──
-  const orbScale1 = useRef(new Animated.Value(1)).current;
-  const orbScale2 = useRef(new Animated.Value(1)).current;
-  const orbOpacity = useRef(new Animated.Value(0.6)).current;
-
-  const contentFade = useRef(new Animated.Value(0)).current;
-  const contentSlide = useRef(new Animated.Value(30)).current;
-  const logoFloat = useRef(new Animated.Value(0)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-  const modeSlide = useRef(new Animated.Value(0)).current; // 0: login, 1: signup
-
+  // ── Refs ──
   const otpInputs = useRef([]);
+  const emailInputRef = useRef(null);
+  const nameInputRef = useRef(null);
 
-  // ── Ambient Background Breathing Glow Animation ──
+  // ── Reanimated Shared Values ──
+  const logoGlow = useSharedValue(0);
+  const logoFloat = useSharedValue(0);
+
+  // ── Ambient Logo Animations (Welcome Phase) ──
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(orbScale1, {
-          toValue: 1.25,
-          duration: 4500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(orbScale1, {
-          toValue: 1,
-          duration: 4500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(orbScale2, {
-          toValue: 1.3,
-          duration: 5500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(orbScale2, {
-          toValue: 1,
-          duration: 5500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(logoFloat, {
-          toValue: -6,
-          duration: 2500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoFloat, {
-          toValue: 0,
-          duration: 2500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    Animated.parallel([
-      Animated.timing(contentFade, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.spring(contentSlide, {
-        toValue: 0,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // Breathing glow
+    logoGlow.value = withRepeat(
+      withTiming(1, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true
+    );
+    // Gentle float
+    logoFloat.value = withRepeat(
+      withTiming(-8, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true
+    );
   }, []);
 
-  // ── Mode Switch Animation ──
-  const switchAuthMode = (mode) => {
-    Keyboard.dismiss();
-    setErrorMessage('');
-    setSuccessNotice('');
-    setAuthMode(mode);
-    Animated.spring(modeSlide, {
-      toValue: mode === 'login' ? 0 : 1,
-      friction: 8,
-      tension: 50,
-      useNativeDriver: true,
-    }).start();
-  };
+  const logoGlowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(logoGlow.value, [0, 1], [0.3, 0.7]),
+    transform: [{ scale: interpolate(logoGlow.value, [0, 1], [1, 1.15]) }],
+  }));
 
-  // ── Countdown Timer for OTP Resend ──
+  const logoFloatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: logoFloat.value }],
+  }));
+
+  // ── OTP Countdown Timer ──
   useEffect(() => {
     let timer;
-    if (step === 'otp' && countdown > 0) {
+    if (phase === 'otp' && countdown > 0) {
       timer = setInterval(() => setCountdown((c) => c - 1), 1000);
     } else if (countdown === 0) {
       setResendActive(true);
     }
     return () => clearInterval(timer);
-  }, [step, countdown]);
+  }, [phase, countdown]);
 
-  // ── Validation Helpers ──
-  const isValidEmail = (val) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
+  // ── Validation ──
+  const isValidEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
+
+  // ── Phase Transitions ──
+  const goToForm = (mode) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setAuthMode(mode);
+    setErrorMessage('');
+    setSuccessNotice('');
+    setPhaseKey((k) => k + 1);
+    setPhase('form');
   };
 
-  const triggerShake = () => {
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
-    ]).start();
+  const goBackToWelcome = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setErrorMessage('');
+    setSuccessNotice('');
+    setName('');
+    setEmail('');
+    setPhaseKey((k) => k + 1);
+    setPhase('welcome');
   };
 
-  // ── Domain Chip Tap Handler ──
+  const goToOtp = () => {
+    setPhaseKey((k) => k + 1);
+    setPhase('otp');
+  };
+
+  const goBackToForm = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setOtp(['', '', '', '', '', '']);
+    setErrorMessage('');
+    setSuccessNotice('');
+    setCountdown(45);
+    setResendActive(false);
+    setPhaseKey((k) => k + 1);
+    setPhase('form');
+  };
+
+  // ── Domain Chip Handler ──
   const handleSelectDomain = (domain) => {
+    Haptics.selectionAsync();
     let base = email.trim();
-    if (base.includes('@')) {
-      base = base.split('@')[0];
-    }
+    if (base.includes('@')) base = base.split('@')[0];
     if (!base) base = 'user';
     setEmail(`${base}${domain}`.toLowerCase());
     setErrorMessage('');
   };
 
-  // ── Submit Form (Login / Signup) ──
+  // ── Form Submission ──
   const handleFormSubmit = async () => {
     Keyboard.dismiss();
     const cleanEmail = email.trim().toLowerCase();
 
     if (authMode === 'signup' && !name.trim()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setErrorMessage('Please enter your name.');
-      triggerShake();
       return;
     }
 
     if (!cleanEmail || !isValidEmail(cleanEmail)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setErrorMessage('Please enter a valid email address.');
-      triggerShake();
       return;
     }
 
     setErrorMessage('');
     setIsLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     setTimeout(() => {
       setIsLoading(false);
-      setStep('otp');
       setCountdown(45);
       setResendActive(false);
       setSuccessNotice(
         authMode === 'signup'
-          ? `Welcome ${name.trim()}! Security code sent to ${cleanEmail}`
-          : `Security code sent to ${cleanEmail}`
+          ? `Welcome ${name.trim()}! Code sent to ${cleanEmail}`
+          : `Verification code sent to ${cleanEmail}`
       );
-      setTimeout(() => otpInputs.current[0]?.focus(), 150);
+      goToOtp();
+      setTimeout(() => otpInputs.current[0]?.focus(), 300);
     }, 700);
   };
 
-  // ── OTP Input with Full Paste Support ──
+  // ── OTP Handling ──
   const handleOtpChange = (text, index) => {
     setErrorMessage('');
     setSuccessNotice('');
 
-    // Handle full 6-digit paste
     if (text && text.length > 1) {
-      const cleanDigits = text.replace(/[^0-9]/g, '').slice(0, 6);
+      const digits = text.replace(/[^0-9]/g, '').slice(0, 6);
       const newOtp = ['', '', '', '', '', ''];
-      for (let i = 0; i < cleanDigits.length; i++) {
-        newOtp[i] = cleanDigits[i];
-      }
+      for (let i = 0; i < digits.length; i++) newOtp[i] = digits[i];
       setOtp(newOtp);
-      if (cleanDigits.length === 6) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (digits.length === 6) {
         otpInputs.current[5]?.focus();
-        verifyOtp(cleanDigits);
+        verifyOtp(digits);
       } else {
-        const nextIdx = Math.min(cleanDigits.length, 5);
-        otpInputs.current[nextIdx]?.focus();
+        otpInputs.current[Math.min(digits.length, 5)]?.focus();
       }
       return;
     }
@@ -245,726 +223,769 @@ export default function AuthScreen({ navigation, route }) {
     newOtp[index] = text;
     setOtp(newOtp);
 
-    if (text && index < 5) {
-      otpInputs.current[index + 1]?.focus();
-    }
-
-    if (text && index === 5 && newOtp.every((d) => d.length === 1)) {
-      verifyOtp(newOtp.join(''));
-    }
-  };
-
-  const handleOtpKeyPress = (e, index) => {
-    if (e.nativeEvent.key === 'Backspace') {
-      if (!otp[index] && index > 0) {
-        const newOtp = [...otp];
-        newOtp[index - 1] = '';
-        setOtp(newOtp);
-        otpInputs.current[index - 1]?.focus();
+    if (text) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (index < 5) otpInputs.current[index + 1]?.focus();
+      if (index === 5 && newOtp.every((d) => d.length === 1)) {
+        verifyOtp(newOtp.join(''));
       }
     }
   };
 
-  // ── Verify OTP & Enter Main Screen ──
+  const handleOtpKeyPress = (e, index) => {
+    if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
+      const newOtp = [...otp];
+      newOtp[index - 1] = '';
+      setOtp(newOtp);
+      otpInputs.current[index - 1]?.focus();
+    }
+  };
+
   const verifyOtp = async (code) => {
     Keyboard.dismiss();
     setIsLoading(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setTimeout(() => {
       setIsLoading(false);
       navigation.replace('PlatformSelect');
     }, 850);
   };
 
-  // ── Resend Code ──
   const handleResendCode = () => {
     if (!resendActive) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCountdown(45);
     setResendActive(false);
     setErrorMessage('');
-    setSuccessNotice('A fresh verification code has been dispatched!');
+    setSuccessNotice('A fresh code has been sent!');
   };
 
-  // ── Back to Form ──
-  const handleBackToForm = () => {
-    setStep('form');
-    setOtp(['', '', '', '', '', '']);
-    setErrorMessage('');
-    setSuccessNotice('');
-  };
-
+  // ═════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═════════════════════════════════════════════════════════════════
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#08070D" />
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* ─── Ambient Pulsing Glowing Orbs ─── */}
-      <View style={styles.ambientGlowContainer} pointerEvents="none">
-        <Animated.View
-          style={[
-            styles.glowOrbPink,
-            {
-              transform: [{ scale: orbScale1 }],
-              opacity: orbOpacity,
-            },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.glowOrbPurple,
-            {
-              transform: [{ scale: orbScale2 }],
-              opacity: orbOpacity,
-            },
-          ]}
-        />
+      {/* ─── Full-Screen Gradient Background ─── */}
+      <LinearGradient
+        colors={['#1A0A1E', '#120818', '#0A0612', '#08070D']}
+        locations={[0, 0.35, 0.7, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* ─── Ambient Gradient Orbs (decorative) ─── */}
+      <View style={styles.orbContainer} pointerEvents="none">
+        <Animated.View style={[styles.orbPink, logoGlowStyle]} />
+        <View style={styles.orbPurple} />
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        style={{ flex: 1 }}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <ScrollView
-            contentContainerStyle={styles.scrollContainer}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <Animated.View
-              style={[
-                styles.contentWrap,
-                {
-                  opacity: contentFade,
-                  transform: [{ translateY: contentSlide }],
-                },
-              ]}
-            >
-              {/* ─── Hero Header & Floating Logo ─── */}
-              <View style={styles.heroSection}>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.kavContainer}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.contentContainer}>
+
+              {/* ═══════════════════════════════════════════════════ */}
+              {/* PHASE 1: WELCOME / LANDING                        */}
+              {/* ═══════════════════════════════════════════════════ */}
+              {phase === 'welcome' && (
                 <Animated.View
-                  style={[
-                    styles.logoBadgeWrap,
-                    { transform: [{ translateY: logoFloat }] },
-                  ]}
+                  key={`welcome-${phaseKey}`}
+                  entering={FadeIn.duration(500)}
+                  exiting={FadeOut.duration(200)}
+                  style={styles.welcomeContainer}
                 >
-                  <View style={styles.logoGlowRing} />
-                  <Image source={LOGO_IMG} style={styles.logoImage} resizeMode="contain" />
-                </Animated.View>
+                  {/* Hero: Logo + Brand */}
+                  <View style={styles.welcomeHero}>
+                    <Animated.View style={[styles.logoOuter, logoFloatStyle]}>
+                      {/* Glow ring behind logo */}
+                      <Animated.View style={[styles.logoGlowRing, logoGlowStyle]} />
+                      <View style={styles.logoBadge}>
+                        <Image source={LOGO_IMG} style={styles.logoImg} resizeMode="contain" />
+                      </View>
+                    </Animated.View>
 
-                <Text style={styles.appTitle}>FlirtEasy</Text>
-                <View style={styles.taglinePill}>
-                  <Ionicons name="sparkles" size={12} color="#FE3C72" />
-                  <Text style={styles.taglineText}>AI DATING COPILOT</Text>
-                </View>
+                    <Animated.Text
+                      entering={FadeInDown.delay(150).duration(500)}
+                      style={styles.brandTitle}
+                    >
+                      FlirtEasy
+                    </Animated.Text>
 
-                <Text style={styles.headline}>
-                  {step === 'otp'
-                    ? 'Verify Security Code'
-                    : authMode === 'signup'
-                    ? 'Create Your Account'
-                    : 'Welcome Back'}
-                </Text>
-                <Text style={styles.subHeadline}>
-                  {step === 'otp'
-                    ? `Enter the 6-digit verification code sent to\n${email}`
-                    : authMode === 'signup'
-                    ? 'Start getting 3x more matches and personalized AI conversations today.'
-                    : 'Sign in to access your automated matches, chats, and live telemetry.'}
-                </Text>
-              </View>
+                    <Animated.View
+                      entering={FadeInDown.delay(250).duration(500)}
+                      style={styles.taglinePill}
+                    >
+                      <Ionicons name="sparkles" size={11} color="#FE3C72" />
+                      <Text style={styles.taglineText}>AI DATING COPILOT</Text>
+                    </Animated.View>
 
-              {/* ─── Form Card ─── */}
-              <Animated.View
-                style={[
-                  styles.glassCard,
-                  { transform: [{ translateX: shakeAnim }] },
-                ]}
-              >
-                {step === 'form' ? (
-                  <>
-                    {/* ── Mode Segment Control (Log In vs Create Account) ── */}
-                    <View style={styles.modeSegmentContainer}>
-                      <TouchableOpacity
-                        style={[
-                          styles.modeSegmentBtn,
-                          authMode === 'login' && styles.modeSegmentBtnActive,
-                        ]}
-                        onPress={() => switchAuthMode('login')}
-                        activeOpacity={0.8}
+                    <Animated.Text
+                      entering={FadeInDown.delay(350).duration(500)}
+                      style={styles.welcomeSubtitle}
+                    >
+                      3x more matches.{'\n'}Intelligent conversations.{'\n'}Zero effort.
+                    </Animated.Text>
+                  </View>
+
+                  {/* Bottom CTAs */}
+                  <Animated.View
+                    entering={FadeInUp.delay(450).duration(500)}
+                    style={styles.welcomeBottomCtas}
+                  >
+                    {/* Primary: Create Account */}
+                    <TouchableOpacity
+                      style={styles.primaryPill}
+                      onPress={() => goToForm('signup')}
+                      activeOpacity={0.85}
+                    >
+                      <LinearGradient
+                        colors={['#FE3C72', '#E8245C']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.primaryPillGradient}
                       >
-                        <Text
-                          style={[
-                            styles.modeSegmentText,
-                            authMode === 'login' && styles.modeSegmentTextActive,
-                          ]}
-                        >
-                          Sign In
-                        </Text>
-                      </TouchableOpacity>
+                        <Text style={styles.primaryPillText}>Create Free Account</Text>
+                        <Ionicons name="arrow-forward" size={18} color="#FFF" />
+                      </LinearGradient>
+                    </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={[
-                          styles.modeSegmentBtn,
-                          authMode === 'signup' && styles.modeSegmentBtnActive,
-                        ]}
-                        onPress={() => switchAuthMode('signup')}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={[
-                            styles.modeSegmentText,
-                            authMode === 'signup' && styles.modeSegmentTextActive,
-                          ]}
-                        >
-                          Create Account
-                        </Text>
-                      </TouchableOpacity>
+                    {/* Secondary: Sign In */}
+                    <TouchableOpacity
+                      style={styles.secondaryPill}
+                      onPress={() => goToForm('login')}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.secondaryPillText}>I already have an account</Text>
+                    </TouchableOpacity>
+
+                    {/* Tertiary: Guest */}
+                    <TouchableOpacity
+                      style={styles.guestLink}
+                      onPress={() => navigation.replace('PlatformSelect')}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.guestLinkText}>Continue as Guest</Text>
+                      <Ionicons name="arrow-forward" size={13} color="#716E89" />
+                    </TouchableOpacity>
+                  </Animated.View>
+
+                  {/* Footer */}
+                  <Animated.View
+                    entering={FadeIn.delay(600).duration(400)}
+                    style={styles.welcomeFooter}
+                  >
+                    <View style={styles.securityBadge}>
+                      <Ionicons name="shield-checkmark" size={12} color="#10B981" />
+                      <Text style={styles.securityBadgeText}>End-to-end encrypted</Text>
                     </View>
+                  </Animated.View>
+                </Animated.View>
+              )}
 
-                    {/* ── Sign Up: Name Field ── */}
-                    {authMode === 'signup' && (
-                      <View style={styles.fieldBlock}>
-                        <Text style={styles.fieldLabel}>YOUR NAME / NICKNAME</Text>
+              {/* ═══════════════════════════════════════════════════ */}
+              {/* PHASE 2: EMAIL FORM (Login / Signup)               */}
+              {/* ═══════════════════════════════════════════════════ */}
+              {phase === 'form' && (
+                <Animated.View
+                  key={`form-${phaseKey}`}
+                  entering={SlideInRight.duration(350).easing(Easing.out(Easing.cubic))}
+                  exiting={SlideOutLeft.duration(250)}
+                  style={styles.formContainer}
+                >
+                  {/* Back Button */}
+                  <TouchableOpacity
+                    style={styles.backBtn}
+                    onPress={goBackToWelcome}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  >
+                    <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                  </TouchableOpacity>
+
+                  {/* Header */}
+                  <View style={styles.formHeader}>
+                    <Text style={styles.formTitle}>
+                      {authMode === 'signup' ? 'Create your account' : 'Welcome back'}
+                    </Text>
+                    <Text style={styles.formSubtitle}>
+                      {authMode === 'signup'
+                        ? 'Start getting smarter matches today.'
+                        : 'Sign in to resume your AI dating copilot.'}
+                    </Text>
+                  </View>
+
+                  {/* Glass Card */}
+                  <BlurView intensity={20} tint="dark" style={styles.glassCard}>
+                    <View style={styles.glassCardInner}>
+                      {/* Name Field (signup only) */}
+                      {authMode === 'signup' && (
+                        <Animated.View
+                          entering={FadeInDown.duration(300)}
+                          style={styles.fieldGroup}
+                        >
+                          <Text style={styles.fieldLabel}>YOUR NAME</Text>
+                          <View
+                            style={[
+                              styles.inputWrap,
+                              focusedField === 'name' && styles.inputWrapFocused,
+                            ]}
+                          >
+                            <Ionicons
+                              name={focusedField === 'name' ? 'person' : 'person-outline'}
+                              size={18}
+                              color={focusedField === 'name' ? '#FE3C72' : '#716E89'}
+                              style={styles.inputIcon}
+                            />
+                            <TextInput
+                              ref={nameInputRef}
+                              style={styles.textInput}
+                              placeholder="What should we call you?"
+                              placeholderTextColor="#4A4860"
+                              value={name}
+                              onChangeText={(t) => { setName(t); setErrorMessage(''); }}
+                              onFocus={() => setFocusedField('name')}
+                              onBlur={() => setFocusedField(null)}
+                              autoCapitalize="words"
+                              autoCorrect={false}
+                              returnKeyType="next"
+                              onSubmitEditing={() => emailInputRef.current?.focus()}
+                            />
+                            {Boolean(name.trim()) && (
+                              <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                            )}
+                          </View>
+                        </Animated.View>
+                      )}
+
+                      {/* Email Field */}
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
                         <View
                           style={[
-                            styles.inputContainer,
-                            focusedField === 'name' && styles.inputContainerFocused,
+                            styles.inputWrap,
+                            focusedField === 'email' && styles.inputWrapFocused,
+                            Boolean(errorMessage) && styles.inputWrapError,
                           ]}
                         >
                           <Ionicons
-                            name={focusedField === 'name' ? 'person' : 'person-outline'}
+                            name={focusedField === 'email' ? 'mail' : 'mail-outline'}
                             size={18}
-                            color={focusedField === 'name' ? '#FE3C72' : '#8E8DA3'}
+                            color={focusedField === 'email' ? '#FE3C72' : '#716E89'}
                             style={styles.inputIcon}
                           />
                           <TextInput
+                            ref={emailInputRef}
                             style={styles.textInput}
-                            placeholder="e.g. Alex"
-                            placeholderTextColor="#5A586E"
-                            value={name}
-                            onChangeText={(text) => {
-                              setName(text);
-                              if (errorMessage) setErrorMessage('');
-                            }}
-                            onFocus={() => setFocusedField('name')}
+                            placeholder="name@example.com"
+                            placeholderTextColor="#4A4860"
+                            value={email}
+                            onChangeText={(t) => { setEmail(t.toLowerCase()); setErrorMessage(''); }}
+                            onFocus={() => setFocusedField('email')}
                             onBlur={() => setFocusedField(null)}
-                            autoCapitalize="words"
+                            autoCapitalize="none"
                             autoCorrect={false}
-                            returnKeyType="next"
+                            keyboardType="email-address"
+                            returnKeyType="done"
+                            onSubmitEditing={handleFormSubmit}
                           />
-                          {Boolean(name.trim()) && (
-                            <View style={styles.validBadge}>
-                              <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                            </View>
+                          {Boolean(email) && (
+                            <TouchableOpacity
+                              onPress={() => { setEmail(''); setErrorMessage(''); }}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              style={{ padding: 4 }}
+                            >
+                              <Ionicons name="close-circle" size={16} color="#716E89" />
+                            </TouchableOpacity>
+                          )}
+                          {isValidEmail(email) && (
+                            <Ionicons name="checkmark-circle" size={18} color="#10B981" style={{ marginLeft: 4 }} />
                           )}
                         </View>
                       </View>
-                    )}
 
-                    {/* ── Email Field ── */}
-                    <View style={styles.fieldBlock}>
-                      <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
-                      <View
-                        style={[
-                          styles.inputContainer,
-                          focusedField === 'email' && styles.inputContainerFocused,
-                          Boolean(errorMessage) && styles.inputContainerError,
-                        ]}
-                      >
-                        <Ionicons
-                          name={focusedField === 'email' ? 'mail' : 'mail-outline'}
-                          size={18}
-                          color={focusedField === 'email' ? '#FE3C72' : '#8E8DA3'}
-                          style={styles.inputIcon}
-                        />
-                        <TextInput
-                          style={styles.textInput}
-                          placeholder="name@example.com"
-                          placeholderTextColor="#5A586E"
-                          value={email}
-                          onChangeText={(text) => {
-                            setEmail(text.toLowerCase());
-                            if (errorMessage) setErrorMessage('');
-                          }}
-                          onFocus={() => setFocusedField('email')}
-                          onBlur={() => setFocusedField(null)}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          keyboardType="email-address"
-                          returnKeyType="done"
-                          onSubmitEditing={handleFormSubmit}
-                        />
+                      {/* Error */}
+                      {Boolean(errorMessage) && (
+                        <Animated.View entering={FadeIn.duration(200)} style={styles.errorRow}>
+                          <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                          <Text style={styles.errorText}>{errorMessage}</Text>
+                        </Animated.View>
+                      )}
 
-                        {Boolean(email) && (
-                          <TouchableOpacity
-                            onPress={() => {
-                              setEmail('');
-                              setErrorMessage('');
-                            }}
-                            style={styles.clearBtn}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          >
-                            <Ionicons name="close-circle" size={16} color="#716E89" />
-                          </TouchableOpacity>
-                        )}
-
-                        {isValidEmail(email) && (
-                          <View style={styles.validBadge}>
-                            <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                          </View>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* Error Message */}
-                    {Boolean(errorMessage) && (
-                      <View style={styles.errorRow}>
-                        <Ionicons name="alert-circle" size={14} color="#EF4444" />
-                        <Text style={styles.errorText}>{errorMessage}</Text>
-                      </View>
-                    )}
-
-                    {/* Smart Domain Quick-Picker Chips */}
-                    <View style={styles.domainChipsWrap}>
-                      <Text style={styles.domainChipsTitle}>Quick Domain:</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.domainChipsScroll}
-                      >
-                        {DOMAIN_SUGGESTIONS.map((domain) => (
-                          <TouchableOpacity
-                            key={domain}
-                            style={styles.domainChip}
-                            onPress={() => handleSelectDomain(domain)}
-                            activeOpacity={0.75}
-                          >
-                            <Text style={styles.domainChipText}>{domain}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </View>
-
-                    {/* ── Sign Up: Platform Preference ── */}
-                    {authMode === 'signup' && (
-                      <View style={styles.platformPrefBlock}>
-                        <Text style={styles.fieldLabel}>PRIMARY DATING APP</Text>
-                        <View style={styles.platformOptionsRow}>
-                          {PLATFORM_OPTIONS.map((plat) => {
-                            const isSelected = selectedPlatform === plat.id;
-                            return (
-                              <TouchableOpacity
-                                key={plat.id}
-                                style={[
-                                  styles.platformOptionChip,
-                                  isSelected && styles.platformOptionChipSelected,
-                                ]}
-                                onPress={() => setSelectedPlatform(plat.id)}
-                                activeOpacity={0.8}
-                              >
-                                <Ionicons
-                                  name={plat.icon}
-                                  size={14}
-                                  color={isSelected ? '#FE3C72' : '#8E8DA3'}
-                                />
-                                <Text
-                                  style={[
-                                    styles.platformOptionLabel,
-                                    isSelected && styles.platformOptionLabelSelected,
-                                  ]}
-                                >
-                                  {plat.label}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
+                      {/* Domain Quick-Picks */}
+                      <View style={styles.domainSection}>
+                        <Text style={styles.domainLabel}>Quick fill:</Text>
+                        <View style={styles.domainChipsRow}>
+                          {DOMAIN_SUGGESTIONS.map((d) => (
+                            <TouchableOpacity
+                              key={d}
+                              style={styles.domainChip}
+                              onPress={() => handleSelectDomain(d)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.domainChipText}>{d}</Text>
+                            </TouchableOpacity>
+                          ))}
                         </View>
                       </View>
-                    )}
 
-                    {/* Primary CTA Button */}
-                    <TouchableOpacity
-                      style={styles.primaryButton}
-                      onPress={handleFormSubmit}
-                      disabled={isLoading}
-                      activeOpacity={0.88}
-                    >
-                      {isLoading ? (
-                        <ActivityIndicator size="small" color="#FFF" />
-                      ) : (
-                        <>
-                          <Text style={styles.primaryButtonText}>
-                            {authMode === 'signup'
-                              ? 'Create Free Account'
-                              : 'Continue with Email'}
-                          </Text>
-                          <Ionicons name="arrow-forward" size={16} color="#FFF" />
-                        </>
-                      )}
-                    </TouchableOpacity>
-
-                    {/* Switch Mode Footer Toggle */}
-                    <View style={styles.switchModeRow}>
-                      <Text style={styles.switchModeText}>
-                        {authMode === 'signup'
-                          ? 'Already have an account?'
-                          : 'New to FlirtEasy?'}
-                      </Text>
+                      {/* CTA */}
                       <TouchableOpacity
-                        onPress={() =>
-                          switchAuthMode(authMode === 'signup' ? 'login' : 'signup')
-                        }
-                        activeOpacity={0.8}
+                        style={[styles.formCta, isLoading && { opacity: 0.7 }]}
+                        onPress={handleFormSubmit}
+                        disabled={isLoading}
+                        activeOpacity={0.88}
                       >
-                        <Text style={styles.switchModeLink}>
-                          {authMode === 'signup' ? 'Sign In' : 'Create Account'}
-                        </Text>
+                        <LinearGradient
+                          colors={['#FE3C72', '#E8245C']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.formCtaGradient}
+                        >
+                          {isLoading ? (
+                            <ActivityIndicator size="small" color="#FFF" />
+                          ) : (
+                            <>
+                              <Text style={styles.formCtaText}>
+                                {authMode === 'signup' ? 'Create Account' : 'Continue'}
+                              </Text>
+                              <Ionicons name="arrow-forward" size={17} color="#FFF" />
+                            </>
+                          )}
+                        </LinearGradient>
                       </TouchableOpacity>
                     </View>
-                  </>
-                ) : (
-                  /* ═══════════ STEP 2: 6-DIGIT OTP VERIFICATION ═══════════ */
-                  <View style={styles.formStep}>
-                    <View style={styles.otpHeaderRow}>
-                      <Text style={styles.fieldLabel}>ENTER 6-DIGIT CODE</Text>
-                      <TouchableOpacity onPress={handleBackToForm} activeOpacity={0.7}>
-                        <Text style={styles.editEmailText}>Change Email</Text>
-                      </TouchableOpacity>
-                    </View>
+                  </BlurView>
 
-                    {/* Success Notice */}
-                    {Boolean(successNotice) && (
-                      <View style={styles.successRow}>
-                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                        <Text style={styles.successText}>{successNotice}</Text>
-                      </View>
-                    )}
+                  {/* Mode Toggle */}
+                  <View style={styles.modeToggleRow}>
+                    <Text style={styles.modeToggleText}>
+                      {authMode === 'signup' ? 'Already have an account?' : 'New to FlirtEasy?'}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setAuthMode(authMode === 'signup' ? 'login' : 'signup');
+                        setErrorMessage('');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.modeToggleLink}>
+                        {authMode === 'signup' ? 'Sign In' : 'Create Account'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-                    {/* 6 Digit Cells */}
-                    <View style={styles.otpCellsRow}>
-                      {otp.map((digit, idx) => (
+                  {/* Terms */}
+                  <Text style={styles.termsText}>
+                    By continuing, you agree to our{' '}
+                    <Text style={styles.termsLink}>Terms</Text> and{' '}
+                    <Text style={styles.termsLink}>Privacy Policy</Text>.
+                  </Text>
+                </Animated.View>
+              )}
+
+              {/* ═══════════════════════════════════════════════════ */}
+              {/* PHASE 3: OTP VERIFICATION                          */}
+              {/* ═══════════════════════════════════════════════════ */}
+              {phase === 'otp' && (
+                <Animated.View
+                  key={`otp-${phaseKey}`}
+                  entering={SlideInRight.duration(350).easing(Easing.out(Easing.cubic))}
+                  exiting={SlideOutLeft.duration(250)}
+                  style={styles.formContainer}
+                >
+                  {/* Back Button */}
+                  <TouchableOpacity
+                    style={styles.backBtn}
+                    onPress={goBackToForm}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  >
+                    <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                  </TouchableOpacity>
+
+                  {/* Header */}
+                  <View style={styles.formHeader}>
+                    <Text style={styles.formTitle}>Verify your email</Text>
+                    <Text style={styles.formSubtitle}>
+                      Enter the 6-digit code sent to{'\n'}
+                      <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{email}</Text>
+                    </Text>
+                  </View>
+
+                  {/* Success Notice */}
+                  {Boolean(successNotice) && (
+                    <Animated.View entering={FadeIn.duration(200)} style={styles.successRow}>
+                      <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                      <Text style={styles.successText}>{successNotice}</Text>
+                    </Animated.View>
+                  )}
+
+                  {/* OTP Cells */}
+                  <View style={styles.otpRow}>
+                    {otp.map((digit, idx) => (
+                      <Animated.View
+                        key={idx}
+                        entering={FadeInDown.delay(idx * 60).duration(300)}
+                        style={styles.otpCellWrap}
+                      >
                         <TextInput
-                          key={idx}
                           ref={(ref) => (otpInputs.current[idx] = ref)}
                           style={[
                             styles.otpCell,
                             digit ? styles.otpCellFilled : null,
                           ]}
                           value={digit}
-                          onChangeText={(text) => handleOtpChange(text, idx)}
+                          onChangeText={(t) => handleOtpChange(t, idx)}
                           onKeyPress={(e) => handleOtpKeyPress(e, idx)}
                           keyboardType="number-pad"
                           maxLength={6}
                           selectTextOnFocus
                         />
-                      ))}
-                    </View>
+                      </Animated.View>
+                    ))}
+                  </View>
 
-                    {/* Error Message */}
-                    {Boolean(errorMessage) && (
-                      <View style={styles.errorRow}>
-                        <Ionicons name="alert-circle" size={14} color="#EF4444" />
-                        <Text style={styles.errorText}>{errorMessage}</Text>
-                      </View>
-                    )}
+                  {/* Error */}
+                  {Boolean(errorMessage) && (
+                    <Animated.View entering={FadeIn.duration(200)} style={styles.errorRow}>
+                      <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                      <Text style={styles.errorText}>{errorMessage}</Text>
+                    </Animated.View>
+                  )}
 
-                    {/* Resend Code Section */}
-                    <View style={styles.resendRow}>
-                      <Text style={styles.resendInfoText}>Didn't receive a code?</Text>
-                      <TouchableOpacity
-                        onPress={handleResendCode}
-                        disabled={!resendActive}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={[
-                            styles.resendBtnText,
-                            resendActive && styles.resendBtnTextActive,
-                          ]}
-                        >
-                          {resendActive ? 'Resend Code' : `Resend in ${countdown}s`}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Verify CTA Button */}
+                  {/* Resend */}
+                  <View style={styles.resendRow}>
+                    <Text style={styles.resendInfoText}>Didn't get a code?</Text>
                     <TouchableOpacity
-                      style={styles.primaryButton}
-                      onPress={() => verifyOtp(otp.join(''))}
-                      disabled={isLoading || otp.some((d) => !d)}
-                      activeOpacity={0.88}
+                      onPress={handleResendCode}
+                      disabled={!resendActive}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.resendBtnText, resendActive && styles.resendBtnActive]}>
+                        {resendActive ? 'Resend Code' : `Resend in ${countdown}s`}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Verify CTA */}
+                  <TouchableOpacity
+                    style={[
+                      styles.formCta,
+                      (isLoading || otp.some((d) => !d)) && { opacity: 0.5 },
+                    ]}
+                    onPress={() => verifyOtp(otp.join(''))}
+                    disabled={isLoading || otp.some((d) => !d)}
+                    activeOpacity={0.88}
+                  >
+                    <LinearGradient
+                      colors={['#FE3C72', '#E8245C']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.formCtaGradient}
                     >
                       {isLoading ? (
                         <ActivityIndicator size="small" color="#FFF" />
                       ) : (
                         <>
-                          <Text style={styles.primaryButtonText}>Verify & Launch Cockpit</Text>
+                          <Text style={styles.formCtaText}>Verify & Continue</Text>
                           <Ionicons name="checkmark-circle-outline" size={17} color="#FFF" />
                         </>
                       )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* ─── Divider ─── */}
-                <View style={styles.dividerRow}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>OR EXPLORE</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-
-                {/* ─── Alternative Quick Actions ─── */}
-                <View style={styles.socialOptionsRow}>
-                  <TouchableOpacity
-                    style={styles.secondarySocialBtn}
-                    onPress={() => navigation.replace('PlatformSelect')}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="speedometer-outline" size={17} color="#FE3C72" />
-                    <Text style={styles.secondarySocialBtnText}>Direct Cockpit Peek</Text>
+                    </LinearGradient>
                   </TouchableOpacity>
+                </Animated.View>
+              )}
 
-                  <TouchableOpacity
-                    style={styles.secondarySocialBtn}
-                    onPress={() => {
-                      navigation.navigate('Browser', {
-                        platform: 'Tinder',
-                        vpsUrl: 'https://stream.smartmaheshwari.com/?usr=User&pwd=admin',
-                        proxyIp: '',
-                      });
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="logo-google" size={16} color="#4285F4" />
-                    <Text style={styles.secondarySocialBtnText}>Tinder Web Sign-In</Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-
-              {/* ─── Security & Privacy Footer ─── */}
-              <View style={styles.footerWrap}>
-                <View style={styles.securityPill}>
-                  <Ionicons name="lock-closed" size={12} color="#10B981" />
-                  <Text style={styles.securityPillText}>256-Bit Encrypted Automation Tunnel</Text>
-                </View>
-
-                <Text style={styles.termsText}>
-                  By continuing, you agree to FlirtEasy's{' '}
-                  <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-                  <Text style={styles.termsLink}>Privacy Policy</Text>.
-                </Text>
-              </View>
-            </Animated.View>
-          </ScrollView>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: '#08070D',
   },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+  safeArea: {
+    flex: 1,
+  },
+  kavContainer: {
+    flex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
   },
 
-  // ── Ambient Background Glows ──
-  ambientGlowContainer: {
+  // ── Ambient Orbs ──
+  orbContainer: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
   },
-  glowOrbPink: {
+  orbPink: {
     position: 'absolute',
-    top: -SCREEN_WIDTH * 0.35,
-    right: -SCREEN_WIDTH * 0.25,
-    width: SCREEN_WIDTH * 0.95,
-    height: SCREEN_WIDTH * 0.95,
-    borderRadius: SCREEN_WIDTH * 0.475,
-    backgroundColor: 'rgba(254, 60, 114, 0.18)',
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 100,
+    top: -SCREEN_WIDTH * 0.3,
+    right: -SCREEN_WIDTH * 0.2,
+    width: SCREEN_WIDTH * 0.85,
+    height: SCREEN_WIDTH * 0.85,
+    borderRadius: SCREEN_WIDTH * 0.425,
+    backgroundColor: 'rgba(254, 60, 114, 0.12)',
   },
-  glowOrbPurple: {
+  orbPurple: {
     position: 'absolute',
-    bottom: -SCREEN_WIDTH * 0.3,
-    left: -SCREEN_WIDTH * 0.25,
-    width: SCREEN_WIDTH * 0.9,
-    height: SCREEN_WIDTH * 0.9,
-    borderRadius: SCREEN_WIDTH * 0.45,
-    backgroundColor: 'rgba(121, 40, 202, 0.15)',
-    shadowColor: '#7928CA',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 110,
+    bottom: -SCREEN_WIDTH * 0.25,
+    left: -SCREEN_WIDTH * 0.2,
+    width: SCREEN_WIDTH * 0.75,
+    height: SCREEN_WIDTH * 0.75,
+    borderRadius: SCREEN_WIDTH * 0.375,
+    backgroundColor: 'rgba(121, 40, 202, 0.08)',
   },
 
-  // ── Hero Section ──
-  contentWrap: {
-    width: '100%',
-    maxWidth: 440,
-    alignSelf: 'center',
+  // ═══════════════════════════════════════════
+  // PHASE 1: WELCOME
+  // ═══════════════════════════════════════════
+  welcomeContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingTop: SCREEN_HEIGHT * 0.08,
+    paddingBottom: 16,
   },
-  heroSection: {
+  welcomeHero: {
     alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  logoOuter: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
   },
-  logoBadgeWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 22,
+  logoGlowRing: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 36,
+    backgroundColor: 'rgba(254, 60, 114, 0.15)',
+  },
+  logoBadge: {
+    width: 80,
+    height: 80,
+    borderRadius: 26,
     backgroundColor: '#161324',
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.35)',
+    borderColor: 'rgba(254, 60, 114, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    shadowColor: '#FE3C72',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  logoImg: {
+    width: 50,
+    height: 50,
+  },
+  brandTitle: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '900',
+    letterSpacing: -0.8,
+    marginBottom: 8,
+  },
+  taglinePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(254, 60, 114, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 60, 114, 0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 20,
+  },
+  taglineText: {
+    color: '#FE3C72',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  welcomeSubtitle: {
+    color: '#8E8DA3',
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+
+  // ── Welcome Bottom CTAs ──
+  welcomeBottomCtas: {
+    gap: 12,
+    paddingBottom: 8,
+  },
+  primaryPill: {
+    borderRadius: 28,
+    overflow: 'hidden',
     shadowColor: '#FE3C72',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 20,
     elevation: 8,
   },
-  logoGlowRing: {
-    position: 'absolute',
-    width: 76,
-    height: 76,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.15)',
+  primaryPillGradient: {
+    height: 56,
+    borderRadius: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
-  logoImage: {
-    width: 44,
-    height: 44,
-  },
-  appTitle: {
+  primaryPillText: {
     color: '#FFFFFF',
-    fontSize: 26,
-    fontWeight: '900',
-    letterSpacing: -0.5,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
-  taglinePill: {
+  secondaryPill: {
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  secondaryPillText: {
+    color: '#D8D6E8',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  guestLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
+  },
+  guestLinkText: {
+    color: '#716E89',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // ── Welcome Footer ──
+  welcomeFooter: {
+    alignItems: 'center',
+    paddingTop: 4,
+  },
+  securityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(254, 60, 114, 0.10)',
+    backgroundColor: 'rgba(16, 185, 129, 0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.28)',
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    marginTop: 6,
-    marginBottom: 14,
-  },
-  taglineText: {
-    color: '#FE3C72',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  headline: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  subHeadline: {
-    color: '#8E8DA3',
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
+    borderColor: 'rgba(16, 185, 129, 0.15)',
+    borderRadius: 20,
     paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  securityBadgeText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '600',
   },
 
-  // ── Glass Form Card ──
-  glassCard: {
-    backgroundColor: '#12101C',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.45,
-    shadowRadius: 32,
-    elevation: 10,
-  },
-
-  // ── Mode Segment Controller ──
-  modeSegmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#191629',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  modeSegmentBtn: {
+  // ═══════════════════════════════════════════
+  // PHASE 2 & 3: FORM / OTP
+  // ═══════════════════════════════════════════
+  formContainer: {
     flex: 1,
-    paddingVertical: 9,
+    paddingTop: 8,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    marginBottom: 20,
   },
-  modeSegmentBtnActive: {
-    backgroundColor: '#26223B',
-    borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.35)',
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+  formHeader: {
+    marginBottom: 24,
   },
-  modeSegmentText: {
-    color: '#8E8DA3',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  modeSegmentTextActive: {
+  formTitle: {
     color: '#FFFFFF',
+    fontSize: 28,
     fontWeight: '800',
+    letterSpacing: -0.5,
+    marginBottom: 6,
+  },
+  formSubtitle: {
+    color: '#8E8DA3',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '400',
+  },
+
+  // ── Glass Card ──
+  glassCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    marginBottom: 20,
+  },
+  glassCardInner: {
+    padding: 20,
+    backgroundColor: 'rgba(18, 16, 28, 0.85)',
   },
 
   // ── Form Fields ──
-  fieldBlock: {
-    marginBottom: 12,
+  fieldGroup: {
+    marginBottom: 16,
   },
   fieldLabel: {
-    color: '#8E8DA3',
-    fontSize: 10.5,
+    color: '#716E89',
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
-    marginBottom: 6,
+    marginBottom: 8,
   },
-  inputContainer: {
+  inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#181528',
+    backgroundColor: '#16132A',
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.07)',
-    height: 50,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    height: 52,
     paddingHorizontal: 14,
   },
-  inputContainerFocused: {
-    borderColor: '#FE3C72',
-    backgroundColor: '#1C182F',
+  inputWrapFocused: {
+    borderColor: 'rgba(254, 60, 114, 0.5)',
+    backgroundColor: '#1A1630',
     shadowColor: '#FE3C72',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  inputContainerError: {
-    borderColor: '#EF4444',
+  inputWrapError: {
+    borderColor: 'rgba(239, 68, 68, 0.6)',
   },
   inputIcon: {
     marginRight: 10,
@@ -972,53 +993,54 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 14.5,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
   },
-  clearBtn: {
-    padding: 4,
-    marginRight: 4,
-  },
-  validBadge: {
-    marginLeft: 4,
-  },
+
+  // ── Error / Success Rows ──
   errorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginBottom: 8,
-    marginLeft: 2,
+    gap: 6,
+    marginBottom: 12,
+    paddingLeft: 2,
   },
   errorText: {
     color: '#EF4444',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   successRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginBottom: 10,
-    marginLeft: 2,
+    gap: 6,
+    marginBottom: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   successText: {
     color: '#10B981',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
+    flex: 1,
   },
 
-  // ── Domain Suggestions ──
-  domainChipsWrap: {
-    marginBottom: 14,
+  // ── Domain Chips ──
+  domainSection: {
+    marginBottom: 20,
   },
-  domainChipsTitle: {
-    color: '#716E89',
-    fontSize: 10,
-    fontWeight: '700',
-    marginBottom: 5,
+  domainLabel: {
+    color: '#5A586E',
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 8,
   },
-  domainChipsScroll: {
-    gap: 7,
+  domainChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   domainChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
@@ -1026,213 +1048,111 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
   domainChipText: {
-    color: '#D8D6E8',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-
-  // ── Sign Up: Platform Selector ──
-  platformPrefBlock: {
-    marginBottom: 16,
-  },
-  platformOptionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  platformOptionChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#181528',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    paddingVertical: 9,
-  },
-  platformOptionChipSelected: {
-    borderColor: '#FE3C72',
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-  },
-  platformOptionLabel: {
-    color: '#8E8DA3',
+    color: '#B8B6CC',
     fontSize: 12,
-    fontWeight: '700',
-  },
-  platformOptionLabelSelected: {
-    color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
-  // ── Primary Action Button ──
-  primaryButton: {
+  // ── Form CTA Button ──
+  formCta: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#FE3C72',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  formCtaGradient: {
     height: 52,
-    backgroundColor: '#FE3C72',
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 6,
   },
-  primaryButtonText: {
+  formCtaText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
 
-  // ── Switch Mode Toggle Link ──
-  switchModeRow: {
+  // ── Mode Toggle ──
+  modeToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: 14,
+    marginBottom: 16,
   },
-  switchModeText: {
+  modeToggleText: {
     color: '#8E8DA3',
-    fontSize: 12.5,
+    fontSize: 13,
   },
-  switchModeLink: {
+  modeToggleLink: {
     color: '#FE3C72',
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: '800',
   },
 
-  // ── Form Step 2: OTP Cells ──
-  formStep: {
-    width: '100%',
-  },
-  otpHeaderRow: {
+  // ── OTP Cells ──
+  otpRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 20,
   },
-  editEmailText: {
-    color: '#FE3C72',
-    fontSize: 11.5,
-    fontWeight: '700',
-  },
-  otpCellsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 8,
+  otpCellWrap: {
+    flex: 1,
+    maxWidth: 52,
   },
   otpCell: {
-    flex: 1,
-    height: 54,
-    backgroundColor: '#181528',
-    borderRadius: 12,
+    height: 56,
+    backgroundColor: '#16132A',
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     textAlign: 'center',
   },
   otpCellFilled: {
-    borderColor: '#FE3C72',
+    borderColor: 'rgba(254, 60, 114, 0.5)',
     backgroundColor: '#1E1933',
   },
+
+  // ── Resend ──
   resendRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginBottom: 18,
+    marginBottom: 24,
   },
   resendInfoText: {
     color: '#8E8DA3',
-    fontSize: 12,
+    fontSize: 13,
   },
   resendBtnText: {
-    color: '#716E89',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  resendBtnTextActive: {
-    color: '#FE3C72',
-  },
-
-  // ── Divider ──
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-    gap: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-  },
-  dividerText: {
-    color: '#636077',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-
-  // ── Secondary Social Options ──
-  socialOptionsRow: {
-    gap: 9,
-  },
-  secondarySocialBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    height: 44,
-  },
-  secondarySocialBtnText: {
-    color: '#D8D6E8',
+    color: '#5A586E',
     fontSize: 13,
     fontWeight: '700',
   },
+  resendBtnActive: {
+    color: '#FE3C72',
+  },
 
-  // ── Footer ──
-  footerWrap: {
-    alignItems: 'center',
-    marginTop: 20,
-    gap: 10,
-  },
-  securityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.22)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  securityPillText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontWeight: '700',
-  },
+  // ── Terms ──
   termsText: {
-    color: '#636077',
-    fontSize: 11,
+    color: '#5A586E',
+    fontSize: 12,
     textAlign: 'center',
-    lineHeight: 16,
-    paddingHorizontal: 20,
+    lineHeight: 18,
   },
   termsLink: {
     color: '#8E8DA3',
