@@ -331,11 +331,7 @@ export default function AuthScreen({ navigation }) {
     safeHaptic('success');
     setTimeout(() => {
       setIsLoading(false);
-      if (authMode === 'signup') {
-        navigation.replace('Onboarding');
-      } else {
-        navigation.replace('PlatformSelect');
-      }
+      navigation.replace('PlatformSelect');
     }, 850);
   };
 
@@ -464,6 +460,18 @@ export default function AuthScreen({ navigation }) {
                     >
                       <Text style={styles.guestLinkText}>Continue as Guest</Text>
                       <Ionicons name="arrow-forward" size={13} color="#716E89" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.onboardingReturnLink}
+                      onPress={() => {
+                        safeHaptic('light');
+                        navigation.replace('Onboarding');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="sparkles" size={13} color="#FE3C72" />
+                      <Text style={styles.onboardingReturnText}>Review Setup & Features</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -992,12 +1000,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   guestLinkText: {
     color: '#716E89',
     fontSize: 13,
     fontWeight: '600',
+  },
+  onboardingReturnLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    marginTop: 2,
+  },
+  onboardingReturnText: {
+    color: '#FE3C72',
+    fontSize: 12.5,
+    fontWeight: '700',
   },
 
   // ── Welcome Footer ──

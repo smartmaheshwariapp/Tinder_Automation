@@ -198,9 +198,9 @@ export default function OnboardingScreen({ navigation }) {
     if (currentStep < totalSteps) {
       transitionToStep(currentStep + 1);
     } else {
-      // Complete Onboarding -> Proceed to Main Cockpit
+      // Step 6 Complete -> Route to Auth to save preferences and create account
       safeHaptic('success');
-      navigation.replace('PlatformSelect');
+      navigation.replace('Auth');
     }
   };
 
@@ -208,8 +208,6 @@ export default function OnboardingScreen({ navigation }) {
     safeHaptic('light');
     if (currentStep > 1) {
       transitionToStep(currentStep - 1);
-    } else {
-      navigation.replace('Auth');
     }
   };
 
@@ -269,20 +267,35 @@ export default function OnboardingScreen({ navigation }) {
       <SafeAreaView style={styles.safeArea}>
         {/* ── Navigation Header & Progress ── */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={handleBack}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
+          {currentStep > 1 ? (
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={handleBack}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerLogoWrap}>
+              <Image source={LOGO_IMG} style={styles.headerLogoImg} resizeMode="contain" />
+            </View>
+          )}
 
           <Text style={styles.stepCounter}>
             {currentStep} of {totalSteps}
           </Text>
 
-          <View style={{ width: 40 }} />
+          <TouchableOpacity
+            style={styles.headerSignInBtn}
+            onPress={() => {
+              safeHaptic('light');
+              navigation.navigate('Auth');
+            }}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.headerSignInText}>Sign In</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── Progress Bar ── */}
@@ -781,12 +794,12 @@ export default function OnboardingScreen({ navigation }) {
               style={styles.continueGradient}
             >
               <Text style={styles.continueBtnText}>
-                {currentStep === totalSteps ? 'Ready! Launch Cockpit' : 'Continue'}
+                {currentStep === totalSteps ? 'Save & Create Account' : 'Continue'}
               </Text>
               <Ionicons
                 name={
                   currentStep === totalSteps
-                    ? 'rocket-outline'
+                    ? 'arrow-forward-outline'
                     : 'arrow-forward-outline'
                 }
                 size={18}
@@ -794,6 +807,19 @@ export default function OnboardingScreen({ navigation }) {
               />
             </LinearGradient>
           </TouchableOpacity>
+
+          {currentStep === totalSteps && (
+            <TouchableOpacity
+              style={styles.guestFooterBtn}
+              onPress={() => {
+                safeHaptic('light');
+                navigation.replace('PlatformSelect');
+              }}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.guestFooterText}>Launch Cockpit as Guest →</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
 
@@ -911,6 +937,20 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 10,
   },
+  headerLogoWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#161324',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 60, 114, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerLogoImg: {
+    width: 24,
+    height: 24,
+  },
   backBtn: {
     width: 38,
     height: 38,
@@ -918,6 +958,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerSignInBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(254, 60, 114, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 60, 114, 0.25)',
+  },
+  headerSignInText: {
+    color: '#FE3C72',
+    fontSize: 12,
+    fontWeight: '800',
   },
   stepCounter: {
     color: '#8E8DA3',
@@ -1355,6 +1408,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: -0.2,
+  },
+  guestFooterBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    marginTop: 6,
+  },
+  guestFooterText: {
+    color: '#8E8DA3',
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   // ── Modals ──
