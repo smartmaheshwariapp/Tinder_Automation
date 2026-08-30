@@ -288,6 +288,24 @@ export default function OnboardingScreen({ navigation }) {
     }
   }, [currentStep]);
 
+  // ── Dial Code Rules & Length Constraints (100% Parity with Desktop Plugin) ──
+  const currentDialRule =
+    DIAL_CODES.find((d) => d.dial === dialCode && d.name === country) ||
+    DIAL_CODES.find((d) => d.dial === dialCode) || { len: [7, 15] };
+  const maxPhoneLength = currentDialRule.len ? currentDialRule.len[1] : 15;
+  const minPhoneLength = currentDialRule.len ? currentDialRule.len[0] : 7;
+  const isPhoneTooShort = Boolean(whatsapp && whatsapp.length < minPhoneLength);
+
+  const cleanPhoneInput = (raw, maxLen) => {
+    let d = raw.replace(/[^\d]/g, '');
+    if (d.startsWith('0')) d = d.slice(1);
+    return d.slice(0, maxLen || maxPhoneLength);
+  };
+
+  const handleWhatsappChange = (text) => {
+    setWhatsapp(cleanPhoneInput(text, maxPhoneLength));
+  };
+
   // ── Step Navigation ──
   const transitionToStep = (newStep) => {
     Animated.timing(fadeAnim, {
@@ -314,6 +332,15 @@ export default function OnboardingScreen({ navigation }) {
   };
 
   const handleNext = () => {
+    if (currentStep === 2) {
+      if (whatsapp && isPhoneTooShort) {
+        safeHaptic('error');
+        return;
+      }
+      if (selectedLanguages.length === 0) {
+        setSelectedLanguages(['English']);
+      }
+    }
     safeHaptic('light');
     if (currentStep < totalSteps) {
       transitionToStep(currentStep + 1);
@@ -351,8 +378,21 @@ export default function OnboardingScreen({ navigation }) {
     const match = DIAL_CODES.find((d) => d.name === selectedCountryName);
     if (match) {
       setDialCode(match.dial);
+      if (whatsapp) {
+        setWhatsapp(cleanPhoneInput(whatsapp, match.len[1]));
+      }
     }
     setCountryModalVisible(false);
+  };
+
+  // ── Dial Code Selection Handler ──
+  const handleSelectDialCode = (item) => {
+    safeHaptic('light');
+    setDialCode(item.dial);
+    if (whatsapp) {
+      setWhatsapp(cleanPhoneInput(whatsapp, item.len[1]));
+    }
+    setDialModalVisible(false);
   };
 
   // ── Language Toggle Handler ──
@@ -620,7 +660,11 @@ export default function OnboardingScreen({ navigation }) {
                       <Ionicons name="logo-whatsapp" size={13} color="#10B981" /> WHATSAPP NUMBER{' '}
                       <Text style={{ color: '#5A586E', fontSize: 10 }}>(OPTIONAL)</Text>
                     </Text>
-                    <View style={styles.phoneInputWrap}>
+                    <View style={[
+                      styles.phoneInputWrap,
+                      isPhoneTooShort && styles.phoneInputWrapError,
+                      Boolean(whatsapp && !isPhoneTooShort) && styles.phoneInputWrapOk,
+                    ]}>
                       <TouchableOpacity
                         style={styles.dialCodeBtn}
                         onPress={() => setDialModalVisible(true)}
@@ -635,11 +679,22 @@ export default function OnboardingScreen({ navigation }) {
                         placeholder={currentPhoneExample}
                         placeholderTextColor="#504E64"
                         value={whatsapp}
-                        onChangeText={(val) => setWhatsapp(val.replace(/[^0-9]/g, ''))}
+                        onChangeText={handleWhatsappChange}
                         keyboardType="phone-pad"
+                        maxLength={maxPhoneLength}
                       />
+                      {Boolean(whatsapp && !isPhoneTooShort) && (
+                        <Ionicons name="checkmark-circle" size={18} color="#10B981" style={{ marginRight: 6 }} />
+                      )}
                     </View>
-                    <Text style={styles.hintText}>No spaces or dashes — just digits.</Text>
+                    <Text style={[
+                      styles.hintText,
+                      isPhoneTooShort && styles.hintTextError,
+                    ]}>
+                      {isPhoneTooShort
+                        ? `Number looks too short for ${dialCode} (min ${minPhoneLength} digits) — double check it.`
+                        : 'No spaces or dashes — just the digits after your country code.'}
+                    </Text>
                   </View>
                 </View>
               )}
@@ -1083,9 +1138,7 @@ export default function OnboardingScreen({ navigation }) {
                   ]}
                   onPress={() => {
                     Keyboard.dismiss();
-                    safeHaptic('light');
-                    setDialCode(item.dial);
-                    setDialModalVisible(false);
+                    handleSelectDialCode(item);
                   }}
                 >
                   <Text style={styles.modalListText}>{item.name}</Text>
@@ -1315,6 +1368,13 @@ const styles = StyleSheet.create({
     height: 52,
     paddingHorizontal: 12,
   },
+  phoneInputWrapError: {
+    borderColor: '#EF4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.06)',
+  },
+  phoneInputWrapOk: {
+    borderColor: 'rgba(16, 185, 129, 0.5)',
+  },
   dialCodeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1343,6 +1403,10 @@ const styles = StyleSheet.create({
     color: '#5A586E',
     fontSize: 11,
     marginTop: 6,
+  },
+  hintTextError: {
+    color: '#EF4444',
+    fontWeight: '700',
   },
 
   // ── Step 3: Goals ──
