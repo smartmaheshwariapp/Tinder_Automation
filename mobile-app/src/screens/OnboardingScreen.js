@@ -934,13 +934,32 @@ export default function OnboardingScreen({ navigation }) {
       </SafeAreaView>
 
       {/* ── Country Picker Modal ── */}
-      <Modal visible={countryModalVisible} transparent animationType="slide">
-        <View style={styles.modalBackdrop}>
+      <Modal
+        visible={countryModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCountryModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <TouchableOpacity
+            style={styles.modalDismissArea}
+            activeOpacity={1}
+            onPress={() => {
+              Keyboard.dismiss();
+              setCountryModalVisible(false);
+            }}
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Country</Text>
               <TouchableOpacity
-                onPress={() => setCountryModalVisible(false)}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setCountryModalVisible(false);
+                }}
                 style={styles.modalCloseBtn}
               >
                 <Ionicons name="close" size={22} color="#FFFFFF" />
@@ -954,6 +973,8 @@ export default function OnboardingScreen({ navigation }) {
                 placeholderTextColor="#5A586E"
                 value={countrySearch}
                 onChangeText={setCountrySearch}
+                autoCorrect={false}
+                returnKeyType="search"
               />
               {Boolean(countrySearch) && (
                 <TouchableOpacity onPress={() => setCountrySearch('')} style={{ padding: 4 }}>
@@ -964,13 +985,20 @@ export default function OnboardingScreen({ navigation }) {
             <FlatList
               data={filteredCountries}
               keyExtractor={(item) => item}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              style={styles.modalList}
+              contentContainerStyle={{ paddingBottom: 24 }}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
                     styles.modalListItem,
                     country === item && styles.modalListItemSelected,
                   ]}
-                  onPress={() => handleSelectCountry(item)}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    handleSelectCountry(item);
+                  }}
                 >
                   <Text
                     style={[
@@ -987,17 +1015,36 @@ export default function OnboardingScreen({ navigation }) {
               )}
             />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Dial Code Modal ── */}
-      <Modal visible={dialModalVisible} transparent animationType="slide">
-        <View style={styles.modalBackdrop}>
+      <Modal
+        visible={dialModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDialModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <TouchableOpacity
+            style={styles.modalDismissArea}
+            activeOpacity={1}
+            onPress={() => {
+              Keyboard.dismiss();
+              setDialModalVisible(false);
+            }}
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Country Code</Text>
               <TouchableOpacity
-                onPress={() => setDialModalVisible(false)}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setDialModalVisible(false);
+                }}
                 style={styles.modalCloseBtn}
               >
                 <Ionicons name="close" size={22} color="#FFFFFF" />
@@ -1011,6 +1058,8 @@ export default function OnboardingScreen({ navigation }) {
                 placeholderTextColor="#5A586E"
                 value={dialSearch}
                 onChangeText={setDialSearch}
+                autoCorrect={false}
+                returnKeyType="search"
               />
               {Boolean(dialSearch) && (
                 <TouchableOpacity onPress={() => setDialSearch('')} style={{ padding: 4 }}>
@@ -1021,6 +1070,10 @@ export default function OnboardingScreen({ navigation }) {
             <FlatList
               data={filteredDialCodes}
               keyExtractor={(item) => item.code}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              style={styles.modalList}
+              contentContainerStyle={{ paddingBottom: 24 }}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
@@ -1028,6 +1081,7 @@ export default function OnboardingScreen({ navigation }) {
                     dialCode === item.dial && styles.modalListItemSelected,
                   ]}
                   onPress={() => {
+                    Keyboard.dismiss();
                     safeHaptic('light');
                     setDialCode(item.dial);
                     setDialModalVisible(false);
@@ -1039,7 +1093,7 @@ export default function OnboardingScreen({ navigation }) {
               )}
             />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1536,15 +1590,23 @@ const styles = StyleSheet.create({
   // ── Modals ──
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
+  },
+  modalDismissArea: {
+    flex: 1,
   },
   modalContent: {
     backgroundColor: '#161324',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '75%',
-    padding: 20,
+    height: '75%',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+  },
+  modalList: {
+    flex: 1,
   },
   modalHeader: {
     flexDirection: 'row',
