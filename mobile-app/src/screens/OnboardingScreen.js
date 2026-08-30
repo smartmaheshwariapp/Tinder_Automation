@@ -141,6 +141,7 @@ export default function OnboardingScreen({ navigation }) {
   const [countrySearch, setCountrySearch] = useState('');
   const [dialModalVisible, setDialModalVisible] = useState(false);
   const [dialSearch, setDialSearch] = useState('');
+  const [showAllLanguages, setShowAllLanguages] = useState(false);
 
   // ── Animations ──
   const progressAnim = useRef(new Animated.Value(1 / 5)).current;
@@ -196,9 +197,22 @@ export default function OnboardingScreen({ navigation }) {
     if (currentStep < totalSteps) {
       transitionToStep(currentStep + 1);
     } else {
-      // Step 6 Complete -> Route to Auth to save preferences and create account
+      // Step 5 Complete -> Route to Auth to save preferences and create account
       safeHaptic('success');
-      navigation.replace('Auth');
+      navigation.replace('Auth', {
+        initialMode: 'signup',
+        onboardingData: {
+          platform: 'tinder',
+          country,
+          languages: selectedLanguages,
+          dialCode,
+          whatsapp,
+          goals: selectedGoals,
+          frequency,
+          personality,
+          safeMode,
+        },
+      });
     }
   };
 
@@ -420,7 +434,7 @@ export default function OnboardingScreen({ navigation }) {
                       <Ionicons name="language-outline" size={13} color="#716E89" /> NATIVE LANGUAGES
                     </Text>
                     <View style={styles.langChipsContainer}>
-                      {LANGUAGES.slice(0, 10).map((lang) => {
+                      {(showAllLanguages ? LANGUAGES : LANGUAGES.slice(0, 8)).map((lang) => {
                         const isSelected = selectedLanguages.includes(lang);
                         return (
                           <TouchableOpacity
@@ -446,6 +460,23 @@ export default function OnboardingScreen({ navigation }) {
                           </TouchableOpacity>
                         );
                       })}
+                      <TouchableOpacity
+                        style={styles.moreLangChip}
+                        onPress={() => {
+                          safeHaptic('light');
+                          setShowAllLanguages(!showAllLanguages);
+                        }}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={styles.moreLangChipText}>
+                          {showAllLanguages ? 'Show Less' : `+ ${LANGUAGES.length - 8} More`}
+                        </Text>
+                        <Ionicons
+                          name={showAllLanguages ? 'chevron-up' : 'chevron-down'}
+                          size={13}
+                          color="#FE3C72"
+                        />
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -673,7 +704,7 @@ export default function OnboardingScreen({ navigation }) {
                       <View style={styles.timelineTextWrap}>
                         <Text style={styles.timelineLabel}>Platform Connected</Text>
                         <Text style={styles.timelineValue}>
-                          {selectedPlatform.toUpperCase()}
+                          {selectedPlatform.toUpperCase()} AUTOMATION
                         </Text>
                       </View>
                     </View>
@@ -702,6 +733,20 @@ export default function OnboardingScreen({ navigation }) {
                         <Text style={styles.timelineLabel}>Profile Configured</Text>
                         <Text style={styles.timelineValue}>
                           {country} ({selectedLanguages.join(', ')})
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.timelineDivider} />
+
+                    <View style={styles.timelineItem}>
+                      <View style={styles.timelineCheck}>
+                        <Ionicons name="checkmark" size={16} color="#10B981" />
+                      </View>
+                      <View style={styles.timelineTextWrap}>
+                        <Text style={styles.timelineLabel}>Style & Protection</Text>
+                        <Text style={styles.timelineValue}>
+                          Every {frequency}m • {personality.toUpperCase()} • {safeMode ? 'Safe Mode Active' : 'Custom Pace'}
                         </Text>
                       </View>
                     </View>
@@ -777,6 +822,11 @@ export default function OnboardingScreen({ navigation }) {
                 value={countrySearch}
                 onChangeText={setCountrySearch}
               />
+              {Boolean(countrySearch) && (
+                <TouchableOpacity onPress={() => setCountrySearch('')} style={{ padding: 4 }}>
+                  <Ionicons name="close-circle" size={16} color="#716E89" />
+                </TouchableOpacity>
+              )}
             </View>
             <FlatList
               data={filteredCountries}
@@ -823,6 +873,21 @@ export default function OnboardingScreen({ navigation }) {
               >
                 <Ionicons name="close" size={22} color="#FFFFFF" />
               </TouchableOpacity>
+            </View>
+            <View style={styles.modalSearchWrap}>
+              <Ionicons name="search" size={18} color="#716E89" />
+              <TextInput
+                style={styles.modalSearchInput}
+                placeholder="Search country or code..."
+                placeholderTextColor="#5A586E"
+                value={dialSearch}
+                onChangeText={setDialSearch}
+              />
+              {Boolean(dialSearch) && (
+                <TouchableOpacity onPress={() => setDialSearch('')} style={{ padding: 4 }}>
+                  <Ionicons name="close-circle" size={16} color="#716E89" />
+                </TouchableOpacity>
+              )}
             </View>
             <FlatList
               data={filteredDialCodes}
@@ -1039,6 +1104,22 @@ const styles = StyleSheet.create({
   langChipTextSelected: {
     color: '#FFFFFF',
     fontWeight: '800',
+  },
+  moreLangChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(254, 60, 114, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 60, 114, 0.25)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  moreLangChipText: {
+    color: '#FE3C72',
+    fontSize: 12,
+    fontWeight: '700',
   },
   phoneInputWrap: {
     flexDirection: 'row',

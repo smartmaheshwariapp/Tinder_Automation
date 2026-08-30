@@ -44,10 +44,13 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 const DOMAIN_SUGGESTIONS = ['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'];
 
-export default function AuthScreen({ navigation }) {
+export default function AuthScreen({ navigation, route }) {
+  const initialMode = route?.params?.initialMode;
+  const onboardingData = route?.params?.onboardingData;
+
   // ── Core State Machine ──
-  const [phase, setPhase] = useState('welcome'); // 'welcome' | 'form' | 'otp'
-  const [authMode, setAuthMode] = useState('signup'); // 'login' | 'signup'
+  const [phase, setPhase] = useState(initialMode ? 'form' : 'welcome'); // 'welcome' | 'form' | 'otp'
+  const [authMode, setAuthMode] = useState(initialMode || 'signup'); // 'login' | 'signup'
 
   // ── Form Data ──
   const [name, setName] = useState('');
@@ -215,9 +218,13 @@ export default function AuthScreen({ navigation }) {
     setSuccessNotice('');
     setName('');
     setEmail('');
-    animateTransition(() => {
-      setPhase('welcome');
-    });
+    if (initialMode && phase === 'form') {
+      navigation.replace('Onboarding');
+    } else {
+      animateTransition(() => {
+        setPhase('welcome');
+      });
+    }
   };
 
   const goToOtp = () => {
@@ -331,7 +338,7 @@ export default function AuthScreen({ navigation }) {
     safeHaptic('success');
     setTimeout(() => {
       setIsLoading(false);
-      navigation.replace('PlatformSelect');
+      navigation.replace('PlatformSelect', { onboardingData });
     }, 850);
   };
 
