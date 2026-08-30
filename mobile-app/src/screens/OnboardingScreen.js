@@ -42,8 +42,6 @@ const safeHaptic = (type) => {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
-const TINDER_IMG = require('../../assets/flirteasy/tinder.jpg');
-const BUMBLE_IMG = require('../../assets/flirteasy/bumble.png');
 
 // ── Master Country & Dial Code Registry (Identical to Desktop Plugin) ──
 const COUNTRIES = [
@@ -125,18 +123,18 @@ const PERSONALITIES = [
 
 export default function OnboardingScreen({ navigation }) {
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 6;
+  const totalSteps = 5;
 
   // ── Step Selections State ──
-  const [selectedPlatform, setSelectedPlatform] = useState('tinder'); // Step 2
-  const [country, setCountry] = useState('United States'); // Step 3
-  const [selectedLanguages, setSelectedLanguages] = useState(['English']); // Step 3
-  const [dialCode, setDialCode] = useState('+1'); // Step 3
-  const [whatsapp, setWhatsapp] = useState(''); // Step 3
-  const [selectedGoals, setSelectedGoals] = useState(['date', 'phone']); // Step 4
-  const [frequency, setFrequency] = useState(30); // Step 5
-  const [personality, setPersonality] = useState('freestyle'); // Step 5
-  const [safeMode, setSafeMode] = useState(true); // Step 5
+  const selectedPlatform = 'tinder'; // Tinder-dedicated app
+  const [country, setCountry] = useState('United States');
+  const [selectedLanguages, setSelectedLanguages] = useState(['English']);
+  const [dialCode, setDialCode] = useState('+1');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [selectedGoals, setSelectedGoals] = useState(['date', 'phone']);
+  const [frequency, setFrequency] = useState(30);
+  const [personality, setPersonality] = useState('freestyle');
+  const [safeMode, setSafeMode] = useState(true);
 
   // ── Modals & Search ──
   const [countryModalVisible, setCountryModalVisible] = useState(false);
@@ -145,7 +143,7 @@ export default function OnboardingScreen({ navigation }) {
   const [dialSearch, setDialSearch] = useState('');
 
   // ── Animations ──
-  const progressAnim = useRef(new Animated.Value(1 / 6)).current;
+  const progressAnim = useRef(new Animated.Value(1 / 5)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const timelineProgress = useRef(new Animated.Value(0)).current;
@@ -158,7 +156,7 @@ export default function OnboardingScreen({ navigation }) {
       useNativeDriver: false,
     }).start();
 
-    if (currentStep === 6) {
+    if (currentStep === 5) {
       Animated.timing(timelineProgress, {
         toValue: 1,
         duration: 800,
@@ -389,75 +387,9 @@ export default function OnboardingScreen({ navigation }) {
               )}
 
               {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 2: WHICH APP ARE YOU ON?                        */}
+              {/* STEP 2: ABOUT YOU                                   */}
               {/* ═════════════════════════════════════════════════════ */}
               {currentStep === 2 && (
-                <View>
-                  <Text style={styles.stepTitle}>Which app are you on?</Text>
-                  <Text style={styles.stepSubtitle}>
-                    FlirtEasy works directly inside these apps.
-                  </Text>
-
-                  <View style={styles.platformList}>
-                    {/* Tinder Card */}
-                    <TouchableOpacity
-                      style={[
-                        styles.platformCard,
-                        selectedPlatform === 'tinder' && styles.platformCardSelected,
-                      ]}
-                      onPress={() => {
-                        safeHaptic('light');
-                        setSelectedPlatform('tinder');
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <Image source={TINDER_IMG} style={styles.platformImg} />
-                      <Text style={styles.platformName}>Tinder</Text>
-                      <View
-                        style={[
-                          styles.radioCircle,
-                          selectedPlatform === 'tinder' && styles.radioCircleSelected,
-                        ]}
-                      >
-                        {selectedPlatform === 'tinder' && (
-                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                        )}
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Bumble Card */}
-                    <TouchableOpacity
-                      style={[
-                        styles.platformCard,
-                        selectedPlatform === 'bumble' && styles.platformCardSelected,
-                      ]}
-                      onPress={() => {
-                        safeHaptic('light');
-                        setSelectedPlatform('bumble');
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <Image source={BUMBLE_IMG} style={styles.platformImg} />
-                      <Text style={styles.platformName}>Bumble</Text>
-                      <View
-                        style={[
-                          styles.radioCircle,
-                          selectedPlatform === 'bumble' && styles.radioCircleSelected,
-                        ]}
-                      >
-                        {selectedPlatform === 'bumble' && (
-                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 3: ABOUT YOU                                   */}
-              {/* ═════════════════════════════════════════════════════ */}
-              {currentStep === 3 && (
                 <View>
                   <Text style={styles.stepTitle}>About you</Text>
                   <Text style={styles.stepSubtitle}>
@@ -548,9 +480,9 @@ export default function OnboardingScreen({ navigation }) {
               )}
 
               {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 4: WHAT IS YOUR GOAL?                           */}
+              {/* STEP 3: WHAT IS YOUR GOAL?                           */}
               {/* ═════════════════════════════════════════════════════ */}
-              {currentStep === 4 && (
+              {currentStep === 3 && (
                 <View>
                   <Text style={styles.stepTitle}>What is your Goal?</Text>
                   <Text style={styles.stepSubtitle}>
@@ -604,9 +536,9 @@ export default function OnboardingScreen({ navigation }) {
               )}
 
               {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 5: BEHAVIOR & STYLE                             */}
+              {/* STEP 4: BEHAVIOR & STYLE                             */}
               {/* ═════════════════════════════════════════════════════ */}
-              {currentStep === 5 && (
+              {currentStep === 4 && (
                 <View>
                   <Text style={styles.stepTitle}>Behavior & Style</Text>
                   <Text style={styles.stepSubtitle}>
@@ -719,9 +651,9 @@ export default function OnboardingScreen({ navigation }) {
               )}
 
               {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 6: YOU'RE ALL SET!                              */}
+              {/* STEP 5: YOU'RE ALL SET!                              */}
               {/* ═════════════════════════════════════════════════════ */}
-              {currentStep === 6 && (
+              {currentStep === 5 && (
                 <View style={{ alignItems: 'center', paddingTop: 10 }}>
                   <View style={styles.successBadge}>
                     <Ionicons name="checkmark" size={36} color="#FFFFFF" />
@@ -1052,50 +984,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
   },
 
-  // ── Step 2: Platform Cards ──
-  platformList: {
-    gap: 14,
-  },
-  platformCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#12101E',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 18,
-    padding: 16,
-  },
-  platformCardSelected: {
-    borderColor: '#FE3C72',
-    backgroundColor: 'rgba(254, 60, 114, 0.08)',
-  },
-  platformImg: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    marginRight: 14,
-  },
-  platformName: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
-    flex: 1,
-  },
-  radioCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioCircleSelected: {
-    borderColor: '#FE3C72',
-    backgroundColor: '#FE3C72',
-  },
-
-  // ── Step 3: About You ──
+  // ── Step 2: About You ──
   fieldSection: {
     marginBottom: 20,
   },
@@ -1191,7 +1080,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  // ── Step 4: Goals ──
+  // ── Step 3: Goals ──
   goalsList: {
     gap: 12,
   },
@@ -1207,6 +1096,19 @@ const styles = StyleSheet.create({
   goalCardSelected: {
     borderColor: '#FE3C72',
     backgroundColor: 'rgba(254, 60, 114, 0.08)',
+  },
+  radioCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioCircleSelected: {
+    borderColor: '#FE3C72',
+    backgroundColor: '#FE3C72',
   },
   goalIconWrap: {
     width: 40,
@@ -1236,7 +1138,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  // ── Step 5: Behavior & Style ──
+  // ── Step 4: Behavior & Style ──
   settingsGroup: {
     gap: 14,
   },
@@ -1320,7 +1222,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 
-  // ── Step 6: Complete ──
+  // ── Step 5: Complete ──
   successBadge: {
     width: 72,
     height: 72,
