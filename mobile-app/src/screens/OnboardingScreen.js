@@ -43,41 +43,161 @@ const safeHaptic = (type) => {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 
-// ── Master Country & Dial Code Registry (Identical to Desktop Plugin) ──
-const COUNTRIES = [
-  'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany',
-  'France', 'India', 'Spain', 'Italy', 'Brazil', 'Netherlands', 'Sweden',
-  'Norway', 'Denmark', 'Switzerland', 'Austria', 'Belgium', 'Poland',
-  'Mexico', 'Argentina', 'Colombia', 'Chile', 'Peru', 'Philippines',
-  'Japan', 'South Korea', 'Singapore', 'New Zealand', 'Ireland', 'Portugal',
-  'South Africa', 'United Arab Emirates', 'Saudi Arabia', 'Israel', 'Turkey',
-  'Thailand', 'Indonesia', 'Malaysia', 'Vietnam', 'Egypt', 'Greece', 'Czech Republic'
-];
-
-const DIAL_CODES = [
-  { code: 'US', dial: '+1', name: 'United States' },
-  { code: 'GB', dial: '+44', name: 'United Kingdom' },
-  { code: 'CA', dial: '+1', name: 'Canada' },
-  { code: 'AU', dial: '+61', name: 'Australia' },
-  { code: 'DE', dial: '+49', name: 'Germany' },
-  { code: 'FR', dial: '+33', name: 'France' },
-  { code: 'IN', dial: '+91', name: 'India' },
-  { code: 'ES', dial: '+34', name: 'Spain' },
-  { code: 'IT', dial: '+39', name: 'Italy' },
-  { code: 'BR', dial: '+55', name: 'Brazil' },
-  { code: 'NL', dial: '+31', name: 'Netherlands' },
-  { code: 'SE', dial: '+46', name: 'Sweden' },
-  { code: 'CH', dial: '+41', name: 'Switzerland' },
-  { code: 'AE', dial: '+971', name: 'United Arab Emirates' },
-  { code: 'SG', dial: '+65', name: 'Singapore' },
-  { code: 'MX', dial: '+52', name: 'Mexico' },
-];
-
+// ── Master Country & Dial Code Registry (Exact 100% Parity with Desktop Plugin) ──
 const LANGUAGES = [
   'English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese',
   'Russian', 'Arabic', 'Hindi', 'Chinese', 'Japanese', 'Korean',
   'Turkish', 'Dutch', 'Polish', 'Swedish', 'Ukrainian', 'Hebrew',
-  'Romanian', 'Greek', 'Czech', 'Hungarian', 'Thai'
+  'Persian', 'Romanian', 'Greek', 'Czech', 'Hungarian', 'Thai'
+];
+
+const DIAL_CODES = [
+  { code: 'AF', dial: '+93',  name: 'Afghanistan',            len: [9,  9]  },
+  { code: 'AL', dial: '+355', name: 'Albania',                len: [9,  9]  },
+  { code: 'DZ', dial: '+213', name: 'Algeria',                len: [9,  9]  },
+  { code: 'AR', dial: '+54',  name: 'Argentina',              len: [10, 10] },
+  { code: 'AM', dial: '+374', name: 'Armenia',                len: [8,  8]  },
+  { code: 'AU', dial: '+61',  name: 'Australia',              len: [9,  9]  },
+  { code: 'AT', dial: '+43',  name: 'Austria',                len: [10, 11] },
+  { code: 'AZ', dial: '+994', name: 'Azerbaijan',             len: [9,  9]  },
+  { code: 'BD', dial: '+880', name: 'Bangladesh',             len: [10, 10] },
+  { code: 'BY', dial: '+375', name: 'Belarus',                len: [9,  9]  },
+  { code: 'BE', dial: '+32',  name: 'Belgium',                len: [9,  9]  },
+  { code: 'BO', dial: '+591', name: 'Bolivia',                len: [8,  8]  },
+  { code: 'BA', dial: '+387', name: 'Bosnia and Herzegovina', len: [8,  8]  },
+  { code: 'BR', dial: '+55',  name: 'Brazil',                 len: [10, 11] },
+  { code: 'BG', dial: '+359', name: 'Bulgaria',               len: [9,  9]  },
+  { code: 'KH', dial: '+855', name: 'Cambodia',               len: [8,  9]  },
+  { code: 'CA', dial: '+1',   name: 'Canada',                 len: [10, 10] },
+  { code: 'CL', dial: '+56',  name: 'Chile',                  len: [9,  9]  },
+  { code: 'CN', dial: '+86',  name: 'China',                  len: [11, 11] },
+  { code: 'CO', dial: '+57',  name: 'Colombia',               len: [10, 10] },
+  { code: 'HR', dial: '+385', name: 'Croatia',                len: [8,  9]  },
+  { code: 'CZ', dial: '+420', name: 'Czech Republic',         len: [9,  9]  },
+  { code: 'DK', dial: '+45',  name: 'Denmark',                len: [8,  8]  },
+  { code: 'EC', dial: '+593', name: 'Ecuador',                len: [9,  9]  },
+  { code: 'EG', dial: '+20',  name: 'Egypt',                  len: [10, 10] },
+  { code: 'EE', dial: '+372', name: 'Estonia',                len: [7,  8]  },
+  { code: 'ET', dial: '+251', name: 'Ethiopia',               len: [9,  9]  },
+  { code: 'FI', dial: '+358', name: 'Finland',                len: [9,  10] },
+  { code: 'FR', dial: '+33',  name: 'France',                 len: [9,  9]  },
+  { code: 'GE', dial: '+995', name: 'Georgia',                len: [9,  9]  },
+  { code: 'DE', dial: '+49',  name: 'Germany',                len: [10, 11] },
+  { code: 'GH', dial: '+233', name: 'Ghana',                  len: [9,  9]  },
+  { code: 'GR', dial: '+30',  name: 'Greece',                 len: [10, 10] },
+  { code: 'GT', dial: '+502', name: 'Guatemala',              len: [8,  8]  },
+  { code: 'HU', dial: '+36',  name: 'Hungary',                len: [9,  9]  },
+  { code: 'IN', dial: '+91',  name: 'India',                  len: [10, 10] },
+  { code: 'ID', dial: '+62',  name: 'Indonesia',              len: [9,  12] },
+  { code: 'IR', dial: '+98',  name: 'Iran',                   len: [10, 10] },
+  { code: 'IQ', dial: '+964', name: 'Iraq',                   len: [10, 10] },
+  { code: 'IE', dial: '+353', name: 'Ireland',                len: [9,  9]  },
+  { code: 'IL', dial: '+972', name: 'Israel',                 len: [9,  9]  },
+  { code: 'IT', dial: '+39',  name: 'Italy',                  len: [9,  10] },
+  { code: 'JP', dial: '+81',  name: 'Japan',                  len: [10, 10] },
+  { code: 'JO', dial: '+962', name: 'Jordan',                 len: [9,  9]  },
+  { code: 'KZ', dial: '+7',   name: 'Kazakhstan',             len: [10, 10] },
+  { code: 'KE', dial: '+254', name: 'Kenya',                  len: [9,  9]  },
+  { code: 'XK', dial: '+383', name: 'Kosovo',                 len: [8,  8]  },
+  { code: 'KW', dial: '+965', name: 'Kuwait',                 len: [8,  8]  },
+  { code: 'LV', dial: '+371', name: 'Latvia',                 len: [8,  8]  },
+  { code: 'LB', dial: '+961', name: 'Lebanon',                len: [7,  8]  },
+  { code: 'LY', dial: '+218', name: 'Libya',                  len: [9,  9]  },
+  { code: 'LT', dial: '+370', name: 'Lithuania',              len: [8,  8]  },
+  { code: 'MY', dial: '+60',  name: 'Malaysia',               len: [9,  10] },
+  { code: 'MX', dial: '+52',  name: 'Mexico',                 len: [10, 10] },
+  { code: 'MD', dial: '+373', name: 'Moldova',                len: [8,  8]  },
+  { code: 'MN', dial: '+976', name: 'Mongolia',               len: [8,  8]  },
+  { code: 'MA', dial: '+212', name: 'Morocco',                len: [9,  9]  },
+  { code: 'NL', dial: '+31',  name: 'Netherlands',            len: [9,  9]  },
+  { code: 'NZ', dial: '+64',  name: 'New Zealand',            len: [8,  9]  },
+  { code: 'NG', dial: '+234', name: 'Nigeria',                len: [10, 10] },
+  { code: 'MK', dial: '+389', name: 'North Macedonia',        len: [8,  8]  },
+  { code: 'NO', dial: '+47',  name: 'Norway',                 len: [8,  8]  },
+  { code: 'PK', dial: '+92',  name: 'Pakistan',               len: [10, 10] },
+  { code: 'PY', dial: '+595', name: 'Paraguay',               len: [9,  9]  },
+  { code: 'PE', dial: '+51',  name: 'Peru',                   len: [9,  9]  },
+  { code: 'PH', dial: '+63',  name: 'Philippines',            len: [10, 10] },
+  { code: 'PL', dial: '+48',  name: 'Poland',                 len: [9,  9]  },
+  { code: 'PT', dial: '+351', name: 'Portugal',               len: [9,  9]  },
+  { code: 'QA', dial: '+974', name: 'Qatar',                  len: [8,  8]  },
+  { code: 'RO', dial: '+40',  name: 'Romania',                len: [9,  9]  },
+  { code: 'RU', dial: '+7',   name: 'Russia',                 len: [10, 10] },
+  { code: 'SA', dial: '+966', name: 'Saudi Arabia',           len: [9,  9]  },
+  { code: 'RS', dial: '+381', name: 'Serbia',                 len: [8,  9]  },
+  { code: 'SK', dial: '+421', name: 'Slovakia',               len: [9,  9]  },
+  { code: 'SI', dial: '+386', name: 'Slovenia',               len: [8,  8]  },
+  { code: 'ZA', dial: '+27',  name: 'South Africa',           len: [9,  9]  },
+  { code: 'KR', dial: '+82',  name: 'South Korea',            len: [9,  10] },
+  { code: 'ES', dial: '+34',  name: 'Spain',                  len: [9,  9]  },
+  { code: 'LK', dial: '+94',  name: 'Sri Lanka',              len: [9,  9]  },
+  { code: 'SE', dial: '+46',  name: 'Sweden',                 len: [9,  9]  },
+  { code: 'CH', dial: '+41',  name: 'Switzerland',            len: [9,  9]  },
+  { code: 'SY', dial: '+963', name: 'Syria',                  len: [9,  9]  },
+  { code: 'TW', dial: '+886', name: 'Taiwan',                 len: [9,  9]  },
+  { code: 'TH', dial: '+66',  name: 'Thailand',               len: [9,  9]  },
+  { code: 'TN', dial: '+216', name: 'Tunisia',                len: [8,  8]  },
+  { code: 'TR', dial: '+90',  name: 'Turkey',                 len: [10, 10] },
+  { code: 'UA', dial: '+380', name: 'Ukraine',                len: [9,  9]  },
+  { code: 'AE', dial: '+971', name: 'United Arab Emirates',   len: [9,  9]  },
+  { code: 'GB', dial: '+44',  name: 'United Kingdom',         len: [10, 10] },
+  { code: 'US', dial: '+1',   name: 'United States',          len: [10, 10] },
+  { code: 'UY', dial: '+598', name: 'Uruguay',                len: [8,  8]  },
+  { code: 'UZ', dial: '+998', name: 'Uzbekistan',             len: [9,  9]  },
+  { code: 'VE', dial: '+58',  name: 'Venezuela',              len: [10, 10] },
+  { code: 'VN', dial: '+84',  name: 'Vietnam',                len: [9,  10] },
+  { code: 'YE', dial: '+967', name: 'Yemen',                  len: [9,  9]  },
+];
+
+const DIAL_EXAMPLES = {
+  '+93': '701234567',   '+355': '661234567',  '+213': '551234567',
+  '+54': '1123456789',  '+374': '77123456',   '+61': '412345678',
+  '+43': '6641234567',  '+994': '501234567',  '+880': '1712345678',
+  '+375': '291234567',  '+32': '470123456',   '+591': '71234567',
+  '+387': '61123456',   '+55': '11912345678', '+359': '881234567',
+  '+855': '12345678',   '+1':  '2015551234',  '+56': '912345678',
+  '+86': '13812345678', '+57': '3001234567',  '+385': '91234567',
+  '+420': '601123456',  '+45': '20123456',    '+593': '991234567',
+  '+20': '1001234567',  '+372': '51234567',   '+251': '911234567',
+  '+358': '412345678',  '+33': '612345678',   '+995': '555123456',
+  '+49': '15123456789', '+233': '201234567',  '+30': '6912345678',
+  '+502': '51234567',   '+36': '201234567',   '+91': '9123456789',
+  '+62': '81234567890', '+98': '9123456789',  '+964': '7901234567',
+  '+353': '851234567',  '+972': '501234567',  '+39': '3123456789',
+  '+81': '9012345678',  '+962': '791234567',  '+7':  '9161234567',
+  '+254': '712345678',  '+383': '43123456',   '+965': '51234567',
+  '+371': '21234567',   '+961': '3123456',    '+218': '912345678',
+  '+370': '61234567',   '+60': '123456789',   '+52': '5512345678',
+  '+373': '69123456',   '+976': '88123456',   '+212': '612345678',
+  '+31': '612345678',   '+64': '21123456',    '+234': '8012345678',
+  '+389': '71234567',   '+47': '41234567',    '+92': '3001234567',
+  '+595': '961234567',  '+51': '912345678',   '+63': '9171234567',
+  '+48': '512345678',   '+351': '912345678',  '+974': '33123456',
+  '+40': '712345678',   '+966': '512345678',  '+381': '641234567',
+  '+421': '901234567',  '+386': '31234567',   '+27': '711234567',
+  '+82': '1012345678',  '+34': '612345678',   '+94': '712345678',
+  '+46': '701234567',   '+41': '791234567',   '+963': '944123456',
+  '+886': '912345678',  '+66': '812345678',   '+216': '20123456',
+  '+90': '5321234567',  '+380': '501234567',  '+971': '501234567',
+  '+44': '7911123456',  '+598': '91234567',   '+998': '901234567',
+  '+58': '4121234567',  '+84': '912345678',   '+967': '712345678',
+};
+
+const COUNTRIES = [
+  'Afghanistan','Albania','Algeria','Argentina','Armenia','Australia','Austria',
+  'Azerbaijan','Bangladesh','Belarus','Belgium','Bolivia','Bosnia and Herzegovina',
+  'Brazil','Bulgaria','Cambodia','Canada','Chile','China','Colombia','Croatia',
+  'Czech Republic','Denmark','Ecuador','Egypt','Estonia','Ethiopia','Finland',
+  'France','Georgia','Germany','Ghana','Greece','Guatemala','Hungary','India',
+  'Indonesia','Iran','Iraq','Ireland','Israel','Italy','Japan','Jordan',
+  'Kazakhstan','Kenya','Kosovo','Kuwait','Latvia','Lebanon','Libya','Lithuania',
+  'Malaysia','Mexico','Moldova','Mongolia','Morocco','Netherlands','New Zealand',
+  'Nigeria','North Macedonia','Norway','Pakistan','Paraguay','Peru','Philippines',
+  'Poland','Portugal','Qatar','Romania','Russia','Saudi Arabia','Serbia',
+  'Slovakia','Slovenia','South Africa','South Korea','Spain','Sri Lanka',
+  'Sweden','Switzerland','Syria','Taiwan','Thailand','Tunisia','Turkey',
+  'Ukraine','United Arab Emirates','United Kingdom','United States','Uruguay',
+  'Uzbekistan','Venezuela','Vietnam','Yemen',
 ];
 
 const GOALS = [
@@ -223,6 +343,17 @@ export default function OnboardingScreen({ navigation }) {
     }
   };
 
+  // ── Country Selection Handler with Smart Dial Auto-Matching ──
+  const handleSelectCountry = (selectedCountryName) => {
+    safeHaptic('light');
+    setCountry(selectedCountryName);
+    const match = DIAL_CODES.find((d) => d.name === selectedCountryName);
+    if (match) {
+      setDialCode(match.dial);
+    }
+    setCountryModalVisible(false);
+  };
+
   // ── Language Toggle Handler ──
   const toggleLanguage = (lang) => {
     safeHaptic('light');
@@ -264,6 +395,8 @@ export default function OnboardingScreen({ navigation }) {
       d.name.toLowerCase().includes(dialSearch.toLowerCase()) ||
       d.dial.includes(dialSearch)
   );
+
+  const currentPhoneExample = DIAL_EXAMPLES[dialCode] || '501234567';
 
   return (
     <View style={styles.root}>
@@ -498,10 +631,10 @@ export default function OnboardingScreen({ navigation }) {
                       <View style={styles.dialDivider} />
                       <TextInput
                         style={styles.phoneInput}
-                        placeholder="501234567"
+                        placeholder={currentPhoneExample}
                         placeholderTextColor="#504E64"
                         value={whatsapp}
-                        onChangeText={setWhatsapp}
+                        onChangeText={(val) => setWhatsapp(val.replace(/[^0-9]/g, ''))}
                         keyboardType="phone-pad"
                       />
                     </View>
@@ -837,11 +970,7 @@ export default function OnboardingScreen({ navigation }) {
                     styles.modalListItem,
                     country === item && styles.modalListItemSelected,
                   ]}
-                  onPress={() => {
-                    safeHaptic('light');
-                    setCountry(item);
-                    setCountryModalVisible(false);
-                  }}
+                  onPress={() => handleSelectCountry(item)}
                 >
                   <Text
                     style={[
