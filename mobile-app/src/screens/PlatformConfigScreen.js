@@ -184,24 +184,24 @@ export default function PlatformConfigScreen({ route, navigation }) {
             )}
           </View>
 
-          {/* Section 2: Cycle Limits */}
+          {/* Section 2: Daily Pacing */}
           <View style={styles.sectionCard}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardTitleRow}>
                 <Ionicons name="speedometer-outline" size={16} color={themeColor} />
-                <Text style={styles.sectionHeader}>Cycle Limits & Safety</Text>
+                <Text style={styles.sectionHeader}>Daily Pacing & Safety</Text>
               </View>
               <View style={[styles.activePill, { backgroundColor: themeColor + '18', borderColor: themeColor + '40' }]}>
                 <Text style={[styles.activePillText, { color: themeColor }]}>Safe Pacing</Text>
               </View>
             </View>
-            <Text style={styles.sectionDesc}>Batch swipe limits per interval to maintain continuous account health.</Text>
+            <Text style={styles.sectionDesc}>Set how many profiles to like and message each session to keep your profile active and natural.</Text>
 
             {/* Likes Stepper */}
             <View style={styles.stepperContainer}>
               <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Likes / Batch</Text>
-                <Text style={styles.stepperHelper}>Target profiles per cycle</Text>
+                <Text style={styles.stepperLabel}>Likes per Session</Text>
+                <Text style={styles.stepperHelper}>Target profiles to like</Text>
               </View>
               <View style={styles.stepperControls}>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(likesPerCycle, setLikesPerCycle, 10, 0)}>
@@ -219,8 +219,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
             {/* Messages Stepper */}
             <View style={styles.stepperContainer}>
               <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Messages / Batch</Text>
-                <Text style={styles.stepperHelper}>AI intros per cycle</Text>
+                <Text style={styles.stepperLabel}>Intro Messages per Session</Text>
+                <Text style={styles.stepperHelper}>First messages to new matches</Text>
               </View>
               <View style={styles.stepperControls}>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(messagesPerCycle, setMessagesPerCycle, 5, 0)}>
@@ -238,8 +238,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
             {/* Interval Stepper */}
             <View style={styles.stepperContainer}>
               <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Cooldown Interval</Text>
-                <Text style={styles.stepperHelper}>Delay between runs</Text>
+                <Text style={styles.stepperLabel}>Break Between Sessions</Text>
+                <Text style={styles.stepperHelper}>Rest time before next session</Text>
               </View>
               <View style={styles.stepperControls}>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(scheduleInterval, setScheduleInterval, 5, 5)}>
@@ -256,15 +256,15 @@ export default function PlatformConfigScreen({ route, navigation }) {
             </View>
           </View>
 
-          {/* Section 3: Custom Opener Directive */}
+          {/* Section 3: Custom First Message */}
           <View style={styles.sectionCard}>
             <View style={styles.toggleHeaderRow}>
               <View style={styles.stepperTextContainer}>
                 <View style={styles.cardTitleRow}>
                   <Ionicons name="chatbubbles-outline" size={16} color={themeColor} />
-                  <Text style={styles.sectionHeader}>Custom Opener Prompt</Text>
+                  <Text style={styles.sectionHeader}>Custom First Message</Text>
                 </View>
-                <Text style={styles.sectionDesc}>Customize the initial AI icebreaker.</Text>
+                <Text style={styles.sectionDesc}>Personalize how your assistant breaks the ice.</Text>
               </View>
               <Switch
                 value={useCustomIntro}
@@ -276,13 +276,13 @@ export default function PlatformConfigScreen({ route, navigation }) {
 
             {useCustomIntro && (
               <View style={styles.expandableContent}>
-                <Text style={styles.inputLabel}>Opener Prompt Directive</Text>
+                <Text style={styles.inputLabel}>Intro Message Instructions</Text>
                 <TextInput
                   style={styles.textArea}
                   value={customIntroPrompt}
                   onChangeText={setCustomIntroPrompt}
                   multiline={true}
-                  placeholder="Instructions for the AI message generator..."
+                  placeholder="Tell your assistant how you like to start conversations..."
                   placeholderTextColor="#7A7990"
                   numberOfLines={3}
                 />
@@ -294,15 +294,15 @@ export default function PlatformConfigScreen({ route, navigation }) {
           <View style={styles.sectionCard}>
             <View style={styles.cardTitleRow}>
               <Ionicons name="notifications-outline" size={16} color={themeColor} />
-              <Text style={styles.sectionHeader}>Push Notification Alerts</Text>
+              <Text style={styles.sectionHeader}>Notification Preferences</Text>
             </View>
-            <Text style={styles.sectionDesc}>Select which live milestones trigger instant mobile alerts.</Text>
+            <Text style={styles.sectionDesc}>Choose which updates you want to receive on your phone.</Text>
 
             {/* Toggle 1: Goal Alerts */}
             <View style={styles.toggleHeaderRow}>
               <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Goal Milestones</Text>
-                <Text style={styles.stepperHelper}>Phone numbers, contact handles and dates secured</Text>
+                <Text style={styles.stepperLabel}>Milestones & Phone Numbers</Text>
+                <Text style={styles.stepperHelper}>Get notified when a match shares their phone or date</Text>
               </View>
               <Switch
                 value={notifyGoals}
@@ -318,7 +318,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
             <View style={styles.toggleHeaderRow}>
               <View style={styles.stepperTextContainer}>
                 <Text style={styles.stepperLabel}>New Matches</Text>
-                <Text style={styles.stepperHelper}>Alert when a new match is found</Text>
+                <Text style={styles.stepperHelper}>Get notified when someone matches with you</Text>
               </View>
               <Switch
                 value={notifyMatches}
@@ -333,8 +333,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
             {/* Toggle 3: Cycles & Safety */}
             <View style={styles.toggleHeaderRow}>
               <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Automation & Cycle Alerts</Text>
-                <Text style={styles.stepperHelper}>Batch completions and pacing cooldowns</Text>
+                <Text style={styles.stepperLabel}>Session Summaries</Text>
+                <Text style={styles.stepperHelper}>Daily activity wrap-up and breaks</Text>
               </View>
               <Switch
                 value={notifyCycles}
@@ -352,7 +352,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
             activeOpacity={0.85}
           >
             <Text style={[styles.launchBtnText, { color: '#FFF' }]}>
-              Launch Virtual Browser
+              Open Live Screen
             </Text>
             <Ionicons
               name="arrow-forward"

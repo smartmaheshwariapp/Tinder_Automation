@@ -426,7 +426,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                 <View style={styles.modalHandle} />
 
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Connection & Server</Text>
+                  <Text style={styles.modalTitle}>Connection Settings</Text>
                   <TouchableOpacity onPress={closeModal} activeOpacity={0.8}>
                     <Ionicons name="close-circle" size={22} color="#716E89" />
                   </TouchableOpacity>
@@ -437,7 +437,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                   contentContainerStyle={styles.modalBody}
                 >
                   {/* Environment Toggle */}
-                  <Text style={styles.modalSectionLabel}>Server Environment</Text>
+                  <Text style={styles.modalSectionLabel}>Connection Mode</Text>
                   <View style={styles.envSelector}>
                     <TouchableOpacity
                       style={[styles.envOption, environment === 'vps' && styles.envOptionActive]}
@@ -450,7 +450,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                         color={environment === 'vps' ? '#FFF' : '#716E89'}
                       />
                       <Text style={[styles.envOptionText, environment === 'vps' && styles.envOptionTextActive]}>
-                        Cloud VPS
+                        Cloud Server
                       </Text>
                     </TouchableOpacity>
 
@@ -465,7 +465,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                         color={environment === 'local' ? '#FFF' : '#716E89'}
                       />
                       <Text style={[styles.envOptionText, environment === 'local' && styles.envOptionTextActive]}>
-                        Local Machine
+                        Direct Connect
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -473,7 +473,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                   {/* Region Selector (VPS only) */}
                   {environment === 'vps' && (
                     <>
-                      <Text style={styles.modalSectionLabel}>Proxy Routing</Text>
+                      <Text style={styles.modalSectionLabel}>Location Route</Text>
                       <View style={styles.regionCardRow}>
                         <TouchableOpacity
                           style={[styles.regionPill, userRegion === 'israel' && styles.regionPillActive]}

@@ -510,7 +510,7 @@ export default function AuthScreen({ navigation, route }) {
 
                     <View style={styles.taglinePill}>
                       <Ionicons name="sparkles" size={11} color="#FE3C72" />
-                      <Text style={styles.taglineText}>AI DATING COPILOT</Text>
+                      <Text style={styles.taglineText}>AI DATING ASSISTANT</Text>
                     </View>
 
                     <Text style={styles.welcomeSubtitle}>
@@ -576,7 +576,7 @@ export default function AuthScreen({ navigation, route }) {
                   <View style={styles.welcomeFooter}>
                     <View style={styles.securityBadge}>
                       <Ionicons name="shield-checkmark" size={12} color="#10B981" />
-                      <Text style={styles.securityBadgeText}>256-Bit Encrypted Automation</Text>
+                      <Text style={styles.securityBadgeText}>100% Private & Secure</Text>
                     </View>
                   </View>
                 </Animated.View>
@@ -625,7 +625,7 @@ export default function AuthScreen({ navigation, route }) {
                     <Text style={styles.formSubtitle}>
                       {authMode === 'signup'
                         ? 'Start getting smarter matches today.'
-                        : 'Sign in to resume your AI dating copilot.'}
+                        : 'Sign in to resume finding great matches.'}
                     </Text>
                   </View>
 

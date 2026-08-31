@@ -309,12 +309,12 @@ export default function NotificationCenterModal({
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
               <Text style={styles.metricVal}>{automationCount}</Text>
-              <Text style={styles.metricLabel}>Cycles</Text>
+              <Text style={styles.metricLabel}>Activity</Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
-              <Text style={[styles.metricVal, { color: '#10B981' }]}>100%</Text>
-              <Text style={styles.metricLabel}>System Health</Text>
+              <Text style={[styles.metricVal, { color: '#10B981' }]}>Active</Text>
+              <Text style={styles.metricLabel}>Assistant</Text>
             </View>
           </View>
 
@@ -400,7 +400,7 @@ export default function NotificationCenterModal({
                   activeFilter === 'automation' && styles.filterChipTextActive,
                 ]}
               >
-                Automation ({automationCount})
+                Activity ({automationCount})
               </Text>
             </TouchableOpacity>
           </View>
