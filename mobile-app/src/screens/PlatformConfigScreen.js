@@ -14,21 +14,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  Switch,
-  StatusBar,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
 
 const V2_GOALS = [
@@ -56,6 +41,11 @@ export default function PlatformConfigScreen({ route, navigation }) {
   // AI Prompt settings
   const [useCustomIntro, setUseCustomIntro] = useState(false);
   const [customIntroPrompt, setCustomIntroPrompt] = useState("Hey, I noticed your profile... let's chat!");
+
+  // Push Notification Preferences
+  const [notifyGoals, setNotifyGoals] = useState(true);
+  const [notifyMatches, setNotifyMatches] = useState(true);
+  const [notifyCycles, setNotifyCycles] = useState(true);
 
   const increment = (value, setter, step = 5, max = 200) => {
     setter(prev => Math.min(prev + step, max));
@@ -298,6 +288,61 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 />
               </View>
             )}
+          </View>
+
+          {/* Section 4: Push Notification Preferences */}
+          <View style={styles.sectionCard}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="notifications-outline" size={16} color={themeColor} />
+              <Text style={styles.sectionHeader}>Push Notification Alerts</Text>
+            </View>
+            <Text style={styles.sectionDesc}>Select which live milestones trigger instant mobile alerts.</Text>
+
+            {/* Toggle 1: Goal Alerts */}
+            <View style={styles.toggleHeaderRow}>
+              <View style={styles.stepperTextContainer}>
+                <Text style={styles.stepperLabel}>🔥 Goal Unlocked</Text>
+                <Text style={styles.stepperHelper}>Phone numbers, WhatsApp & dates secured</Text>
+              </View>
+              <Switch
+                value={notifyGoals}
+                onValueChange={setNotifyGoals}
+                trackColor={{ false: '#26223B', true: themeColor }}
+                thumbColor={notifyGoals ? '#FFF' : '#7A7990'}
+              />
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Toggle 2: New Match Sparks */}
+            <View style={styles.toggleHeaderRow}>
+              <View style={styles.stepperTextContainer}>
+                <Text style={styles.stepperLabel}>⚡ New Match Sparks</Text>
+                <Text style={styles.stepperHelper}>Instant alert when a match is found</Text>
+              </View>
+              <Switch
+                value={notifyMatches}
+                onValueChange={setNotifyMatches}
+                trackColor={{ false: '#26223B', true: themeColor }}
+                thumbColor={notifyMatches ? '#FFF' : '#7A7990'}
+              />
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Toggle 3: Cycles & Safety */}
+            <View style={styles.toggleHeaderRow}>
+              <View style={styles.stepperTextContainer}>
+                <Text style={styles.stepperLabel}>🎯 Daily Cycle Digests</Text>
+                <Text style={styles.stepperHelper}>Cycle completion & smart rest cooldowns</Text>
+              </View>
+              <Switch
+                value={notifyCycles}
+                onValueChange={setNotifyCycles}
+                trackColor={{ false: '#26223B', true: themeColor }}
+                thumbColor={notifyCycles ? '#FFF' : '#7A7990'}
+              />
+            </View>
           </View>
 
           {/* Launch Button */}

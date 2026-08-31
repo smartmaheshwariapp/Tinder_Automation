@@ -433,6 +433,65 @@ export default {
             }
 
             // ============================================
+            // 3.5 PUSH NOTIFICATIONS ENDPOINTS (Expo Push API)
+            // ============================================
+            if (url.pathname === '/push/register-token' && method === 'POST') {
+                const { userId, pushToken, platform: devPlatform } = await request.json();
+                if (!userId || !pushToken) {
+                    return jsonResponse({ success: false, error: 'userId and pushToken required' }, 400, corsHeaders);
+                }
+
+                // Upsert to user_snapshots settings
+                await fetch(`${SUPABASE_URL}/rest/v1/user_snapshots?user_id=eq.${userId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': SUPABASE_SERVICE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        settings: { pushToken, pushPlatform: devPlatform || 'ios' },
+                        updated_at: new Date().toISOString()
+                    })
+                }).catch(() => {});
+
+                return jsonResponse({ success: true, message: 'Push token registered successfully' }, 200, corsHeaders);
+            }
+
+            if (url.pathname === '/push/send' && method === 'POST') {
+                const { userId, type, title, body, data } = await request.json();
+                if (!title || !body) {
+                    return jsonResponse({ success: false, error: 'title and body required' }, 400, corsHeaders);
+                }
+
+                let targetToken = null;
+                if (userId) {
+                    const snapRes = await fetch(`${SUPABASE_URL}/rest/v1/user_snapshots?user_id=eq.${userId}&select=settings`, {
+                        headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}` }
+                    }).then(r => r.json()).catch(() => []);
+                    targetToken = snapRes?.[0]?.settings?.pushToken;
+                }
+
+                if (targetToken && (targetToken.startsWith('ExponentPushToken') || targetToken.startsWith('ExpoPushToken'))) {
+                    await fetch('https://exp.host/--/api/v2/push/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify([{
+                            to: targetToken,
+                            sound: 'default',
+                            title,
+                            body,
+                            data: { ...(data || {}), type: type || 'new_match' },
+                            priority: 'high',
+                            channelId: type === 'goal_unlocked' ? 'matches_and_goals' : 'default'
+                        }])
+                    }).catch(() => {});
+                }
+
+                return jsonResponse({ success: true, message: 'Push notification processed' }, 200, corsHeaders);
+            }
+
+            // ============================================
             // 4. VERIFY TOKEN ENDPOINT
             // ============================================
             if (url.pathname === '/auth/verify' && method === 'GET') {
