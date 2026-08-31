@@ -23,13 +23,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { getAutoDetectedLocalIp, resolveLocalUrl } from '../utils/network';
 import useExtensionStats from '../hooks/useExtensionStats';
 import { DashboardPanel } from '../components/dashboard';
+import SupabaseService from '../services/supabase';
 
 const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 const TINDER_IMG = require('../../assets/flirteasy/tinder.jpg');
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export default function PlatformSelectScreen({ navigation }) {
+export default function PlatformSelectScreen({ navigation, route }) {
   // ── Connection Configuration State ──
   const [environment, setEnvironment] = useState('vps'); // 'vps' | 'local'
   const [userRegion, setUserRegion] = useState('israel'); // 'israel' | 'direct'
@@ -115,6 +116,25 @@ export default function PlatformSelectScreen({ navigation }) {
       clearInterval(interval);
     };
   }, [orchestratorUrl]);
+
+  // ── Sync Live Telemetry / Snapshot with Supabase ──
+  const currentUser = route?.params?.user;
+  const onboardingData = route?.params?.onboardingData;
+
+  useEffect(() => {
+    if (currentUser?.id && stats) {
+      SupabaseService.saveUserSnapshot(currentUser.id, {
+        is_active: Boolean(stats?.agentState?.isRunning),
+        stats: {
+          likesToday: stats?.todayStats?.likesSent || 0,
+          matchesToday: stats?.todayStats?.matchesReceived || 0,
+          messagesToday: stats?.todayStats?.messagesSent || 0,
+          lifetimeSwipes: stats?.lifetimeStats?.totalSwipes || 0,
+          lifetimeMatches: stats?.lifetimeStats?.totalMatches || 0,
+        },
+      }).catch(() => {});
+    }
+  }, [currentUser?.id, stats]);
 
   // ── Mount Fade-In Animation ──
   useEffect(() => {

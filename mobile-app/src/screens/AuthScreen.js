@@ -21,6 +21,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import SupabaseService from '../services/supabase';
 
 // Optional safe haptics
 let Haptics;
@@ -336,10 +337,31 @@ export default function AuthScreen({ navigation, route }) {
     Keyboard.dismiss();
     setIsLoading(true);
     safeHaptic('success');
-    setTimeout(() => {
+
+    try {
+      let result;
+      if (authMode === 'signup') {
+        result = await SupabaseService.registerUser({
+          email: email.trim().toLowerCase(),
+          fullName: name.trim(),
+          onboardingData,
+        });
+      } else {
+        result = await SupabaseService.loginUser({
+          email: email.trim().toLowerCase(),
+        });
+      }
+
+      setIsLoading(false);
+      navigation.replace('PlatformSelect', {
+        user: result?.user,
+        onboardingData,
+      });
+    } catch (err) {
+      console.error('[Auth Error]', err);
       setIsLoading(false);
       navigation.replace('PlatformSelect', { onboardingData });
-    }, 850);
+    }
   };
 
   const handleResendCode = () => {

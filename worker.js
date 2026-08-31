@@ -40,8 +40,8 @@ Original: "{{message}}"
 
 Output ONLY the edited message. No explanation. No quotes.`;
 
-const SUPABASE_URL = 'https://ccfwoayuszifehykuwlg.supabase.co';
-const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjZndvYXl1c3ppZmVoeWt1d2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTc3NDI3OSwiZXhwIjoyMDg1MzUwMjc5fQ.qFpfDMjupfmRaem6Oen_o6S8bs3FwX8WbI27yRUMzkw';
+const SUPABASE_URL = 'https://equzoqtuskwfqnulzpmh.supabase.co';
+const SUPABASE_SERVICE_KEY = 'sb_secret_PMjEcR2288eBBUEhID4vgw_1N7zeN7H';
 
 // JWT Secret for signing tokens
 const JWT_SECRET = 'fE$8kLm9Pq2#nR5wTx4yU6zV3aB0cD1eF7gH2jK4mN6pQ8rS0tU3vW5xY7zA9bC1dE3fG5hJ7kL9mN1pR3sT5uV7wX9yZ';
