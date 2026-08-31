@@ -99,16 +99,8 @@ export default function NotificationCenterModal({
   const handleItemPress = (item) => {
     NotificationService.markAsRead(item.id);
     safeHaptic('light');
-    if (
-      item.type === 'goal_unlocked' ||
-      item.type === 'new_match' ||
-      item.type === 'date_secured'
-    ) {
-      if (onOpenStream) {
-        onClose();
-        onOpenStream();
-      }
-    }
+    onClose();
+    NotificationService.openPlatformApp('Tinder', item.data);
   };
 
   const handleCopyPhone = (item, e) => {
@@ -228,7 +220,7 @@ export default function NotificationCenterModal({
               )}
 
               <View style={styles.tapActionWrap}>
-                <Text style={styles.tapActionText}>View Details</Text>
+                <Text style={styles.tapActionText}>Open in Tinder</Text>
                 <Ionicons name="chevron-forward" size={11} color="#615F75" />
               </View>
             </View>

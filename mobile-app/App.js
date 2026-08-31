@@ -54,15 +54,7 @@ export default function App() {
     <SafeAreaProvider>
       <NavigationContainer ref={navigationRef}>
         <AppNavigator />
-        <InAppNotificationBanner
-          onNavigateToStream={(notif) => {
-            try {
-              navigationRef.current?.navigate('Browser', {
-                platform: 'Tinder',
-              });
-            } catch (_) {}
-          }}
-        />
+        <InAppNotificationBanner />
       </NavigationContainer>
     </SafeAreaProvider>
   );

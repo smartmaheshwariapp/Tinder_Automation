@@ -159,6 +159,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
 
   const handleTap = () => {
     dismissBanner();
+    NotificationService.openPlatformApp('Tinder', currentNotif?.data);
     if (onNavigateToStream) {
       onNavigateToStream(currentNotif);
     }
@@ -261,7 +262,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
             )}
 
             <View style={styles.actionPillSecondary}>
-              <Text style={styles.actionPillSecondaryText}>Open live stream</Text>
+              <Text style={styles.actionPillSecondaryText}>Open Tinder</Text>
               <Ionicons name="chevron-forward" size={11} color="#8E8DA3" />
             </View>
           </View>

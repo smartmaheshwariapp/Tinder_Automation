@@ -1,7 +1,7 @@
 // mobile-app/src/services/notifications.js
 // FlirtEasy Dating App Push Notifications System & In-App HUD Dispatcher
 
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import SupabaseService from './supabase';
 
 let Notifications = null;
@@ -321,6 +321,52 @@ export const NotificationService = {
    */
   getUnreadCount() {
     return _notificationInbox.filter((item) => !item.is_read).length;
+  },
+
+  /**
+   * Open the real native dating app (e.g. Tinder) if installed, or fallback to web browser
+   */
+  async openPlatformApp(platform = 'Tinder', data = {}) {
+    const cleanPlatform = (platform || 'Tinder').toLowerCase();
+
+    // If phone number / WhatsApp action is provided:
+    if (data?.phone) {
+      const cleanPhone = String(data.phone).replace(/[^0-9+]/g, '');
+      const whatsappUrl = `whatsapp://send?phone=${cleanPhone}`;
+      const canOpenWhatsapp = await Linking.canOpenURL(whatsappUrl).catch(() => false);
+      if (canOpenWhatsapp) {
+        return Linking.openURL(whatsappUrl).catch(() => {});
+      }
+    }
+
+    // Platform specific deep links
+    let deepLinkScheme = 'tinder://';
+    let fallbackWebUrl = 'https://tinder.com/app/matches';
+
+    if (cleanPlatform.includes('bumble')) {
+      deepLinkScheme = 'bumble://';
+      fallbackWebUrl = 'https://bumble.com/app';
+    } else if (cleanPlatform.includes('hinge')) {
+      deepLinkScheme = 'hinge://';
+      fallbackWebUrl = 'https://hinge.co';
+    }
+
+    try {
+      const canOpenNative = await Linking.canOpenURL(deepLinkScheme).catch(() => false);
+      if (canOpenNative) {
+        await Linking.openURL(deepLinkScheme);
+        return { success: true, target: 'native_app' };
+      } else {
+        await Linking.openURL(fallbackWebUrl);
+        return { success: true, target: 'web_fallback' };
+      }
+    } catch (err) {
+      console.log('[NotificationService] Deep link notice:', err.message);
+      try {
+        await Linking.openURL(fallbackWebUrl);
+        return { success: true, target: 'web_fallback' };
+      } catch (_) {}
+    }
   },
 };
 
