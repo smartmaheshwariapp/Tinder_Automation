@@ -49,8 +49,13 @@ Thumbs.db
 *.mov
 *.wmv
 
-# Neko Chrome profile sessions (large runtime cache, not source)
+# Environment variables & sensitive config
+.env
+*.env
+
+# Neko Chrome profile sessions (large runtime cache & sensitive user session data, not source)
 neko-setup/sessions/
+neko-setup/lib/sessions/
 neko-setup/lib/sessions/
 neko-setup/clean-extension/
 

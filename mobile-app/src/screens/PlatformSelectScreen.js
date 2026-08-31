@@ -974,6 +974,7 @@ const styles = StyleSheet.create({
   advancedToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 10,
     marginBottom: 6,
