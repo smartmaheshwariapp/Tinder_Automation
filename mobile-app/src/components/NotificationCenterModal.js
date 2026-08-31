@@ -100,7 +100,7 @@ export default function NotificationCenterModal({
     NotificationService.markAsRead(item.id);
     safeHaptic('light');
     onClose();
-    NotificationService.openPlatformApp('Tinder', item.data);
+    NotificationService.handleNotificationRedirect(item);
   };
 
   const handleCopyPhone = (item, e) => {

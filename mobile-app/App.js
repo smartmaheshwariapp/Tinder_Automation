@@ -5,11 +5,21 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
 import AppNavigator from './src/navigation/AppNavigator';
 import InAppNotificationBanner from './src/components/InAppNotificationBanner';
+import ExternalRedirectModal from './src/components/ExternalRedirectModal';
+import NotificationService from './src/services/notifications';
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("Checking for updates...");
+  const [redirectNotif, setRedirectNotif] = useState(null);
   const navigationRef = useRef(null);
+
+  useEffect(() => {
+    const unsub = NotificationService.subscribeRedirectPrompt((notif) => {
+      setRedirectNotif(notif);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const boot = async () => {
@@ -55,6 +65,11 @@ export default function App() {
       <NavigationContainer ref={navigationRef}>
         <AppNavigator />
         <InAppNotificationBanner />
+        <ExternalRedirectModal
+          visible={!!redirectNotif}
+          notification={redirectNotif}
+          onClose={() => setRedirectNotif(null)}
+        />
       </NavigationContainer>
     </SafeAreaProvider>
   );

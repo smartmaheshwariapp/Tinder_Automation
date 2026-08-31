@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
+import NotificationService from '../services/notifications';
 
 const V2_GOALS = [
   { id: 'date', label: 'Set up a Date', icon: 'calendar-outline' },
@@ -46,6 +47,16 @@ export default function PlatformConfigScreen({ route, navigation }) {
   const [notifyGoals, setNotifyGoals] = useState(true);
   const [notifyMatches, setNotifyMatches] = useState(true);
   const [notifyCycles, setNotifyCycles] = useState(true);
+
+  // External App Redirect Preferences
+  const [redirectPrefs, setRedirectPrefs] = useState(NotificationService.getRedirectPreferences());
+
+  useEffect(() => {
+    const unsub = NotificationService.subscribeRedirectPreferences((prefs) => {
+      setRedirectPrefs(prefs);
+    });
+    return unsub;
+  }, []);
 
   const increment = (value, setter, step = 5, max = 200) => {
     setter(prev => Math.min(prev + step, max));
@@ -341,6 +352,67 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 onValueChange={setNotifyCycles}
                 trackColor={{ false: '#26223B', true: themeColor }}
                 thumbColor={notifyCycles ? '#FFF' : '#7A7990'}
+              />
+            </View>
+          </View>
+
+          {/* Section 5: External App Redirects */}
+          <View style={styles.sectionCard}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="open-outline" size={16} color={themeColor} />
+              <Text style={styles.sectionHeader}>External App Redirects</Text>
+            </View>
+            <Text style={styles.sectionDesc}>Choose whether to ask for confirmation before leaving FlirtEasy.</Text>
+
+            {/* Toggle 1: Tinder Confirmation */}
+            <View style={styles.toggleHeaderRow}>
+              <View style={styles.stepperTextContainer}>
+                <Text style={styles.stepperLabel}>Ask before opening Tinder</Text>
+                <Text style={styles.stepperHelper}>Show confirmation prompt when tapping match alerts</Text>
+              </View>
+              <Switch
+                value={redirectPrefs.tinder === 'always_ask'}
+                onValueChange={(val) => {
+                  NotificationService.setRedirectPreference('tinder', val ? 'always_ask' : 'auto_open');
+                }}
+                trackColor={{ false: '#26223B', true: themeColor }}
+                thumbColor={redirectPrefs.tinder === 'always_ask' ? '#FFF' : '#7A7990'}
+              />
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Toggle 2: WhatsApp Confirmation */}
+            <View style={styles.toggleHeaderRow}>
+              <View style={styles.stepperTextContainer}>
+                <Text style={styles.stepperLabel}>Ask before opening WhatsApp</Text>
+                <Text style={styles.stepperHelper}>Show confirmation prompt when phone numbers are tapped</Text>
+              </View>
+              <Switch
+                value={redirectPrefs.whatsapp === 'always_ask'}
+                onValueChange={(val) => {
+                  NotificationService.setRedirectPreference('whatsapp', val ? 'always_ask' : 'auto_open');
+                }}
+                trackColor={{ false: '#26223B', true: themeColor }}
+                thumbColor={redirectPrefs.whatsapp === 'always_ask' ? '#FFF' : '#7A7990'}
+              />
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Toggle 3: Instagram Confirmation */}
+            <View style={styles.toggleHeaderRow}>
+              <View style={styles.stepperTextContainer}>
+                <Text style={styles.stepperLabel}>Ask before opening Instagram</Text>
+                <Text style={styles.stepperHelper}>Show confirmation prompt when social handles are tapped</Text>
+              </View>
+              <Switch
+                value={redirectPrefs.instagram === 'always_ask'}
+                onValueChange={(val) => {
+                  NotificationService.setRedirectPreference('instagram', val ? 'always_ask' : 'auto_open');
+                }}
+                trackColor={{ false: '#26223B', true: themeColor }}
+                thumbColor={redirectPrefs.instagram === 'always_ask' ? '#FFF' : '#7A7990'}
               />
             </View>
           </View>

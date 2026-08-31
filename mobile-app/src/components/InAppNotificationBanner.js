@@ -159,7 +159,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
 
   const handleTap = () => {
     dismissBanner();
-    NotificationService.openPlatformApp('Tinder', currentNotif?.data);
+    NotificationService.handleNotificationRedirect(currentNotif);
     if (onNavigateToStream) {
       onNavigateToStream(currentNotif);
     }

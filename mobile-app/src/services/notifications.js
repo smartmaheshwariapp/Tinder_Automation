@@ -118,6 +118,14 @@ let _notificationInbox = [
 
 let _inboxListeners = [];
 let _bannerListeners = [];
+let _redirectListeners = [];
+let _preferenceListeners = [];
+
+let _redirectPreferences = {
+  tinder: 'always_ask',
+  whatsapp: 'always_ask',
+  instagram: 'always_ask',
+};
 
 export const NotificationService = {
   /**
@@ -321,6 +329,102 @@ export const NotificationService = {
    */
   getUnreadCount() {
     return _notificationInbox.filter((item) => !item.is_read).length;
+  },
+
+  /**
+   * Get Redirect Preferences
+   */
+  getRedirectPreferences() {
+    return { ..._redirectPreferences };
+  },
+
+  /**
+   * Set Redirect Preference for a platform ('always_ask' | 'auto_open')
+   */
+  setRedirectPreference(platform, mode) {
+    const key = (platform || 'tinder').toLowerCase();
+    _redirectPreferences[key] = mode;
+    _preferenceListeners.forEach((fn) => fn({ ..._redirectPreferences }));
+  },
+
+  /**
+   * Subscribe to Redirect Preferences changes
+   */
+  subscribeRedirectPreferences(listener) {
+    _preferenceListeners.push(listener);
+    listener({ ..._redirectPreferences });
+    return () => {
+      _preferenceListeners = _preferenceListeners.filter((fn) => fn !== listener);
+    };
+  },
+
+  /**
+   * Subscribe to Redirect Confirmation Modal prompts
+   */
+  subscribeRedirectPrompt(listener) {
+    _redirectListeners.push(listener);
+    return () => {
+      _redirectListeners = _redirectListeners.filter((fn) => fn !== listener);
+    };
+  },
+
+  /**
+   * Handle Smart Redirect: checks preference before opening or prompting
+   */
+  async handleNotificationRedirect(notification) {
+    if (!notification) return;
+    const data = notification.data || {};
+    const phone = data.phone;
+    const instagram = data.instagram || data.handle;
+
+    let targetPlatform = 'tinder';
+    if (phone) targetPlatform = 'whatsapp';
+    else if (instagram) targetPlatform = 'instagram';
+
+    const pref = _redirectPreferences[targetPlatform] || 'always_ask';
+
+    if (pref === 'auto_open') {
+      if (targetPlatform === 'whatsapp' && phone) {
+        return this.openWhatsApp(phone);
+      } else if (targetPlatform === 'instagram' && instagram) {
+        return this.openInstagram(instagram);
+      } else {
+        return this.openPlatformApp('Tinder', data);
+      }
+    }
+
+    // Trigger confirmation modal
+    _redirectListeners.forEach((fn) => fn(notification));
+  },
+
+  /**
+   * Open WhatsApp directly or via web fallback
+   */
+  async openWhatsApp(phone) {
+    if (!phone) return;
+    const cleanPhone = String(phone).replace(/[^0-9+]/g, '');
+    const whatsappUrl = `whatsapp://send?phone=${cleanPhone}`;
+    const webFallback = `https://wa.me/${cleanPhone.replace('+', '')}`;
+    const canOpen = await Linking.canOpenURL(whatsappUrl).catch(() => false);
+    if (canOpen) {
+      return Linking.openURL(whatsappUrl).catch(() => {});
+    }
+    return Linking.openURL(webFallback).catch(() => {});
+  },
+
+  /**
+   * Open Instagram profile directly or via web fallback
+   */
+  async openInstagram(handle) {
+    if (!handle) return;
+    const cleanHandle = String(handle).replace('@', '').trim();
+    const instaAppUrl = `instagram://user?username=${cleanHandle}`;
+    const instaWebUrl = `https://instagram.com/${cleanHandle}`;
+    const canOpen = await Linking.canOpenURL(instaAppUrl).catch(() => false);
+    if (canOpen) {
+      return Linking.openURL(instaAppUrl).catch(() => {});
+    }
+    return Linking.openURL(instaWebUrl).catch(() => {});
   },
 
   /**
