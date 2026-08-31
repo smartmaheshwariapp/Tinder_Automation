@@ -71,6 +71,8 @@ export default function LoginScreen({ navigation }) {
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
@@ -110,6 +112,11 @@ export default function LoginScreen({ navigation }) {
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  selectionColor="#E06D53"
+                  cursorColor="#E06D53"
+                  underlineColorAndroid="transparent"
                   keyboardType="email-address"
                   onFocus={() => setIsFocusedEmail(true)}
                   onBlur={() => setIsFocusedEmail(false)}
@@ -138,6 +145,11 @@ export default function LoginScreen({ navigation }) {
                   placeholderTextColor="#A4ACA6"
                   value={password}
                   onChangeText={setPassword}
+                  autoCorrect={false}
+                  spellCheck={false}
+                  selectionColor="#E06D53"
+                  cursorColor="#E06D53"
+                  underlineColorAndroid="transparent"
                   secureTextEntry={!showPassword}
                   onFocus={() => setIsFocusedPassword(true)}
                   onBlur={() => setIsFocusedPassword(false)}

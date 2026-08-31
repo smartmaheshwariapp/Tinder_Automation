@@ -16,6 +16,7 @@ import {
   Image,
   StatusBar,
   Keyboard,
+  ScrollView,
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -296,8 +297,11 @@ export default function AuthScreen({ navigation, route }) {
     setErrorMessage('');
     setSuccessNotice('');
 
-    if (text && text.length > 1) {
-      const digits = text.replace(/[^0-9]/g, '').slice(0, 6);
+    const clean = text.replace(/[^0-9]/g, '');
+
+    // Multi-digit paste (e.g. from SMS autofill or clipboard)
+    if (clean.length > 1) {
+      const digits = clean.slice(0, 6);
       const newOtp = ['', '', '', '', '', ''];
       for (let i = 0; i < digits.length; i++) newOtp[i] = digits[i];
       setOtp(newOtp);
@@ -311,13 +315,16 @@ export default function AuthScreen({ navigation, route }) {
       return;
     }
 
+    const singleDigit = clean.slice(-1);
     const newOtp = [...otp];
-    newOtp[index] = text;
+    newOtp[index] = singleDigit;
     setOtp(newOtp);
 
-    if (text) {
+    if (singleDigit) {
       safeHaptic('light');
-      if (index < 5) otpInputs.current[index + 1]?.focus();
+      if (index < 5) {
+        otpInputs.current[index + 1]?.focus();
+      }
       if (index === 5 && newOtp.every((d) => d.length === 1)) {
         verifyOtp(newOtp.join(''));
       }
@@ -395,26 +402,24 @@ export default function AuthScreen({ navigation, route }) {
 
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.kavContainer}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
         >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          {/* ═══════════════════════════════════════════════════ */}
+          {/* PHASE 1: WELCOME / LANDING                        */}
+          {/* ═══════════════════════════════════════════════════ */}
+          {phase === 'welcome' && (
             <View style={styles.contentContainer}>
-
-              {/* ═══════════════════════════════════════════════════ */}
-              {/* PHASE 1: WELCOME / LANDING                        */}
-              {/* ═══════════════════════════════════════════════════ */}
-              {phase === 'welcome' && (
-                <Animated.View
-                  style={[
-                    styles.welcomeContainer,
-                    {
-                      opacity: welcomeFade,
-                      transform: [{ translateY: welcomeSlide }],
-                    },
-                  ]}
-                >
+              <Animated.View
+                style={[
+                  styles.welcomeContainer,
+                  {
+                    opacity: welcomeFade,
+                    transform: [{ translateY: welcomeSlide }],
+                  },
+                ]}
+              >
                   {/* Hero: Floating Logo + Brand */}
                   <View style={styles.welcomeHero}>
                     <Animated.View
@@ -512,12 +517,21 @@ export default function AuthScreen({ navigation, route }) {
                     </View>
                   </View>
                 </Animated.View>
-              )}
+              </View>
+            )}
 
-              {/* ═══════════════════════════════════════════════════ */}
-              {/* PHASE 2: EMAIL FORM (Login / Signup)               */}
-              {/* ═══════════════════════════════════════════════════ */}
-              {phase === 'form' && (
+            {/* ═══════════════════════════════════════════════════ */}
+            {/* PHASE 2: EMAIL FORM (Login / Signup)               */}
+            {/* ═══════════════════════════════════════════════════ */}
+            {phase === 'form' && (
+              <ScrollView
+                style={styles.scrollFlex}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
                 <Animated.View
                   style={[
                     styles.formContainer,
@@ -585,6 +599,11 @@ export default function AuthScreen({ navigation, route }) {
                               onBlur={() => setFocusedField(null)}
                               autoCapitalize="words"
                               autoCorrect={false}
+                              spellCheck={false}
+                              textContentType="name"
+                              selectionColor="#FE3C72"
+                              cursorColor="#FE3C72"
+                              underlineColorAndroid="transparent"
                               returnKeyType="next"
                               onSubmitEditing={() => emailInputRef.current?.focus()}
                             />
@@ -625,7 +644,13 @@ export default function AuthScreen({ navigation, route }) {
                             onBlur={() => setFocusedField(null)}
                             autoCapitalize="none"
                             autoCorrect={false}
+                            spellCheck={false}
                             keyboardType="email-address"
+                            textContentType="emailAddress"
+                            keyboardAppearance="dark"
+                            selectionColor="#FE3C72"
+                            cursorColor="#FE3C72"
+                            underlineColorAndroid="transparent"
                             returnKeyType="done"
                             onSubmitEditing={handleFormSubmit}
                           />
@@ -731,12 +756,21 @@ export default function AuthScreen({ navigation, route }) {
                     <Text style={styles.termsLink}>Privacy Policy</Text>.
                   </Text>
                 </Animated.View>
-              )}
+              </ScrollView>
+            )}
 
-              {/* ═══════════════════════════════════════════════════ */}
-              {/* PHASE 3: OTP VERIFICATION                          */}
-              {/* ═══════════════════════════════════════════════════ */}
-              {phase === 'otp' && (
+            {/* ═══════════════════════════════════════════════════ */}
+            {/* PHASE 3: OTP VERIFICATION                          */}
+            {/* ═══════════════════════════════════════════════════ */}
+            {phase === 'otp' && (
+              <ScrollView
+                style={styles.scrollFlex}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
                 <Animated.View
                   style={[
                     styles.formContainer,
@@ -790,6 +824,10 @@ export default function AuthScreen({ navigation, route }) {
                           onChangeText={(t) => handleOtpChange(t, idx)}
                           onKeyPress={(e) => handleOtpKeyPress(e, idx)}
                           keyboardType="number-pad"
+                          textContentType="oneTimeCode"
+                          selectionColor="#FE3C72"
+                          cursorColor="#FE3C72"
+                          underlineColorAndroid="transparent"
                           maxLength={6}
                           selectTextOnFocus
                         />
@@ -851,10 +889,8 @@ export default function AuthScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
                 </Animated.View>
-              )}
-
-            </View>
-          </TouchableWithoutFeedback>
+              </ScrollView>
+            )}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -874,6 +910,15 @@ const styles = StyleSheet.create({
   },
   kavContainer: {
     flex: 1,
+  },
+  scrollFlex: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 40,
+    flexGrow: 1,
   },
   contentContainer: {
     flex: 1,
@@ -1159,6 +1204,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '500',
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
   },
 
   // ── Error / Success Rows ──
