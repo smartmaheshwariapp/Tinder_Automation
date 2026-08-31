@@ -1,7 +1,7 @@
 // mobile-app/src/components/NotificationCenterModal.js
-// Production-Grade Notification Center & Activity Feed (iOS Clean Minimalist Dark Aesthetic)
+// Production-Grade Top-Down Notification Center Shade (iOS 17 / Native Notification Drawer)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,7 +12,11 @@ import {
   Dimensions,
   Clipboard,
   Platform,
+  Animated,
+  PanResponder,
+  StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import NotificationService, { NOTIFICATION_CATEGORIES } from '../services/notifications';
@@ -50,11 +54,76 @@ function formatTimeAgo(isoString) {
 export default function NotificationCenterModal({
   visible,
   onClose,
-  onOpenStream,
 }) {
+  const insets = useSafeAreaInsets();
   const [notifications, setNotifications] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'milestones' | 'matches' | 'automation'
   const [copiedId, setCopiedId] = useState(null);
+
+  // Top-Down Slide Animation
+  const translateY = useRef(new Animated.Value(-SCREEN_HEIGHT)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      safeHaptic('light');
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 0,
+          friction: 8,
+          tension: 65,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const handleDismiss = () => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: -SCREEN_HEIGHT,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+    });
+  };
+
+  // Pan Responder for bottom drag handle to swipe up to close
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5,
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dy < 0) {
+          translateY.setValue(gesture.dy);
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy < -60 || gesture.vy < -0.5) {
+          handleDismiss();
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            friction: 8,
+            tension: 65,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     const unsubscribe = NotificationService.subscribeInbox((items) => {
@@ -99,7 +168,7 @@ export default function NotificationCenterModal({
   const handleItemPress = (item) => {
     NotificationService.markAsRead(item.id);
     safeHaptic('light');
-    onClose();
+    handleDismiss();
     NotificationService.handleNotificationRedirect(item);
   };
 
@@ -230,31 +299,43 @@ export default function NotificationCenterModal({
     );
   };
 
+  if (!visible) return null;
+
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleDismiss}
+      statusBarTranslucent
     >
-      <View style={styles.backdrop}>
-        <TouchableOpacity
-          style={styles.dismissArea}
-          activeOpacity={1}
-          onPress={onClose}
-        />
+      <View style={styles.rootModalContainer}>
+        {/* Animated Dim Backdrop */}
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+          <TouchableOpacity
+            style={styles.dismissArea}
+            activeOpacity={1}
+            onPress={handleDismiss}
+          />
+        </Animated.View>
 
-        <View style={styles.sheetContainer}>
-          {/* Drag Handle */}
-          <View style={styles.dragHandle} />
-
+        {/* Top-Down Sliding Shade Container */}
+        <Animated.View
+          style={[
+            styles.shadeContainer,
+            {
+              paddingTop: Math.max(insets.top, 14),
+              transform: [{ translateY }],
+            },
+          ]}
+        >
           {/* Header Bar */}
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
               <View style={styles.bellBadge}>
                 <Ionicons name="notifications-outline" size={15} color="#FFFFFF" />
               </View>
-              <Text style={styles.headerTitle}>Notifications</Text>
+              <Text style={styles.headerTitle}>Notification Center</Text>
               {unreadCount > 0 && (
                 <View style={styles.unreadCountBadge}>
                   <Text style={styles.unreadCountBadgeText}>{unreadCount}</Text>
@@ -279,7 +360,7 @@ export default function NotificationCenterModal({
 
               <TouchableOpacity
                 style={styles.closeBtn}
-                onPress={onClose}
+                onPress={handleDismiss}
                 activeOpacity={0.8}
               >
                 <Ionicons name="close" size={16} color="#8E8DA3" />
@@ -417,43 +498,49 @@ export default function NotificationCenterModal({
               showsVerticalScrollIndicator={false}
             />
           )}
-        </View>
+
+          {/* Bottom Pull-Up Dismiss Handle Area */}
+          <View style={styles.bottomHandleBar} {...panResponder.panHandlers}>
+            <View style={styles.bottomHandleIndicator} />
+            <Text style={styles.bottomHandleText}>Swipe up to close</Text>
+          </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  rootModalContainer: {
     flex: 1,
+    justifyContent: 'flex-start',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'flex-end',
   },
   dismissArea: {
     flex: 1,
   },
-  sheetContainer: {
+  shadeContainer: {
     backgroundColor: '#0C0B12',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    height: SCREEN_HEIGHT * 0.82,
-    paddingTop: 10,
-  },
-  dragHandle: {
-    width: 32,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    alignSelf: 'center',
-    marginBottom: 14,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    maxHeight: SCREEN_HEIGHT * 0.85,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.6,
+    shadowRadius: 32,
+    elevation: 25,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    marginTop: 6,
     marginBottom: 14,
   },
   headerTitleRow: {
@@ -579,7 +666,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 24,
+    paddingBottom: 16,
     gap: 8,
   },
   cardWrapper: {
@@ -701,7 +788,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   emptyState: {
-    flex: 1,
+    paddingVertical: 40,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
@@ -728,5 +815,27 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     lineHeight: 16,
     textAlign: 'center',
+  },
+  bottomHandleBar: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: '#0C0B12',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  bottomHandleIndicator: {
+    width: 32,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 4,
+  },
+  bottomHandleText: {
+    color: '#555364',
+    fontSize: 9.5,
+    fontWeight: '600',
   },
 });
