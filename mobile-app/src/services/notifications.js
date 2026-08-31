@@ -117,6 +117,7 @@ let _notificationInbox = [
 ];
 
 let _inboxListeners = [];
+let _bannerListeners = [];
 
 export const NotificationService = {
   /**
@@ -203,6 +204,7 @@ export const NotificationService = {
 
       _notificationInbox = [notifItem, ..._notificationInbox];
       _inboxListeners.forEach((fn) => fn(_notificationInbox));
+      _bannerListeners.forEach((fn) => fn(notifItem));
 
       if (onReceived) onReceived(notifItem);
     });
@@ -238,6 +240,7 @@ export const NotificationService = {
 
     _notificationInbox = [notifItem, ..._notificationInbox];
     _inboxListeners.forEach((fn) => fn(_notificationInbox));
+    _bannerListeners.forEach((fn) => fn(notifItem));
 
     if (Notifications && Notifications.scheduleNotificationAsync) {
       try {
@@ -274,6 +277,16 @@ export const NotificationService = {
     listener(_notificationInbox);
     return () => {
       _inboxListeners = _inboxListeners.filter((fn) => fn !== listener);
+    };
+  },
+
+  /**
+   * Subscribe to Floating In-App Banner Popups
+   */
+  subscribeBanner(listener) {
+    _bannerListeners.push(listener);
+    return () => {
+      _bannerListeners = _bannerListeners.filter((fn) => fn !== listener);
     };
   },
 

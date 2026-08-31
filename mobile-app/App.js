@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, ActivityIndicator, StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
 import AppNavigator from './src/navigation/AppNavigator';
+import InAppNotificationBanner from './src/components/InAppNotificationBanner';
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("Checking for updates...");
+  const navigationRef = useRef(null);
 
   useEffect(() => {
     const boot = async () => {
@@ -48,9 +51,20 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      <AppNavigator />
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer ref={navigationRef}>
+        <AppNavigator />
+        <InAppNotificationBanner
+          onNavigateToStream={(notif) => {
+            try {
+              navigationRef.current?.navigate('Browser', {
+                platform: 'Tinder',
+              });
+            } catch (_) {}
+          }}
+        />
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
 

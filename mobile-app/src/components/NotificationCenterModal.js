@@ -1,5 +1,5 @@
 // mobile-app/src/components/NotificationCenterModal.js
-// Interactive Dating App Notification Center Inbox & HUD for FlirtEasy
+// Ultra-Premium Dating App Notification Hub & Activity Feed (iOS 17 Glassmorphic Aesthetic)
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -10,13 +10,31 @@ import {
   Modal,
   FlatList,
   Dimensions,
-  Animated,
+  Clipboard,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import NotificationService, { NOTIFICATION_CATEGORIES } from '../services/notifications';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+let Haptics = null;
+try {
+  Haptics = require('expo-haptics');
+} catch (_) {}
+
+const safeHaptic = (type = 'light') => {
+  try {
+    if (Haptics && Haptics.impactAsync) {
+      if (type === 'success' && Haptics.notificationAsync) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    }
+  } catch (_) {}
+};
 
 function formatTimeAgo(isoString) {
   if (!isoString) return 'Just now';
@@ -36,6 +54,7 @@ export default function NotificationCenterModal({
 }) {
   const [notifications, setNotifications] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'goal_unlocked' | 'new_match' | 'cycle_complete'
+  const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
     const unsubscribe = NotificationService.subscribeInbox((items) => {
@@ -43,6 +62,18 @@ export default function NotificationCenterModal({
     });
     return unsubscribe;
   }, []);
+
+  const totalCount = notifications.length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const goalCount = notifications.filter(
+    (n) => n.type === 'goal_unlocked' || n.type === 'date_secured'
+  ).length;
+  const matchCount = notifications.filter(
+    (n) => n.type === 'new_match' || n.type === 'fast_reply'
+  ).length;
+  const cycleCount = notifications.filter(
+    (n) => n.type === 'cycle_complete' || n.type === 'safety_cooldown' || n.type === 'daily_digest'
+  ).length;
 
   const filteredNotifications = notifications.filter((item) => {
     if (activeFilter === 'all') return true;
@@ -53,16 +84,23 @@ export default function NotificationCenterModal({
       return item.type === 'new_match' || item.type === 'fast_reply';
     }
     if (activeFilter === 'cycle_complete') {
-      return item.type === 'cycle_complete' || item.type === 'safety_cooldown' || item.type === 'daily_digest';
+      return (
+        item.type === 'cycle_complete' ||
+        item.type === 'safety_cooldown' ||
+        item.type === 'daily_digest'
+      );
     }
     return true;
   });
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
-
   const handleItemPress = (item) => {
     NotificationService.markAsRead(item.id);
-    if (item.type === 'goal_unlocked' || item.type === 'new_match' || item.type === 'date_secured') {
+    safeHaptic('light');
+    if (
+      item.type === 'goal_unlocked' ||
+      item.type === 'new_match' ||
+      item.type === 'date_secured'
+    ) {
       if (onOpenStream) {
         onClose();
         onOpenStream();
@@ -70,22 +108,171 @@ export default function NotificationCenterModal({
     }
   };
 
-  const handleTestMatch = () => {
-    NotificationService.triggerLocalNotification({
-      type: 'new_match',
-      title: '⚡ New Match with Maya!',
-      body: 'Maya just swiped right! Your AI Wingman queued a witty opener based on her photography bio.',
-      data: { matchName: 'Maya', intent: 'date' },
-    });
+  const handleCopyPhone = (item, e) => {
+    e?.stopPropagation?.();
+    const phone = item.data?.phone;
+    if (phone) {
+      Clipboard.setString(phone);
+      setCopiedId(item.id);
+      safeHaptic('success');
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
-  const handleTestGoal = () => {
-    NotificationService.triggerLocalNotification({
-      type: 'goal_unlocked',
-      title: '🔥 Goal Unlocked! Phone Collected',
-      body: 'Elena shared her phone number: +1 (201) 555-8391. View conversation in cockpit.',
-      data: { matchName: 'Elena', phone: '+12015558391', goal: 'phone' },
-    });
+  const handleTestTrigger = (type) => {
+    safeHaptic('light');
+    if (type === 'goal_unlocked') {
+      NotificationService.triggerLocalNotification({
+        type: 'goal_unlocked',
+        title: '🔥 Goal Unlocked! Phone Collected',
+        body: 'Elena shared her phone number: +1 (201) 555-8391. Ready for WhatsApp.',
+        data: { matchName: 'Elena', phone: '+12015558391', goal: 'phone' },
+      });
+    } else if (type === 'new_match') {
+      NotificationService.triggerLocalNotification({
+        type: 'new_match',
+        title: '⚡ New Match with Maya!',
+        body: 'Maya matched! Your AI Wingman queued a witty opener on photography.',
+        data: { matchName: 'Maya', intent: 'date' },
+      });
+    } else if (type === 'date_secured') {
+      NotificationService.triggerLocalNotification({
+        type: 'date_secured',
+        title: '📅 Date Confirmed with Chloe!',
+        body: 'Chloe agreed to drinks this Thursday at 8 PM. View conversation details.',
+        data: { matchName: 'Chloe', goal: 'date' },
+      });
+    }
+  };
+
+  const renderNotificationCard = ({ item }) => {
+    const category =
+      NOTIFICATION_CATEGORIES[item.type?.toUpperCase()] ||
+      NOTIFICATION_CATEGORIES.NEW_MATCH;
+
+    const isGoal = item.type === 'goal_unlocked' || item.type === 'date_secured';
+    const isCopied = copiedId === item.id;
+    const phone = item.data?.phone;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.cardWrapper,
+          !item.is_read && styles.cardWrapperUnread,
+          isGoal && styles.cardWrapperGoal,
+        ]}
+        onPress={() => handleItemPress(item)}
+        activeOpacity={0.88}
+      >
+        <LinearGradient
+          colors={
+            isGoal
+              ? ['#251528', '#1A1020']
+              : !item.is_read
+              ? ['#1E1A30', '#151322']
+              : ['#171524', '#110F1D']
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.cardGradient}
+        >
+          {/* Unread Accent Bar */}
+          {!item.is_read && <View style={styles.unreadAccentBar} />}
+
+          {/* Left Icon Avatar Badge */}
+          <View
+            style={[
+              styles.avatarBadge,
+              { borderColor: category.badgeColor + '60' },
+            ]}
+          >
+            <LinearGradient
+              colors={
+                isGoal
+                  ? ['#FE3C72', '#E8245C']
+                  : [category.badgeColor, category.badgeColor + '99']
+              }
+              style={styles.avatarGradient}
+            >
+              <Ionicons
+                name={
+                  item.type === 'goal_unlocked'
+                    ? 'flame'
+                    : item.type === 'date_secured'
+                    ? 'calendar'
+                    : item.type === 'new_match'
+                    ? 'heart'
+                    : item.type === 'cycle_complete'
+                    ? 'checkmark-done-circle'
+                    : item.type === 'safety_cooldown'
+                    ? 'shield-checkmark'
+                    : 'sparkles'
+                }
+                size={18}
+                color="#FFFFFF"
+              />
+            </LinearGradient>
+          </View>
+
+          {/* Center Content Body */}
+          <View style={styles.cardCenter}>
+            <View style={styles.cardTitleRow}>
+              <Text
+                style={[
+                  styles.cardTitle,
+                  !item.is_read && styles.cardTitleUnread,
+                ]}
+                numberOfLines={1}
+              >
+                {item.title}
+              </Text>
+              <Text style={styles.timeAgoText}>{formatTimeAgo(item.created_at)}</Text>
+            </View>
+
+            <Text style={styles.cardBody} numberOfLines={2}>
+              {item.body}
+            </Text>
+
+            {/* Rich Action Pills */}
+            <View style={styles.cardActionsRow}>
+              {phone && (
+                <TouchableOpacity
+                  style={[styles.phonePill, isCopied && styles.phonePillCopied]}
+                  onPress={(e) => handleCopyPhone(item, e)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={isCopied ? 'checkmark-circle' : 'copy-outline'}
+                    size={11}
+                    color={isCopied ? '#10B981' : '#FE3C72'}
+                  />
+                  <Text
+                    style={[
+                      styles.phonePillText,
+                      isCopied && { color: '#10B981' },
+                    ]}
+                  >
+                    {isCopied ? 'Copied Number!' : `Copy ${phone}`}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {isGoal && (
+                <View style={styles.goalStatusPill}>
+                  <Ionicons name="sparkles" size={10} color="#10B981" />
+                  <Text style={styles.goalStatusPillText}>MILESTONE</Text>
+                </View>
+              )}
+
+              <View style={styles.tapActionWrap}>
+                <Text style={styles.tapActionText}>View in Live Stream</Text>
+                <Ionicons name="chevron-forward" size={11} color="#716E89" />
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -103,140 +290,210 @@ export default function NotificationCenterModal({
         />
 
         <View style={styles.sheetContainer}>
-          {/* Header */}
+          {/* Drag Handle */}
+          <View style={styles.dragHandle} />
+
+          {/* Header Bar */}
           <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <View style={styles.bellIconWrap}>
-                <Ionicons name="notifications" size={18} color="#FE3C72" />
+            <View style={styles.headerTitleRow}>
+              <View style={styles.bellBadge}>
+                <Ionicons name="notifications" size={16} color="#FE3C72" />
               </View>
-              <Text style={styles.headerTitle}>Notifications</Text>
+              <Text style={styles.headerTitle}>Activity & Alerts</Text>
               {unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+                <View style={styles.unreadCountBadge}>
+                  <Text style={styles.unreadCountBadgeText}>{unreadCount} NEW</Text>
                 </View>
               )}
             </View>
 
-            <View style={styles.headerActions}>
+            <View style={styles.headerRightActions}>
               {unreadCount > 0 && (
                 <TouchableOpacity
-                  onPress={() => NotificationService.markAllAsRead()}
-                  style={styles.markReadBtn}
-                  activeOpacity={0.7}
+                  style={styles.markAllBtn}
+                  onPress={() => {
+                    NotificationService.markAllAsRead();
+                    safeHaptic('light');
+                  }}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.markReadText}>Mark all read</Text>
+                  <Ionicons name="checkmark-done" size={14} color="#FE3C72" />
+                  <Text style={styles.markAllBtnText}>Read All</Text>
                 </TouchableOpacity>
               )}
+
               <TouchableOpacity
-                onPress={onClose}
                 style={styles.closeBtn}
-                activeOpacity={0.7}
+                onPress={onClose}
+                activeOpacity={0.8}
               >
-                <Ionicons name="close" size={20} color="#FFFFFF" />
+                <Ionicons name="close" size={18} color="#A4A2B8" />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Filter Pills */}
-          <View style={styles.filterRow}>
-            {[
-              { key: 'all', label: 'All' },
-              { key: 'goal_unlocked', label: 'Goals 🔥' },
-              { key: 'new_match', label: 'Matches ⚡' },
-              { key: 'cycle_complete', label: 'Cycles 🎯' },
-            ].map((f) => {
-              const isSelected = activeFilter === f.key;
-              return (
-                <TouchableOpacity
-                  key={f.key}
-                  style={[styles.filterChip, isSelected && styles.filterChipSelected]}
-                  onPress={() => setActiveFilter(f.key)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.filterChipText, isSelected && styles.filterChipTextSelected]}>
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          {/* Quick Metrics Bar */}
+          <View style={styles.metricsBar}>
+            <View style={styles.metricItem}>
+              <Text style={styles.metricVal}>{goalCount}</Text>
+              <Text style={styles.metricLabel}>Goals 🔥</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricItem}>
+              <Text style={styles.metricVal}>{matchCount}</Text>
+              <Text style={styles.metricLabel}>Sparks ⚡</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricItem}>
+              <Text style={styles.metricVal}>{cycleCount}</Text>
+              <Text style={styles.metricLabel}>Cycles 🎯</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricVal, { color: '#10B981' }]}>98%</Text>
+              <Text style={styles.metricLabel}>AI Delivery</Text>
+            </View>
           </View>
 
-          {/* Notifications List */}
+          {/* Category Filter Chips */}
+          <View style={styles.filterScroll}>
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                activeFilter === 'all' && styles.filterChipActive,
+              ]}
+              onPress={() => {
+                setActiveFilter('all');
+                safeHaptic('light');
+              }}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  activeFilter === 'all' && styles.filterChipTextActive,
+                ]}
+              >
+                All ({totalCount})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                activeFilter === 'goal_unlocked' && styles.filterChipActive,
+              ]}
+              onPress={() => {
+                setActiveFilter('goal_unlocked');
+                safeHaptic('light');
+              }}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  activeFilter === 'goal_unlocked' && styles.filterChipTextActive,
+                ]}
+              >
+                Goals 🔥 ({goalCount})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                activeFilter === 'new_match' && styles.filterChipActive,
+              ]}
+              onPress={() => {
+                setActiveFilter('new_match');
+                safeHaptic('light');
+              }}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  activeFilter === 'new_match' && styles.filterChipTextActive,
+                ]}
+              >
+                Matches ⚡ ({matchCount})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                activeFilter === 'cycle_complete' && styles.filterChipActive,
+              ]}
+              onPress={() => {
+                setActiveFilter('cycle_complete');
+                safeHaptic('light');
+              }}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  activeFilter === 'cycle_complete' && styles.filterChipTextActive,
+                ]}
+              >
+                Cycles 🎯 ({cycleCount})
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Notifications Feed */}
           {filteredNotifications.length === 0 ? (
-            <View style={styles.emptyWrap}>
-              <Ionicons name="notifications-off-outline" size={42} color="#5A586E" />
-              <Text style={styles.emptyTitle}>No notifications yet</Text>
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIconCircle}>
+                <Ionicons name="notifications-off-outline" size={32} color="#504E64" />
+              </View>
+              <Text style={styles.emptyTitle}>All Caught Up!</Text>
               <Text style={styles.emptySubtitle}>
-                You will receive instant alerts when your AI Wingman collects a phone number, secures a date, or matches with someone new.
+                No notifications in this category. Your AI Copilot is actively scouting for your next date.
               </Text>
             </View>
           ) : (
             <FlatList
               data={filteredNotifications}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingBottom: 20 }}
-              renderItem={({ item }) => {
-                const category =
-                  NOTIFICATION_CATEGORIES[item.type?.toUpperCase()] ||
-                  NOTIFICATION_CATEGORIES.NEW_MATCH;
-
-                return (
-                  <TouchableOpacity
-                    style={[styles.card, !item.is_read && styles.cardUnread]}
-                    onPress={() => handleItemPress(item)}
-                    activeOpacity={0.85}
-                  >
-                    <View style={[styles.categoryIconWrap, { backgroundColor: `${category.badgeColor}20` }]}>
-                      <Ionicons name={category.icon} size={18} color={category.badgeColor} />
-                    </View>
-
-                    <View style={styles.cardContent}>
-                      <View style={styles.cardHeaderRow}>
-                        <Text style={styles.cardTitle} numberOfLines={1}>
-                          {item.title}
-                        </Text>
-                        <Text style={styles.cardTime}>{formatTimeAgo(item.created_at)}</Text>
-                      </View>
-
-                      <Text style={styles.cardBody} numberOfLines={2}>
-                        {item.body}
-                      </Text>
-
-                      {item.data?.phone && (
-                        <View style={styles.goalTag}>
-                          <Ionicons name="call" size={11} color="#10B981" />
-                          <Text style={styles.goalTagText}>{item.data.phone}</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {!item.is_read && <View style={styles.unreadDot} />}
-                  </TouchableOpacity>
-                );
-              }}
+              renderItem={renderNotificationCard}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
             />
           )}
 
-          {/* Test Trigger Action Bar */}
+          {/* Testing Actions Bar */}
           <View style={styles.testBar}>
-            <Text style={styles.testBarLabel}>TEST ALERTS:</Text>
-            <TouchableOpacity
-              style={styles.testBtn}
-              onPress={handleTestGoal}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="flame" size={13} color="#10B981" />
-              <Text style={styles.testBtnText}>+ Phone Goal</Text>
-            </TouchableOpacity>
+            <Text style={styles.testBarLabel}>TEST LIVE HUD BANNER:</Text>
+            <View style={styles.testBtnRow}>
+              <TouchableOpacity
+                style={styles.testBtnGoal}
+                onPress={() => handleTestTrigger('goal_unlocked')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="flame" size={13} color="#FFF" />
+                <Text style={styles.testBtnText}>+ Phone Goal</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.testBtn}
-              onPress={handleTestMatch}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="heart" size={13} color="#FE3C72" />
-              <Text style={styles.testBtnText}>+ New Match</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.testBtnMatch}
+                onPress={() => handleTestTrigger('new_match')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="heart" size={13} color="#FFF" />
+                <Text style={styles.testBtnText}>+ Match Spark</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.testBtnDate}
+                onPress={() => handleTestTrigger('date_secured')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="calendar" size={13} color="#FFF" />
+                <Text style={styles.testBtnText}>+ Date Set</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -247,39 +504,45 @@ export default function NotificationCenterModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(5, 4, 10, 0.82)',
     justifyContent: 'flex-end',
   },
   dismissArea: {
     flex: 1,
   },
   sheetContainer: {
-    backgroundColor: '#141124',
+    backgroundColor: '#0E0C17',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: SCREEN_HEIGHT * 0.82,
-    minHeight: 420,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    height: SCREEN_HEIGHT * 0.88,
+    paddingTop: 10,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignSelf: 'center',
+    marginBottom: 12,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
-  headerLeft: {
+  headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  bellIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+  bellBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     backgroundColor: 'rgba(254, 60, 114, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -290,184 +553,313 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.3,
   },
-  unreadBadge: {
+  unreadCountBadge: {
     backgroundColor: '#FE3C72',
     borderRadius: 10,
     paddingHorizontal: 7,
     paddingVertical: 2,
   },
-  unreadBadgeText: {
+  unreadCountBadgeText: {
     color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
-  headerActions: {
+  headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
-  markReadBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+  markAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(254, 60, 114, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 60, 114, 0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
   },
-  markReadText: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '600',
+  markAllBtnText: {
+    color: '#FE3C72',
+    fontSize: 11,
+    fontWeight: '700',
   },
   closeBtn: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: '#1E1B2E',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filterRow: {
+  metricsBar: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: '#141222',
+    marginHorizontal: 16,
+    borderRadius: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    marginBottom: 12,
+  },
+  metricItem: {
+    alignItems: 'center',
+  },
+  metricVal: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  metricLabel: {
+    color: '#716E89',
+    fontSize: 9.5,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  metricDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  filterScroll: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 6,
+    marginBottom: 12,
   },
   filterChip: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     paddingVertical: 6,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: '#181528',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
   },
-  filterChipSelected: {
-    backgroundColor: 'rgba(254, 60, 114, 0.15)',
+  filterChipActive: {
+    backgroundColor: '#FE3C72',
     borderColor: '#FE3C72',
   },
   filterChipText: {
     color: '#8E8DA3',
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
   },
-  filterChipTextSelected: {
+  filterChipTextActive: {
     color: '#FFFFFF',
   },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#100D1C',
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    gap: 10,
+  },
+  cardWrapper: {
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
-  cardUnread: {
-    borderColor: 'rgba(254, 60, 114, 0.3)',
-    backgroundColor: '#161126',
+  cardWrapperUnread: {
+    borderColor: 'rgba(254, 60, 114, 0.35)',
   },
-  categoryIconWrap: {
-    width: 36,
-    height: 36,
+  cardWrapperGoal: {
+    borderColor: 'rgba(254, 60, 114, 0.5)',
+    shadowColor: '#FE3C72',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  cardGradient: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 12,
+    position: 'relative',
+  },
+  unreadAccentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3.5,
+    backgroundColor: '#FE3C72',
+  },
+  avatarBadge: {
+    width: 38,
+    height: 38,
     borderRadius: 12,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+  },
+  avatarGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
-  cardContent: {
+  cardCenter: {
     flex: 1,
   },
-  cardHeaderRow: {
+  cardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   cardTitle: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: '#D8D6E8',
+    fontSize: 13.5,
     fontWeight: '700',
     flex: 1,
     marginRight: 6,
   },
-  cardTime: {
+  cardTitleUnread: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  timeAgoText: {
     color: '#5A586E',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
   cardBody: {
     color: '#8E8DA3',
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: '500',
+    marginBottom: 8,
   },
-  goalTag: {
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  phonePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    alignSelf: 'flex-start',
-    marginTop: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    backgroundColor: 'rgba(254, 60, 114, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 60, 114, 0.3)',
+    borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 8,
   },
-  goalTagText: {
-    color: '#10B981',
-    fontSize: 11,
+  phonePillCopied: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  phonePillText: {
+    color: '#FE3C72',
+    fontSize: 10.5,
     fontWeight: '700',
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FE3C72',
-    marginLeft: 6,
-    marginTop: 4,
+  goalStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
-  emptyWrap: {
+  goalStatusPillText: {
+    color: '#10B981',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  tapActionWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginLeft: 'auto',
+  },
+  tapActionText: {
+    color: '#716E89',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  emptyState: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 20,
+    paddingHorizontal: 32,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#161326',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   emptyTitle: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
-    marginTop: 12,
+    fontWeight: '800',
     marginBottom: 6,
   },
   emptySubtitle: {
-    color: '#5A586E',
+    color: '#716E89',
     fontSize: 12,
-    textAlign: 'center',
     lineHeight: 18,
+    textAlign: 'center',
   },
   testBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
-    marginTop: 6,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: '#12101E',
   },
   testBarLabel: {
     color: '#5A586E',
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
+    marginBottom: 8,
   },
-  testBtn: {
+  testBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  testBtnGoal: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#E8245C',
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 8,
+  },
+  testBtnMatch: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#3B82F6',
+    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  testBtnDate: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 10,
+    paddingVertical: 8,
   },
   testBtnText: {
-    color: '#D8D6E8',
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });
