@@ -301,8 +301,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
             {/* Toggle 1: Goal Alerts */}
             <View style={styles.toggleHeaderRow}>
               <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>🔥 Goal Unlocked</Text>
-                <Text style={styles.stepperHelper}>Phone numbers, WhatsApp & dates secured</Text>
+                <Text style={styles.stepperLabel}>Goal Milestones</Text>
+                <Text style={styles.stepperHelper}>Phone numbers, contact handles and dates secured</Text>
               </View>
               <Switch
                 value={notifyGoals}
@@ -317,8 +317,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
             {/* Toggle 2: New Match Sparks */}
             <View style={styles.toggleHeaderRow}>
               <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>⚡ New Match Sparks</Text>
-                <Text style={styles.stepperHelper}>Instant alert when a match is found</Text>
+                <Text style={styles.stepperLabel}>New Matches</Text>
+                <Text style={styles.stepperHelper}>Alert when a new match is found</Text>
               </View>
               <Switch
                 value={notifyMatches}
@@ -333,8 +333,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
             {/* Toggle 3: Cycles & Safety */}
             <View style={styles.toggleHeaderRow}>
               <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>🎯 Daily Cycle Digests</Text>
-                <Text style={styles.stepperHelper}>Cycle completion & smart rest cooldowns</Text>
+                <Text style={styles.stepperLabel}>Automation & Cycle Alerts</Text>
+                <Text style={styles.stepperHelper}>Batch completions and pacing cooldowns</Text>
               </View>
               <Switch
                 value={notifyCycles}

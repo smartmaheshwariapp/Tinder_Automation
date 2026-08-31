@@ -197,11 +197,11 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
           {/* Top Bar Header: App Title + Timestamp + Dismiss Handle */}
           <View style={styles.bannerHeader}>
             <View style={styles.bannerHeaderLeft}>
-              <View style={[styles.appBadge, { backgroundColor: category.badgeColor + '20' }]}>
-                <Ionicons name="sparkles" size={10} color={category.badgeColor} />
-                <Text style={[styles.appBadgeText, { color: category.badgeColor }]}>FLIRTEASY</Text>
+              <View style={[styles.appBadge, { backgroundColor: 'rgba(255, 255, 255, 0.08)' }]}>
+                <Ionicons name="shield-checkmark" size={10} color="#D8D6E8" />
+                <Text style={styles.appBadgeText}>FLIRTEASY</Text>
               </View>
-              <Text style={styles.timestampText}>JUST NOW</Text>
+              <Text style={styles.timestampText}>Just now</Text>
             </View>
 
             <View style={styles.topHandleBar} />
@@ -209,30 +209,23 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
 
           {/* Main Content Row: Icon/Avatar + Text + Action */}
           <View style={styles.mainContentRow}>
-            {/* Category Glowing Icon Badge */}
-            <View style={[styles.iconBadge, { borderColor: category.badgeColor + '60' }]}>
-              <LinearGradient
-                colors={
-                  isGoal
-                    ? ['#FE3C72', '#E8245C']
-                    : [category.badgeColor, category.badgeColor + '99']
+            {/* Category Icon Badge */}
+            <View style={[styles.iconBadge, { backgroundColor: isGoal ? 'rgba(254, 60, 114, 0.15)' : 'rgba(255, 255, 255, 0.08)', borderColor: isGoal ? '#FE3C72' : 'rgba(255, 255, 255, 0.15)' }]}>
+              <Ionicons
+                name={
+                  currentNotif.type === 'goal_unlocked'
+                    ? 'call-outline'
+                    : currentNotif.type === 'date_secured'
+                    ? 'calendar-outline'
+                    : currentNotif.type === 'new_match'
+                    ? 'heart-outline'
+                    : currentNotif.type === 'cycle_complete'
+                    ? 'checkmark-circle-outline'
+                    : 'notifications-outline'
                 }
-                style={styles.iconGradient}
-              >
-                <Ionicons
-                  name={
-                    currentNotif.type === 'goal_unlocked'
-                      ? 'flame'
-                      : currentNotif.type === 'date_secured'
-                      ? 'calendar'
-                      : currentNotif.type === 'new_match'
-                      ? 'heart'
-                      : 'sparkles'
-                  }
-                  size={19}
-                  color="#FFFFFF"
-                />
-              </LinearGradient>
+                size={18}
+                color={isGoal ? '#FE3C72' : '#FFFFFF'}
+              />
             </View>
 
             {/* Notification Text Body */}
@@ -248,25 +241,27 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
 
           {/* Action Chips Bar */}
           <View style={styles.actionsBar}>
-            {phone && (
+            {phone ? (
               <TouchableOpacity
                 style={[styles.actionPill, copied && styles.actionPillSuccess]}
                 onPress={handleCopyPhone}
                 activeOpacity={0.8}
               >
                 <Ionicons
-                  name={copied ? 'checkmark-circle' : 'copy-outline'}
+                  name={copied ? 'checkmark-circle-outline' : 'copy-outline'}
                   size={12}
-                  color={copied ? '#10B981' : '#FE3C72'}
+                  color={copied ? '#10B981' : '#FFFFFF'}
                 />
                 <Text style={[styles.actionPillText, copied && { color: '#10B981' }]}>
-                  {copied ? 'Copied Number!' : `Copy ${phone}`}
+                  {copied ? 'Copied to Clipboard' : `Copy ${phone}`}
                 </Text>
               </TouchableOpacity>
+            ) : (
+              <View />
             )}
 
             <View style={styles.actionPillSecondary}>
-              <Text style={styles.actionPillSecondaryText}>Tap to open stream</Text>
+              <Text style={styles.actionPillSecondaryText}>Open live stream</Text>
               <Ionicons name="chevron-forward" size={11} color="#8E8DA3" />
             </View>
           </View>
