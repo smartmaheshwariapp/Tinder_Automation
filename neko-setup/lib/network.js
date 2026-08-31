@@ -9,38 +9,47 @@ const { execSync } = require('child_process');
 // ─── LAN IP Auto-Discovery ───
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
+  // Helper to filter out virtual/docker interfaces
+  const isVirtualIface = (name) => {
+    const lower = name.toLowerCase();
+    return lower.includes('wsl') || lower.includes('veth') || lower.includes('docker') || lower.includes('loopback') || lower.includes('br-');
+  };
+
+  // Helper to check if IP is a Docker internal subnet (172.16.0.0 - 172.31.255.255)
+  const isDockerSubnet = (ip) => {
+    if (!ip.startsWith('172.')) return false;
+    const second = parseInt(ip.split('.')[1], 10);
+    return second >= 16 && second <= 31;
+  };
+
   // Priority 1: Standard LAN IPv4 (192.168.x.x)
   for (const name of Object.keys(interfaces)) {
-    const lowerName = name.toLowerCase();
-    if (lowerName.includes('wsl') || lowerName.includes('veth') || lowerName.includes('docker') || lowerName.includes('loopback')) continue;
+    if (isVirtualIface(name)) continue;
     for (const iface of interfaces[name]) {
       if (iface.family === 'IPv4' && !iface.internal && iface.address.startsWith('192.168.')) {
         return iface.address;
       }
     }
   }
-  // Priority 2: Private Class A / B LAN IPv4 (10.x.x.x, 172.16-31.x.x)
+
+  // Priority 2: Private Class A / B LAN IPv4 (10.x.x.x, non-docker 172.x.x.x)
   for (const name of Object.keys(interfaces)) {
-    const lowerName = name.toLowerCase();
-    if (lowerName.includes('wsl') || lowerName.includes('veth') || lowerName.includes('docker') || lowerName.includes('loopback')) continue;
+    if (isVirtualIface(name)) continue;
     for (const iface of interfaces[name]) {
       if (iface.family === 'IPv4' && !iface.internal) {
         if (iface.address.startsWith('10.')) return iface.address;
-        if (iface.address.startsWith('172.')) {
-          const second = parseInt(iface.address.split('.')[1], 10);
-          if (second >= 16 && second <= 31 && second !== 17 && second !== 18) {
-            return iface.address;
-          }
+        if (iface.address.startsWith('172.') && !isDockerSubnet(iface.address)) {
+          return iface.address;
         }
       }
     }
   }
-  // Priority 3: Any non-internal IPv4
+
+  // Priority 3: Any non-internal IPv4 on non-virtual interface
   for (const name of Object.keys(interfaces)) {
-    const lowerName = name.toLowerCase();
-    if (lowerName.includes('wsl') || lowerName.includes('veth') || lowerName.includes('docker') || lowerName.includes('loopback')) continue;
+    if (isVirtualIface(name)) continue;
     for (const iface of interfaces[name]) {
-      if (iface.family === 'IPv4' && !iface.internal) {
+      if (iface.family === 'IPv4' && !iface.internal && !isDockerSubnet(iface.address)) {
         return iface.address;
       }
     }
@@ -56,7 +65,12 @@ function resolveWebrtcNatIp(req) {
 
   if (req && req.headers && req.headers.host) {
     const hostHeader = req.headers.host.split(':')[0].trim();
-    if (/^[0-9.]+$/.test(hostHeader) && hostHeader !== '127.0.0.1' && hostHeader !== '0.0.0.0' && !hostHeader.startsWith('172.17.') && !hostHeader.startsWith('172.18.')) {
+    const isDockerIp = hostHeader.startsWith('172.') && (() => {
+      const second = parseInt(hostHeader.split('.')[1], 10);
+      return second >= 16 && second <= 31;
+    })();
+
+    if (/^[0-9.]+$/.test(hostHeader) && hostHeader !== '127.0.0.1' && hostHeader !== '0.0.0.0' && !isDockerIp) {
       console.log(`[Orchestrator] WebRTC NAT IP derived from client connection host: ${hostHeader}`);
       return hostHeader;
     }

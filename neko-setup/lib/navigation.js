@@ -125,6 +125,14 @@ try:
 except Exception:
     pass
 
+try:
+    ws.call('Browser.grantPermissions', {
+        'permissions': ['geolocation', 'notifications', 'audioCapture', 'videoCapture'],
+        'origin': 'https://bumble.com'
+    })
+except Exception:
+    pass
+
 # Already on phone input?
 if eval_js(ws, "!!document.querySelector('input[type=\"tel\"],#phone-country-code')"):
     print('ALREADY_ON_PHONE', flush=True); ws.close(); sys.exit(0)
