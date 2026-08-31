@@ -16,7 +16,7 @@ import {
   Image,
   StatusBar,
   Keyboard,
-  TouchableWithoutFeedback,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -373,11 +373,18 @@ export default function AuthScreen({ navigation, route }) {
 
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.kavContainer}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          keyboardVerticalOffset={0}
+          enabled={Platform.OS === 'ios'}
         >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="always"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            keyboardDismissMode="none"
+          >
             <View style={styles.contentContainer}>
 
               {/* ═══════════════════════════════════════════════════ */}
@@ -501,10 +508,7 @@ export default function AuthScreen({ navigation, route }) {
                     styles.formContainer,
                     {
                       opacity: phaseFade,
-                      transform: [
-                        { translateX: phaseSlide },
-                        { translateX: shakeAnim },
-                      ],
+                      transform: [{ translateX: shakeAnim }],
                     },
                   ]}
                 >
@@ -563,6 +567,7 @@ export default function AuthScreen({ navigation, route }) {
                               onBlur={() => setFocusedField(null)}
                               autoCapitalize="words"
                               autoCorrect={false}
+                              blurOnSubmit={false}
                               returnKeyType="next"
                               onSubmitEditing={() => emailInputRef.current?.focus()}
                             />
@@ -720,10 +725,7 @@ export default function AuthScreen({ navigation, route }) {
                     styles.formContainer,
                     {
                       opacity: phaseFade,
-                      transform: [
-                        { translateX: phaseSlide },
-                        { translateX: shakeAnim },
-                      ],
+                      transform: [{ translateX: shakeAnim }],
                     },
                   ]}
                 >
@@ -832,7 +834,7 @@ export default function AuthScreen({ navigation, route }) {
               )}
 
             </View>
-          </TouchableWithoutFeedback>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -852,6 +854,9 @@ const styles = StyleSheet.create({
   },
   kavContainer: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   contentContainer: {
     flex: 1,
@@ -1120,11 +1125,6 @@ const styles = StyleSheet.create({
   inputWrapFocused: {
     borderColor: '#FE3C72',
     backgroundColor: '#1E1933',
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 4,
   },
   inputWrapError: {
     borderColor: 'rgba(239, 68, 68, 0.6)',

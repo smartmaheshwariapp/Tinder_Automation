@@ -1,15 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import { Ionicons } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
-import { DashboardPanel } from '../components/dashboard';
-import { useExtensionStats } from '../hooks/useExtensionStats';
-
 import { DashboardPanel } from '../components/dashboard';
 import { useExtensionStats } from '../hooks/useExtensionStats';
 

@@ -236,6 +236,15 @@ export default function PlatformSelectScreen({ navigation }) {
           >
             <Ionicons name="options-outline" size={18} color="#8E8DA3" />
           </TouchableOpacity>
+
+          {/* App Sign Out */}
+          <TouchableOpacity
+            style={styles.headerSignOutBtn}
+            onPress={() => navigation.replace('Auth')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="log-out-outline" size={17} color="#FE3C72" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -627,6 +636,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E1B2E',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerSignOutBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: 'rgba(254, 60, 114, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 60, 114, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
   },
