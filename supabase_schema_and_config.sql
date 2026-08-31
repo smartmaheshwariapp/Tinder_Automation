@@ -137,6 +137,36 @@ CREATE TABLE IF NOT EXISTS public.error_issue_status (
     updated_by TEXT
 );
 
+-- 2.10 USER PUSH TOKENS TABLE (Device push token registry for mobile alerts)
+CREATE TABLE IF NOT EXISTS public.user_push_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    push_token TEXT UNIQUE NOT NULL,
+    platform TEXT DEFAULT 'ios',
+    device_name TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON public.user_push_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_push_tokens_token ON public.user_push_tokens(push_token);
+
+-- 2.11 NOTIFICATIONS HISTORY TABLE (In-app notification center inbox)
+CREATE TABLE IF NOT EXISTS public.notifications_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL, -- 'goal_unlocked', 'new_match', 'cycle_complete', 'safety_cooldown', 'digest'
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    data JSONB DEFAULT '{}'::jsonb,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notif_user_created ON public.notifications_history(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notif_user_unread ON public.notifications_history(user_id, is_read);
+
 -- ==============================================================================
 -- 3. ROW LEVEL SECURITY (RLS) & ACCESS POLICIES
 -- ==============================================================================
@@ -149,6 +179,8 @@ ALTER TABLE public.community_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.error_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.error_issue_status ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_push_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications_history ENABLE ROW LEVEL SECURITY;
 
 -- Allow Service Role (Cloudflare Worker & backend) full access
 DO $$
@@ -162,6 +194,10 @@ BEGIN
     CREATE POLICY "Service role full access on audit_logs" ON public.audit_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
     CREATE POLICY "Service role full access on error_logs" ON public.error_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
     CREATE POLICY "Service role full access on error_issue_status" ON public.error_issue_status FOR ALL TO service_role USING (true) WITH CHECK (true);
+    CREATE POLICY "Service role full access on user_push_tokens" ON public.user_push_tokens FOR ALL TO service_role USING (true) WITH CHECK (true);
+    CREATE POLICY "Service role full access on notifications_history" ON public.notifications_history FOR ALL TO service_role USING (true) WITH CHECK (true);
+    CREATE POLICY "Public read and write push tokens" ON public.user_push_tokens FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+    CREATE POLICY "Public read and write notifications" ON public.notifications_history FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

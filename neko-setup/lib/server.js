@@ -80,6 +80,21 @@ const server = http.createServer((req, res) => {
     handleExtensionStats(req, res);
   } else if (req.method === 'GET' && req.url === '/extension-settings') {
     handleGetSettings(req, res);
+  } else if (req.method === 'POST' && req.url === '/send-push-notification') {
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const { notifyUser } = require('./services/push-dispatcher');
+        const result = await notifyUser(payload.userId, payload);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
   } else if (req.method === 'GET' && (req.url === '/test' || req.url === '/')) {
     const fs = require('fs');
     const path = require('path');

@@ -24,6 +24,8 @@ import { getAutoDetectedLocalIp, resolveLocalUrl } from '../utils/network';
 import useExtensionStats from '../hooks/useExtensionStats';
 import { DashboardPanel } from '../components/dashboard';
 import SupabaseService from '../services/supabase';
+import NotificationService from '../services/notifications';
+import NotificationCenterModal from '../components/NotificationCenterModal';
 
 const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 const TINDER_IMG = require('../../assets/flirteasy/tinder.jpg');
@@ -50,6 +52,17 @@ export default function PlatformSelectScreen({ navigation, route }) {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // ── Notification Center State ──
+  const [showNotifModal, setShowNotifModal] = useState(false);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+
+  useEffect(() => {
+    const unsub = NotificationService.subscribeInbox((items) => {
+      setUnreadNotifCount(items.filter((i) => !i.is_read).length);
+    });
+    return unsub;
+  }, []);
 
   // ── Animations ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -117,9 +130,15 @@ export default function PlatformSelectScreen({ navigation, route }) {
     };
   }, [orchestratorUrl]);
 
-  // ── Sync Live Telemetry / Snapshot with Supabase ──
+  // ── Sync Live Telemetry / Snapshot with Supabase & Push Token ──
   const currentUser = route?.params?.user;
   const onboardingData = route?.params?.onboardingData;
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      NotificationService.registerForPushNotificationsAsync(currentUser.id).catch(() => {});
+    }
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (currentUser?.id && stats) {
@@ -248,6 +267,20 @@ export default function PlatformSelectScreen({ navigation, route }) {
         </View>
 
         <View style={styles.headerActions}>
+          {/* Notification Bell with Badge */}
+          <TouchableOpacity
+            style={styles.notifBtn}
+            onPress={() => setShowNotifModal(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="notifications-outline" size={18} color="#D8D6E8" />
+            {unreadNotifCount > 0 && (
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>{unreadNotifCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
           {/* Connection Settings Gear */}
           <TouchableOpacity
             style={styles.gearBtn}
@@ -592,6 +625,12 @@ export default function PlatformSelectScreen({ navigation, route }) {
           </View>
         </View>
       </Modal>
+      {/* ═══════════════════ NOTIFICATION CENTER MODAL ═══════════════════ */}
+      <NotificationCenterModal
+        visible={showNotifModal}
+        onClose={() => setShowNotifModal(false)}
+        onOpenStream={handleOpenLiveFeed}
+      />
     </SafeAreaView>
   );
 }
@@ -639,6 +678,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  notifBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: '#1E1B2E',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  headerBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FE3C72',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  headerBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
   },
   gearBtn: {
     width: 34,
