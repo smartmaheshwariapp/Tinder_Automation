@@ -345,12 +345,11 @@ export default function OnboardingScreen({ navigation }) {
     if (currentStep < totalSteps) {
       transitionToStep(currentStep + 1);
     } else {
-      // Step 5 Complete -> Route to Auth to save preferences and create account
+      // Step 5 Complete -> All calibrated -> Route directly to Linksy Cockpit
       safeHaptic('success');
-      navigation.replace('Auth', {
-        initialMode: 'signup',
+      navigation.replace('PlatformSelect', {
         onboardingData: {
-          platform: 'tinder',
+          platform: selectedPlatform,
           country,
           languages: selectedLanguages,
           dialCode,
@@ -527,7 +526,7 @@ export default function OnboardingScreen({ navigation }) {
                 <View>
                   <Text style={styles.stepTitle}>Meet your AI-Wingman</Text>
                   <Text style={styles.stepSubtitle}>
-                    FlirtEasy automates the repetitive stuff so you can focus on real connections.
+                    Linksy automates the repetitive stuff so you can focus on real connections.
                   </Text>
 
                   <View style={styles.featureList}>
@@ -960,7 +959,7 @@ export default function OnboardingScreen({ navigation }) {
               style={styles.continueGradient}
             >
               <Text style={styles.continueBtnText}>
-                {currentStep === totalSteps ? 'Save & Create Account' : 'Continue'}
+                {currentStep === totalSteps ? 'Complete & Launch Cockpit' : 'Continue'}
               </Text>
               <Ionicons
                 name={

@@ -56,9 +56,10 @@ export default function BrowserScreen({ route, navigation }) {
     vpsUrl && vpsUrl.includes('hyperbeam.com') ? vpsUrl : ''
   );
   const [startingHyperbeam, setStartingHyperbeam] = useState(false);
-  const [lastToast, setLastToast] = useState('🟢 FlirtEasy In-Page Engine Ready');
+  const [lastCoord, setLastCoord] = useState(null);
+  const [lastToast, setLastToast] = useState('🟢 Linksy In-Page Engine Ready');
   const [logs, setLogs] = useState([
-    { id: '1', time: new Date().toLocaleTimeString(), text: 'FlirtEasy Automation Engine initialized.', type: 'info' },
+    { id: '1', time: new Date().toLocaleTimeString(), text: 'Linksy Automation Engine initialized.', type: 'info' },
     { id: '2', time: new Date().toLocaleTimeString(), text: 'Desktop Web View (1280x720) ready for interaction.', type: 'info' }
   ]);
 
@@ -249,6 +250,16 @@ export default function BrowserScreen({ route, navigation }) {
     };
   }, [loginStep, vpsUrl]);
 
+  // When loginStep reaches 'done', automatically dismiss post-login Privacy / Consent modal (1263, 478)
+  useEffect(() => {
+    if (loginStep === 'done') {
+      const timer = setTimeout(() => {
+        dispatchCoordClick(1263, 478, 'Auto-close Privacy / Consent Dialog');
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [loginStep]);
+
   const getOrchestratorUrl = (nekoUrl) => {
     if (paramOrchestratorUrl) return paramOrchestratorUrl;
     try {
@@ -384,27 +395,43 @@ export default function BrowserScreen({ route, navigation }) {
       console.log(`[Browser] Executing coordinate command: ${action}`, payload);
 
       if (action === 'CLICK_LOGIN') {
-        // Click Header "Log In" button (1180, 35) + Accept cookies (640, 660)
-        await dispatchCoordClick(640, 660, 'Accept Cookies');
-        await new Promise(r => setTimeout(r, 200));
-        await dispatchCoordClick(1180, 35, 'Header Log In Button');
+        // 1. Click Accept Cookies / Consent banner (845, 526)
+        await dispatchCoordClick(845, 526, 'Accept Cookies');
+        await new Promise(r => setTimeout(r, 400));
+        // 2. Click Header "Log In" button (1190, 220)
+        await dispatchCoordClick(1190, 220, 'Header Log In Button');
       } else if (action === 'CLICK_EMAIL_LOGIN') {
-        // 1. Click Header Log in button in case modal isn't open yet
-        await dispatchCoordClick(1180, 35, 'Header Log In');
+        // 1. Dismiss Cookies / Banner
+        await dispatchCoordClick(845, 526, 'Accept Cookies');
+        await new Promise(r => setTimeout(r, 300));
+        // 2. Click Header Log in button in case modal isn't open yet
+        await dispatchCoordClick(1190, 220, 'Header Log In');
         await new Promise(r => setTimeout(r, 500));
-        // 2. Click "Trouble Logging In / Email" option (640, 510)
-        await dispatchCoordClick(640, 510, '"Log in with Email"');
+        // 3. Click "Log in with Email" option at (700, 358)
+        await dispatchCoordClick(700, 358, 'Log in with Email');
+        await new Promise(r => setTimeout(r, 300));
+        // 4. Fallback "Trouble Logging In / Email" option (640, 510)
+        await dispatchCoordClick(640, 510, '"Trouble Logging In"');
+      } else if (action === 'DISMISS_PRIVACY') {
+        // Close / Dismiss Privacy Policy or Welcome Banner (1263, 478)
+        await dispatchCoordClick(1263, 478, 'Close Privacy Dialog');
       } else if (action === 'CLICK_PHONE_LOGIN') {
-        // 1. Click Header Log in button
-        await dispatchCoordClick(1180, 35, 'Header Log In');
+        // 1. Dismiss Cookies / Banner
+        await dispatchCoordClick(845, 526, 'Accept Cookies');
+        await new Promise(r => setTimeout(r, 300));
+        // 2. Click Header Log in button
+        await dispatchCoordClick(1190, 220, 'Header Log In');
         await new Promise(r => setTimeout(r, 500));
-        // 2. Click "Log in with phone number" option (640, 440)
+        // 3. Click "Log in with phone number" option (640, 440)
         await dispatchCoordClick(640, 440, '"Log in with Phone"');
       } else if (action === 'CLICK_GOOGLE_LOGIN') {
-        // 1. Click Header Log in button
-        await dispatchCoordClick(1180, 35, 'Header Log In');
+        // 1. Dismiss Cookies / Banner
+        await dispatchCoordClick(845, 526, 'Accept Cookies');
+        await new Promise(r => setTimeout(r, 300));
+        // 2. Click Header Log in button
+        await dispatchCoordClick(1190, 220, 'Header Log In');
         await new Promise(r => setTimeout(r, 500));
-        // 2. Click "Continue with Google" option (640, 330)
+        // 3. Click "Continue with Google" option (640, 330)
         await dispatchCoordClick(640, 330, '"Continue with Google"');
       } else if (action === 'CLICK_TROUBLE') {
         await dispatchCoordClick(640, 510, 'Trouble Logging In');
@@ -861,7 +888,7 @@ export default function BrowserScreen({ route, navigation }) {
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="terminal" size={16} color="#10B981" />
-                <Text style={styles.modalTitle}>FlirtEasy Automation Logs</Text>
+                <Text style={styles.modalTitle}>Linksy Automation Logs</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TouchableOpacity
@@ -934,7 +961,7 @@ export default function BrowserScreen({ route, navigation }) {
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="stats-chart" size={16} color="#FD297B" />
-                <Text style={styles.modalTitle}>FlirtEasy Dashboard</Text>
+                <Text style={styles.modalTitle}>Linksy Dashboard</Text>
               </View>
               <TouchableOpacity
                 style={styles.modalCloseBtn}
@@ -1077,6 +1104,10 @@ export default function BrowserScreen({ route, navigation }) {
                   if (msg.type === 'FE_LOG') {
                     addLog(msg.text, msg.logType || 'info');
                   }
+                  if (msg.type === 'FE_COORD') {
+                    setLastCoord({ x: msg.x, y: msg.y });
+                    addLog(`📍 Tap Coordinate: X=${msg.x}, Y=${msg.y}`, 'action');
+                  }
                   // Extension signals phone input is ready — advance wizard automatically to phone
                   if (msg.type === 'bumble:phoneInputReady' && loginStep === 'navigating') {
                     console.log('[Browser] Bumble phone input ready — advancing wizard to phone');
@@ -1131,7 +1162,35 @@ export default function BrowserScreen({ route, navigation }) {
                       if (r.top < 120 && r.height < 120 && r.height > 0) { el.style.display = 'none'; }
                     }
                   });
-                }, 150);
+                  // Auto-dismiss any privacy/terms/consent modal close buttons
+                  document.querySelectorAll('button, [role="button"], a').forEach(function(btn) {
+                    var txt = (btn.innerText || btn.textContent || '').trim().toLowerCase();
+                    var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+                    if (aria.includes('close') || aria.includes('dismiss') || txt === 'i accept' || txt === 'agree' || txt === 'got it') {
+                      if (btn.closest('[role="dialog"], [class*="modal"], [class*="overlay"], [class*="privacy"]')) {
+                        btn.click();
+                      }
+                    }
+                  });
+                }, 250);
+
+                document.addEventListener('pointerdown', function(e) {
+                  var el = document.querySelector('video') || document.querySelector('canvas') || document.querySelector('.video-container') || document.body;
+                  var r = el.getBoundingClientRect();
+                  if (r.width > 0 && r.height > 0) {
+                    var normX = Math.round(((e.clientX - r.left) / r.width) * 1280);
+                    var normY = Math.round(((e.clientY - r.top) / r.height) * 720);
+                    if (normX >= 0 && normX <= 1280 && normY >= 0 && normY <= 720) {
+                      if (window.ReactNativeWebView) {
+                        window.ReactNativeWebView.postMessage(JSON.stringify({
+                          type: 'FE_COORD',
+                          x: normX,
+                          y: normY
+                        }));
+                      }
+                    }
+                  }
+                }, true);
               })();
               true;
             `}
@@ -1139,6 +1198,20 @@ export default function BrowserScreen({ route, navigation }) {
               keyboardDisplayRequiresUserAction={false}
               userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
             />
+          )}
+          {lastCoord && (
+            <View style={styles.coordHudBadge}>
+              <Ionicons name="locate" size={13} color="#10B981" />
+              <Text style={styles.coordHudText}>
+                X: {lastCoord.x}  |  Y: {lastCoord.y}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setLastCoord(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close-circle" size={14} color="#8E8DA3" />
+              </TouchableOpacity>
+            </View>
           )}
           {startingHyperbeam && (
             <View style={styles.loaderContainer}>
@@ -2556,5 +2629,31 @@ const styles = StyleSheet.create({
     color: '#F0F0F5',
     fontSize: 12.5,
     lineHeight: 17,
+  },
+  coordHudBadge: {
+    position: 'absolute',
+    top: 12,
+    alignSelf: 'center',
+    zIndex: 9999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: 'rgba(18, 16, 28, 0.95)',
+    borderWidth: 1,
+    borderColor: '#10B981',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  coordHudText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
 });

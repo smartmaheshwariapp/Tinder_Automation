@@ -54,7 +54,7 @@ export default function LoginScreen({ navigation }) {
         <View style={styles.brandContainer}>
           <View style={styles.logoRow}>
             <Text style={styles.logoTilde}>~ </Text>
-            <Text style={styles.logoScript}>flirteasy</Text>
+            <Text style={styles.logoScript}>Linksy</Text>
             <View style={styles.heartWrapper}>
               <Ionicons name="heart-outline" size={18} color="#F5C6A5" style={styles.heart1} />
               <Ionicons name="heart-outline" size={14} color="#F5C6A5" style={styles.heart2} />
@@ -79,7 +79,7 @@ export default function LoginScreen({ navigation }) {
             <View style={styles.titleSection}>
               <Text style={styles.welcomeTitle}>
                 {isSignUp ? 'Join ' : 'Welcome to '}
-                <Text style={styles.brandHighlight}>flirteasy</Text>!
+                <Text style={styles.brandHighlight}>Linksy</Text>!
               </Text>
               <Text style={styles.welcomeSubtitle}>
                 {isSignUp

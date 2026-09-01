@@ -260,7 +260,7 @@ export default function PlatformSelectScreen({ navigation }) {
         <View style={styles.headerLeft}>
           <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" />
           <View>
-            <Text style={styles.headerTitle}>FlirtEasy</Text>
+            <Text style={styles.headerTitle}>Linksy</Text>
             <Text style={styles.headerSub}>AI Dating Assistant</Text>
           </View>
         </View>

@@ -41,7 +41,7 @@ export default function App() {
       <View style={styles.splashContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#0F0F13" />
         <ActivityIndicator size="large" color="#FE3C72" />
-        <Text style={styles.splashTitle}>FlirtEasy</Text>
+        <Text style={styles.splashTitle}>Linksy</Text>
         <Text style={styles.splashStatus}>{updateStatus}</Text>
       </View>
     );

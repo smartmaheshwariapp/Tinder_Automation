@@ -338,7 +338,16 @@ export default function AuthScreen({ navigation, route }) {
     safeHaptic('success');
     setTimeout(() => {
       setIsLoading(false);
-      navigation.replace('PlatformSelect', { onboardingData });
+      if (authMode === 'signup') {
+        // New Account -> Route to 5-Step Dating Goals & AI Calibration Onboarding
+        navigation.replace('Onboarding', {
+          userName: name.trim(),
+          email: email.trim(),
+        });
+      } else {
+        // Existing Account -> Route directly to Linksy Platform Cockpit
+        navigation.replace('PlatformSelect', { onboardingData });
+      }
     }, 850);
   };
 
@@ -423,7 +432,7 @@ export default function AuthScreen({ navigation, route }) {
                       </View>
                     </Animated.View>
 
-                    <Text style={styles.brandTitle}>FlirtEasy</Text>
+                    <Text style={styles.brandTitle}>Linksy</Text>
 
                     <View style={styles.taglinePill}>
                       <Ionicons name="sparkles" size={11} color="#FE3C72" />
@@ -691,7 +700,7 @@ export default function AuthScreen({ navigation, route }) {
                   {/* Mode Toggle */}
                   <View style={styles.modeToggleRow}>
                     <Text style={styles.modeToggleText}>
-                      {authMode === 'signup' ? 'Already have an account?' : 'New to FlirtEasy?'}
+                      {authMode === 'signup' ? 'Already have an account?' : 'New to Linksy?'}
                     </Text>
                     <TouchableOpacity
                       onPress={() => {

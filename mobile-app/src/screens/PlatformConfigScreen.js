@@ -252,7 +252,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.title}>{platform} Launch Setup</Text>
-            <Text style={[styles.headerSubtitle, { color: themeColor }]}>FlirtEasy V2 Engine</Text>
+            <Text style={[styles.headerSubtitle, { color: themeColor }]}>Linksy V2 Engine</Text>
           </View>
           <View style={{ width: 50 }} />
         </View>
