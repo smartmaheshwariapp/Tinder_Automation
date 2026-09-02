@@ -4292,28 +4292,12 @@ if (typeof isLoggedIn === 'function') {
     const handleTinderLoginLanding = () => {
       handleCookieAccept();
 
-      // 1. Prioritize button/a tags for "Trouble logging in"
-      let troubleBtn = Array.from(document.querySelectorAll('button, a')).find(el => {
-        if (!isVisible(el)) return false;
-        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-        return txt.includes('trouble logging in');
-      });
-      // Fallback
-      if (!troubleBtn) {
-        troubleBtn = Array.from(document.querySelectorAll('div, span')).find(el => {
-          if (!isVisible(el)) return false;
-          const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-          return txt.includes('trouble logging in');
-        });
-      }
-      if (troubleBtn) {
-        console.log('[Tinder Login] Found "Trouble logging in?" button, clicking it!');
-        clickElement(troubleBtn);
-        return;
-      }
+      // Check if modal or any input field is already visible/open
+      const isModalOrInputOpen = document.querySelector('input[type="tel"], input[type="email"], input[autocomplete="one-time-code"]') ||
+        document.querySelector('div[role="dialog"]') ||
+        document.querySelector('.Mstart\\(a\\)');
 
-      const isModalOpen = document.querySelector('input[type="tel"], input[type="email"], input[autocomplete="one-time-code"]');
-      if (!isModalOpen) {
+      if (!isModalOrInputOpen) {
         let loginBtn = null;
         try {
           loginBtn = document.querySelector('span.Typs\\(sans-button-md\\)');
@@ -4338,7 +4322,7 @@ if (typeof isLoggedIn === 'function') {
           });
         }
         if (loginBtn) {
-          console.log('[Tinder Login] Found "Log in" button, clicking it!');
+          console.log('[Tinder Login] Found "Log in" button on landing page, clicking it to show login options!');
           clickElement(loginBtn);
         }
       }
