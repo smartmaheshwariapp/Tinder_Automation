@@ -12,7 +12,7 @@ const Stack = createNativeStackNavigator();
 export default function AppNavigator() {
   return (
     <Stack.Navigator
-      initialRouteName="Onboarding"
+      initialRouteName="Auth"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: '#08070D' },

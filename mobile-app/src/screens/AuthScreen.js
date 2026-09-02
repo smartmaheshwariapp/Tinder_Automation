@@ -17,7 +17,6 @@ import {
   StatusBar,
   Keyboard,
   ScrollView,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,7 +38,7 @@ const safeHaptic = (type) => {
     else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     else if (type === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-  } catch (_) {}
+  } catch (_) { }
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -330,7 +329,7 @@ export default function AuthScreen({ navigation, route }) {
 
     try {
       await sendEmailOtp(cleanEmail, name.trim());
-    } catch (_) {}
+    } catch (_) { }
 
     setIsLoading(false);
     setCountdown(45);
@@ -427,8 +426,17 @@ export default function AuthScreen({ navigation, route }) {
     } catch (err) {
       console.error('[Auth Error]', err);
       setIsLoading(false);
-      navigation.replace('PlatformSelect', { onboardingData });
-    }
+      if (authMode === 'signup') {
+        // New Account -> Route to 5-Step Dating Goals & AI Calibration Onboarding
+        navigation.replace('Onboarding', {
+          userName: name.trim(),
+          email: email.trim(),
+        });
+      } else {
+        // Existing Account -> Route directly to Linksy Platform Cockpit
+        navigation.replace('PlatformSelect', { onboardingData });
+      }
+    }, 850);
   };
 
   const handleResendCode = async () => {
@@ -440,7 +448,7 @@ export default function AuthScreen({ navigation, route }) {
     setSuccessNotice('A fresh verification code has been dispatched to your email!');
     try {
       await sendEmailOtp(email.trim().toLowerCase(), name.trim());
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // ═════════════════════════════════════════════════════════════════
@@ -467,22 +475,31 @@ export default function AuthScreen({ navigation, route }) {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.kavContainer}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+          keyboardVerticalOffset={0}
+          enabled={Platform.OS === 'ios'}
         >
-          {/* ═══════════════════════════════════════════════════ */}
-          {/* PHASE 1: WELCOME / LANDING                        */}
-          {/* ═══════════════════════════════════════════════════ */}
-          {phase === 'welcome' && (
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="always"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            keyboardDismissMode="none"
+          >
             <View style={styles.contentContainer}>
-              <Animated.View
-                style={[
-                  styles.welcomeContainer,
-                  {
-                    opacity: welcomeFade,
-                    transform: [{ translateY: welcomeSlide }],
-                  },
-                ]}
-              >
+
+              {/* ═══════════════════════════════════════════════════ */}
+              {/* PHASE 1: WELCOME / LANDING                        */}
+              {/* ═══════════════════════════════════════════════════ */}
+              {phase === 'welcome' && (
+                <Animated.View
+                  style={[
+                    styles.welcomeContainer,
+                    {
+                      opacity: welcomeFade,
+                      transform: [{ translateY: welcomeSlide }],
+                    },
+                  ]}
+                >
                   {/* Hero: Floating Logo + Brand */}
                   <View style={styles.welcomeHero}>
                     <Animated.View
@@ -506,7 +523,7 @@ export default function AuthScreen({ navigation, route }) {
                       </View>
                     </Animated.View>
 
-                    <Text style={styles.brandTitle}>FlirtEasy</Text>
+                    <Text style={styles.brandTitle}>Linksy</Text>
 
                     <View style={styles.taglinePill}>
                       <Ionicons name="sparkles" size={11} color="#FE3C72" />
@@ -600,10 +617,7 @@ export default function AuthScreen({ navigation, route }) {
                     styles.formContainer,
                     {
                       opacity: phaseFade,
-                      transform: [
-                        { translateX: phaseSlide },
-                        { translateX: shakeAnim },
-                      ],
+                      transform: [{ translateX: shakeAnim }],
                     },
                   ]}
                 >
@@ -662,11 +676,7 @@ export default function AuthScreen({ navigation, route }) {
                               onBlur={() => setFocusedField(null)}
                               autoCapitalize="words"
                               autoCorrect={false}
-                              spellCheck={false}
-                              textContentType="name"
-                              selectionColor="#FE3C72"
-                              cursorColor="#FE3C72"
-                              underlineColorAndroid="transparent"
+                              blurOnSubmit={false}
                               returnKeyType="next"
                               onSubmitEditing={() => emailInputRef.current?.focus()}
                             />
@@ -796,7 +806,7 @@ export default function AuthScreen({ navigation, route }) {
                   {/* Mode Toggle */}
                   <View style={styles.modeToggleRow}>
                     <Text style={styles.modeToggleText}>
-                      {authMode === 'signup' ? 'Already have an account?' : 'New to FlirtEasy?'}
+                      {authMode === 'signup' ? 'Already have an account?' : 'New to Linksy?'}
                     </Text>
                     <TouchableOpacity
                       onPress={() => {
@@ -839,10 +849,7 @@ export default function AuthScreen({ navigation, route }) {
                     styles.formContainer,
                     {
                       opacity: phaseFade,
-                      transform: [
-                        { translateX: phaseSlide },
-                        { translateX: shakeAnim },
-                      ],
+                      transform: [{ translateX: shakeAnim }],
                     },
                   ]}
                 >
@@ -952,8 +959,10 @@ export default function AuthScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
                 </Animated.View>
-              </ScrollView>
-            )}
+              )}
+
+              </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -974,13 +983,7 @@ const styles = StyleSheet.create({
   kavContainer: {
     flex: 1,
   },
-  scrollFlex: {
-    flex: 1,
-  },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 40,
     flexGrow: 1,
   },
   contentContainer: {
@@ -1250,11 +1253,6 @@ const styles = StyleSheet.create({
   inputWrapFocused: {
     borderColor: '#FE3C72',
     backgroundColor: '#1E1933',
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 4,
   },
   inputWrapError: {
     borderColor: 'rgba(239, 68, 68, 0.6)',

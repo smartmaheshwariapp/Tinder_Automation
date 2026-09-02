@@ -51,7 +51,7 @@ export default function CloudDashboardScreen({ route, navigation }) {
           <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" />
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.headerTitle}>FlirtEasy Assistant</Text>
+              <Text style={styles.headerTitle}>Linksy Assistant</Text>
               <View style={styles.proTag}>
                 <Text style={styles.proTagText}>24/7</Text>
               </View>
@@ -91,7 +91,7 @@ export default function CloudDashboardScreen({ route, navigation }) {
               <Text style={styles.infoTitle}>Tinder Assistant Active</Text>
             </View>
             <Text style={styles.infoText}>
-              FlirtEasy is actively finding compatible matches and chatting in your unique personal style.
+              Linksy is actively finding compatible matches and chatting in your unique personal style.
             </Text>
             {vpsUrl && (
               <TouchableOpacity

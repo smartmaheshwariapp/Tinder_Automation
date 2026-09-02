@@ -354,7 +354,7 @@ export default function SettingsPanel({
     return (
       <View style={styles.centerWrap}>
         <ActivityIndicator size="small" color="#FE3C72" />
-        <Text style={styles.loadingText}>Syncing FlirtEasy Settings...</Text>
+        <Text style={styles.loadingText}>Syncing Linksy Settings...</Text>
       </View>
     );
   }

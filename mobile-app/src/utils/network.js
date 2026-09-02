@@ -1,9 +1,9 @@
 import Constants from 'expo-constants';
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 /**
  * Dynamically resolves the host computer's local network IP address (LAN IP)
- * when running the mobile app in Expo / React Native development mode on a phone.
+ * when running the mobile app in Expo / React Native development mode on a phone or emulator.
  */
 export const getAutoDetectedLocalIp = () => {
   try {
@@ -28,11 +28,16 @@ export const getAutoDetectedLocalIp = () => {
     }
   } catch (_) {}
 
+  // 3. Android Emulator fallback
+  if (Platform.OS === 'android' && !Constants.isDevice) {
+    return '10.0.2.2';
+  }
+
   return 'localhost';
 };
 
 /**
- * Replaces localhost / 127.0.0.1 in any URL with the auto-detected LAN IP if running on physical device
+ * Replaces localhost / 127.0.0.1 in any URL with the auto-detected LAN IP if running on physical device or emulator
  */
 export const resolveLocalUrl = (url) => {
   if (!url) return url;

@@ -68,6 +68,9 @@ const TRIAL_LIMITS = {
     messages: 30
 };
 
+// Hyperbeam Cloud API Key
+const HYPERBEAM_API_KEY = 'sk_test_fsuC8naqJLF2lGcL8Vak2ogGyhYFldLzqCEbX2zQYf0';
+
 export default {
     // Cloudflare Cron Trigger — runs on schedule set in Cloudflare dashboard
     async scheduled(event, env, ctx) {
@@ -90,6 +93,57 @@ export default {
         }
 
         try {
+            // ============================================
+            // 0. HYPERBEAM CLOUD VIRTUAL BROWSER ENDPOINTS
+            // ============================================
+            if (url.pathname === '/api/hyperbeam/start-session' && method === 'POST') {
+                const body = await request.json().catch(() => ({}));
+                const platform = String(body.platform || 'tinder').toLowerCase();
+                const startUrl = platform === 'bumble' ? 'https://bumble.com' : 'https://tinder.com';
+
+                const hbRes = await fetch('https://engine.hyperbeam.com/v0/vm', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${env.HYPERBEAM_API_KEY || HYPERBEAM_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        start_url: startUrl
+                    })
+                });
+
+                const hbData = await hbRes.json();
+                if (!hbRes.ok) {
+                    return jsonResponse({ success: false, error: hbData.message || 'Hyperbeam API error' }, hbRes.status, corsHeaders);
+                }
+
+                return jsonResponse({
+                    success: true,
+                    session_id: hbData.session_id,
+                    embed_url: hbData.embed_url,
+                    admin_token: hbData.admin_token,
+                    platform: platform,
+                    start_url: startUrl
+                }, 200, corsHeaders);
+            }
+
+            if (url.pathname === '/api/hyperbeam/stop-session' && method === 'POST') {
+                const body = await request.json().catch(() => ({}));
+                const sessionId = body.sessionId;
+                if (!sessionId) {
+                    return jsonResponse({ success: false, error: 'sessionId required' }, 400, corsHeaders);
+                }
+
+                const hbRes = await fetch(`https://engine.hyperbeam.com/v0/vm/${sessionId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${env.HYPERBEAM_API_KEY || HYPERBEAM_API_KEY}`
+                    }
+                });
+
+                return jsonResponse({ success: hbRes.ok }, 200, corsHeaders);
+            }
+
             // ============================================
             // 1. SIGNUP ENDPOINT
             // ============================================
