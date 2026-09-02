@@ -38,7 +38,7 @@ export default function BrowserScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(null);
   const isBumble = platform?.toLowerCase() === 'bumble';
-  const [loginStep, setLoginStep] = useState(isLocalDevice ? 'done' : (isBumble ? 'navigating' : 'options'));
+  const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'options');
   const [showNeko, setShowNeko] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -394,10 +394,129 @@ export default function BrowserScreen({ route, navigation }) {
     }
   };
 
+  const executeOnDeviceDomCommand = (action, payload = {}) => {
+    if (!webViewRef.current || !isLocalDevice) return;
+    const sanitizedEmail = (payload.email || '').replace(/'/g, "\\'");
+    const sanitizedPhone = (payload.phone || '').replace(/'/g, "\\'");
+    const sanitizedOtp = (payload.otp || '').replace(/'/g, "\\'");
+
+    const script = `
+      (function() {
+        function dismissCookies() {
+          document.querySelectorAll('button, a, div[role="button"]').forEach(function(el) {
+            var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+            if (txt === 'i accept' || txt === 'agree' || txt === 'accept' || txt === 'allow' || txt === 'got it') {
+              el.click();
+            }
+          });
+        }
+        dismissCookies();
+
+        function clickTextOrAria(terms) {
+          for (var i = 0; i < terms.length; i++) {
+            var term = terms[i].toLowerCase();
+            var elements = document.querySelectorAll('button, a, div[role="button"], span');
+            for (var j = 0; j < elements.length; j++) {
+              var el = elements[j];
+              var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+              var aria = (el.getAttribute('aria-label') || '').toLowerCase();
+              if ((txt.includes(term) || aria.includes(term)) && el.offsetParent !== null) {
+                var target = el.closest('button, a, div[role="button"]') || el;
+                target.click();
+                return true;
+              }
+            }
+          }
+          return false;
+        }
+
+        var act = '${action}';
+        if (act === 'CLICK_LOGIN') {
+          clickTextOrAria(['log in', 'login']);
+        } else if (act === 'CLICK_EMAIL_LOGIN') {
+          clickTextOrAria(['log in', 'login']);
+          setTimeout(function() {
+            clickTextOrAria(['log in with email', 'trouble logging in', 'email']);
+          }, 600);
+        } else if (act === 'CLICK_PHONE_LOGIN') {
+          clickTextOrAria(['log in', 'login']);
+          setTimeout(function() {
+            clickTextOrAria(['log in with phone', 'continue with phone', 'phone number', 'phone']);
+          }, 600);
+        } else if (act === 'CLICK_GOOGLE_LOGIN') {
+          clickTextOrAria(['log in', 'login']);
+          setTimeout(function() {
+            clickTextOrAria(['continue with google', 'log in with google', 'google']);
+          }, 600);
+        } else if (act === 'CLICK_TROUBLE') {
+          clickTextOrAria(['trouble logging in', 'log in with email', 'email']);
+        } else if (act === 'SUBMIT_EMAIL') {
+          var email = '${sanitizedEmail}';
+          var inputs = document.querySelectorAll('input[type="email"], input[type="text"], input[name="email"], input');
+          for (var k = 0; k < inputs.length; k++) {
+            var inp = inputs[k];
+            if (inp.offsetParent !== null) {
+              inp.focus();
+              inp.value = email;
+              inp.dispatchEvent(new Event('input', { bubbles: true }));
+              inp.dispatchEvent(new Event('change', { bubbles: true }));
+              break;
+            }
+          }
+          setTimeout(function() {
+            clickTextOrAria(['continue', 'next', 'send email', 'submit']);
+          }, 400);
+        } else if (act === 'SUBMIT_PHONE') {
+          var phone = '${sanitizedPhone}';
+          var inputs = document.querySelectorAll('input[type="tel"], input[type="text"], input[name="phone_number"], input');
+          for (var k = 0; k < inputs.length; k++) {
+            var inp = inputs[k];
+            if (inp.offsetParent !== null) {
+              inp.focus();
+              inp.value = phone;
+              inp.dispatchEvent(new Event('input', { bubbles: true }));
+              inp.dispatchEvent(new Event('change', { bubbles: true }));
+              break;
+            }
+          }
+          setTimeout(function() {
+            clickTextOrAria(['continue', 'next', 'send code', 'submit']);
+          }, 400);
+        } else if (act === 'SUBMIT_OTP') {
+          var otp = '${sanitizedOtp}';
+          var inputs = document.querySelectorAll('input[type="tel"], input[type="number"], input[type="text"], input');
+          if (inputs.length === 1) {
+            inputs[0].focus();
+            inputs[0].value = otp;
+            inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+            inputs[0].dispatchEvent(new Event('change', { bubbles: true }));
+          } else if (inputs.length >= 6) {
+            for (var m = 0; m < Math.min(otp.length, inputs.length); m++) {
+              inputs[m].focus();
+              inputs[m].value = otp[m];
+              inputs[m].dispatchEvent(new Event('input', { bubbles: true }));
+              inputs[m].dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+          setTimeout(function() {
+            clickTextOrAria(['continue', 'next', 'verify', 'submit', 'log in']);
+          }, 400);
+        }
+      })();
+      true;
+    `;
+    webViewRef.current.injectJavaScript(script);
+  };
+
   // Sends coordinate-based (x, y) clicks, typing, and OTP commands directly into Hyperbeam & Neko
   const sendBrowserCommand = async (action, payload = {}) => {
     try {
-      console.log(`[Browser] Executing coordinate command: ${action}`, payload);
+      console.log(`[Browser] Executing command: ${action}`, payload);
+
+      if (isLocalDevice) {
+        executeOnDeviceDomCommand(action, payload);
+        return;
+      }
 
       if (action === 'CLICK_LOGIN') {
         // 1. Click Accept Cookies / Consent banner (845, 526)
@@ -770,6 +889,61 @@ export default function BrowserScreen({ route, navigation }) {
         function randomDelay(min, max) {
           return Math.floor(Math.random() * (max - min + 1)) + min;
         }
+
+        function dismissCookies() {
+          document.querySelectorAll('button, a, div[role="button"]').forEach(function(el) {
+            var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+            if (txt === 'i accept' || txt === 'agree' || txt === 'accept' || txt === 'allow' || txt === 'got it') {
+              el.click();
+            }
+          });
+        }
+        dismissCookies();
+
+        function checkLoginState() {
+          var isDeck = document.querySelector('[data-testid="gamepad-like"]') || 
+                       document.querySelector('button[aria-label="Like"]') ||
+                       document.querySelector('.recCard') ||
+                       document.querySelector('a[href*="/app/recs"]');
+          if (isDeck) {
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'FE_LOGGED_IN' }));
+            }
+            return true;
+          }
+          return false;
+        }
+
+        function autoOpenLoginDialog() {
+          if (checkLoginState()) return;
+
+          dismissCookies();
+
+          var loginBtn = null;
+          document.querySelectorAll('button, a, div[role="button"]').forEach(function(el) {
+            var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+            var href = (el.getAttribute('href') || '').toLowerCase();
+            var aria = (el.getAttribute('aria-label') || '').toLowerCase();
+            if (txt === 'log in' || txt === 'login' || aria === 'log in' || href.includes('/app/recs') || href.includes('login')) {
+              if (!loginBtn && el.offsetParent !== null) {
+                loginBtn = el;
+              }
+            }
+          });
+
+          if (loginBtn) {
+            loginBtn.click();
+            logToApp('🔑 Auto-opened Tinder Login Dialog', 'action');
+          }
+        }
+
+        setTimeout(autoOpenLoginDialog, 800);
+        setTimeout(autoOpenLoginDialog, 2200);
+
+        setInterval(function() {
+          checkLoginState();
+          dismissCookies();
+        }, 1500);
 
         function runAutoSwipe() {
           if (!window.__FE_ACTIVE) return;
@@ -1243,6 +1417,10 @@ export default function BrowserScreen({ route, navigation }) {
                   const msg = JSON.parse(event.nativeEvent.data);
                   if (msg.type === 'FE_LOG') {
                     addLog(msg.text, msg.logType || 'info');
+                  }
+                  if (msg.type === 'FE_LOGGED_IN') {
+                    addLog('🎉 Logged into platform! Ready to swipe.', 'success');
+                    setLoginStep('done');
                   }
                   if (msg.type === 'FE_SWIPE') {
                     addLog(`💚 Swipe ${msg.direction === 'right' ? 'Liked' : 'Passed'}`, 'action');
