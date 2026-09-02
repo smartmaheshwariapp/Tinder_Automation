@@ -26,13 +26,8 @@ const maskProxy = (proxy) => {
 
 export default function BrowserScreen({ route, navigation }) {
   const { platform, vpsUrl: rawVpsUrl, proxyIp, extensionSettings, orchestratorUrl: paramOrchestratorUrl } = route.params;
-  const isLocalDevice = Boolean(route.params?.isLocalDevice || route.params?.environment === 'on_device' || (rawVpsUrl && (rawVpsUrl.includes('tinder.com') || rawVpsUrl.includes('bumble.com')) && !rawVpsUrl.includes('stream.')));
-  const isHyperbeam = !isLocalDevice && Boolean((rawVpsUrl && rawVpsUrl.includes('hyperbeam.com')) || route.params?.isHyperbeam || rawVpsUrl === 'hyperbeam');
-  const vpsUrl = isHyperbeam || isLocalDevice ? rawVpsUrl : resolveLocalUrl(rawVpsUrl);
-  const sessionDuration = route.params?.sessionDuration !== undefined ? route.params?.sessionDuration : 30;
-  const [secondsRemaining, setSecondsRemaining] = useState(sessionDuration > 0 ? sessionDuration * 60 : null);
-  const [isAutoRunning, setIsAutoRunning] = useState(true);
-  const [sessionCompleted, setSessionCompleted] = useState(false);
+  const isHyperbeam = Boolean((rawVpsUrl && rawVpsUrl.includes('hyperbeam.com')) || route.params?.isHyperbeam || rawVpsUrl === 'hyperbeam');
+  const vpsUrl = isHyperbeam ? rawVpsUrl : resolveLocalUrl(rawVpsUrl);
   const webViewRef = useRef(null);
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -394,129 +389,10 @@ export default function BrowserScreen({ route, navigation }) {
     }
   };
 
-  const executeOnDeviceDomCommand = (action, payload = {}) => {
-    if (!webViewRef.current || !isLocalDevice) return;
-    const sanitizedEmail = (payload.email || '').replace(/'/g, "\\'");
-    const sanitizedPhone = (payload.phone || '').replace(/'/g, "\\'");
-    const sanitizedOtp = (payload.otp || '').replace(/'/g, "\\'");
-
-    const script = `
-      (function() {
-        function dismissCookies() {
-          document.querySelectorAll('button, a, div[role="button"]').forEach(function(el) {
-            var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-            if (txt === 'i accept' || txt === 'agree' || txt === 'accept' || txt === 'allow' || txt === 'got it') {
-              el.click();
-            }
-          });
-        }
-        dismissCookies();
-
-        function clickTextOrAria(terms) {
-          for (var i = 0; i < terms.length; i++) {
-            var term = terms[i].toLowerCase();
-            var elements = document.querySelectorAll('button, a, div[role="button"], span');
-            for (var j = 0; j < elements.length; j++) {
-              var el = elements[j];
-              var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-              var aria = (el.getAttribute('aria-label') || '').toLowerCase();
-              if ((txt.includes(term) || aria.includes(term)) && el.offsetParent !== null) {
-                var target = el.closest('button, a, div[role="button"]') || el;
-                target.click();
-                return true;
-              }
-            }
-          }
-          return false;
-        }
-
-        var act = '${action}';
-        if (act === 'CLICK_LOGIN') {
-          clickTextOrAria(['log in', 'login']);
-        } else if (act === 'CLICK_EMAIL_LOGIN') {
-          clickTextOrAria(['log in', 'login']);
-          setTimeout(function() {
-            clickTextOrAria(['log in with email', 'trouble logging in', 'email']);
-          }, 600);
-        } else if (act === 'CLICK_PHONE_LOGIN') {
-          clickTextOrAria(['log in', 'login']);
-          setTimeout(function() {
-            clickTextOrAria(['log in with phone', 'continue with phone', 'phone number', 'phone']);
-          }, 600);
-        } else if (act === 'CLICK_GOOGLE_LOGIN') {
-          clickTextOrAria(['log in', 'login']);
-          setTimeout(function() {
-            clickTextOrAria(['continue with google', 'log in with google', 'google']);
-          }, 600);
-        } else if (act === 'CLICK_TROUBLE') {
-          clickTextOrAria(['trouble logging in', 'log in with email', 'email']);
-        } else if (act === 'SUBMIT_EMAIL') {
-          var email = '${sanitizedEmail}';
-          var inputs = document.querySelectorAll('input[type="email"], input[type="text"], input[name="email"], input');
-          for (var k = 0; k < inputs.length; k++) {
-            var inp = inputs[k];
-            if (inp.offsetParent !== null) {
-              inp.focus();
-              inp.value = email;
-              inp.dispatchEvent(new Event('input', { bubbles: true }));
-              inp.dispatchEvent(new Event('change', { bubbles: true }));
-              break;
-            }
-          }
-          setTimeout(function() {
-            clickTextOrAria(['continue', 'next', 'send email', 'submit']);
-          }, 400);
-        } else if (act === 'SUBMIT_PHONE') {
-          var phone = '${sanitizedPhone}';
-          var inputs = document.querySelectorAll('input[type="tel"], input[type="text"], input[name="phone_number"], input');
-          for (var k = 0; k < inputs.length; k++) {
-            var inp = inputs[k];
-            if (inp.offsetParent !== null) {
-              inp.focus();
-              inp.value = phone;
-              inp.dispatchEvent(new Event('input', { bubbles: true }));
-              inp.dispatchEvent(new Event('change', { bubbles: true }));
-              break;
-            }
-          }
-          setTimeout(function() {
-            clickTextOrAria(['continue', 'next', 'send code', 'submit']);
-          }, 400);
-        } else if (act === 'SUBMIT_OTP') {
-          var otp = '${sanitizedOtp}';
-          var inputs = document.querySelectorAll('input[type="tel"], input[type="number"], input[type="text"], input');
-          if (inputs.length === 1) {
-            inputs[0].focus();
-            inputs[0].value = otp;
-            inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-            inputs[0].dispatchEvent(new Event('change', { bubbles: true }));
-          } else if (inputs.length >= 6) {
-            for (var m = 0; m < Math.min(otp.length, inputs.length); m++) {
-              inputs[m].focus();
-              inputs[m].value = otp[m];
-              inputs[m].dispatchEvent(new Event('input', { bubbles: true }));
-              inputs[m].dispatchEvent(new Event('change', { bubbles: true }));
-            }
-          }
-          setTimeout(function() {
-            clickTextOrAria(['continue', 'next', 'verify', 'submit', 'log in']);
-          }, 400);
-        }
-      })();
-      true;
-    `;
-    webViewRef.current.injectJavaScript(script);
-  };
-
   // Sends coordinate-based (x, y) clicks, typing, and OTP commands directly into Hyperbeam & Neko
   const sendBrowserCommand = async (action, payload = {}) => {
     try {
-      console.log(`[Browser] Executing command: ${action}`, payload);
-
-      if (isLocalDevice) {
-        executeOnDeviceDomCommand(action, payload);
-        return;
-      }
+      console.log(`[Browser] Executing coordinate command: ${action}`, payload);
 
       if (action === 'CLICK_LOGIN') {
         // 1. Click Accept Cookies / Consent banner (845, 526)
@@ -770,7 +646,7 @@ export default function BrowserScreen({ route, navigation }) {
   }, []);
 
   const injectConfigScript = () => {
-    if (isHyperbeam || isLocalDevice) return; // Only Neko needs custom canvas layout override
+    if (isHyperbeam) return; // Hyperbeam manages its own touch/WebRTC viewport natively
     const settingsJson = JSON.stringify(extensionSettings || {});
     const cssCode = `
       html, body, #app, #neko, .v-application, .v-main, .neko-main, .video-container, .neko-video, video, canvas {
@@ -833,199 +709,41 @@ export default function BrowserScreen({ route, navigation }) {
     }
   };
 
-  const formatTime = (secs) => {
-    if (secs === null || secs === undefined) return 'Non-stop';
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
+  // Auto-start Hyperbeam Cloud VM if navigated with generic 'hyperbeam' endpoint
   useEffect(() => {
-    if (sessionDuration <= 0 || !isAutoRunning || secondsRemaining === null) return;
-    if (secondsRemaining <= 0) {
-      setIsAutoRunning(false);
-      setSessionCompleted(true);
-      if (webViewRef.current && isLocalDevice) {
-        webViewRef.current.injectJavaScript("window.__FE_STOP && window.__FE_STOP(); true;");
-      }
-      addLog('⏱️ Session Duration Complete! Automation safely paused.', 'success');
-      return;
+    if (isHyperbeam && (!hyperbeamEmbedUrl || vpsUrl === 'hyperbeam')) {
+      let isCancelled = false;
+      setStartingHyperbeam(true);
+      setConnectionError(null);
+      console.log('[Browser] Initiating Hyperbeam Cloud VM session fallback...');
+
+      startHyperbeamCloudSession({
+        platform: platform || 'tinder',
+        proxyIp: proxyIp || '',
+        orchestratorUrl: paramOrchestratorUrl || getOrchestratorUrl(vpsUrl),
+      })
+        .then(({ embedUrl }) => {
+          if (!isCancelled) {
+            console.log('[Browser] Hyperbeam Cloud VM session ready:', embedUrl);
+            setHyperbeamEmbedUrl(embedUrl);
+            setStartingHyperbeam(false);
+          }
+        })
+        .catch((err) => {
+          if (!isCancelled) {
+            console.error('[Browser] Hyperbeam startup error:', err);
+            setStartingHyperbeam(false);
+            setConnectionError({ description: `Hyperbeam error: ${err.message}` });
+          }
+        });
+
+      return () => {
+        isCancelled = true;
+      };
     }
-
-    const interval = setInterval(() => {
-      setSecondsRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [secondsRemaining, isAutoRunning, sessionDuration, isLocalDevice]);
-
-  const injectOnDeviceEngine = () => {
-    if (!isLocalDevice) return;
-    const settingsJson = JSON.stringify(extensionSettings || {});
-    const js = `
-      (function() {
-        if (window.__FE_INITIALIZED) return;
-        window.__FE_INITIALIZED = true;
-        window.__FE_ACTIVE = true;
-
-        function logToApp(text, type) {
-          if (window.ReactNativeWebView) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'FE_LOG',
-              text: text,
-              logType: type || 'info'
-            }));
-          }
-        }
-
-        logToApp('📱 FlirtEasy On-Device Mobile Engine Activated', 'success');
-
-        function randomDelay(min, max) {
-          return Math.floor(Math.random() * (max - min + 1)) + min;
-        }
-
-        function dismissCookies() {
-          document.querySelectorAll('button, a, div[role="button"]').forEach(function(el) {
-            var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-            if (txt === 'i accept' || txt === 'agree' || txt === 'accept' || txt === 'allow' || txt === 'got it') {
-              el.click();
-            }
-          });
-        }
-        dismissCookies();
-
-        function checkLoginState() {
-          var isDeck = document.querySelector('[data-testid="gamepad-like"]') || 
-                       document.querySelector('button[aria-label="Like"]') ||
-                       document.querySelector('.recCard') ||
-                       document.querySelector('a[href*="/app/recs"]');
-          if (isDeck) {
-            if (window.ReactNativeWebView) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'FE_LOGGED_IN' }));
-            }
-            return true;
-          }
-          return false;
-        }
-
-        function autoOpenLoginDialog() {
-          if (checkLoginState()) return;
-
-          dismissCookies();
-
-          var loginBtn = null;
-          document.querySelectorAll('button, a, div[role="button"]').forEach(function(el) {
-            var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-            var href = (el.getAttribute('href') || '').toLowerCase();
-            var aria = (el.getAttribute('aria-label') || '').toLowerCase();
-            if (txt === 'log in' || txt === 'login' || aria === 'log in' || href.includes('/app/recs') || href.includes('login')) {
-              if (!loginBtn && el.offsetParent !== null) {
-                loginBtn = el;
-              }
-            }
-          });
-
-          if (loginBtn) {
-            loginBtn.click();
-            logToApp('🔑 Auto-opened Tinder Login Dialog', 'action');
-          }
-        }
-
-        setTimeout(autoOpenLoginDialog, 800);
-        setTimeout(autoOpenLoginDialog, 2200);
-
-        setInterval(function() {
-          checkLoginState();
-          dismissCookies();
-        }, 1500);
-
-        function runAutoSwipe() {
-          if (!window.__FE_ACTIVE) return;
-
-          try {
-            var likeBtn = document.querySelector('button[aria-label="Like"]') ||
-                          document.querySelector('button.button[aria-label="Like"]') ||
-                          document.querySelector('[data-testid="gamepad-like"]') ||
-                          document.querySelector('button span.Bgc\\\\(\\\\\\$c-like-green\\\\)')?.closest('button');
-
-            var passBtn = document.querySelector('button[aria-label="Pass"]') ||
-                          document.querySelector('button.button[aria-label="Pass"]') ||
-                          document.querySelector('[data-testid="gamepad-pass"]');
-
-            if (likeBtn && !document.querySelector('[data-testid="its-a-match"]')) {
-              likeBtn.click();
-              logToApp('💚 Auto-Liked Profile', 'action');
-              if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'FE_SWIPE',
-                  direction: 'right'
-                }));
-              }
-            } else if (document.querySelector('[data-testid="its-a-match"]') || document.querySelector('.itsAMatch')) {
-              logToApp('🎉 New Match Detected!', 'success');
-              if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'FE_MATCH_DETECTED'
-                }));
-              }
-              setTimeout(function() {
-                var dismiss = document.querySelector('[data-testid="its-a-match"] button') || document.querySelector('.itsAMatch button');
-                if (dismiss) dismiss.click();
-              }, 2000);
-            }
-          } catch(err) {
-            logToApp('Note: ' + err.message, 'info');
-          }
-
-          if (window.__FE_ACTIVE) {
-            var nextDelay = randomDelay(2000, 4200);
-            setTimeout(runAutoSwipe, nextDelay);
-          }
-        }
-
-        window.__FE_START = function() {
-          window.__FE_ACTIVE = true;
-          logToApp('▶️ On-Device Automation Resumed', 'info');
-          setTimeout(runAutoSwipe, 1500);
-        };
-
-        window.__FE_STOP = function() {
-          window.__FE_ACTIVE = false;
-          logToApp('⏸️ On-Device Automation Paused', 'info');
-        };
-
-        window.__FE_SWIPE_RIGHT = function() {
-          var likeBtn = document.querySelector('button[aria-label="Like"]') || document.querySelector('[data-testid="gamepad-like"]');
-          if (likeBtn) likeBtn.click();
-          logToApp('💚 Manual Like Sent', 'action');
-        };
-
-        window.__FE_SWIPE_LEFT = function() {
-          var passBtn = document.querySelector('button[aria-label="Pass"]') || document.querySelector('[data-testid="gamepad-pass"]');
-          if (passBtn) passBtn.click();
-          logToApp('❌ Manual Pass Sent', 'action');
-        };
-
-        setTimeout(runAutoSwipe, 3000);
-      })();
-      true;
-    `;
-    if (webViewRef.current) {
-      webViewRef.current.injectJavaScript(js);
-    }
-  };
+  }, [isHyperbeam, vpsUrl, platform, proxyIp]);
 
   const finalUrl = React.useMemo(() => {
-    if (isLocalDevice) {
-      const clean = vpsUrl || (platform?.toLowerCase() === 'bumble' ? 'https://bumble.com' : 'https://tinder.com');
-      return clean.includes('://') ? clean : 'https://' + clean;
-    }
     if (isHyperbeam) {
       if (hyperbeamEmbedUrl) return hyperbeamEmbedUrl;
       if (vpsUrl && vpsUrl.includes('hyperbeam.com')) return vpsUrl;
@@ -1059,7 +777,7 @@ export default function BrowserScreen({ route, navigation }) {
       }
     }
     return `${clean}${clean.includes('?') ? '&' : '?'}t=${Date.now()}`;
-  }, [vpsUrl, isHyperbeam, isLocalDevice, hyperbeamEmbedUrl, platform]);
+  }, [vpsUrl, isHyperbeam, hyperbeamEmbedUrl]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1082,40 +800,9 @@ export default function BrowserScreen({ route, navigation }) {
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{platform} Session</Text>
             <Text style={styles.subtitle} numberOfLines={1}>
-              {isLocalDevice
-                ? '📱 On-Device Direct'
-                : (isHyperbeam ? '⚡ Hyperbeam Cloud Stream' : (proxyIp ? `IP: ${maskProxy(proxyIp)}` : 'Direct Connection'))}
+              {isHyperbeam ? '⚡ Hyperbeam Cloud Stream' : (proxyIp ? `IP: ${maskProxy(proxyIp)}` : 'Direct Connection')}
             </Text>
           </View>
-
-          {/* Session Timer Badge */}
-          {secondsRemaining !== null && (
-            <TouchableOpacity
-              style={[
-                styles.timerHeaderBadge,
-                sessionCompleted ? styles.timerHeaderBadgeEnded : (isAutoRunning ? styles.timerHeaderBadgeActive : styles.timerHeaderBadgePaused)
-              ]}
-              onPress={() => {
-                if (isLocalDevice) {
-                  const nextState = !isAutoRunning;
-                  setIsAutoRunning(nextState);
-                  if (webViewRef.current) {
-                    webViewRef.current.injectJavaScript(nextState ? "window.__FE_START && window.__FE_START(); true;" : "window.__FE_STOP && window.__FE_STOP(); true;");
-                  }
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name={sessionCompleted ? "checkmark-done-circle" : (isAutoRunning ? "timer-outline" : "pause-circle-outline")}
-                size={12}
-                color={sessionCompleted ? "#10B981" : (isAutoRunning ? "#FE3C72" : "#FBBF24")}
-              />
-              <Text style={styles.timerHeaderText}>
-                {sessionCompleted ? 'Finished' : formatTime(secondsRemaining)}
-              </Text>
-            </TouchableOpacity>
-          )}
           {loginStep !== 'done' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity
@@ -1372,7 +1059,7 @@ export default function BrowserScreen({ route, navigation }) {
 
         {/* ─── Rounded Glass Browser Container ─── */}
         <View
-          {...(isHyperbeam || isLocalDevice ? {} : panResponder.panHandlers)}
+          {...(isHyperbeam ? {} : panResponder.panHandlers)}
           style={[
             styles.webviewContainer,
             loginStep === 'done'
@@ -1410,23 +1097,12 @@ export default function BrowserScreen({ route, navigation }) {
               onLoadEnd={() => {
                 setLoading(false);
                 injectConfigScript();
-                injectOnDeviceEngine();
               }}
               onMessage={(event) => {
                 try {
                   const msg = JSON.parse(event.nativeEvent.data);
                   if (msg.type === 'FE_LOG') {
                     addLog(msg.text, msg.logType || 'info');
-                  }
-                  if (msg.type === 'FE_LOGGED_IN') {
-                    addLog('🎉 Logged into platform! Ready to swipe.', 'success');
-                    setLoginStep('done');
-                  }
-                  if (msg.type === 'FE_SWIPE') {
-                    addLog(`💚 Swipe ${msg.direction === 'right' ? 'Liked' : 'Passed'}`, 'action');
-                  }
-                  if (msg.type === 'FE_MATCH_DETECTED') {
-                    addLog(`🎉 Match Detected on Device!`, 'success');
                   }
                   if (msg.type === 'FE_COORD') {
                     setLastCoord({ x: msg.x, y: msg.y });
@@ -1454,63 +1130,7 @@ export default function BrowserScreen({ route, navigation }) {
               }}
               mediaCapturePermissionGrantType="grant"
               mixedContentMode="always"
-              injectedJavaScript={isLocalDevice ? `
-              (function() {
-                window.__logToApp = function(txt, t) {
-                  try {
-                    if (window.ReactNativeWebView) {
-                      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'FE_LOG', text: txt, logType: t || 'info' }));
-                    }
-                  } catch(_) {}
-                };
-
-                function dismissCookies() {
-                  document.querySelectorAll('button, a, div[role="button"]').forEach(function(el) {
-                    var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    if (txt === 'i accept' || txt === 'agree' || txt === 'accept' || txt === 'allow' || txt === 'got it') {
-                      el.click();
-                    }
-                  });
-                }
-                dismissCookies();
-
-                function autoClickLogin() {
-                  dismissCookies();
-                  var isDeck = document.querySelector('[data-testid="gamepad-like"]') || 
-                               document.querySelector('button[aria-label="Like"]') ||
-                               document.querySelector('.recCard') ||
-                               document.querySelector('a[href*="/app/recs"]');
-                  if (isDeck) {
-                    if (window.ReactNativeWebView) {
-                      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'FE_LOGGED_IN' }));
-                    }
-                    return;
-                  }
-
-                  var loginButtons = [];
-                  document.querySelectorAll('button, a, div[role="button"], span').forEach(function(el) {
-                    var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    var href = (el.getAttribute('href') || '').toLowerCase();
-                    var aria = (el.getAttribute('aria-label') || '').toLowerCase();
-                    if (txt === 'log in' || txt === 'login' || aria === 'log in' || href.includes('login') || href.includes('/app/recs')) {
-                      var btn = el.closest('button, a, div[role="button"]') || el;
-                      if (btn && btn.offsetParent !== null && !loginButtons.includes(btn)) {
-                        loginButtons.push(btn);
-                      }
-                    }
-                  });
-
-                  if (loginButtons.length > 0) {
-                    loginButtons[0].click();
-                  }
-                }
-
-                setTimeout(autoClickLogin, 600);
-                setTimeout(autoClickLogin, 1500);
-                setTimeout(autoClickLogin, 3000);
-              })();
-              true;
-              ` : `
+              injectedJavaScript={`
               (function() {
                 window.__logToApp = function(txt, t) {
                   try {
@@ -1573,7 +1193,7 @@ export default function BrowserScreen({ route, navigation }) {
                 }, true);
               })();
               true;
-              `}
+            `}
               overScrollMode="never"
               keyboardDisplayRequiresUserAction={false}
               userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -2336,33 +1956,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  timerHeaderBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginRight: 6,
-  },
-  timerHeaderBadgeActive: {
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    borderColor: 'rgba(254, 60, 114, 0.35)',
-  },
-  timerHeaderBadgePaused: {
-    backgroundColor: 'rgba(251, 191, 36, 0.12)',
-    borderColor: 'rgba(251, 191, 36, 0.35)',
-  },
-  timerHeaderBadgeEnded: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-  },
-  timerHeaderText: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: '700',
   },
   headerLogoutBtn: {
     flexDirection: 'row',

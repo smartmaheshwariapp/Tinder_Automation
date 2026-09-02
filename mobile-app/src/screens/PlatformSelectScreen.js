@@ -21,7 +21,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getAutoDetectedLocalIp, resolveLocalUrl } from '../utils/network';
-import { startHyperbeamCloudSession, startOnDeviceSession } from '../utils/sessionManager';
+import { startHyperbeamCloudSession } from '../utils/sessionManager';
 import useExtensionStats from '../hooks/useExtensionStats';
 import { DashboardPanel } from '../components/dashboard';
 import SupabaseService from '../services/supabase';
@@ -43,7 +43,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function PlatformSelectScreen({ navigation }) {
   const [selectedPlatform, setSelectedPlatform] = useState('Tinder');
-  const [environment, setEnvironment] = useState('on_device'); // 'on_device' | 'hyperbeam' | 'vps' | 'local'
+  const [environment, setEnvironment] = useState('hyperbeam'); // 'hyperbeam' | 'vps' | 'local'
   const [userRegion, setUserRegion] = useState('israel'); // 'israel' | 'direct'
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
@@ -193,25 +193,6 @@ export default function PlatformSelectScreen({ navigation }) {
       ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
       : activeProxy;
 
-    if (environment === 'on_device') {
-      setStartingSession(true);
-      try {
-        const { targetUrl } = await startOnDeviceSession({ platform: targetPlatform });
-        setStartingSession(false);
-        navigation.navigate('Browser', {
-          vpsUrl: targetUrl,
-          platform: targetPlatform,
-          environment: 'on_device',
-          isLocalDevice: true,
-          proxyIp: '',
-        });
-      } catch (err) {
-        setStartingSession(false);
-        console.error('[PlatformSelectScreen] On-device start error:', err);
-      }
-      return;
-    }
-
     if (environment === 'hyperbeam') {
       setStartingSession(true);
       try {
@@ -261,15 +242,12 @@ export default function PlatformSelectScreen({ navigation }) {
       ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
       : activeProxy;
 
-    const resolvedUrl = environment === 'on_device'
-      ? (targetPlatform.toLowerCase() === 'bumble' ? 'https://bumble.com' : 'https://tinder.com')
-      : (environment === 'hyperbeam' ? 'hyperbeam' : resolveLocalUrl(activeStreamUrl));
+    const resolvedUrl = environment === 'hyperbeam' ? 'hyperbeam' : resolveLocalUrl(activeStreamUrl);
 
     navigation.navigate('PlatformConfig', {
       platform: targetPlatform,
       vpsUrl: resolvedUrl,
       environment: environment,
-      isLocalDevice: environment === 'on_device',
       proxyIp: realProxy,
     });
   }, [navigation, activeProxy, activeStreamUrl, environment, selectedPlatform]);
@@ -665,32 +643,17 @@ export default function PlatformSelectScreen({ navigation }) {
 
                   <View style={styles.envSelector}>
                     <TouchableOpacity
-                      style={[styles.envOption, environment === 'on_device' && styles.envOptionActive]}
-                      onPress={() => setEnvironment('on_device')}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name="phone-portrait-outline"
-                        size={14}
-                        color={environment === 'on_device' ? '#10B981' : '#716E89'}
-                      />
-                      <Text style={[styles.envOptionText, environment === 'on_device' && styles.envOptionTextActive]}>
-                        📱 On-Device
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
                       style={[styles.envOption, environment === 'hyperbeam' && styles.envOptionActive]}
                       onPress={() => setEnvironment('hyperbeam')}
                       activeOpacity={0.8}
                     >
                       <Ionicons
                         name="flash-outline"
-                        size={14}
+                        size={15}
                         color={environment === 'hyperbeam' ? '#FE3C72' : '#716E89'}
                       />
                       <Text style={[styles.envOptionText, environment === 'hyperbeam' && styles.envOptionTextActive]}>
-                        ⚡ Hyperbeam
+                        ⚡ Hyperbeam Cloud
                       </Text>
                     </TouchableOpacity>
 
@@ -701,7 +664,7 @@ export default function PlatformSelectScreen({ navigation }) {
                     >
                       <Ionicons
                         name="cloud-done-outline"
-                        size={14}
+                        size={15}
                         color={environment === 'vps' ? '#FFF' : '#716E89'}
                       />
                       <Text style={[styles.envOptionText, environment === 'vps' && styles.envOptionTextActive]}>
@@ -716,7 +679,7 @@ export default function PlatformSelectScreen({ navigation }) {
                     >
                       <Ionicons
                         name="laptop-outline"
-                        size={14}
+                        size={15}
                         color={environment === 'local' ? '#FFF' : '#716E89'}
                       />
                       <Text style={[styles.envOptionText, environment === 'local' && styles.envOptionTextActive]}>
@@ -1488,17 +1451,15 @@ const styles = StyleSheet.create({
   },
   envSelector: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     backgroundColor: '#0D0B14',
     borderRadius: 12,
-    padding: 4,
+    padding: 3,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
     marginBottom: 16,
-    gap: 4,
   },
   envOption: {
-    width: '49%',
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

@@ -33,25 +33,26 @@ def get_all_targets():
 try:
     targets = get_all_targets()
 
-    # Find Extension Target (Service Worker or Worker or Extension Page)
+    # Find Extension Target (Service Worker or Popup Page)
     ext_target = next(
         (t for t in targets
-         if (t.get('type') in ('service_worker', 'worker', 'page'))
-         and 'chrome-extension://' in t.get('url', '')
-         and t.get('webSocketDebuggerUrl')),
+         if t.get('type') == 'service_worker'
+         and 'chrome-extension://' in t.get('url', '')),
         None
     ) or next(
         (t for t in targets
-         if t.get('type') == 'worker'
-         and t.get('webSocketDebuggerUrl')),
-        None
-    ) or next(
-        (t for t in targets
-         if t.get('type') == 'page'
-         and ('tinder.com' in t.get('url', '') or 'bumble.com' in t.get('url', ''))
-         and t.get('webSocketDebuggerUrl')),
+         if 'chrome-extension://' in t.get('url', '')),
         None
     )
+
+    # If no extension context is currently awake, wake up popup in background
+    if not ext_target:
+        try:
+            req = urllib.request.Request('http://localhost:9222/json/new?chrome-extension://kpmmkcndeankkhfljfbaflhiogkfmhnk/popup/popup.html', method='PUT')
+            ext_target = json.loads(urllib.request.urlopen(req, timeout=4).read())
+            time.sleep(0.3)
+        except Exception:
+            pass
 
     if not ext_target or not ext_target.get('webSocketDebuggerUrl'):
         print(json.dumps({'success': False, 'error': 'Extension service worker not found'}))
