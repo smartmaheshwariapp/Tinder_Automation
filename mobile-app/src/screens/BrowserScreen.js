@@ -389,88 +389,131 @@ export default function BrowserScreen({ route, navigation }) {
     }
   };
 
-  // Sends coordinate-based (x, y) clicks, typing, and OTP commands directly into Hyperbeam & Neko
+  // Sends clicks, typing, and OTP commands directly into Hyperbeam & Neko
   const sendBrowserCommand = async (action, payload = {}) => {
     try {
-      console.log(`[Browser] Executing coordinate command: ${action}`, payload);
+      console.log(`[Browser] Executing command: ${action}`, payload);
+      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
 
-      if (action === 'CLICK_LOGIN') {
-        // 1. Click Accept Cookies / Consent banner (845, 526)
-        await dispatchCoordClick(845, 526, 'Accept Cookies');
-        await new Promise(r => setTimeout(r, 400));
-        // 2. Click Header "Log In" button (1190, 220)
-        await dispatchCoordClick(1190, 220, 'Header Log In Button');
-      } else if (action === 'CLICK_EMAIL_LOGIN') {
-        // 1. Dismiss Cookies / Banner
-        await dispatchCoordClick(845, 526, 'Accept Cookies');
-        await new Promise(r => setTimeout(r, 300));
-        // 2. Click Header Log in button in case modal isn't open yet
-        await dispatchCoordClick(1190, 220, 'Header Log In');
-        await new Promise(r => setTimeout(r, 500));
-        // 3. Click "Log in with Email" option at (700, 358)
-        await dispatchCoordClick(700, 358, 'Log in with Email');
-        await new Promise(r => setTimeout(r, 300));
-        // 4. Fallback "Trouble Logging In / Email" option (640, 510)
-        await dispatchCoordClick(640, 510, '"Trouble Logging In"');
-      } else if (action === 'DISMISS_PRIVACY') {
-        // Close / Dismiss Privacy Policy or Welcome Banner (1263, 478)
-        await dispatchCoordClick(1263, 478, 'Close Privacy Dialog');
-      } else if (action === 'CLICK_PHONE_LOGIN') {
-        // 1. Dismiss Cookies / Banner
-        await dispatchCoordClick(845, 526, 'Accept Cookies');
-        await new Promise(r => setTimeout(r, 300));
-        // 2. Click Header Log in button
-        await dispatchCoordClick(1190, 220, 'Header Log In');
-        await new Promise(r => setTimeout(r, 500));
-        // 3. Click "Log in with phone number" option (640, 440)
-        await dispatchCoordClick(640, 440, '"Log in with Phone"');
-      } else if (action === 'CLICK_GOOGLE_LOGIN') {
-        // 1. Dismiss Cookies / Banner
-        await dispatchCoordClick(845, 526, 'Accept Cookies');
-        await new Promise(r => setTimeout(r, 300));
-        // 2. Click Header Log in button
-        await dispatchCoordClick(1190, 220, 'Header Log In');
-        await new Promise(r => setTimeout(r, 500));
-        // 3. Click "Continue with Google" option (640, 330)
-        await dispatchCoordClick(640, 330, '"Continue with Google"');
-      } else if (action === 'CLICK_TROUBLE') {
-        await dispatchCoordClick(640, 510, 'Trouble Logging In');
-      } else if (action === 'SUBMIT_EMAIL') {
-        // 1. Focus & type email into input box (640, 350)
-        await dispatchCoordType(640, 350, payload.email || '', 'Email Field');
-        await new Promise(r => setTimeout(r, 400));
-        // 2. Click "Next / Submit" button (640, 430)
-        await dispatchCoordClick(640, 430, 'Email Submit (Next)');
-      } else if (action === 'SUBMIT_PHONE') {
-        const digits = String(payload.phone || '').replace(/\D/g, '');
-        // 1. Focus & type phone digits into input box (640, 350)
-        await dispatchCoordType(640, 350, digits, 'Phone Field');
-        await new Promise(r => setTimeout(r, 400));
-        // 2. Click "Next / Send Code" button (640, 430)
-        await dispatchCoordClick(640, 430, 'Phone Submit (Next)');
-      } else if (action === 'SUBMIT_OTP') {
-        const otpDigits = String(payload.otp || '').replace(/\D/g, '');
-        // 1. Focus & type OTP digits into input box (640, 360)
-        await dispatchCoordType(640, 360, otpDigits, 'OTP Passcode Field');
-        await new Promise(r => setTimeout(r, 400));
-        // 2. Click "Verify / Next" button (640, 440)
-        await dispatchCoordClick(640, 440, 'Verify & Log In');
-      } else if (action === 'RESEND_OTP') {
-        await dispatchCoordClick(640, 490, 'Resend Code');
+      if (isHyperbeam) {
+        if (action === 'CLICK_LOGIN') {
+          await dispatchCoordClick(845, 526, 'Accept Cookies');
+          await new Promise(r => setTimeout(r, 400));
+          await dispatchCoordClick(1190, 220, 'Header Log In Button');
+        } else if (action === 'CLICK_EMAIL_LOGIN') {
+          await dispatchCoordClick(845, 526, 'Accept Cookies');
+          await new Promise(r => setTimeout(r, 300));
+          await dispatchCoordClick(1190, 220, 'Header Log In');
+          await new Promise(r => setTimeout(r, 500));
+          await dispatchCoordClick(700, 358, 'Log in with Email');
+        } else if (action === 'CLICK_PHONE_LOGIN') {
+          await dispatchCoordClick(845, 526, 'Accept Cookies');
+          await new Promise(r => setTimeout(r, 300));
+          await dispatchCoordClick(1190, 220, 'Header Log In');
+          await new Promise(r => setTimeout(r, 500));
+          await dispatchCoordClick(640, 440, '"Log in with Phone"');
+        } else if (action === 'CLICK_GOOGLE_LOGIN') {
+          await dispatchCoordClick(845, 526, 'Accept Cookies');
+          await new Promise(r => setTimeout(r, 300));
+          await dispatchCoordClick(1190, 220, 'Header Log In');
+          await new Promise(r => setTimeout(r, 500));
+          await dispatchCoordClick(640, 330, '"Continue with Google"');
+        } else if (action === 'CLICK_TROUBLE') {
+          await dispatchCoordClick(640, 510, 'Trouble Logging In');
+        } else if (action === 'DISMISS_PRIVACY') {
+          await dispatchCoordClick(1263, 478, 'Close Privacy Dialog');
+        } else if (action === 'SUBMIT_EMAIL') {
+          const safeEmail = JSON.stringify(payload.email || '');
+          const js = `(function() {
+            var el = document.querySelector('input[type="email"], input[name="email"], input');
+            if (el) {
+              el.focus();
+              try {
+                var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                nativeSetter.call(el, ${safeEmail});
+              } catch(e) { el.value = ${safeEmail}; }
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              var btn = document.querySelector('button[type="submit"]') || Array.from(document.querySelectorAll('button, [role="button"]')).find(b => (b.innerText||'').toLowerCase().includes('next') || (b.innerText||'').toLowerCase().includes('continue'));
+              if (btn) btn.click();
+            }
+          })(); true;`;
+          if (webViewRef.current) webViewRef.current.injectJavaScript(js);
+        } else if (action === 'SUBMIT_PHONE') {
+          const digits = String(payload.phone || '').replace(/\D/g, '');
+          const safeDigits = JSON.stringify(digits);
+          const js = `(function() {
+            var el = document.querySelector('input[type="tel"], input[name="phone_number"], input');
+            if (el) {
+              el.focus();
+              try {
+                var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                nativeSetter.call(el, ${safeDigits});
+              } catch(e) { el.value = ${safeDigits}; }
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              var btn = document.querySelector('button[type="submit"]') || Array.from(document.querySelectorAll('button, [role="button"]')).find(b => (b.innerText||'').toLowerCase().includes('continue') || (b.innerText||'').toLowerCase().includes('next'));
+              if (btn) btn.click();
+            }
+          })(); true;`;
+          if (webViewRef.current) webViewRef.current.injectJavaScript(js);
+        } else if (action === 'SUBMIT_OTP') {
+          const otpDigits = String(payload.otp || '').replace(/\D/g, '');
+          const safeOtp = JSON.stringify(otpDigits);
+          const js = `(function() {
+            var el = document.querySelector('input[autocomplete="one-time-code"], input');
+            if (el) {
+              el.focus();
+              try {
+                var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                nativeSetter.call(el, ${safeOtp});
+              } catch(e) { el.value = ${safeOtp}; }
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              var btn = document.querySelector('button[type="submit"]') || Array.from(document.querySelectorAll('button, [role="button"]')).find(b => (b.innerText||'').toLowerCase().includes('continue') || (b.innerText||'').toLowerCase().includes('verify'));
+              if (btn) btn.click();
+            }
+          })(); true;`;
+          if (webViewRef.current) webViewRef.current.injectJavaScript(js);
+        }
+        return;
       }
 
-      // Also trigger orchestrator CDP text search fallback if available
-      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+      // Neko backend orchestration (CDP precision)
       if (action === 'CLICK_EMAIL_LOGIN') {
         fetch(`${orchestratorUrl}/click-text`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'email' }) }).catch(() => { });
       } else if (action === 'CLICK_PHONE_LOGIN') {
         fetch(`${orchestratorUrl}/click-text`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'phone' }) }).catch(() => { });
+      } else if (action === 'CLICK_GOOGLE_LOGIN') {
+        fetch(`${orchestratorUrl}/click-text`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'google' }) }).catch(() => { });
+      } else if (action === 'CLICK_TROUBLE') {
+        fetch(`${orchestratorUrl}/click-text`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'trouble' }) }).catch(() => { });
+      } else if (action === 'DISMISS_PRIVACY') {
+        await dispatchCoordClick(1263, 478, 'Close Privacy Dialog');
       } else if (action === 'SUBMIT_EMAIL') {
-        fetch(`${orchestratorUrl}/submit-email`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: payload.email }) }).catch(() => { });
+        addLog(`Submitting email: ${payload.email}`, 'action');
+        const res = await fetch(`${orchestratorUrl}/submit-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: payload.email })
+        });
+        if (res.ok) addLog('Email submitted successfully', 'success');
       } else if (action === 'SUBMIT_PHONE') {
-        fetch(`${orchestratorUrl}/submit-phone`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ countryCode: payload.countryCode, phoneNumber: payload.phone }) }).catch(() => { });
+        addLog(`Submitting phone: ${payload.phone}`, 'action');
+        const res = await fetch(`${orchestratorUrl}/submit-phone`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ countryCode: payload.countryCode || '+91', phoneNumber: payload.phone })
+        });
+        if (res.ok) addLog('Phone number submitted successfully', 'success');
       } else if (action === 'SUBMIT_OTP') {
-        fetch(`${orchestratorUrl}/submit-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp: payload.otp }) }).catch(() => { });
+        addLog(`Submitting OTP code...`, 'action');
+        const res = await fetch(`${orchestratorUrl}/submit-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ otp: payload.otp })
+        });
+        if (res.ok) addLog('OTP submitted successfully', 'success');
       } else if (action === 'RESEND_OTP') {
         fetch(`${orchestratorUrl}/resend-code`, { method: 'POST' }).catch(() => { });
       }

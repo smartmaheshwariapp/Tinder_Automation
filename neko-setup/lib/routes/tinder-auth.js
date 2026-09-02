@@ -97,8 +97,8 @@ try:
           el.click();
           try {
             var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            nativeSetter.call(el, '');
-          } catch(e) { el.value = ''; }
+            nativeSetter.call(el, """ + json.dumps(email_str) + """);
+          } catch(e) { el.value = """ + json.dumps(email_str) + """; }
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -111,17 +111,7 @@ try:
         val = (res.get('result') or {}).get('value')
 
         if val and val.get('found'):
-            x, y = val['x'], val['y']
-            ws.call('Input.dispatchMouseEvent', {'type': 'mousePressed', 'x': x, 'y': y, 'button': 'left', 'clickCount': 1})
-            time.sleep(0.04)
-            ws.call('Input.dispatchMouseEvent', {'type': 'mouseReleased', 'x': x, 'y': y, 'button': 'left', 'clickCount': 1})
-            time.sleep(0.1)
-
-            for ch in email_str:
-                ws.call('Input.insertText', {'text': ch})
-                time.sleep(random.uniform(0.03, 0.08))
-
-            time.sleep(random.uniform(0.2, 0.4))
+            time.sleep(0.2)
 
             submit_js = """
             (function() {
