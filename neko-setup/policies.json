@@ -28,13 +28,12 @@
   "HideCrashRestoreBubble": true,
   "MetricsReportingEnabled": false,
   "PromotionsEnabled": false,
+  "URLAllowlist": [
+    "*"
+  ],
   "ExtensionSettings": {
     "*": {
       "installation_mode": "allowed"
-    },
-    "kpmmkcndeankkhfljfbaflhiogkfmhnk": {
-      "installation_mode": "normal_installed",
-      "toolbar_pin": "force_pinned"
     }
   }
 }
