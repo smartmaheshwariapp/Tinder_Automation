@@ -82,7 +82,7 @@ function handleStartSession(req, res) {
               fs.mkdirSync(cleanExtensionDir, { recursive: true });
             }
 
-            const srcRoot = rootDir;
+            const srcRoot = fs.existsSync(path.join(rootDir, '..', 'manifest.json')) ? path.join(rootDir, '..') : rootDir;
             const itemsToCopy = [
               'manifest.json',
               'debug-config.js',

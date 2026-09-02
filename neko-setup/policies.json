@@ -11,18 +11,16 @@
   "CommandLineFlagSecurityWarningsEnabled": false,
   "DefaultGeolocationSetting": 1,
   "GeolocationAllowedForUrls": [
-    "https://tinder.com",
-    "https://*.tinder.com",
-    "https://bumble.com",
-    "https://*.bumble.com",
-    "https://*.hinge.co"
+    "[*.]tinder.com",
+    "[*.]gotinder.com",
+    "[*.]bumble.com",
+    "[*.]hinge.co"
   ],
   "DefaultNotificationsSetting": 1,
   "NotificationsAllowedForUrls": [
-    "https://tinder.com",
-    "https://*.tinder.com",
-    "https://bumble.com",
-    "https://*.bumble.com"
+    "[*.]tinder.com",
+    "[*.]gotinder.com",
+    "[*.]bumble.com"
   ],
   "RestoreOnStartup": 1,
   "HideCrashRestoreBubble": true,
@@ -31,9 +29,9 @@
   "URLAllowlist": [
     "*"
   ],
-  "ExtensionSettings": {
-    "*": {
-      "installation_mode": "allowed"
-    }
-  }
+  "ExtensionInstallTypeAllowlist": [
+    "development",
+    "normal",
+    "other"
+  ]
 }

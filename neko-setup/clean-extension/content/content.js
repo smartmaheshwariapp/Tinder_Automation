@@ -1,6 +1,6 @@
-// Auto-redirect away from /faq directly to /app/login
+// Auto-redirect away from /faq directly to Tinder home
 if (window.location.pathname.startsWith('/faq') || window.location.href.includes('/faq')) {
-  window.location.replace('https://tinder.com/app/login');
+  window.location.replace('https://tinder.com/');
 }
 
 // ─── Automated Cookie Consent Auto-Dismiss ───

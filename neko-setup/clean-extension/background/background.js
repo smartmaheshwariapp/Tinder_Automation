@@ -4130,3 +4130,7 @@ async function fetchRemoteConfig() {
 // Automatically appended by Neko Orchestrator
 self.ORCHESTRATOR_USER_ID = "dev_user_1";
 self.PROXY_AUTH = null;
+
+// Automatically appended by Neko Orchestrator
+self.ORCHESTRATOR_USER_ID = "dev_user_1";
+self.PROXY_AUTH = null;
