@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
 import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession } from '../utils/sessionManager';
+import NotificationService from '../services/notifications';
 
 const V2_GOALS = [
   { id: 'date', label: 'Set up a Date', icon: 'calendar-outline' },
