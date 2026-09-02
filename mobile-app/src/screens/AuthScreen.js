@@ -436,7 +436,7 @@ export default function AuthScreen({ navigation, route }) {
         // Existing Account -> Route directly to Linksy Platform Cockpit
         navigation.replace('PlatformSelect', { onboardingData });
       }
-    }, 850);
+    }
   };
 
   const handleResendCode = async () => {
@@ -478,28 +478,26 @@ export default function AuthScreen({ navigation, route }) {
           keyboardVerticalOffset={0}
           enabled={Platform.OS === 'ios'}
         >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="always"
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-            keyboardDismissMode="none"
-          >
-            <View style={styles.contentContainer}>
-
-              {/* ═══════════════════════════════════════════════════ */}
-              {/* PHASE 1: WELCOME / LANDING                        */}
-              {/* ═══════════════════════════════════════════════════ */}
-              {phase === 'welcome' && (
-                <Animated.View
-                  style={[
-                    styles.welcomeContainer,
-                    {
-                      opacity: welcomeFade,
-                      transform: [{ translateY: welcomeSlide }],
-                    },
-                  ]}
-                >
+          {/* ═══════════════════════════════════════════════════ */}
+          {/* PHASE 1: WELCOME / LANDING                        */}
+          {/* ═══════════════════════════════════════════════════ */}
+          {phase === 'welcome' && (
+            <ScrollView
+              style={styles.scrollFlex}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <Animated.View
+                style={[
+                  styles.welcomeContainer,
+                  {
+                    opacity: welcomeFade,
+                    transform: [{ translateY: welcomeSlide }],
+                  },
+                ]}
+              >
                   {/* Hero: Floating Logo + Brand */}
                   <View style={styles.welcomeHero}>
                     <Animated.View
@@ -597,7 +595,7 @@ export default function AuthScreen({ navigation, route }) {
                     </View>
                   </View>
                 </Animated.View>
-              </View>
+              </ScrollView>
             )}
 
             {/* ═══════════════════════════════════════════════════ */}
@@ -959,10 +957,8 @@ export default function AuthScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
                 </Animated.View>
-              )}
-
-              </View>
-          </ScrollView>
+              </ScrollView>
+            )}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
