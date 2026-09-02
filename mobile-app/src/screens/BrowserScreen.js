@@ -770,7 +770,7 @@ export default function BrowserScreen({ route, navigation }) {
   }, []);
 
   const injectConfigScript = () => {
-    if (isHyperbeam) return; // Hyperbeam manages its own touch/WebRTC viewport natively
+    if (isHyperbeam || isLocalDevice) return; // Only Neko needs custom canvas layout override
     const settingsJson = JSON.stringify(extensionSettings || {});
     const cssCode = `
       html, body, #app, #neko, .v-application, .v-main, .neko-main, .video-container, .neko-video, video, canvas {
@@ -1375,7 +1375,7 @@ export default function BrowserScreen({ route, navigation }) {
           {...(isHyperbeam || isLocalDevice ? {} : panResponder.panHandlers)}
           style={[
             styles.webviewContainer,
-            loginStep === 'done' || isLocalDevice
+            loginStep === 'done'
               ? styles.webviewContainerFull
               : (showNeko
                 ? (isExpanded || loginStep === 'captcha' ? styles.webviewContainerFull : styles.webviewContainerSplit)
@@ -1454,7 +1454,63 @@ export default function BrowserScreen({ route, navigation }) {
               }}
               mediaCapturePermissionGrantType="grant"
               mixedContentMode="always"
-              injectedJavaScript={`
+              injectedJavaScript={isLocalDevice ? `
+              (function() {
+                window.__logToApp = function(txt, t) {
+                  try {
+                    if (window.ReactNativeWebView) {
+                      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'FE_LOG', text: txt, logType: t || 'info' }));
+                    }
+                  } catch(_) {}
+                };
+
+                function dismissCookies() {
+                  document.querySelectorAll('button, a, div[role="button"]').forEach(function(el) {
+                    var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    if (txt === 'i accept' || txt === 'agree' || txt === 'accept' || txt === 'allow' || txt === 'got it') {
+                      el.click();
+                    }
+                  });
+                }
+                dismissCookies();
+
+                function autoClickLogin() {
+                  dismissCookies();
+                  var isDeck = document.querySelector('[data-testid="gamepad-like"]') || 
+                               document.querySelector('button[aria-label="Like"]') ||
+                               document.querySelector('.recCard') ||
+                               document.querySelector('a[href*="/app/recs"]');
+                  if (isDeck) {
+                    if (window.ReactNativeWebView) {
+                      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'FE_LOGGED_IN' }));
+                    }
+                    return;
+                  }
+
+                  var loginButtons = [];
+                  document.querySelectorAll('button, a, div[role="button"], span').forEach(function(el) {
+                    var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    var href = (el.getAttribute('href') || '').toLowerCase();
+                    var aria = (el.getAttribute('aria-label') || '').toLowerCase();
+                    if (txt === 'log in' || txt === 'login' || aria === 'log in' || href.includes('login') || href.includes('/app/recs')) {
+                      var btn = el.closest('button, a, div[role="button"]') || el;
+                      if (btn && btn.offsetParent !== null && !loginButtons.includes(btn)) {
+                        loginButtons.push(btn);
+                      }
+                    }
+                  });
+
+                  if (loginButtons.length > 0) {
+                    loginButtons[0].click();
+                  }
+                }
+
+                setTimeout(autoClickLogin, 600);
+                setTimeout(autoClickLogin, 1500);
+                setTimeout(autoClickLogin, 3000);
+              })();
+              true;
+              ` : `
               (function() {
                 window.__logToApp = function(txt, t) {
                   try {
@@ -1517,7 +1573,7 @@ export default function BrowserScreen({ route, navigation }) {
                 }, true);
               })();
               true;
-            `}
+              `}
               overScrollMode="never"
               keyboardDisplayRequiresUserAction={false}
               userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
