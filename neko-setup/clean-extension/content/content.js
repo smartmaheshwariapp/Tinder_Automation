@@ -4290,41 +4290,51 @@ if (typeof isLoggedIn === 'function') {
     };
 
     const handleTinderLoginLanding = () => {
+      // 1. If language select modal is open, immediately dismiss it
+      const langModal = document.querySelector('.language-select-modal, [class*="language-select"]');
+      if (langModal) {
+        const closeBtn = langModal.querySelector('button, [aria-label*="close" i]') ||
+          document.querySelector('button[aria-label*="close" i], button.C\\(\\$c-ds-icon-secondary\\)');
+        if (closeBtn) {
+          console.log('[Tinder Login] Language select modal detected, clicking close button');
+          clickElement(closeBtn);
+          return;
+        }
+      }
+
+      // 2. Accept cookies
       handleCookieAccept();
 
-      // Check if modal or any input field is already visible/open
-      const isModalOrInputOpen = document.querySelector('input[type="tel"], input[type="email"], input[autocomplete="one-time-code"]') ||
-        document.querySelector('div[role="dialog"]') ||
-        document.querySelector('.Mstart\\(a\\)');
+      // 3. Check if Tinder login options or input fields are already visible
+      const isLoginOptionsVisible = Array.from(document.querySelectorAll('button, a, div[role="button"]')).some(b => {
+        const txt = (b.innerText || b.textContent || '').trim().toLowerCase();
+        return txt === 'log in with phone number' ||
+               txt === 'continue with google' ||
+               txt === 'log in with facebook' ||
+               txt === 'log in with google' ||
+               txt.includes('trouble logging in');
+      });
 
-      if (!isModalOrInputOpen) {
-        let loginBtn = null;
-        try {
-          loginBtn = document.querySelector('span.Typs\\(sans-button-md\\)');
-          if (loginBtn && !isVisible(loginBtn)) {
-            loginBtn = null;
-          }
-        } catch (_) {}
-        if (!loginBtn) {
-          // Prioritize button/a
-          loginBtn = Array.from(document.querySelectorAll('button, a')).find(el => {
-            if (!isVisible(el)) return false;
-            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-            return txt === 'log in' || txt === 'login';
-          });
-        }
-        if (!loginBtn) {
-          // Fallback to div/span
-          loginBtn = Array.from(document.querySelectorAll('div, span')).find(el => {
-            if (!isVisible(el)) return false;
-            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-            return txt === 'log in' || txt === 'login';
-          });
-        }
-        if (loginBtn) {
-          console.log('[Tinder Login] Found "Log in" button on landing page, clicking it to show login options!');
-          clickElement(loginBtn);
-        }
+      const isInputVisible = document.querySelector('input[type="tel"], input[type="email"], input[name="phone_number"], input[autocomplete="one-time-code"]');
+
+      if (isLoginOptionsVisible || isInputVisible) {
+        // Login options or inputs are already displayed, do not click anything
+        return;
+      }
+
+      // 4. Find the real "Log in" button on the landing page header
+      const clickables = Array.from(document.querySelectorAll('a, button, [role="button"]'));
+      const realLoginBtn = clickables.find(el => {
+        if (!isVisible(el)) return false;
+        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+        const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+        if (txt.includes('language') || aria.includes('language')) return false;
+        return txt === 'log in' || txt === 'login';
+      });
+
+      if (realLoginBtn) {
+        console.log('[Tinder Login] Found real "Log in" button on landing page, clicking it to show login options!');
+        clickElement(realLoginBtn);
       }
     };
 
