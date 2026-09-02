@@ -1,9 +1,51 @@
 // mobile-app/src/utils/sessionManager.js
 // Centralized active session lifecycle manager ensuring only ONE session is active at a time.
+// Supports Hyperbeam Cloud VMs (with stateful profile persistence & auto-fallback) and Self-Hosted Neko.
+
+import SupabaseService from '../services/supabase';
 
 const HYPERBEAM_KEY = 'sk_test_fsuC8naqJLF2lGcL8Vak2ogGyhYFldLzqCEbX2zQYf0';
 
 let activeSession = null;
+const memoryProfileCache = {};
+
+/**
+ * Gets saved Hyperbeam profile ID for a user/platform
+ */
+export const getSavedHyperbeamProfile = async (userId, platform = 'tinder') => {
+  const key = `${userId || 'guest'}_${platform.toLowerCase()}`;
+  if (memoryProfileCache[key]) {
+    return memoryProfileCache[key];
+  }
+  if (userId) {
+    try {
+      const snap = await SupabaseService.getUserSnapshot(userId);
+      const profileId = snap?.data?.settings?.hyperbeam_profile_id;
+      if (profileId) {
+        memoryProfileCache[key] = profileId;
+        return profileId;
+      }
+    } catch (_) {}
+  }
+  return null;
+};
+
+/**
+ * Saves Hyperbeam profile ID for a user/platform
+ */
+export const saveHyperbeamProfile = async (userId, platform = 'tinder', profileId = null) => {
+  if (!profileId) return;
+  const key = `${userId || 'guest'}_${platform.toLowerCase()}`;
+  memoryProfileCache[key] = profileId;
+  if (userId) {
+    try {
+      await SupabaseService.saveUserSnapshot(userId, {
+        platform: platform.toLowerCase(),
+        settings: { hyperbeam_profile_id: profileId }
+      });
+    } catch (_) {}
+  }
+};
 
 /**
  * Registers a newly launched session.
@@ -13,6 +55,7 @@ let activeSession = null;
  * @param {boolean} sessionInfo.isHyperbeam
  * @param {string} sessionInfo.orchestratorUrl
  * @param {string} sessionInfo.platform
+ * @param {string} sessionInfo.profileId
  */
 export const registerActiveSession = (sessionInfo) => {
   activeSession = {
@@ -121,18 +164,21 @@ export const cleanupCurrentSession = async () => {
 };
 
 /**
- * Starts a Hyperbeam Cloud VM session and returns { embedUrl, sessionId }.
+ * Starts a Hyperbeam Cloud VM session and returns { embedUrl, sessionId, profileId }.
+ * Supports stateful profile persistence with seamless fallback if restricted on test tier.
  * @param {object} options
  * @param {string} [options.platform='tinder']
  * @param {string} [options.proxyIp]
  * @param {string} [options.orchestratorUrl]
+ * @param {string} [options.userId]
  * @param {string} [options.apiKey]
- * @returns {Promise<{ embedUrl: string, sessionId: string }>}
+ * @returns {Promise<{ embedUrl: string, sessionId: string, profileId?: string }>}
  */
 export const startHyperbeamCloudSession = async ({
   platform = 'tinder',
   proxyIp = '',
   orchestratorUrl = null,
+  userId = null,
   apiKey = HYPERBEAM_KEY,
 } = {}) => {
   const platformKey = (platform || 'tinder').toLowerCase();
@@ -143,8 +189,11 @@ export const startHyperbeamCloudSession = async ({
   // 1. Terminate previous sessions first
   await terminatePreviousSessions(orchestratorUrl, apiKey);
 
+  const existingProfileId = await getSavedHyperbeamProfile(userId, platformKey);
+
   let embedUrl = null;
   let sessionId = null;
+  let profileId = existingProfileId;
 
   // 2. Try orchestrator /hyperbeam/start-session if available
   if (orchestratorUrl) {
@@ -154,8 +203,9 @@ export const startHyperbeamCloudSession = async ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           platform: platformKey,
-          userId: 'dev_user_1',
+          userId: userId || 'dev_user_1',
           proxyIp: proxyIp || '',
+          profileId: existingProfileId,
           apiKey,
           width: webWidth,
           height: webHeight,
@@ -166,6 +216,9 @@ export const startHyperbeamCloudSession = async ({
         if (data?.embed_url) {
           embedUrl = data.embed_url;
           sessionId = data.session_id;
+          if (data?.profile_id) {
+            profileId = data.profile_id;
+          }
         }
       }
     } catch (_) {}
@@ -174,32 +227,58 @@ export const startHyperbeamCloudSession = async ({
   // 3. Direct Cloud API Fallback (Serverless Hyperbeam Engine)
   if (!embedUrl) {
     console.log('[SessionManager] Calling Hyperbeam Cloud Engine v0/vm...');
-    const bodyPayload = {
-      start_url: startUrl,
-      width: webWidth,
-      height: webHeight,
+    
+    // Function to create VM with optional profile
+    const requestVm = async (includeProfile = false) => {
+      const bodyPayload = {
+        start_url: startUrl,
+        width: webWidth,
+        height: webHeight,
+      };
+      if (proxyIp) {
+        bodyPayload.proxy = { server: proxyIp };
+      }
+      if (includeProfile) {
+        bodyPayload.profile = existingProfileId || true;
+      }
+
+      const cloudResp = await fetch('https://engine.hyperbeam.com/v0/vm', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bodyPayload),
+      });
+
+      const cloudData = await cloudResp.json();
+      return { ok: cloudResp.ok, status: cloudResp.status, data: cloudData };
     };
-    if (proxyIp) {
-      bodyPayload.proxy = { server: proxyIp };
+
+    // First attempt: try with profile persistence
+    let vmResult = await requestVm(Boolean(existingProfileId));
+
+    // If profile is restricted on test tier, auto-retry without profile parameter
+    if (!vmResult.ok && (vmResult.data?.code === 'err_api_restricted' || vmResult.status === 400)) {
+      console.warn('[SessionManager] Profile persistence restricted on test tier. Falling back to standard Cloud VM...');
+      vmResult = await requestVm(false);
     }
 
-    const cloudResp = await fetch('https://engine.hyperbeam.com/v0/vm', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(bodyPayload),
-    });
-
-    const cloudData = await cloudResp.json();
-    if (cloudResp.ok && cloudData?.embed_url) {
-      embedUrl = cloudData.embed_url;
-      sessionId = cloudData.session_id;
+    if (vmResult.ok && vmResult.data?.embed_url) {
+      embedUrl = vmResult.data.embed_url;
+      sessionId = vmResult.data.session_id;
+      if (vmResult.data?.profile_id) {
+        profileId = vmResult.data.profile_id;
+        await saveHyperbeamProfile(userId, platformKey, profileId);
+      }
     } else {
-      const errMsg = cloudData?.message || cloudData?.error || `HTTP ${cloudResp.status}`;
+      const errMsg = vmResult.data?.message || vmResult.data?.error || `HTTP ${vmResult.status}`;
       throw new Error(errMsg);
     }
+  }
+
+  if (profileId) {
+    await saveHyperbeamProfile(userId, platformKey, profileId);
   }
 
   registerActiveSession({
@@ -207,8 +286,9 @@ export const startHyperbeamCloudSession = async ({
     embedUrl,
     isHyperbeam: true,
     platform,
+    profileId,
     orchestratorUrl,
   });
 
-  return { embedUrl, sessionId };
+  return { embedUrl, sessionId, profileId };
 };

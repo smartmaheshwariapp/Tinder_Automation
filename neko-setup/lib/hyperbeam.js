@@ -91,6 +91,7 @@ async function startHyperbeamSession(options = {}) {
     platform = 'tinder',
     userId = 'dev_user_1',
     proxyIp = '',
+    profileId = null,
     apiKey = DEFAULT_HYPERBEAM_API_KEY,
     width = 1280,
     height = 720
@@ -109,6 +110,10 @@ async function startHyperbeamSession(options = {}) {
     width: parseInt(width, 10) || 1280,
     height: parseInt(height, 10) || 720
   };
+
+  if (profileId) {
+    vmPayload.profile = profileId;
+  }
 
   const parsedProxy = parseProxyForHyperbeam(proxyIp);
   if (parsedProxy) {
@@ -222,6 +227,13 @@ async function startHyperbeamSession(options = {}) {
                   platform: platformKey,
                   start_url: startUrl
                 });
+              } else if (parsed.code === 'err_api_restricted') {
+                if (vmPayload.profile) {
+                  console.warn('[Hyperbeam] Profile persistence restricted on this key tier, retrying standard session without profile...');
+                  delete vmPayload.profile;
+                }
+                console.warn('[Hyperbeam] Falling back to standard session with in-page DOM automation...');
+                sendRequest(false).then(resolve).catch(reject);
               } else {
                 reject(new Error(parsed.message || `Hyperbeam API error: HTTP ${res.statusCode}`));
               }

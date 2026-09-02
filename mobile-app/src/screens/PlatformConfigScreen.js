@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
-import { terminatePreviousSessions, registerActiveSession } from '../utils/sessionManager';
+import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession } from '../utils/sessionManager';
 
 const V2_GOALS = [
   { id: 'date', label: 'Set up a Date', icon: 'calendar-outline' },
@@ -101,99 +101,33 @@ export default function PlatformConfigScreen({ route, navigation }) {
 
     if (isHyperbeam) {
       try {
-        console.log('[Mobile] Starting Hyperbeam Desktop Web Browser session...');
-        const platformKey = platform.toLowerCase();
-        const startUrl = platformKey === 'bumble' ? 'https://bumble.com' : 'https://tinder.com';
+        console.log('[Mobile] Starting Hyperbeam Cloud Browser session...');
+        const realProxy = proxyIp === 'http://*****:*****@46.203.181.164:43343'
+          ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
+          : proxyIp;
 
-        let embedUrl = null;
-        let sessionId = null;
+        const { embedUrl, sessionId, profileId } = await startHyperbeamCloudSession({
+          platform,
+          proxyIp: realProxy,
+          orchestratorUrl: resolvedOrchestratorUrl,
+        });
 
-        // 1. Try Orchestrator if running
-        try {
-          const resp = await fetch(`${resolvedOrchestratorUrl}/hyperbeam/start-session`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              platform: platformKey,
-              userId: 'dev_user_1',
-              proxyIp: proxyIp || '',
-              apiKey: HYPERBEAM_KEY,
-              width: webWidth,
-              height: webHeight,
-            })
-          });
-          if (resp.ok) {
-            const data = await resp.json();
-            if (data && data.embed_url) {
-              embedUrl = data.embed_url;
-              sessionId = data.session_id;
-            }
-          }
-        } catch (_) { }
-
-        // 2. Direct Cloud API Fallback (Serverless - Zero VPS required)
-        if (!embedUrl) {
-          console.log(`[Mobile] Calling Hyperbeam Cloud Engine for Desktop Web View (${webWidth}x${webHeight})...`);
-          const cloudResp = await fetch('https://engine.hyperbeam.com/v0/vm', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${HYPERBEAM_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              start_url: startUrl,
-              width: webWidth,
-              height: webHeight,
-            })
-          });
-          const cloudData = await cloudResp.json();
-          console.log('[Mobile] Hyperbeam Cloud response:', cloudResp.status, cloudData);
-
-          if (cloudResp.ok && cloudData && cloudData.embed_url) {
-            embedUrl = cloudData.embed_url;
-            sessionId = cloudData.session_id;
-          } else {
-            const errorMsg = cloudData?.message || cloudData?.error || `HTTP ${cloudResp.status}`;
-            console.error('[Mobile] Hyperbeam Cloud Error:', errorMsg);
-            setLoading(false);
-            Alert.alert(
-              'Hyperbeam Session Failed',
-              `Could not start Hyperbeam Cloud Browser: ${errorMsg}\n\nPlease check your Hyperbeam API key or switch to Local Docker environment.`
-            );
-            return;
-          }
-        }
-
-        if (embedUrl) {
-          console.log('[Mobile] Hyperbeam session ready:', embedUrl);
-          registerActiveSession({
-            sessionId,
-            embedUrl,
-            isHyperbeam: true,
-            platform,
-            orchestratorUrl: resolvedOrchestratorUrl
-          });
-          setLoading(false);
-          navigation.navigate('Browser', {
-            platform,
-            vpsUrl: embedUrl,
-            proxyIp,
-            isHyperbeam: true,
-            orchestratorUrl: resolvedOrchestratorUrl,
-          });
-          return;
-        } else {
-          setLoading(false);
-          Alert.alert(
-            'Hyperbeam Session Error',
-            'Could not retrieve streaming URL from Hyperbeam. Please check your API key or use Local Docker mode.'
-          );
-          return;
-        }
+        setLoading(false);
+        navigation.navigate('Browser', {
+          platform,
+          vpsUrl: embedUrl,
+          proxyIp: realProxy,
+          isHyperbeam: true,
+          orchestratorUrl: resolvedOrchestratorUrl,
+        });
+        return;
       } catch (hbErr) {
         console.error('[Mobile] Hyperbeam startup error:', hbErr);
         setLoading(false);
-        Alert.alert('Hyperbeam Error', `Network error connecting to Hyperbeam: ${hbErr.message}`);
+        Alert.alert(
+          'Hyperbeam Session Failed',
+          `Could not start Hyperbeam Cloud Browser: ${hbErr.message}\n\nPlease check your Hyperbeam API key or switch to Local Docker environment.`
+        );
         return;
       }
     }
