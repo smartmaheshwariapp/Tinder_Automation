@@ -280,6 +280,20 @@ export default function PlatformSelectScreen({ navigation }) {
         </View>
 
         <View style={styles.headerActions}>
+          {/* Notification Bell with Badge */}
+          <TouchableOpacity
+            style={styles.notifBtn}
+            onPress={() => setShowNotifModal(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="notifications-outline" size={18} color="#D8D6E8" />
+            {unreadNotifCount > 0 && (
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>{unreadNotifCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
           {/* Quick 1-Tap Launch Button */}
           <TouchableOpacity
             style={[styles.headerLaunchBtn, startingSession && { opacity: 0.8 }]}
@@ -882,6 +896,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  notifBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: '#1E1B2E',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  headerBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FE3C72',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  headerBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
   },
   headerLaunchBtn: {
     flexDirection: 'row',
