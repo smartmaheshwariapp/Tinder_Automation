@@ -292,3 +292,32 @@ export const startHyperbeamCloudSession = async ({
 
   return { embedUrl, sessionId, profileId };
 };
+
+/**
+ * Starts an On-Device Direct Mobile session.
+ * Bypasses cloud servers and loads platform URL directly on user's device.
+ * @param {object} options
+ * @param {string} [options.platform='tinder']
+ * @param {number} [options.duration=30] - Session duration in minutes
+ * @returns {Promise<{ targetUrl: string, isLocalDevice: boolean, duration: number }>}
+ */
+export const startOnDeviceSession = async ({
+  platform = 'tinder',
+  duration = 30,
+} = {}) => {
+  const platformKey = (platform || 'tinder').toLowerCase();
+  const targetUrl = platformKey === 'bumble' ? 'https://bumble.com' : 'https://tinder.com';
+
+  // Terminate any previous remote VMs or containers first
+  await terminatePreviousSessions();
+
+  registerActiveSession({
+    isLocalDevice: true,
+    platform: platformKey,
+    targetUrl,
+    duration,
+  });
+
+  return { targetUrl, isLocalDevice: true, duration };
+};
+

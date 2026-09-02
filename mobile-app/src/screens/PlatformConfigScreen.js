@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
-import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession } from '../utils/sessionManager';
+import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession, startOnDeviceSession } from '../utils/sessionManager';
 import NotificationService from '../services/notifications';
 
 const V2_GOALS = [
@@ -38,6 +38,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
   const [contactHandle, setContactHandle] = useState('');
 
   // Cycle settings
+  const [sessionDuration, setSessionDuration] = useState(30); // 15 | 30 | 45 | 60 | 0 (continuous)
   const [likesPerCycle, setLikesPerCycle] = useState(50);
   const [messagesPerCycle, setMessagesPerCycle] = useState(20);
   const [scheduleInterval, setScheduleInterval] = useState(30);
@@ -92,6 +93,29 @@ export default function PlatformConfigScreen({ route, navigation }) {
 
     // ─── Terminate any other currently active sessions first ───
     await terminatePreviousSessions(resolvedOrchestratorUrl, HYPERBEAM_KEY);
+
+    const isLocalDevice = route.params?.isLocalDevice || route.params?.environment === 'on_device';
+    if (isLocalDevice) {
+      try {
+        console.log('[Mobile] Starting On-Device Local Session...');
+        const { targetUrl } = await startOnDeviceSession({
+          platform,
+          duration: sessionDuration,
+        });
+        setLoading(false);
+        navigation.navigate('Browser', {
+          platform,
+          vpsUrl: targetUrl,
+          isLocalDevice: true,
+          environment: 'on_device',
+          sessionDuration,
+          proxyIp: '',
+        });
+        return;
+      } catch (devErr) {
+        console.error('[Mobile] On-device startup error:', devErr);
+      }
+    }
 
     const isHyperbeam = vpsUrl === 'hyperbeam' || route.params?.environment === 'hyperbeam';
 
@@ -325,6 +349,51 @@ export default function PlatformConfigScreen({ route, navigation }) {
                   <Feather name="plus" size={14} color="#FFF" />
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+
+          {/* Section 2.5: Automation Duration / Session Timer */}
+          <View style={styles.sectionCard}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardTitleRow}>
+                <Ionicons name="timer-outline" size={16} color={themeColor} />
+                <Text style={styles.sectionHeader}>Session Duration</Text>
+              </View>
+              <View style={[styles.activePill, { backgroundColor: `${themeColor}20`, borderColor: themeColor }]}>
+                <Text style={[styles.activePillText, { color: themeColor }]}>
+                  {sessionDuration === 0 ? 'Continuous' : `${sessionDuration} min auto-stop`}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.sectionDesc}>
+              Automatically pause swiping when time is up to protect account safety and save battery.
+            </Text>
+
+            <View style={styles.timerDurationGrid}>
+              {[
+                { label: '15 min', value: 15 },
+                { label: '30 min', value: 30, recommended: true },
+                { label: '45 min', value: 45 },
+                { label: '60 min', value: 60 },
+                { label: 'Non-stop', value: 0 },
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item.value}
+                  style={[
+                    styles.timerChip,
+                    sessionDuration === item.value && [styles.timerChipActive, { borderColor: themeColor, backgroundColor: `${themeColor}15` }],
+                  ]}
+                  onPress={() => setSessionDuration(item.value)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.timerChipText, sessionDuration === item.value && { color: '#FFF', fontWeight: '700' }]}>
+                    {item.label}
+                  </Text>
+                  {item.recommended && (
+                    <Text style={[styles.timerChipBadge, { color: themeColor }]}>Rec</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
@@ -637,6 +706,36 @@ const styles = StyleSheet.create({
     padding: 3,
     borderWidth: 1,
     borderColor: '#26223B',
+  },
+  timerDurationGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  timerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#0D0B14',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#221E33',
+  },
+  timerChipActive: {
+    borderWidth: 1.5,
+  },
+  timerChipText: {
+    color: '#8E8DA3',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  timerChipBadge: {
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
   stepBtn: {
     width: 30,
