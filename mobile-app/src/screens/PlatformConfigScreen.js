@@ -10,10 +10,11 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Alert,
   Dimensions,
 } from 'react-native';
+import ActivityIndicator from '../components/common/SafeActivityIndicator';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';

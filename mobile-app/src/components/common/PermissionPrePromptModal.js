@@ -8,10 +8,10 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Platform,
   AppState,
 } from 'react-native';
+import ActivityIndicator from './SafeActivityIndicator';
 import { Ionicons } from '@expo/vector-icons';
 import LocationService from '../../services/locationService';
 import NotificationService from '../../services/notifications';

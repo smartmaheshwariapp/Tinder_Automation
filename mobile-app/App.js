@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, StatusBar } from 'react-native';
+import { StyleSheet, Text, View, StatusBar } from 'react-native';
+import SafeActivityIndicator from './src/components/common/SafeActivityIndicator';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
@@ -15,11 +16,38 @@ export default function App() {
   const navigationRef = useRef(null);
 
   useEffect(() => {
-    const unsub = NotificationService.subscribeRedirectPrompt((notif) => {
+    // 1. Initialize Notification Center persistent storage & channels
+    NotificationService.initialize();
+
+    // 2. Subscribe to smart redirect modals (WhatsApp / Instagram / Tinder)
+    const unsubRedirect = NotificationService.subscribeRedirectPrompt((notif) => {
       setRedirectNotif(notif);
     });
-    return unsub;
+
+    // 3. Setup Native Push & OS Tray Tap Listeners
+    const cleanupListeners = NotificationService.setupListeners(
+      (notif) => {
+        // Foreground push received
+      },
+      (response, notifItem) => {
+        // User tapped push notification in the OS tray
+        const data = notifItem?.data || {};
+        if (data.phone || data.instagram) {
+          NotificationService.handleNotificationRedirect(notifItem);
+        } else if (data.type === 'new_match' || data.type === 'cycle_complete') {
+          if (navigationRef.current && navigationRef.current.isReady && navigationRef.current.isReady()) {
+            navigationRef.current.navigate('PlatformSelect');
+          }
+        }
+      }
+    );
+
+    return () => {
+      unsubRedirect();
+      cleanupListeners();
+    };
   }, []);
+
 
   useEffect(() => {
     const boot = async () => {
@@ -53,7 +81,7 @@ export default function App() {
     return (
       <View style={styles.splashContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#0F0F13" />
-        <ActivityIndicator size="large" color="#FE3C72" />
+        <SafeActivityIndicator size="large" color="#FE3C72" />
         <Text style={styles.splashTitle}>Linksy</Text>
         <Text style={styles.splashStatus}>{updateStatus}</Text>
       </View>
@@ -64,7 +92,16 @@ export default function App() {
     <SafeAreaProvider>
       <NavigationContainer ref={navigationRef}>
         <AppNavigator />
-        <InAppNotificationBanner />
+        <InAppNotificationBanner
+          onNavigateToStream={(notif) => {
+            const data = notif?.data || {};
+            if (data.type === 'new_match' || data.type === 'cycle_complete') {
+              if (navigationRef.current && navigationRef.current.isReady && navigationRef.current.isReady()) {
+                navigationRef.current.navigate('PlatformSelect');
+              }
+            }
+          }}
+        />
         <ExternalRedirectModal
           visible={!!redirectNotif}
           notification={redirectNotif}

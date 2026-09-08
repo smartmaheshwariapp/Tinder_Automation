@@ -84,6 +84,9 @@ export default function CloudDashboardScreen({ route, navigation }) {
         error={error}
         orchestratorUrl={orchestratorUrl}
         onToggleAgent={handleToggleAgent}
+        onLogout={() => navigation.navigate('PlatformSelect')}
+        onConnect={vpsUrl ? () => navigation.navigate('Browser', { vpsUrl, platform, proxyIp: '' }) : undefined}
+        isLoggedIn={Boolean(stats?.tinderAccount?.isLoggedIn ?? true)}
         controlsContent={
           <View style={styles.infoBox}>
             <View style={styles.infoTitleRow}>

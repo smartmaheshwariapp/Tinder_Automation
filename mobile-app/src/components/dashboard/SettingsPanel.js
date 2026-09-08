@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
-  ActivityIndicator,
   StyleSheet,
+} from 'react-native';
+import ActivityIndicator from '../common/SafeActivityIndicator';
+import {
   LayoutAnimation,
   Platform,
   UIManager,
@@ -40,7 +42,7 @@ export { REGION_FILTERS, CITY_PRESETS } from '../../utils/locationHubs';
 import { REGION_FILTERS, CITY_PRESETS } from '../../utils/locationHubs';
 import LocationService from '../../services/locationService';
 import LocationNoticeModal from '../common/LocationNoticeModal';
-
+import { getTinderAuthState, subscribeTinderAuthState } from '../../utils/sessionManager';
 
 const BIO_MODES = [
   { id: 'tinder', label: 'Sync' },
@@ -90,6 +92,8 @@ export default function SettingsPanel({
   onSave,
   onDirtyChange,
   onLogout,
+  onConnect,
+  isLoggedIn: propIsLoggedIn,
   rawControlsContent,
   orchestratorUrl,
   stats,
@@ -97,6 +101,36 @@ export default function SettingsPanel({
   onPushBio,
   initialOpenSection,
 }) {
+  const [tinderAuth, setTinderAuth] = useState(() => {
+    try {
+      return typeof getTinderAuthState === 'function' ? getTinderAuthState() : null;
+    } catch (_) {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (typeof subscribeTinderAuthState === 'function') {
+      return subscribeTinderAuthState((newAuth) => {
+        setTinderAuth({ ...newAuth });
+      });
+    }
+  }, []);
+
+  const isTinderLoggedIn = Boolean(
+    propIsLoggedIn !== undefined
+      ? propIsLoggedIn
+      : (stats?.tinderAccount?.isLoggedIn ?? tinderAuth?.isLoggedIn ?? false)
+  );
+
+  const handleConnectPress = () => {
+    if (typeof onConnect === 'function') {
+      onConnect();
+    } else if (typeof onLogout === 'function') {
+      onLogout();
+    }
+  };
+
   const [form, setForm] = useState(null);
   const formRef = useRef(null);
   const [safetyCollapsed, setSafetyCollapsed] = useState(true);
@@ -1457,41 +1491,78 @@ export default function SettingsPanel({
           <View style={styles.accountProfileRow}>
             <View style={styles.accountIconWrap}>
               <Image source={TINDER_ICON} style={styles.accountLogo} />
-              <View style={styles.accountActiveDot} />
+              <View
+                style={[
+                  styles.accountActiveDot,
+                  !isTinderLoggedIn && styles.accountInactiveDot,
+                ]}
+              />
             </View>
             <View style={styles.accountInfoWrap}>
               <View style={styles.accountTitleRow}>
                 <Text style={styles.accountTitle}>
-                  {form?.userProfile?.name ? `${form.userProfile.name} (Tinder)` : (stats?.tinderAccount?.name || 'Tinder Account')}
+                  {isTinderLoggedIn
+                    ? (form?.userProfile?.name
+                      ? `${form.userProfile.name} (Tinder)`
+                      : (stats?.tinderAccount?.name || tinderAuth?.accountName || 'Tinder Account'))
+                    : 'Tinder Account'}
                 </Text>
-                <View style={styles.accountPlanBadge}>
-                  <Text style={styles.accountPlanText}>PRO PLAN ✦</Text>
+                <View
+                  style={[
+                    styles.accountPlanBadge,
+                    !isTinderLoggedIn && styles.accountInactiveBadge,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.accountPlanText,
+                      !isTinderLoggedIn && styles.accountInactiveBadgeText,
+                    ]}
+                  >
+                    {isTinderLoggedIn ? 'PRO PLAN ✦' : 'NOT CONNECTED'}
+                  </Text>
                 </View>
               </View>
               <Text style={styles.accountSubText} numberOfLines={1}>
-                {stats?.tinderAccount?.email ? `${stats.tinderAccount.email} • Connected` : 'Active • Connected Session'}
+                {isTinderLoggedIn
+                  ? (stats?.tinderAccount?.email ? `${stats.tinderAccount.email} • Connected` : 'Active • Connected Session')
+                  : 'Signed Out • Connect Tinder to automate'}
               </Text>
             </View>
           </View>
 
           <View style={styles.cardDivider} />
 
-          {/* Prominent Full-Width Red Glass Logout Button */}
-          <TouchableOpacity
-            style={styles.accountLogoutBtn}
-            onPress={handleLogoutPress}
-            disabled={loggingOut}
-            activeOpacity={0.85}
-          >
-            {loggingOut ? (
-              <ActivityIndicator size="small" color="#EF4444" />
-            ) : (
-              <View style={styles.accountLogoutBtnInner}>
-                <Ionicons name="log-out-outline" size={16} color="#EF4444" />
-                <Text style={styles.accountLogoutBtnText}>Log Out of Tinder</Text>
+          {/* Dynamic Action Button: Logout if Connected, Connect if Disconnected */}
+          {isTinderLoggedIn ? (
+            <TouchableOpacity
+              style={styles.accountLogoutBtn}
+              onPress={handleLogoutPress}
+              disabled={loggingOut}
+              activeOpacity={0.85}
+            >
+              {loggingOut ? (
+                <ActivityIndicator size="small" color="#EF4444" />
+              ) : (
+                <View style={styles.accountLogoutBtnInner}>
+                  <Ionicons name="log-out-outline" size={16} color="#EF4444" />
+                  <Text style={styles.accountLogoutBtnText}>Log Out of Tinder</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.accountConnectBtn}
+              onPress={handleConnectPress}
+              activeOpacity={0.85}
+            >
+              <View style={styles.accountConnectBtnInner}>
+                <Ionicons name="flame" size={16} color="#FFFFFF" />
+                <Text style={styles.accountConnectBtnText}>Log In to Tinder</Text>
+                <Ionicons name="arrow-forward" size={14} color="#FFFFFF" style={{ marginLeft: 2 }} />
               </View>
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ════════════════════ CATEGORY 4: DIRECT KEYPAD ════════════════════ */}
@@ -2145,6 +2216,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#151322',
   },
+  accountInactiveDot: {
+    backgroundColor: '#64748B',
+    borderColor: '#151322',
+  },
   accountInfoWrap: {
     flex: 1,
   },
@@ -2168,11 +2243,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
+  accountInactiveBadge: {
+    backgroundColor: 'rgba(148, 163, 184, 0.12)',
+    borderColor: 'rgba(148, 163, 184, 0.25)',
+  },
   accountPlanText: {
     color: '#FE3C72',
     fontSize: 9.5,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  accountInactiveBadgeText: {
+    color: '#94A3B8',
   },
   accountSubText: {
     color: '#8E8DA3',
@@ -2197,6 +2279,30 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontSize: 13,
     fontWeight: '700',
+  },
+  accountConnectBtn: {
+    backgroundColor: '#FE3C72',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FE3C72',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  accountConnectBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  accountConnectBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   cardDivider: {
     height: 1,

@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   Animated,
   StyleSheet,
-  ActivityIndicator,
   Easing,
   Platform,
 } from 'react-native';
+import ActivityIndicator from '../common/SafeActivityIndicator';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function FloatingSaveBar({

@@ -3,10 +3,10 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  ActivityIndicator,
   StyleSheet,
   ScrollView,
 } from 'react-native';
+import ActivityIndicator from '../common/SafeActivityIndicator';
 import { Ionicons } from '@expo/vector-icons';
 
 import MasterHeroController from './MasterHeroController';
@@ -18,6 +18,7 @@ import SettingsPanel from './SettingsPanel';
 import FloatingSaveBar from './FloatingSaveBar';
 import useExtensionSettings from '../../hooks/useExtensionSettings';
 import { resolveLocalUrl } from '../../utils/network';
+import { getProgressFeed } from '../../utils/sessionManager';
 
 function LoadingState() {
   return (
@@ -35,6 +36,8 @@ export default function DashboardPanel({
   controlsContent,
   onToggleAgent,
   onLogout,
+  onConnect,
+  isLoggedIn,
   orchestratorUrl,
   onSaveSettings,
   settings: propSettings,
@@ -56,7 +59,9 @@ export default function DashboardPanel({
 
   const agentState    = stats?.agentState    ?? null;
   const lifetimeStats = stats?.lifetimeStats ?? null;
-  const progressFeed  = stats?.progressFeed  ?? [];
+  const progressFeed  = (Array.isArray(stats?.progressFeed) && stats.progressFeed.length > 0)
+    ? stats.progressFeed
+    : (typeof getProgressFeed === 'function' ? getProgressFeed() : []);
   const liveSettings  = (propSettings || stats?.settings) ?? null;
 
   const effectiveOrchestratorUrl = orchestratorUrl || resolveLocalUrl('http://localhost:3001');
@@ -190,6 +195,8 @@ export default function DashboardPanel({
             onSave={handleSave}
             onDirtyChange={handleDirtyChange}
             onLogout={onLogout}
+            onConnect={onConnect}
+            isLoggedIn={isLoggedIn}
             rawControlsContent={controlsContent}
             orchestratorUrl={effectiveOrchestratorUrl}
             stats={stats}

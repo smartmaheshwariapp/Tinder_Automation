@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
-  ActivityIndicator,
   StyleSheet,
+} from 'react-native';
+import ActivityIndicator from '../common/SafeActivityIndicator';
+import {
   LayoutAnimation,
   Platform,
   UIManager,

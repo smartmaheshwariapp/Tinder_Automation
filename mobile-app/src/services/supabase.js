@@ -201,6 +201,103 @@ export const SupabaseService = {
   },
 
   /**
+   * Batch insert tracking events into user_events
+   */
+  async insertUserEvents(events = []) {
+    if (!Array.isArray(events) || events.length === 0) return { success: true };
+    return apiRequest('/user_events', 'POST', events);
+  },
+
+  /**
+   * Aggregate batch events into live user_snapshots (likes_today, messages_today, agent_state, etc.)
+   */
+  async syncSnapshotWithEvents(userId, events = []) {
+    if (!userId) return { success: false };
+    const existingRes = await this.getUserSnapshot(userId);
+    const existing = existingRes.data || {};
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const stats = { ...(existing.stats || {}) };
+
+    // Daily rollover reset
+    if (stats.stats_date !== todayStr) {
+      stats.messages_today = 0;
+      stats.likes_today = 0;
+      stats.matches_today = 0;
+      stats.follow_ups_today = 0;
+      stats.errors_today = 0;
+      stats.ai_calls_today = 0;
+      stats.stats_date = todayStr;
+    }
+
+    const agent_state = { ...(existing.agent_state || {}) };
+    let platform = existing.platform || 'tinder';
+
+    for (const e of events) {
+      if (e.platform) platform = e.platform;
+      const p = e.payload || {};
+      switch (e.event_type) {
+        case 'agent_start':
+          agent_state.is_running = true;
+          agent_state.agent_started_at = now.toISOString();
+          break;
+        case 'agent_stop':
+          agent_state.is_running = false;
+          agent_state.agent_stopped_at = now.toISOString();
+          break;
+        case 'like_sent':
+          stats.likes_today = (stats.likes_today || 0) + (p.count || 1);
+          stats.likes_total = (stats.likes_total || 0) + (p.count || 1);
+          break;
+        case 'message_sent':
+          stats.messages_today = (stats.messages_today || 0) + (p.count || 1);
+          stats.messages_total = (stats.messages_total || 0) + (p.count || 1);
+          if (p.style) stats.last_style = p.style;
+          if (p.language) stats.last_language = p.language;
+          break;
+        case 'match_found':
+          stats.matches_today = (stats.matches_today || 0) + (p.count || 1);
+          stats.matches_total = (stats.matches_total || 0) + (p.count || 1);
+          break;
+        case 'follow_up_sent':
+          stats.follow_ups_today = (stats.follow_ups_today || 0) + (p.count || 1);
+          stats.follow_ups_total = (stats.follow_ups_total || 0) + (p.count || 1);
+          break;
+        case 'handoff':
+          stats.handoffs_total = (stats.handoffs_total || 0) + 1;
+          stats.last_handoff_type = p.handoff_type;
+          stats.last_handoff_at = now.toISOString();
+          break;
+        case 'ai_call':
+          stats.ai_calls_today = (stats.ai_calls_today || 0) + 1;
+          stats.ai_calls_total = (stats.ai_calls_total || 0) + 1;
+          if (p.model) stats.last_ai_model = p.model;
+          if (p.latency_ms) stats.last_ai_latency_ms = p.latency_ms;
+          break;
+        case 'cycle_start':
+          stats.cycles_total = (stats.cycles_total || 0) + 1;
+          agent_state.last_cycle_start = now.toISOString();
+          break;
+        case 'cycle_end':
+          agent_state.last_cycle_end = now.toISOString();
+          break;
+        case 'error':
+          stats.errors_today = (stats.errors_today || 0) + 1;
+          stats.errors_total = (stats.errors_total || 0) + 1;
+          if (p.message) stats.last_error = String(p.message).slice(0, 200);
+          break;
+      }
+    }
+
+    return this.saveUserSnapshot(userId, {
+      platform,
+      stats,
+      agent_state,
+      is_active: agent_state.is_running !== undefined ? agent_state.is_running : existing.is_active,
+    });
+  },
+
+  /**
    * Fetch system configuration and prompt presets
    */
   async fetchSystemConfig() {

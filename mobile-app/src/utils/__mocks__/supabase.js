@@ -3,6 +3,8 @@
 const SupabaseService = {
   getUserSnapshot: jest.fn(async () => null),
   saveUserSnapshot: jest.fn(async () => {}),
+  insertUserEvents: jest.fn(async () => ({ ok: true, status: 201 })),
+  syncSnapshotWithEvents: jest.fn(async () => ({ ok: true, status: 200 })),
 };
 
 module.exports = SupabaseService;

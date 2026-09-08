@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   Animated,
   StyleSheet,
-  ActivityIndicator,
   Easing,
 } from 'react-native';
+import ActivityIndicator from '../common/SafeActivityIndicator';
 import { Ionicons } from '@expo/vector-icons';
 
 // ─── Phase Telemetry & Copywriting (1:1 with Desktop V2 status-display.js) ───
@@ -201,8 +201,8 @@ export default function MasterHeroController({
   }, [agentState?.nextRunTimestamp]);
 
   // ─── 7. Telemetry Strings & Dynamic Content ───
-  const currentLikes = agentState?.currentCycle?.likesCompleted || 0;
-  const currentMsgs = (agentState?.currentCycle?.messagesProcessed || 0) + (agentState?.currentCycle?.followUpsSent || 0);
+  const currentLikes = agentState?.currentCycle?.likesCompleted ?? agentState?.stats?.swipes ?? agentState?.stats?.likesCompleted ?? 0;
+  const currentMsgs = ((agentState?.currentCycle?.messagesProcessed || 0) + (agentState?.currentCycle?.followUpsSent || 0)) || (agentState?.stats?.messages ?? agentState?.stats?.messagesSent ?? 0);
 
   const telemetry = useMemo(() => {
     if (isSafetyLocked) {

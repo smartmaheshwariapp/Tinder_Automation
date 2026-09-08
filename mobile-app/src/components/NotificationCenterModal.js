@@ -54,6 +54,7 @@ function formatTimeAgo(isoString) {
 export default function NotificationCenterModal({
   visible,
   onClose,
+  onOpenStream,
 }) {
   const insets = useSafeAreaInsets();
   const [notifications, setNotifications] = useState([]);
@@ -170,6 +171,9 @@ export default function NotificationCenterModal({
     safeHaptic('light');
     handleDismiss();
     NotificationService.handleNotificationRedirect(item);
+    if (onOpenStream) {
+      onOpenStream(item);
+    }
   };
 
   const handleCopyPhone = (item, e) => {
@@ -354,7 +358,21 @@ export default function NotificationCenterModal({
                   activeOpacity={0.8}
                 >
                   <Ionicons name="checkmark-done" size={13} color="#D8D6E8" />
-                  <Text style={styles.markAllBtnText}>Mark all as read</Text>
+                  <Text style={styles.markAllBtnText}>Read</Text>
+                </TouchableOpacity>
+              )}
+
+              {totalCount > 0 && (
+                <TouchableOpacity
+                  style={styles.clearAllBtn}
+                  onPress={() => {
+                    NotificationService.clearAll();
+                    safeHaptic('light');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="trash-outline" size={12} color="#8E8DA3" />
+                  <Text style={styles.clearAllBtnText}>Clear</Text>
                 </TouchableOpacity>
               )}
 
@@ -593,6 +611,22 @@ const styles = StyleSheet.create({
   },
   markAllBtnText: {
     color: '#D8D6E8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  clearAllBtnText: {
+    color: '#8E8DA3',
     fontSize: 11,
     fontWeight: '600',
   },

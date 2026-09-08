@@ -141,6 +141,19 @@ describe('eager restore on module load', () => {
     // Raw value is preserved in state (BrowserScreen ignores it for isRunning).
     expect(getOnDeviceSessionState().swipes).toBe(50);
   });
+
+  it('preserves active in-memory isRunning:true if started before eager restore completes', async () => {
+    AsyncStorage._store['@fe_on_device_session_state'] = JSON.stringify({
+      swipes: 10, matches: 2, isRunning: false, lastSavedAt: 100
+    });
+
+    const sm = loadSessionManager();
+    // Simulate user starting automation immediately on load
+    await sm.saveOnDeviceSessionState({ isRunning: true });
+    await Promise.resolve(); // flush any pending eager restore
+
+    expect(sm.getOnDeviceSessionState().isRunning).toBe(true);
+  });
 });
 
 describe('clearTinderAuthState clears session state and destroys singleton', () => {

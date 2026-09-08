@@ -14,15 +14,26 @@ const EVENT_CONFIG = {
   swipe_progress:   { icon: 'trending-up-outline',   label: 'Swiping Session',    color: '#FE3C72' },
   msg_progress:     { icon: 'chatbox-ellipses',      label: 'Messaging Queue',    color: '#EC4899' },
   rate_limit:       { icon: 'shield-outline',        label: 'Safety Pace Active', color: '#EF4444' },
+  follow_up_sent:   { icon: 'paper-plane-outline',   label: 'Follow-Up Sent',     color: '#A78BFA' },
+  trial_limit:      { icon: 'flag-outline',          label: 'Trial Limit Active', color: '#716E89' },
   trial_ended:      { icon: 'flag-outline',          label: 'Cycle Paused',       color: '#716E89' },
   error:            { icon: 'alert-circle-outline',  label: 'Attention Needed',   color: '#EF4444' },
+  // Aliases from direct logs & webview events
+  like:             { icon: 'heart',                 label: 'Profile Liked',      color: '#FE3C72' },
+  match:            { icon: 'sparkles',              label: 'New Match',          color: '#F59E0B' },
+  message:          { icon: 'chatbubbles-outline',   label: 'Reply Sent',         color: '#818CF8' },
+  info:             { icon: 'options-outline',       label: 'Tone Calibrated',    color: '#818CF8' },
+  action:           { icon: 'trending-up-outline',   label: 'Swiping Session',    color: '#FE3C72' },
+  success:          { icon: 'sparkles',              label: 'Milestone',          color: '#10B981' },
 };
 
 function formatTimeAgo(timestamp) {
-  if (!timestamp) return '';
-  const diff = Date.now() - timestamp;
+  if (!timestamp) return 'Just now';
+  const ts = typeof timestamp === 'number' ? timestamp : Date.now();
+  const diff = Math.max(0, Date.now() - ts);
   const secs = Math.floor(diff / 1000);
-  if (secs < 30) return 'Just now';
+  if (secs < 5) return 'Just now';
+  if (secs < 60) return `${secs}s ago`;
   const mins = Math.floor(secs / 60);
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
@@ -31,21 +42,84 @@ function formatTimeAgo(timestamp) {
   return days === 1 ? 'Yesterday' : `${days}d ago`;
 }
 
-function truncateText(text, maxLen = 48) {
+function truncateText(text, maxLen = 54) {
   const clean = (text || '').replace(/\s+/g, ' ').trim();
   return clean.length > maxLen ? `${clean.slice(0, maxLen - 1)}…` : clean;
 }
 
+function getEventDisplay(event) {
+  const config = EVENT_CONFIG[event.type] || EVENT_CONFIG.profile_liked;
+  let title = config.label;
+  let detail = (event.detail || event.message || event.text || '').trim();
+
+  switch (event.type) {
+    case 'profile_liked':
+    case 'like':
+      title = event.name ? `Liked ${event.name}` : 'Liked Profile';
+      // Eliminate tautological echoing ("Liked X's profile" -> contextual metadata)
+      if (!detail || detail.toLowerCase().includes('liked') || detail.toLowerCase().includes('swiped')) {
+        detail = event.age ? `Age ${event.age} · Verified Profile` : 'AI Compatibility Match · Safe Paced';
+      }
+      break;
+
+    case 'match_detected':
+    case 'match':
+      title = event.name ? `Matched with ${event.name}!` : 'New Match Connected!';
+      if (!detail || detail.toLowerCase().includes('match connected') || detail.toLowerCase().includes('new match')) {
+        detail = 'High Compatibility · Ready for Opener';
+      }
+      break;
+
+    case 'opener_sent':
+      title = event.name ? `Opener to ${event.name}` : 'Opener Sent';
+      break;
+
+    case 'message_replied':
+    case 'message':
+      title = event.name ? `Reply to ${event.name}` : 'Reply Sent';
+      break;
+
+    case 'handoff_detected':
+      title = event.name ? `Contact Exchanged (${event.name})` : 'Goal Reached: Lead Captured';
+      break;
+
+    case 'swipe_progress':
+    case 'action':
+      title = 'Batch Progress';
+      break;
+
+    case 'cycle_complete':
+      title = 'Batch Completed';
+      break;
+
+    case 'persona_update':
+    case 'info':
+      title = 'Wingman Active';
+      break;
+
+    default:
+      if (event.name) {
+        title = `${config.label} · ${event.name}`;
+      }
+      break;
+  }
+
+  return {
+    config,
+    title,
+    detailText: detail ? truncateText(detail, 54) : null,
+  };
+}
+
 function TimelineItem({ event, isLast }) {
-  const config = EVENT_CONFIG[event.type] || EVENT_CONFIG.error;
-  const nameLabel = event.name ? ` → ${event.name}` : '';
-  const detailText = event.detail ? truncateText(event.detail) : null;
+  const { config, title, detailText } = getEventDisplay(event);
+  const rawDetail = event.detail || event.message || event.text || '';
   const isMoment = event.type === 'handoff_detected' || (
-    event.detail && (
-      event.detail.toLowerCase().includes('number') ||
-      event.detail.toLowerCase().includes('date') ||
-      event.detail.toLowerCase().includes('whatsapp') ||
-      event.detail.toLowerCase().includes('instagram')
+    rawDetail && (
+      rawDetail.toLowerCase().includes('number') ||
+      rawDetail.toLowerCase().includes('date') ||
+      rawDetail.toLowerCase().includes('whatsapp') ||
+      rawDetail.toLowerCase().includes('instagram')
     )
   );
 
@@ -70,8 +144,7 @@ function TimelineItem({ event, isLast }) {
               color={isMoment ? '#10B981' : config.color}
             />
             <Text style={[styles.cardTitle, isMoment && { color: '#10B981' }]} numberOfLines={1}>
-              {isMoment ? 'Match Moment (Goal)' : config.label}
-              {nameLabel ? <Text style={{ color: '#FFF' }}>{nameLabel}</Text> : null}
+              {title}
             </Text>
           </View>
           <Text style={styles.cardTime}>{formatTimeAgo(event.timestamp)}</Text>
@@ -90,6 +163,15 @@ function TimelineItem({ event, isLast }) {
 export default function ActivityTimeline({ progressFeed }) {
   const scrollRef = useRef(null);
   const events = Array.isArray(progressFeed) ? progressFeed : [];
+
+  // Live timer to tick relative timestamps every 5 seconds
+  const [, setTick] = React.useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick(t => t + 1);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   const momentsCount = events.filter(e =>
     e.type === 'handoff_detected' ||
@@ -123,7 +205,7 @@ export default function ActivityTimeline({ progressFeed }) {
         </View>
 
         {events.length > 0 && (
-          <Text style={styles.countText}>{events.length} events</Text>
+          <Text style={styles.countText}>{events.length} {events.length === 1 ? 'event' : 'events'}</Text>
         )}
       </View>
 
@@ -139,6 +221,7 @@ export default function ActivityTimeline({ progressFeed }) {
         <ScrollView
           ref={scrollRef}
           style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
           nestedScrollEnabled={true}
           showsVerticalScrollIndicator={false}
         >
@@ -203,7 +286,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   scroll: {
-    maxHeight: 260,
+    maxHeight: 280,
+  },
+  scrollContent: {
+    paddingTop: 4,
+    paddingBottom: 10,
+    paddingHorizontal: 2,
   },
   itemRow: {
     flexDirection: 'row',

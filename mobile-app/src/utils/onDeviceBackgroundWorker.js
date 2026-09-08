@@ -3,6 +3,14 @@
 // Replaces the Chrome Extension background service worker (background.js + openai.js)
 // inside the React Native environment.
 
+import { API_CONFIG } from '../config/api';
+import trackingService from '../services/trackingService';
+import {
+  saveOnDeviceSessionState,
+  getOnDeviceSessionState,
+  pushProgressFeedEvent,
+} from './sessionManager';
+
 /**
  * Default fallback responses if OpenAI API is completely unreachable.
  * Tailored by style and goal so automation continues smoothly.
@@ -81,20 +89,27 @@ export class OnDeviceBackgroundWorker {
     this.onLog = onLog;
 
     // In-memory state (mirrors extension background state)
+    const session = typeof getOnDeviceSessionState === 'function' ? getOnDeviceSessionState() : {};
     this.agentState = {
       isRunning: false,
       isPaused: false,
       currentPhase: 'idle', // 'swiping' | 'messaging' | 'idle' | 'waiting'
       stats: {
-        swipes: 0,
-        matches: 0,
-        messages: 0,
+        swipes: session?.swipes || 0,
+        matches: session?.matches || 0,
+        messages: session?.messages || 0,
+        likesCompleted: session?.swipes || 0,
+        matchesCreated: session?.matches || 0,
+        messagesSent: session?.messages || 0,
         cycles: 0,
         draftingStep: ''
       },
       lastCycleAt: null,
       nextCycleAt: null
     };
+
+    this._currentRunLikes = 0;
+    this._currentRunMessages = 0;
 
     this.stoppedChats = new Map(); // matchId -> { reason, matchName, stoppedAt }
     this.matchLanguage = new Map(); // matchId -> { code, name, confidence, source }
@@ -161,18 +176,83 @@ export class OnDeviceBackgroundWorker {
 
       case 'updateCycleStats': {
         const stats = payload.stats || {};
-        const swipes = stats.swipes !== undefined ? stats.swipes : stats.likesCompleted;
-        const matches = stats.matches !== undefined ? stats.matches : stats.matchesCreated;
-        const messages = stats.messages !== undefined ? stats.messages : stats.messagesSent;
 
-        if (swipes !== undefined) this.agentState.stats.swipes = swipes;
-        if (matches !== undefined) this.agentState.stats.matches = matches;
-        if (messages !== undefined) this.agentState.stats.messages = messages;
+        // Swipes / Likes tracking
+        if (stats.likesCompleted !== undefined) {
+          // Cycle-relative likes completed from autoLike (1, 2, 3...)
+          const deltaLikes = Math.max(0, stats.likesCompleted - this._currentRunLikes);
+          this._currentRunLikes = stats.likesCompleted;
+          if (deltaLikes > 0) {
+            this.agentState.stats.swipes = (this.agentState.stats.swipes || 0) + deltaLikes;
+            this.agentState.stats.likesCompleted = this.agentState.stats.swipes;
+            trackingService.trackLike(deltaLikes);
+
+            const targetName = stats.currentName || 'Someone New';
+            const detailText = stats.detail || (stats.age ? `Age ${stats.age} · Verified Profile` : 'AI Target Match · Safe Paced');
+            pushProgressFeedEvent('profile_liked', detailText, targetName, 5);
+
+            if (this._currentRunLikes > 0 && this._currentRunLikes % 5 === 0) {
+              const target = this.settings.likesPerCycle || 50;
+              const completedInCycle = this._currentRunLikes;
+              const remainingInCycle = Math.max(0, target - completedInCycle);
+              pushProgressFeedEvent('swipe_progress', `Batch progress: ${completedInCycle}/${target} · ${remainingInCycle} remaining`, null, 0);
+            }
+          }
+        } else if (stats.swipes !== undefined) {
+          const prevSwipes = this.agentState.stats.swipes || 0;
+          if (stats.swipes > prevSwipes) {
+            trackingService.trackLike(stats.swipes - prevSwipes);
+          }
+          this.agentState.stats.swipes = stats.swipes;
+          this.agentState.stats.likesCompleted = stats.swipes;
+        }
+
+        // Matches tracking
+        if (stats.matchesCreated !== undefined) {
+          const prevMatches = this.agentState.stats.matches || 0;
+          if (stats.matchesCreated > prevMatches) {
+            const newMatches = stats.matchesCreated - prevMatches;
+            for (let i = 0; i < newMatches; i++) {
+              trackingService.trackMatch({ matchName: stats.currentName || null });
+            }
+            pushProgressFeedEvent('match_detected', 'New Match Connected!', stats.currentName || null, 25);
+          }
+          this.agentState.stats.matches = stats.matchesCreated;
+          this.agentState.stats.matchesCreated = stats.matchesCreated;
+        } else if (stats.matches !== undefined) {
+          this.agentState.stats.matches = stats.matches;
+          this.agentState.stats.matchesCreated = stats.matches;
+        }
+
+        // Messages tracking
+        if (stats.messagesProcessed !== undefined) {
+          const deltaMessages = Math.max(0, stats.messagesProcessed - this._currentRunMessages);
+          this._currentRunMessages = stats.messagesProcessed;
+          if (deltaMessages > 0) {
+            this.agentState.stats.messages = (this.agentState.stats.messages || 0) + deltaMessages;
+            this.agentState.stats.messagesSent = this.agentState.stats.messages;
+            const targetName = stats.currentName || 'Match';
+            const feedDetail = (stats.currentMessage || '').trim() || `Replied to ${targetName}`;
+            pushProgressFeedEvent('message_replied', feedDetail, targetName, 10);
+          }
+        } else if (stats.messages !== undefined) {
+          this.agentState.stats.messages = stats.messages;
+          this.agentState.stats.messagesSent = stats.messages;
+        }
+
         if (stats.draftingStep !== undefined) this.agentState.stats.draftingStep = stats.draftingStep;
 
-        if (stats.currentName) {
+        if (stats.currentName && (stats.likesCompleted !== undefined || stats.swipes !== undefined)) {
           this.log(`❤️ Liked ${stats.currentName} (${this.agentState.stats.swipes} profiles)`);
         }
+
+        saveOnDeviceSessionState({
+          swipes: this.agentState.stats.swipes,
+          matches: this.agentState.stats.matches,
+          messages: this.agentState.stats.messages,
+          isRunning: this.agentState.isRunning,
+        });
+
         this.notifyStateChange();
         return { success: true, stats: this.agentState.stats };
       }
@@ -204,6 +284,11 @@ export class OnDeviceBackgroundWorker {
           stoppedAt: Date.now()
         });
         this.log(`Chat stopped for match ${matchId}: ${reason}`);
+        trackingService.trackEvent('stop_condition_triggered', {
+          match_id: matchId,
+          reason: reason || 'Stopped by user',
+          match_name: matchName || 'Unknown',
+        });
         return { success: true };
       }
 
@@ -293,6 +378,15 @@ export class OnDeviceBackgroundWorker {
           this.handleSentStats[platform]++;
           this.log(`Handle sent tracked for ${platform}: ${this.handleSentStats[platform]}`);
         }
+        trackingService.trackHandoff({
+          handoff_type: platform || 'handle',
+          match_name: payload.matchName,
+          contact_value: payload.contactValue,
+          details: payload,
+        });
+        const matchName = payload.matchName || 'Match';
+        const contactVal = payload.contactValue || platform || 'Handle';
+        pushProgressFeedEvent('handoff_detected', `Moved to ${platform || 'contact'}: ${contactVal}`, matchName, 25);
         return { success: true, stats: this.handleSentStats };
       }
 
@@ -322,8 +416,11 @@ export class OnDeviceBackgroundWorker {
         };
 
       case 'recordMessage':
+        return { success: true };
+
       case 'trialMessageLimitReached':
       case 'messagingRateLimitReached':
+        trackingService.trackRateLimit(action);
         return { success: true };
 
       // ── AI Message Generation ──
@@ -332,18 +429,38 @@ export class OnDeviceBackgroundWorker {
         return await this.generateMessage(matchData, settings || this.settings, isFollowUp);
       }
 
-      // ── Agent Run Controls ──
+      // ── Agent Run Controls & State Query ──
+      case 'getAgentState':
+        return {
+          isRunning: Boolean(this.agentState.isRunning),
+          isPaused: Boolean(this.agentState.isPaused),
+          currentPhase: this.agentState.currentPhase || 'idle',
+          stats: this.agentState.stats || { swipes: 0, matches: 0, messages: 0 },
+          currentCycle: this.agentState.currentCycle || { likesCompleted: 0, messagesProcessed: 0 },
+        };
+
       case 'startAgent':
         this.agentState.isRunning = true;
         this.agentState.isPaused = false;
+        this.agentState.currentPhase = 'swiping';
+        this._currentRunLikes = 0;
+        this._currentRunMessages = 0;
+        pushProgressFeedEvent('persona_update', 'AI Wingman Activated — Swiping & Chatting', null, 0);
+        saveOnDeviceSessionState({ isRunning: true });
         this.notifyStateChange();
+        trackingService.trackAgentStart(this.settings);
         return { success: true };
 
       case 'stopAgent':
         this.agentState.isRunning = false;
-        this.agentState.isPaused = false;
+        this.agentState.isPaused = true;
         this.agentState.currentPhase = 'idle';
+        this._currentRunLikes = 0;
+        this._currentRunMessages = 0;
+        pushProgressFeedEvent('cycle_complete', `Automation paused · ${this.agentState.stats.swipes || 0} total swiped`, null, 0);
+        saveOnDeviceSessionState({ isRunning: false });
         this.notifyStateChange();
+        trackingService.trackAgentStop('manual');
         return { success: true };
 
       // ── Stop Condition Evaluator ──
@@ -353,9 +470,15 @@ export class OnDeviceBackgroundWorker {
       }
 
       // ── Diagnostics & Telemetry ──
-      case 'reportDomError':
-        this.log(`[DOM Error] ${payload.payload?.error_type || 'error'}: ${payload.payload?.error_message || ''}`);
+      case 'reportDomError': {
+        const p = payload.payload || payload;
+        this.log(`[DOM Error] ${p.error_type || 'error'}: ${p.error_message || ''}`);
+        trackingService.trackError(p.error_type || 'dom_error', p.error_message || 'DOM error', {
+          selector: p.selector_key,
+          url: p.page_url,
+        });
         return { success: true };
+      }
 
       case 'progressFeedUpdate':
         return { success: true };
@@ -385,10 +508,36 @@ export class OnDeviceBackgroundWorker {
       const message = await this.callOpenAI(systemPrompt, userPrompt, effectiveSettings);
       const cleaned = this.cleanMessage(message);
       this.log(`AI generated message: "${cleaned}"`);
+
+      trackingService.trackMessage({
+        count: 1,
+        style: effectiveSettings.chattingStyle,
+        language: effectiveSettings.conversationLanguage,
+        isOpener: !isFollowUp,
+        matchName: matchData.name,
+      });
+
+      this.agentState.stats.messages = (this.agentState.stats.messages || 0) + 1;
+      this.agentState.stats.messagesSent = this.agentState.stats.messages;
+      saveOnDeviceSessionState({ messages: this.agentState.stats.messages });
+      this.notifyStateChange();
+
+      const feedType = isFollowUp ? 'follow_up_sent' : (matchData.conversationHistory?.length ? 'message_replied' : 'opener_sent');
+      pushProgressFeedEvent(feedType, cleaned, matchData.name || null, isFollowUp ? 8 : 10);
+
       return { success: true, message: cleaned };
     } catch (err) {
       this.log(`AI generation failed: ${err.message}. Using intelligent fallback.`);
       const fallback = this.getFallbackMessage(effectiveSettings, matchData, isFollowUp);
+
+      this.agentState.stats.messages = (this.agentState.stats.messages || 0) + 1;
+      this.agentState.stats.messagesSent = this.agentState.stats.messages;
+      saveOnDeviceSessionState({ messages: this.agentState.stats.messages });
+      this.notifyStateChange();
+
+      const feedType = isFollowUp ? 'follow_up_sent' : (matchData.conversationHistory?.length ? 'message_replied' : 'opener_sent');
+      pushProgressFeedEvent(feedType, fallback, matchData.name || null, 5);
+
       return { success: true, message: fallback, isFallback: true };
     }
   }
@@ -495,6 +644,8 @@ CRITICAL TEXTING RULES:
     const apiKey = settings.apiKey;
     const styleParams = STYLE_AI_PARAMS[settings.chattingStyle] || { temperature: 0.88, max_tokens: 90 };
 
+    const startTime = Date.now();
+
     // Mode A: Direct OpenAI API Key
     if (apiKey && apiKey.startsWith('sk-')) {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -520,21 +671,23 @@ CRITICAL TEXTING RULES:
       }
 
       const data = await res.json();
+      const latency_ms = Date.now() - startTime;
+      trackingService.trackAiCall({ model: settings.aiModel || 'gpt-4o-mini', latency_ms });
       return data.choices?.[0]?.message?.content?.trim() || '';
     }
 
-    // Mode B: FlirtEasy Cloudflare Worker Proxy (DEV bypass token)
-    const proxyUrl = 'https://flirteasy-auth.shnaiderdm.workers.dev/api/ai/chat';
-    const authToken = settings.userToken || 'dev-bypass-token';
+    // Mode B: Linksy / FlirtEasy Mobile Cloudflare Worker Proxy
+    const endpoints = API_CONFIG.getEndpoints();
+    const proxyUrl = endpoints.AI_CHAT;
+    const authToken = settings.userToken || API_CONFIG.appSecret;
 
     const res = await fetch(proxyUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+      headers: API_CONFIG.getHeaders({
         'Authorization': `Bearer ${authToken}`
-      },
+      }),
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: settings.aiModel || 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -550,9 +703,44 @@ CRITICAL TEXTING RULES:
     }
 
     const data = await res.json();
+    const latency_ms = Date.now() - startTime;
+    trackingService.trackAiCall({ model: settings.aiModel || 'gpt-4o-mini', latency_ms });
+
     const content = data.choices?.[0]?.message?.content || data.message || data.result;
     if (!content) throw new Error('Empty response from AI proxy');
     return content.trim();
+  }
+
+  /**
+   * Optional AI Humanizer pass via Cloudflare Worker (/api/ai/rewrite)
+   */
+  async rewriteMessageWithAI(rawMessage, { style = 'casual', language = 'auto', matchGender = null, senderGender = null } = {}) {
+    if (!rawMessage || typeof rawMessage !== 'string') return rawMessage;
+    try {
+      const endpoints = API_CONFIG.getEndpoints();
+      const res = await fetch(endpoints.AI_REWRITE, {
+        method: 'POST',
+        headers: API_CONFIG.getHeaders(),
+        body: JSON.stringify({
+          message: rawMessage,
+          style,
+          language,
+          matchGender,
+          senderGender,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.message) {
+          trackingService.trackRewrite({ changed: data.message !== rawMessage, model: data.source || 'humanizer' });
+          return data.message;
+        }
+      }
+    } catch (err) {
+      this.log(`[Humanizer Pass Skipped] ${err.message}`);
+    }
+    return rawMessage;
   }
 
   cleanMessage(msg) {

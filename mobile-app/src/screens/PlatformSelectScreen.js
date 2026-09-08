@@ -16,8 +16,9 @@ import {
   Platform,
   ScrollView,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
+import ActivityIndicator from '../components/common/SafeActivityIndicator';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -40,6 +41,9 @@ import {
   setHasPromptedPermissions,
   getPendingWebViewPurge,
   setPendingWebViewPurge,
+  probeTinderSession,
+  saveOnDeviceSessionState,
+  pushProgressFeedEvent,
 } from '../utils/sessionManager';
 import useExtensionStats from '../hooks/useExtensionStats';
 import { DashboardPanel } from '../components/dashboard';
@@ -182,6 +186,28 @@ export default function PlatformSelectScreen({ navigation, route }) {
     return true;
   }, [localSettings, route?.params?.userId]);
 
+  const handleSyncProfileFromHome = useCallback(async () => {
+    const auth = getTinderAuthState();
+    if (!auth?.token) {
+      return { success: false, error: 'Please connect your Tinder account first.' };
+    }
+    const res = await probeTinderSession(auth.token);
+    if (res?.ok && res.user) {
+      const u = res.user;
+      const profile = {
+        name: u.name || null,
+        bio: u.bio || '',
+        interests: (u.user_interests || u.interests || []).map(i => i.name || i).filter(Boolean),
+        job: (u.jobs || []).map(j => (j.title && j.title.name) || (j.company && j.company.name) || '').filter(Boolean).join(', ') || null,
+        school: (u.schools || []).map(s => s.name).filter(Boolean).join(', ') || null,
+        photos: (u.photos || []).map(p => p.url).filter(Boolean),
+      };
+      await handleSaveSettings({ userProfile: profile });
+      return { success: true, profile };
+    }
+    return { success: false, error: 'Could not sync profile. Please open the Tinder browser session.' };
+  }, [handleSaveSettings]);
+
   // ── Notification Center State ──
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
@@ -275,20 +301,36 @@ export default function PlatformSelectScreen({ navigation, route }) {
       return;
     }
 
-    // 2. Check in-memory shared & persisted auth state (fastest, immediately available)
     const auth = getTinderAuthState();
+
+    // 2. For On-Device mode: strictly validate using real Tinder API token
+    if (environment === 'on_device') {
+      if (auth?.token) {
+        probeTinderSession(auth.token).then((res) => {
+          if (res?.ok) {
+            setIsLoggedIn(true);
+          } else if (res?.expired) {
+            setIsLoggedIn(false);
+          }
+        }).catch(() => {});
+        setIsLoggedIn(Boolean(auth?.isLoggedIn));
+      } else {
+        // Unauthenticated or closed without logging in — no valid token exists.
+        // Cleanse any dirty/corrupted auth state.
+        if (auth?.isLoggedIn) {
+          setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+        }
+        setIsLoggedIn(false);
+      }
+      setCheckingAuth(false);
+      return;
+    }
+
+    // 3. For Remote/VPS mode: Check in-memory shared & persisted auth state
     if (auth && typeof auth.isLoggedIn === 'boolean') {
       setIsLoggedIn(auth.isLoggedIn);
       setCheckingAuth(false);
       if (auth.isLoggedIn) return;
-    }
-
-    // 3. For On-Device mode, auth is managed strictly by the local on-device WebView and content script.
-    // Do NOT infer login from past swipes or remote orchestrator in on_device mode.
-    if (environment === 'on_device') {
-      setIsLoggedIn(Boolean(auth?.isLoggedIn));
-      setCheckingAuth(false);
-      return;
     }
 
     const cachedProfile = localSettings?.userProfile;
@@ -384,6 +426,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
     }).start(() => setShowSettingsModal(false));
   };
 
+
   // Open live browser session (supports autoStartAgent and custom launch parameters)
   const handleOpenLiveFeed = useCallback(async (platformName, extraParams = {}) => {
     const targetPlatform = typeof platformName === 'string' ? platformName : selectedPlatform;
@@ -407,6 +450,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
           isHyperbeam: true,
           proxyIp: realProxy,
           orchestratorUrl,
+          userId: route?.params?.userId || route?.params?.user?.id || 'dev_user_1',
           ...extraParams,
         });
       } catch (err) {
@@ -425,7 +469,8 @@ export default function PlatformSelectScreen({ navigation, route }) {
     }
 
     const resolvedUrl = resolveLocalUrl(activeStreamUrl);
-    const needPurge = Boolean(getPendingWebViewPurge() || !isLoggedIn);
+    // Only purge if an explicit logout was triggered. Never purge just because unauthenticated.
+    const needPurge = Boolean(getPendingWebViewPurge());
 
     navigation.navigate('Browser', {
       vpsUrl: resolvedUrl,
@@ -435,10 +480,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
       proxyIp: realProxy,
       orchestratorUrl,
       forceLogout: needPurge,
-      clearSession: needPurge,
+      userId: route?.params?.userId || route?.params?.user?.id || 'dev_user_1',
       ...extraParams,
     });
-  }, [navigation, activeProxy, activeStreamUrl, environment, selectedPlatform, orchestratorUrl, isLoggedIn]);
+  }, [navigation, activeProxy, activeStreamUrl, environment, selectedPlatform, orchestratorUrl, route?.params]);
 
   // Toggle agent (handles both local on-device automation and remote orchestrator CDP)
   const handleToggleAgent = useCallback(async () => {
@@ -454,7 +499,20 @@ export default function PlatformSelectScreen({ navigation, route }) {
       });
       // If user tapped Start Agent from the Home Screen, launch live browser with auto-start
       if (nextRunning) {
+        saveOnDeviceSessionState({ isRunning: true });
+        pushProgressFeedEvent('persona_update', 'AI Wingman Activated — Swiping & Chatting', null, 0);
         handleOpenLiveFeed('Tinder', { autoStartAgent: true, isOnDevice: true });
+      } else {
+        updateSharedAgentState({
+          agentState: {
+            isRunning: false,
+            isPaused: true,
+            currentPhase: 'stopped',
+            source: 'home_screen',
+          }
+        });
+        saveOnDeviceSessionState({ isRunning: false });
+        pushProgressFeedEvent('cycle_complete', 'Automation paused from Home Screen', null, 0);
       }
       return;
     }
@@ -750,8 +808,11 @@ export default function PlatformSelectScreen({ navigation, route }) {
               orchestratorUrl={orchestratorUrl || (environment === 'vps' ? 'https://api.smartmaheshwari.com' : resolveLocalUrl('http://localhost:3001'))}
               onToggleAgent={handleToggleAgent}
               onLogout={handleLogout}
+              onConnect={() => handleOpenLiveFeed('Tinder')}
+              isLoggedIn={isLoggedIn}
               onSaveSettings={handleSaveSettings}
               settings={localSettings}
+              onSyncProfile={environment === 'on_device' ? handleSyncProfileFromHome : undefined}
               controlsContent={
                 <View style={styles.infoBox}>
                   <View style={styles.infoTitleRow}>
@@ -1029,6 +1090,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
         }}
         onLocationAcquired={handleLocationAcquired}
       />
+
     </SafeAreaView>
   );
 }

@@ -9,9 +9,11 @@
     "@react-navigation/native-stack": "^7.17.10",
     "expo": "~54.0.36",
     "expo-blur": "~15.0.8",
+    "expo-device": "~8.0.10",
     "expo-haptics": "~15.0.8",
     "expo-linear-gradient": "~15.0.8",
     "expo-location": "~19.0.8",
+    "expo-notifications": "^0.32.17",
     "expo-status-bar": "~3.0.9",
     "expo-updates": "~29.0.19",
     "expo-web-browser": "~15.0.11",
@@ -39,17 +41,25 @@
       "**/__tests__/**/*.test.js"
     ],
     "transform": {
-      "^.+\\.js$": ["babel-jest", {
-        "plugins": ["@babel/plugin-transform-modules-commonjs"],
-        "presets": []
-      }]
+      "^.+\\.js$": [
+        "babel-jest",
+        {
+          "plugins": [
+            "@babel/plugin-transform-modules-commonjs"
+          ],
+          "presets": []
+        }
+      ]
     },
     "transformIgnorePatterns": [],
     "moduleNameMapper": {
       "^@react-native-async-storage/async-storage$": "<rootDir>/src/utils/__mocks__/async-storage.js",
       "^react-native$": "<rootDir>/src/utils/__mocks__/react-native.js",
       "^../services/supabase$": "<rootDir>/src/utils/__mocks__/supabase.js",
-      "^../../services/supabase$": "<rootDir>/src/utils/__mocks__/supabase.js"
+      "^../../services/supabase$": "<rootDir>/src/utils/__mocks__/supabase.js",
+      "^\\./supabase$": "<rootDir>/src/utils/__mocks__/supabase.js",
+      "^expo-notifications$": "<rootDir>/src/utils/__mocks__/expo-notifications.js",
+      "^expo-device$": "<rootDir>/src/utils/__mocks__/expo-device.js"
     }
   },
   "private": true,

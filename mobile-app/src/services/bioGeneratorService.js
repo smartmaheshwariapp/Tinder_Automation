@@ -1,9 +1,9 @@
 // mobile-app/src/services/bioGeneratorService.js
 // Hybrid GPT-4o-mini & Resilient Local Algorithmic Dating Bio Generator
 import { resolveLocalUrl } from '../utils/network';
+import { API_CONFIG } from '../config/api';
 
-export const DEFAULT_OPENAI_KEY =
-  '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';
+export const DEFAULT_OPENAI_KEY = '';
 
 export const CURATED_MAGIC_BIOS = [
   {
@@ -172,7 +172,33 @@ Rules:
     }
   }
 
-  // 2. Orchestrator fallback (/generate-bio)
+  // 2. Cloudflare Worker AI Bio Proxy
+  try {
+    const endpoints = API_CONFIG.getEndpoints();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const workerRes = await fetch(endpoints.AI_BIO, {
+      method: 'POST',
+      headers: API_CONFIG.getHeaders(),
+      body: JSON.stringify({ userProfile, currentBioText }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (workerRes.ok) {
+      const data = await workerRes.json();
+      if (data && data.success && data.bio && data.bio !== currentBioText) {
+        return {
+          score: calculateBioScore(data.bio),
+          text: data.bio,
+          source: 'cloudflare_proxy',
+        };
+      }
+    }
+  } catch (_) {}
+
+  // 3. Orchestrator fallback (/generate-bio)
   const effectiveOrchUrl = orchestratorUrl || resolveLocalUrl('http://localhost:3001');
   if (effectiveOrchUrl) {
     try {

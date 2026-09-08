@@ -4,6 +4,7 @@
 
 import SupabaseService from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NotificationService from '../services/notifications';
 
 const HYPERBEAM_KEY = 'sk_test_fsuC8naqJLF2lGcL8Vak2ogGyhYFldLzqCEbX2zQYf0';
 
@@ -302,6 +303,7 @@ let tinderAuthState = {
   isLoggedIn: false,
   accountName: null,
   accountEmail: null,
+  token: null,
   lastUpdated: 0,
 };
 
@@ -366,6 +368,13 @@ try {
       try {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed.isLoggedIn === 'boolean') {
+          // Cleanse phantom logins that lack a token or captured the landing page heading ("Swipe Right®")
+          if (parsed.isLoggedIn && (!parsed.token || parsed.accountName === 'Swipe Right®')) {
+            parsed.isLoggedIn = false;
+            parsed.accountName = null;
+            parsed.token = null;
+            AsyncStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(parsed)).catch(() => {});
+          }
           tinderAuthState = { ...tinderAuthState, ...parsed };
           console.log('[SessionManager] Restored persisted Tinder auth state:', tinderAuthState);
           authListeners.forEach((fn) => {
@@ -379,6 +388,10 @@ try {
 
 export const setTinderAuthState = (data) => {
   if (data && data.isLoggedIn) {
+    if (data.accountName === 'Swipe Right®') {
+      console.warn('[SessionManager] Ignored phantom auth state containing landing page title');
+      return;
+    }
     pendingWebViewPurge = false;
     AsyncStorage.removeItem(STORAGE_KEY_PENDING_PURGE).catch(() => {});
   }
@@ -401,6 +414,7 @@ export const clearTinderAuthState = async () => {
     isLoggedIn: false,
     accountName: null,
     accountEmail: null,
+    token: null,
     lastUpdated: Date.now()
   };
   pendingWebViewPurge = true;
@@ -413,6 +427,7 @@ export const clearTinderAuthState = async () => {
   // clearOnDeviceSessionState is defined later in this file but the call
   // happens at runtime, so the forward reference is safe in a module scope.
   try { await clearOnDeviceSessionState(); } catch (_) {}
+  try { await clearProgressFeed(); } catch (_) {}
   // Destroy the worker singleton so the new session starts with clean chat Maps.
   try { destroyOnDeviceWorker(); } catch (_) {}
   authListeners.forEach((fn) => {
@@ -429,6 +444,55 @@ export const getTinderAuthState = () => {
   return tinderAuthState;
 };
 
+/**
+ * Fast direct REST probe to test if an existing Tinder auth token is valid.
+ * Confirms session in ~200ms without mounting a visible browser.
+ */
+export const probeTinderSession = async (tokenToTest) => {
+  const token = tokenToTest || tinderAuthState?.token;
+  if (!token) return { ok: false, error: 'No token available' };
+
+  try {
+    const cleanToken = String(token).replace(/^["'](.*)["']$/, '$1').trim();
+    const res = await fetch('https://api.gotinder.com/v2/profile?include=account%2Cuser', {
+      method: 'GET',
+      headers: {
+        'x-auth-token': cleanToken,
+        'platform': 'web',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const user = data?.data?.user;
+      const account = data?.data?.account;
+      const name = user?.name || null;
+      const email = account?.account_email || null;
+
+      setTinderAuthState({
+        isLoggedIn: true,
+        token: cleanToken,
+        accountName: name || tinderAuthState.accountName || 'Tinder Account',
+        accountEmail: email || tinderAuthState.accountEmail,
+      });
+
+      return { ok: true, name, email, user };
+    } else if (res.status === 401) {
+      console.log('[SessionManager] Probe detected expired Tinder token (401)');
+      setTinderAuthState({ isLoggedIn: false, token: null, accountName: null });
+      return { ok: false, expired: true };
+    }
+  } catch (err) {
+    console.warn('[SessionManager] Probe network error:', err?.message);
+  }
+  return { ok: false };
+};
+
+// ── Progress Feed Events (AsyncStorage-persisted, max 50) ──
+const STORAGE_KEY_PROGRESS_FEED = '@fe_progress_feed_events';
+let progressFeedEvents = [];
+
 // ── Shared Automation Agent State (Synced between Home Screen & BrowserScreen) ──
 let sharedAgentState = {
   agentState: {
@@ -443,11 +507,22 @@ let sharedAgentState = {
       matchesCreated: 0,
       messagesSent: 0,
     },
+    currentCycle: {
+      likesCompleted: 0,
+      messagesProcessed: 0,
+      followUpsSent: 0,
+    },
   },
   lifetimeStats: {
+    totalSwipes: 0,
+    todaySwipes: 0,
     totalLikes: 0,
+    totalMatches: 0,
     matchesCreated: 0,
+    totalMessages: 0,
+    todayMessages: 0,
     messagesSent: 0,
+    activeChats: 0,
     activeConversations: 0,
   },
   progressFeed: [],
@@ -456,12 +531,174 @@ let sharedAgentState = {
 
 const agentListeners = new Set();
 
+const notifyAgentListeners = () => {
+  const snapshot = sharedAgentState;
+  const dispatch = () => {
+    agentListeners.forEach((fn) => {
+      try { fn(snapshot); } catch (_) {}
+    });
+  };
+  if (typeof queueMicrotask === 'function') {
+    queueMicrotask(dispatch);
+  } else {
+    Promise.resolve().then(dispatch);
+  }
+};
+
+// Eager restore progressFeedEvents on module load
+try {
+  AsyncStorage.getItem(STORAGE_KEY_PROGRESS_FEED).then((raw) => {
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          progressFeedEvents = parsed;
+          sharedAgentState = {
+            ...sharedAgentState,
+            progressFeed: [...progressFeedEvents],
+          };
+          notifyAgentListeners();
+        }
+      } catch (_) {}
+    }
+  }).catch(() => {});
+} catch (_) {}
+
+export const getProgressFeed = () => [...progressFeedEvents];
+
+export const pushProgressFeedEvent = (typeOrEvent, detail, name, xp = 0) => {
+  let event;
+  if (typeof typeOrEvent === 'object' && typeOrEvent !== null) {
+    const rawType = typeOrEvent.type || 'profile_liked';
+    const mappedType = rawType === 'like' ? 'profile_liked'
+      : (rawType === 'match' ? 'match_detected'
+      : (rawType === 'message' ? 'message_replied'
+      : (rawType === 'info' ? 'persona_update' : rawType)));
+
+    event = {
+      id: typeOrEvent.id || `feed_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      type: mappedType,
+      detail: typeOrEvent.detail || typeOrEvent.message || typeOrEvent.text || '',
+      name: typeOrEvent.name || null,
+      xp: typeOrEvent.xp || 0,
+      timestamp: typeof typeOrEvent.timestamp === 'number' ? typeOrEvent.timestamp : Date.now(),
+    };
+  } else {
+    const rawType = typeOrEvent || 'profile_liked';
+    const mappedType = rawType === 'like' ? 'profile_liked'
+      : (rawType === 'match' ? 'match_detected'
+      : (rawType === 'message' ? 'message_replied'
+      : (rawType === 'info' ? 'persona_update' : rawType)));
+
+    event = {
+      id: `feed_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      type: mappedType,
+      detail: detail || '',
+      name: name || null,
+      xp: xp || 0,
+      timestamp: Date.now(),
+    };
+  }
+
+  // Guard: Deduplicate rapid duplicate events for the same action & target (e.g. from concurrent WebView and worker events)
+  const now = event.timestamp || Date.now();
+  const isDuplicate = progressFeedEvents.slice(0, 8).some((prev) => {
+    const timeDelta = Math.abs(now - (prev.timestamp || 0));
+    if (timeDelta > 15000) return false;
+    if (event.name && prev.name && event.type === prev.type) {
+      return event.name.toLowerCase().trim() === prev.name.toLowerCase().trim();
+    }
+    if (event.type === prev.type && event.detail && prev.detail) {
+      return event.detail.trim() === prev.detail.trim();
+    }
+    return false;
+  });
+
+  if (isDuplicate) {
+    return null;
+  }
+
+  progressFeedEvents.unshift(event);
+  if (progressFeedEvents.length > 50) progressFeedEvents.length = 50;
+
+  try {
+    AsyncStorage.setItem(STORAGE_KEY_PROGRESS_FEED, JSON.stringify(progressFeedEvents)).catch(() => {});
+  } catch (_) {}
+
+  sharedAgentState = {
+    ...sharedAgentState,
+    progressFeed: [...progressFeedEvents],
+  };
+
+  notifyAgentListeners();
+
+  // ── Dispatch High-Priority In-App & Push Notification ──
+  try {
+    if (NotificationService && NotificationService.triggerLocalNotification) {
+      if (event.type === 'match_detected') {
+        const matchName = event.name || 'Someone New';
+        NotificationService.triggerLocalNotification({
+          type: 'new_match',
+          title: `New Match: ${matchName}! 💘`,
+          body: `Your AI Wingman connected with ${matchName}. Opener is being sent!`,
+          data: { matchName, type: 'new_match' },
+        }).catch(() => {});
+      } else if (event.type === 'handoff_detected') {
+        const matchName = event.name || 'Match';
+        const phoneMatch = event.detail && event.detail.match(/(\+?[0-9]{8,15})/);
+        const instaMatch = event.detail && event.detail.match(/@([a-zA-Z0-9._]+)/);
+        const phone = phoneMatch ? phoneMatch[1] : null;
+        const instagram = instaMatch ? instaMatch[1] : null;
+        NotificationService.triggerLocalNotification({
+          type: 'goal_unlocked',
+          title: '🎉 Lead / Contact Captured!',
+          body: `${matchName} shared contact: ${event.detail}. Ready on WhatsApp.`,
+          data: { matchName, phone, instagram, detail: event.detail, type: 'goal_unlocked' },
+        }).catch(() => {});
+      } else if (event.type === 'cycle_complete') {
+        NotificationService.triggerLocalNotification({
+          type: 'cycle_complete',
+          title: 'Swiping Session Complete',
+          body: event.detail || 'Session target reached. AI Wingman is taking a break.',
+          data: { detail: event.detail, type: 'cycle_complete' },
+        }).catch(() => {});
+      } else if (event.type === 'safety_cooldown') {
+        NotificationService.triggerLocalNotification({
+          type: 'safety_cooldown',
+          title: 'Taking a Short Break',
+          body: event.detail || 'Pacing automation to protect your account reputation.',
+          data: { detail: event.detail, type: 'safety_cooldown' },
+        }).catch(() => {});
+      }
+    }
+  } catch (_) {}
+
+  return event;
+};
+
+export const clearProgressFeed = async () => {
+  progressFeedEvents = [];
+  sharedAgentState = {
+    ...sharedAgentState,
+    progressFeed: [],
+  };
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY_PROGRESS_FEED);
+  } catch (_) {}
+  notifyAgentListeners();
+};
+
 export const getSharedAgentState = () => sharedAgentState;
 
 export const updateSharedAgentState = (updater) => {
   if (typeof updater === 'function') {
     sharedAgentState = updater(sharedAgentState);
   } else if (updater && typeof updater === 'object') {
+    const rawLifetime = updater.lifetimeStats || {};
+    const swipes = updater.agentState?.stats?.swipes ?? updater.stats?.swipes ?? rawLifetime.totalSwipes ?? rawLifetime.totalLikes ?? sharedAgentState.agentState?.stats?.swipes ?? 0;
+    const matches = updater.agentState?.stats?.matches ?? updater.stats?.matches ?? rawLifetime.totalMatches ?? rawLifetime.matchesCreated ?? sharedAgentState.agentState?.stats?.matches ?? 0;
+    const messages = updater.agentState?.stats?.messages ?? updater.stats?.messages ?? rawLifetime.totalMessages ?? rawLifetime.messagesSent ?? sharedAgentState.agentState?.stats?.messages ?? 0;
+
     sharedAgentState = {
       ...sharedAgentState,
       ...updater,
@@ -471,20 +708,38 @@ export const updateSharedAgentState = (updater) => {
         stats: {
           ...sharedAgentState.agentState?.stats,
           ...(updater.agentState?.stats || updater.stats || {}),
+          swipes,
+          matches,
+          messages,
+          likesCompleted: swipes,
+          matchesCreated: matches,
+          messagesSent: messages,
+        },
+        currentCycle: {
+          ...(sharedAgentState.agentState?.currentCycle || {}),
+          ...(updater.agentState?.currentCycle || {}),
+          likesCompleted: updater.agentState?.currentCycle?.likesCompleted ?? swipes,
+          messagesProcessed: updater.agentState?.currentCycle?.messagesProcessed ?? messages,
         },
       },
       lifetimeStats: {
         ...sharedAgentState.lifetimeStats,
-        ...(updater.lifetimeStats || {}),
+        ...rawLifetime,
+        totalSwipes: rawLifetime.totalSwipes ?? swipes,
+        todaySwipes: rawLifetime.todaySwipes ?? swipes,
+        totalLikes: rawLifetime.totalLikes ?? swipes,
+        totalMatches: rawLifetime.totalMatches ?? matches,
+        matchesCreated: rawLifetime.matchesCreated ?? matches,
+        totalMessages: rawLifetime.totalMessages ?? messages,
+        todayMessages: rawLifetime.todayMessages ?? messages,
+        messagesSent: rawLifetime.messagesSent ?? messages,
+        activeChats: rawLifetime.activeChats ?? matches,
+        activeConversations: rawLifetime.activeConversations ?? matches,
       },
       progressFeed: updater.progressFeed || sharedAgentState.progressFeed,
     };
   }
-  agentListeners.forEach((fn) => {
-    try {
-      fn(sharedAgentState);
-    } catch (_) {}
-  });
+  notifyAgentListeners();
 };
 
 export const subscribeSharedAgentState = (listener) => {
@@ -578,6 +833,43 @@ const ON_DEVICE_SESSION_DEFAULTS = {
 
 let onDeviceSessionState = { ...ON_DEVICE_SESSION_DEFAULTS };
 
+const syncOnDeviceSessionToShared = () => {
+  const { swipes, matches, messages, isRunning } = onDeviceSessionState;
+  updateSharedAgentState({
+    agentState: {
+      isRunning: Boolean(isRunning),
+      isPaused: !isRunning,
+      currentPhase: isRunning ? 'liking' : 'stopped',
+      stats: {
+        swipes,
+        matches,
+        messages,
+        likesCompleted: swipes,
+        matchesCreated: matches,
+        messagesSent: messages,
+      },
+      currentCycle: {
+        likesCompleted: swipes,
+        messagesProcessed: messages,
+        followUpsSent: 0,
+      },
+    },
+    lifetimeStats: {
+      totalSwipes: swipes,
+      todaySwipes: swipes,
+      totalLikes: swipes,
+      totalMatches: matches,
+      matchesCreated: matches,
+      totalMessages: messages,
+      todayMessages: messages,
+      messagesSent: messages,
+      activeChats: matches,
+      activeConversations: matches,
+    },
+    progressFeed: [...progressFeedEvents],
+  });
+};
+
 // Eager restore on module load — identical pattern to tinderAuthState.
 try {
   AsyncStorage.getItem(STORAGE_KEY_ON_DEVICE_SESSION).then((raw) => {
@@ -585,7 +877,13 @@ try {
       try {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
-          onDeviceSessionState = { ...ON_DEVICE_SESSION_DEFAULTS, ...parsed };
+          const activeIsRunning = onDeviceSessionState.isRunning;
+          onDeviceSessionState = {
+            ...ON_DEVICE_SESSION_DEFAULTS,
+            ...parsed,
+            ...(activeIsRunning ? { isRunning: true } : {})
+          };
+          syncOnDeviceSessionToShared();
           console.log('[SessionManager] Restored on-device session state:', onDeviceSessionState);
         }
       } catch (_) {}
@@ -606,6 +904,7 @@ export const saveOnDeviceSessionState = async (patch) => {
     ...patch,
     lastSavedAt: Date.now(),
   };
+  syncOnDeviceSessionToShared();
   try {
     await AsyncStorage.setItem(
       STORAGE_KEY_ON_DEVICE_SESSION,
@@ -621,6 +920,7 @@ export const saveOnDeviceSessionState = async (patch) => {
  */
 export const clearOnDeviceSessionState = async () => {
   onDeviceSessionState = { ...ON_DEVICE_SESSION_DEFAULTS };
+  syncOnDeviceSessionToShared();
   try {
     await AsyncStorage.removeItem(STORAGE_KEY_ON_DEVICE_SESSION);
   } catch (_) {}

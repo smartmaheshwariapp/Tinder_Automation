@@ -13,12 +13,12 @@ function formatNumber(n) {
 export default function QuickTelemetryCapsule({ lifetimeStats }) {
   const stats = lifetimeStats || {};
 
-  const totalSwipes   = stats.totalSwipes   ?? 0;
-  const todaySwipes   = stats.todaySwipes   ?? 0;
-  const totalMessages = stats.totalMessages ?? 0;
-  const todayMessages = stats.todayMessages ?? 0;
-  const totalMatches  = stats.totalMatches  ?? 0;
-  const activeChats   = stats.activeChats   ?? 0;
+  const totalSwipes   = stats.totalSwipes   ?? stats.totalLikes   ?? stats.swipes   ?? 0;
+  const todaySwipes   = stats.todaySwipes   ?? stats.todayLikes   ?? stats.swipes   ?? 0;
+  const totalMessages = stats.totalMessages ?? stats.messagesSent ?? stats.messages ?? 0;
+  const todayMessages = stats.todayMessages ?? stats.messagesSent ?? stats.messages ?? 0;
+  const totalMatches  = stats.totalMatches  ?? stats.matchesCreated ?? stats.matches ?? 0;
+  const activeChats   = stats.activeChats   ?? stats.activeConversations ?? stats.matches ?? 0;
 
   return (
     <View style={styles.container}>

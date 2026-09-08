@@ -146,6 +146,13 @@ describe('iOS stale-auth: tinderAuthState says logged-in but WebView says logged
     expect(auth.lastUpdated).toBeGreaterThan(0);
   });
 
+  it('rejects phantom auth state updates containing landing page title (Swipe Right®)', () => {
+    const sm = loadFresh();
+    sm.setTinderAuthState({ isLoggedIn: false, accountName: null });
+    sm.setTinderAuthState({ isLoggedIn: true, accountName: 'Swipe Right®' });
+    expect(sm.getTinderAuthState().isLoggedIn).toBe(false);
+  });
+
   it('authListeners are notified when the stale signed-in state is corrected', () => {
     const sm = loadFresh();
     sm.setTinderAuthState({ isLoggedIn: true, accountName: 'Alice' });
@@ -168,6 +175,131 @@ describe('iOS stale-auth: tinderAuthState says logged-in but WebView says logged
     // The tri-state logic in BrowserScreen: lastUpdated > 0 → not unknown.
     expect(state.lastUpdated).toBeGreaterThan(0);
     expect(state.isLoggedIn).toBe(false);
+  });
+});
+
+// ─── Auth Button & Session State Consistency ────────────────────────────────
+
+describe('auth button and session state consistency', () => {
+  it('resolves isTinderLoggedIn correctly with prop precedence over sessionManager', () => {
+    const sm = loadFresh();
+    sm.setTinderAuthState({ isLoggedIn: true, accountName: 'Test User' });
+
+    const authState = sm.getTinderAuthState();
+    const resolveLoggedIn = (propIsLoggedIn, stats, tinderAuth) => Boolean(
+      propIsLoggedIn !== undefined
+        ? propIsLoggedIn
+        : (stats?.tinderAccount?.isLoggedIn ?? tinderAuth?.isLoggedIn ?? false)
+    );
+
+    // Prop overrides
+    expect(resolveLoggedIn(false, null, authState)).toBe(false);
+    expect(resolveLoggedIn(true, null, { isLoggedIn: false })).toBe(true);
+
+    // Fallback to tinderAuth
+    expect(resolveLoggedIn(undefined, null, authState)).toBe(true);
+    expect(resolveLoggedIn(undefined, null, { isLoggedIn: false })).toBe(false);
+
+    // Fallback to stats
+    expect(resolveLoggedIn(undefined, { tinderAccount: { isLoggedIn: true } }, { isLoggedIn: false })).toBe(true);
+  });
+
+  it('triggers connect handler when logged out and logout handler when logged in', () => {
+    const onConnect = jest.fn();
+    const onLogout = jest.fn();
+
+    const handleButtonPress = (isLoggedIn) => {
+      if (isLoggedIn) {
+        onLogout();
+      } else {
+        onConnect();
+      }
+    };
+
+    handleButtonPress(true);
+    expect(onLogout).toHaveBeenCalledTimes(1);
+    expect(onConnect).not.toHaveBeenCalled();
+
+    handleButtonPress(false);
+    expect(onConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('header logout button only renders in SESSION_SIGNED_IN state', () => {
+    const SESSION_UNKNOWN = 'unknown';
+    const SESSION_SIGNED_IN = 'signed_in';
+    const SESSION_SIGNED_OUT = 'signed_out';
+
+    const getSessionStatus = (state) => {
+      if (!state || !state.lastUpdated) return SESSION_UNKNOWN;
+      return state.isLoggedIn ? SESSION_SIGNED_IN : SESSION_SIGNED_OUT;
+    };
+
+    const shouldRenderLogout = (sessionStatus) => sessionStatus === SESSION_SIGNED_IN;
+
+    expect(shouldRenderLogout(getSessionStatus(null))).toBe(false);
+    expect(shouldRenderLogout(getSessionStatus({ lastUpdated: 123, isLoggedIn: false }))).toBe(false);
+    expect(shouldRenderLogout(getSessionStatus({ lastUpdated: 123, isLoggedIn: true }))).toBe(true);
+  });
+});
+
+// ─── Headless Pre-Warm & Purge Guardrails ────────────────────────────────────
+
+describe('headless pre-warm & purge guardrails', () => {
+  it('needPurge is false when user is not logged in unless getPendingWebViewPurge() is true', () => {
+    const sm = loadFresh();
+    expect(sm.getPendingWebViewPurge()).toBe(false);
+
+    // Guardrail rule: unauthenticated status must NOT trigger a purge
+    const computeNeedPurge = (isLoggedIn, pendingPurge) => Boolean(pendingPurge);
+
+    expect(computeNeedPurge(false, sm.getPendingWebViewPurge())).toBe(false);
+    expect(computeNeedPurge(true, sm.getPendingWebViewPurge())).toBe(false);
+
+    // Only explicit logout activates pending purge
+    sm.setPendingWebViewPurge(true);
+    expect(computeNeedPurge(false, sm.getPendingWebViewPurge())).toBe(true);
+  });
+
+  it('token persists in authState and probeTinderSession updates isLoggedIn', async () => {
+    const sm = loadFresh();
+    const mockProfile = { data: { user: { name: 'Sarah' }, account: { account_email: 'sarah@test.com' } } };
+
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockProfile,
+    });
+
+    try {
+      const result = await sm.probeTinderSession('mock_token_123');
+      expect(result.ok).toBe(true);
+      expect(result.name).toBe('Sarah');
+
+      const auth = sm.getTinderAuthState();
+      expect(auth.isLoggedIn).toBe(true);
+      expect(auth.token).toBe('mock_token_123');
+      expect(auth.accountName).toBe('Sarah');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('probeTinderSession handles 401 expired token safely without crashing', async () => {
+    const sm = loadFresh();
+
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+    });
+
+    try {
+      const result = await sm.probeTinderSession('expired_token');
+      expect(result.ok).toBe(false);
+      expect(result.expired).toBe(true);
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });
 

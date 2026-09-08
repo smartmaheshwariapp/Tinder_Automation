@@ -10,11 +10,11 @@ import {
   TouchableOpacity,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   AppState,
   Animated,
   Keyboard,
 } from 'react-native';
+import ActivityIndicator from './SafeActivityIndicator';
 import { Ionicons } from '@expo/vector-icons';
 import LocationService from '../../services/locationService';
 

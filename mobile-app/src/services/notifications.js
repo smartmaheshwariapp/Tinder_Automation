@@ -1,18 +1,25 @@
 // mobile-app/src/services/notifications.js
 // FlirtEasy Dating App Push Notifications System & In-App HUD Dispatcher
+// Production-grade persistent notification center, smart redirects, and native OS tray bridge
 
 import { Platform, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import SupabaseService from './supabase';
 
 let Notifications = null;
 let Device = null;
 
 try {
-  Notifications = require('expo-notifications');
-  Device = require('expo-device');
-} catch (e) {
-  console.log('[Notifications] expo-notifications or expo-device not linked natively, running in fallback mode.');
-}
+  const notifPkg = 'expo-notifications';
+  Notifications = require(notifPkg);
+} catch (_) {}
+
+try {
+  const devicePkg = 'expo-device';
+  Device = require(devicePkg);
+} catch (_) {}
+
+
 
 // ── Configure Default In-App Notification Presentation ──
 if (Notifications && Notifications.setNotificationHandler) {
@@ -85,41 +92,20 @@ export const NOTIFICATION_CATEGORIES = {
   },
 };
 
-// ── In-Memory Notification Inbox ──
-let _notificationInbox = [
-  {
-    id: 'sample-1',
-    type: 'goal_unlocked',
-    title: 'Phone Number Received',
-    body: 'Jessica shared her contact number (+1 201-555-0192). Ready to chat on WhatsApp.',
-    data: { matchName: 'Jessica', goal: 'phone', phone: '+12015550192' },
-    is_read: false,
-    created_at: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-  },
-  {
-    id: 'sample-2',
-    type: 'new_match',
-    title: 'New Match: Sarah',
-    body: 'You matched with Sarah! Your assistant sent a friendly first message.',
-    data: { matchName: 'Sarah', opener: 'travel' },
-    is_read: false,
-    created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-  },
-  {
-    id: 'sample-3',
-    type: 'cycle_complete',
-    title: 'Swiping Session Complete',
-    body: 'Liked 42 profiles and found 3 new matches. Next session will start automatically.',
-    data: { likes: 42, matches: 3 },
-    is_read: true,
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-  },
-];
+// ── Storage Keys ──
+const STORAGE_KEY_NOTIFICATIONS = '@flirteasy_notification_inbox_v1';
+const STORAGE_KEY_PUSH_TOKEN = '@flirteasy_push_token_v1';
+const STORAGE_KEY_REDIRECT_PREFS = '@flirteasy_redirect_preferences_v1';
 
+// ── In-Memory Notification Inbox & Subscription Channels ──
+let _notificationInbox = [];
+let _isInitialized = false;
+let _initPromise = null;
 let _inboxListeners = [];
 let _bannerListeners = [];
 let _redirectListeners = [];
 let _preferenceListeners = [];
+let _lastTriggeredMap = new Map();
 
 let _redirectPreferences = {
   tinder: 'always_ask',
@@ -127,7 +113,82 @@ let _redirectPreferences = {
   instagram: 'always_ask',
 };
 
+const persistInbox = async () => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(_notificationInbox));
+  } catch (err) {
+    console.warn('[Notifications] Failed to persist inbox:', err.message);
+  }
+};
+
+const persistRedirectPrefs = async () => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY_REDIRECT_PREFS, JSON.stringify(_redirectPreferences));
+  } catch (err) {
+    console.warn('[Notifications] Failed to persist redirect prefs:', err.message);
+  }
+};
+
 export const NotificationService = {
+  /**
+   * Initialize Notification Service:
+   * 1. Restores persistent inbox from AsyncStorage
+   * 2. Restores user redirect preferences
+   * 3. Configures Android notification channels
+   */
+  async initialize() {
+    if (_initPromise) return _initPromise;
+
+    _initPromise = (async () => {
+      try {
+        // Load stored inbox
+        const savedInbox = await AsyncStorage.getItem(STORAGE_KEY_NOTIFICATIONS);
+        if (savedInbox) {
+          const parsed = JSON.parse(savedInbox);
+          if (Array.isArray(parsed)) {
+            _notificationInbox = parsed;
+          }
+        }
+
+        // Load redirect preferences
+        const savedPrefs = await AsyncStorage.getItem(STORAGE_KEY_REDIRECT_PREFS);
+        if (savedPrefs) {
+          const parsedPrefs = JSON.parse(savedPrefs);
+          if (parsedPrefs && typeof parsedPrefs === 'object') {
+            _redirectPreferences = { ..._redirectPreferences, ...parsedPrefs };
+          }
+        }
+
+        // Configure native Android notification channels
+        if (Notifications && Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'FlirtEasy Alerts',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FE3C72',
+          }).catch(() => {});
+
+          await Notifications.setNotificationChannelAsync('matches_and_goals', {
+            name: 'Matches & Goals',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 500, 200, 500],
+            lightColor: '#10B981',
+            sound: 'default',
+          }).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('[Notifications] Initialize notice:', err.message);
+      } finally {
+        _isInitialized = true;
+        _inboxListeners.forEach((fn) => fn([..._notificationInbox]));
+        _preferenceListeners.forEach((fn) => fn({ ..._redirectPreferences }));
+      }
+      return true;
+    })();
+
+    return _initPromise;
+  },
+
   /**
    * Request push notification permissions
    */
@@ -140,8 +201,10 @@ export const NotificationService = {
    */
   async registerForPushNotificationsAsync(userId = null) {
     if (!Notifications || !Device) {
-      console.log('[Notifications] Running in mock mode (web/simulator/expo fallback)');
-      return { success: true, token: 'mock-expo-push-token-flirteasy' };
+      console.log('[Notifications] Running in mock/fallback mode (web/simulator/expo fallback)');
+      const fallbackToken = 'mock-expo-push-token-flirteasy';
+      await AsyncStorage.setItem(STORAGE_KEY_PUSH_TOKEN, fallbackToken).catch(() => {});
+      return { success: true, token: fallbackToken };
     }
 
     try {
@@ -151,7 +214,7 @@ export const NotificationService = {
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#FE3C72',
-        });
+        }).catch(() => {});
 
         await Notifications.setNotificationChannelAsync('matches_and_goals', {
           name: 'Matches & Goals',
@@ -159,7 +222,7 @@ export const NotificationService = {
           vibrationPattern: [0, 500, 200, 500],
           lightColor: '#10B981',
           sound: 'default',
-        });
+        }).catch(() => {});
       }
 
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -174,20 +237,23 @@ export const NotificationService = {
         return { success: false, error: 'Notification permissions not granted' };
       }
 
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        // projectId configured automatically in Expo EAS
-      }).catch((err) => {
+      const tokenData = await Notifications.getExpoPushTokenAsync({}).catch((err) => {
         console.log('[Notifications] Push token retrieval notice:', err.message);
         return { data: 'expo-token-dev-fallback' };
       });
 
       const pushToken = tokenData.data;
 
-      // Sync push token to Supabase if userId is provided
-      if (userId && pushToken) {
-        await SupabaseService.saveUserSnapshot(userId, {
-          settings: { pushToken },
-        }).catch(() => {});
+      if (pushToken) {
+        // Persist token locally for offline and on-device use
+        await AsyncStorage.setItem(STORAGE_KEY_PUSH_TOKEN, pushToken).catch(() => {});
+
+        // Sync push token to Supabase if userId is provided
+        if (userId) {
+          await SupabaseService.saveUserSnapshot(userId, {
+            settings: { pushToken },
+          }).catch(() => {});
+        }
       }
 
       return { success: true, token: pushToken };
@@ -205,28 +271,42 @@ export const NotificationService = {
 
     const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
       const { title, body, data } = notification.request.content;
-      const type = data?.type || 'new_match';
+      const type = (data?.type || 'new_match').toLowerCase();
 
       const notifItem = {
-        id: notification.request.identifier || `notif-${Date.now()}`,
+        id: notification.request.identifier || `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type,
-        title,
-        body,
-        data,
+        title: title || 'FlirtEasy Update',
+        body: body || '',
+        data: { ...data, type },
         is_read: false,
         created_at: new Date().toISOString(),
       };
 
       _notificationInbox = [notifItem, ..._notificationInbox];
-      _inboxListeners.forEach((fn) => fn(_notificationInbox));
+      if (_notificationInbox.length > 50) _notificationInbox.length = 50;
+      persistInbox();
+
+      _inboxListeners.forEach((fn) => fn([..._notificationInbox]));
       _bannerListeners.forEach((fn) => fn(notifItem));
 
       if (onReceived) onReceived(notifItem);
     });
 
     const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      if (onResponse) onResponse(data);
+      const content = response?.notification?.request?.content || {};
+      const data = content.data || {};
+      const notifItem = {
+        id: response?.notification?.request?.identifier || `response-${Date.now()}`,
+        type: (data.type || 'new_match').toLowerCase(),
+        title: content.title || 'FlirtEasy Update',
+        body: content.body || '',
+        data,
+        is_read: true,
+        created_at: new Date().toISOString(),
+      };
+
+      if (onResponse) onResponse(response, notifItem);
     });
 
     return () => {
@@ -236,36 +316,62 @@ export const NotificationService = {
   },
 
   /**
-   * Trigger a Local Notification (for testing or local bot events)
+   * Trigger a Local Notification (for live automation bot events or testing)
    */
   async triggerLocalNotification({ type = 'new_match', title, body, data = {} }) {
-    const category = NOTIFICATION_CATEGORIES[type.toUpperCase()] || NOTIFICATION_CATEGORIES.NEW_MATCH;
+    const normalizedType = (type || 'new_match').toLowerCase();
+    const categoryKey = normalizedType.toUpperCase();
+    const category = NOTIFICATION_CATEGORIES[categoryKey] || NOTIFICATION_CATEGORIES.NEW_MATCH;
     const finalTitle = title || category.title;
     const finalBody = body || 'Your AI Wingman has a new update for you.';
 
+    // Rapid duplicate suppression window (8 seconds)
+    const now = Date.now();
+    const dedupeKey = `${normalizedType}:${finalTitle}:${data.matchName || ''}:${data.phone || ''}`;
+    const lastTime = _lastTriggeredMap.get(dedupeKey);
+    if (lastTime && (now - lastTime) < 8000) {
+      return null;
+    }
+    _lastTriggeredMap.set(dedupeKey, now);
+
+    // Prune stale deduplication entries
+    if (_lastTriggeredMap.size > 50) {
+      for (const [k, ts] of _lastTriggeredMap.entries()) {
+        if (now - ts > 30000) _lastTriggeredMap.delete(k);
+      }
+    }
+
     const notifItem = {
-      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      type,
+      id: `notif-${now}-${Math.random().toString(36).slice(2, 6)}`,
+      type: normalizedType,
       title: finalTitle,
       body: finalBody,
-      data,
+      data: { ...data, type: normalizedType },
       is_read: false,
       created_at: new Date().toISOString(),
     };
 
+    // Update in-memory and persistent storage
     _notificationInbox = [notifItem, ..._notificationInbox];
-    _inboxListeners.forEach((fn) => fn(_notificationInbox));
+    if (_notificationInbox.length > 50) _notificationInbox.length = 50;
+    persistInbox();
+
+    // Broadcast to UI subscribers (HUD Banner & Notification Center)
+    _inboxListeners.forEach((fn) => fn([..._notificationInbox]));
     _bannerListeners.forEach((fn) => fn(notifItem));
 
+    // Schedule native OS notification tray alert if available
     if (Notifications && Notifications.scheduleNotificationAsync) {
       try {
+        const isUrgent = normalizedType === 'goal_unlocked' || normalizedType === 'new_match' || normalizedType === 'fast_reply';
         await Notifications.scheduleNotificationAsync({
           content: {
             title: finalTitle,
             body: finalBody,
-            data: { ...data, type },
+            data: { ...data, type: normalizedType },
             sound: true,
             badge: 1,
+            channelId: isUrgent ? 'matches_and_goals' : 'default',
           },
           trigger: null, // deliver immediately
         });
@@ -289,7 +395,7 @@ export const NotificationService = {
    */
   subscribeInbox(listener) {
     _inboxListeners.push(listener);
-    listener(_notificationInbox);
+    listener([..._notificationInbox]);
     return () => {
       _inboxListeners = _inboxListeners.filter((fn) => fn !== listener);
     };
@@ -312,7 +418,8 @@ export const NotificationService = {
     _notificationInbox = _notificationInbox.map((item) =>
       item.id === id ? { ...item, is_read: true } : item
     );
-    _inboxListeners.forEach((fn) => fn(_notificationInbox));
+    persistInbox();
+    _inboxListeners.forEach((fn) => fn([..._notificationInbox]));
   },
 
   /**
@@ -320,7 +427,8 @@ export const NotificationService = {
    */
   markAllAsRead() {
     _notificationInbox = _notificationInbox.map((item) => ({ ...item, is_read: true }));
-    _inboxListeners.forEach((fn) => fn(_notificationInbox));
+    persistInbox();
+    _inboxListeners.forEach((fn) => fn([..._notificationInbox]));
   },
 
   /**
@@ -328,7 +436,8 @@ export const NotificationService = {
    */
   clearAll() {
     _notificationInbox = [];
-    _inboxListeners.forEach((fn) => fn(_notificationInbox));
+    persistInbox();
+    _inboxListeners.forEach((fn) => fn([]));
   },
 
   /**
@@ -351,6 +460,7 @@ export const NotificationService = {
   setRedirectPreference(platform, mode) {
     const key = (platform || 'tinder').toLowerCase();
     _redirectPreferences[key] = mode;
+    persistRedirectPrefs();
     _preferenceListeners.forEach((fn) => fn({ ..._redirectPreferences }));
   },
 
@@ -438,8 +548,6 @@ export const NotificationService = {
    * Open the real native dating app (e.g. Tinder) if installed, or fallback to web browser
    */
   async openPlatformApp(platform = 'Tinder', data = {}) {
-    const cleanPlatform = (platform || 'Tinder').toLowerCase();
-
     // If phone number / WhatsApp action is provided:
     if (data?.phone) {
       const cleanPhone = String(data.phone).replace(/[^0-9+]/g, '');
@@ -450,7 +558,7 @@ export const NotificationService = {
       }
     }
 
-    // Platform specific deep links (Tinder only)
+    // Platform specific deep links (Tinder)
     const deepLinkScheme = 'tinder://';
     const fallbackWebUrl = 'https://tinder.com/app/matches';
 

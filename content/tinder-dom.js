@@ -527,7 +527,14 @@ function isLoggedIn() {
     () => {
       try {
         const token = localStorage.getItem('TinderWeb/APIToken');
-        return token && typeof token === 'string' && token.length > 20;
+        if (token && typeof token === 'string' && token.length > 20) return true;
+        const apiStore = localStorage.getItem('TinderWeb/APIStore');
+        if (apiStore) {
+          const parsed = JSON.parse(apiStore);
+          const tok = parsed && (parsed.token || parsed.auth_token || (parsed.user && parsed.user.api_token));
+          if (tok && typeof tok === 'string' && tok.length > 20) return true;
+        }
+        return false;
       } catch(_) { return false; }
     }
   ];
@@ -539,7 +546,17 @@ function isLoggedIn() {
 
 function waitRandom(min, max) {
   const delay = Math.floor(Math.random() * (max - min + 1)) + min;
-  return new Promise(resolve => setTimeout(resolve, delay));
+  return new Promise(resolve => {
+    const t = setTimeout(resolve, delay);
+    const poll = setInterval(() => {
+      if (window.__flirteasy_stop === true) {
+        clearInterval(poll);
+        clearTimeout(t);
+        resolve();
+      }
+    }, 100);
+    setTimeout(() => clearInterval(poll), delay + 50);
+  });
 }
 
 async function getSwipeDelay() {

@@ -1,0 +1,19 @@
+# Cloudflare Workers Configuration for Mobile App
+# File: wrangler.toml
+
+name = "linksy-mobile-worker"
+main = "mobile_worker.js"
+compatibility_date = "2024-09-01"
+
+[vars]
+ENVIRONMENT = "production"
+
+# Sensitive variables should be configured as Cloudflare Secrets:
+#   npx wrangler secret put OPENAI_API_KEY
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put HYPERBEAM_API_KEY
+#   npx wrangler secret put MOBILE_APP_SECRET
+#   npx wrangler secret put ZAPIER_EMAIL_WEBHOOK_URL
+#   npx wrangler secret put RESEND_API_KEY
+#   npx wrangler secret put SUPABASE_URL
+#   npx wrangler secret put SUPABASE_SERVICE_KEY

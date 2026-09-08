@@ -7,9 +7,11 @@ import {
   View,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   Animated,
   Easing,
+} from 'react-native';
+import ActivityIndicator from '../components/common/SafeActivityIndicator';
+import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
@@ -22,6 +24,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SupabaseService from '../services/supabase';
+import { API_CONFIG } from '../config/api';
 
 // Optional safe haptics
 let Haptics;
@@ -287,6 +290,31 @@ export default function AuthScreen({ navigation, route }) {
 </body>
 </html>`;
 
+    try {
+      // 1. Dispatch via Cloudflare Worker Auth OTP Proxy
+      const endpoints = API_CONFIG.getEndpoints();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+      const workerRes = await fetch(endpoints.AUTH_SEND_OTP, {
+        method: 'POST',
+        headers: API_CONFIG.getHeaders(),
+        body: JSON.stringify({
+          email: targetEmail,
+          code: generatedCode,
+          name: targetName || '',
+        }),
+        signal: controller.signal,
+      }).catch(() => null);
+      clearTimeout(timeoutId);
+
+      if (workerRes && workerRes.ok) {
+        console.log(`[OTP] Sent verification code ${generatedCode} via worker to ${targetEmail}`);
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback: Direct Zapier webhook delivery
     try {
       await fetch('https://hooks.zapier.com/hooks/catch/27320666/ujl8uyu/', {
         method: 'POST',

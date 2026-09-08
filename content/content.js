@@ -208,6 +208,21 @@ let autoLikeRunning = false; // Mutex for autoLike
 let processChatsRunning = false; // Mutex for processChats
 let _autoLikeGen = 0;      // Monotonic generation counter for autoLike instances
 let _processChatsGen = 0;  // Monotonic generation counter for processChats instances
+
+function stopAllAutomation() {
+  console.log(`[FlirtEasy] ⛔ STOP command executed at ${new Date().toISOString()}`);
+  console.log(`[FlirtEasy] ⛔ Kill state: autoLikeRunning=${autoLikeRunning}, processChatsRunning=${processChatsRunning}`);
+  autoLikeRunning = false;
+  processChatsRunning = false;
+  _autoLikeGen++;
+  _processChatsGen++;
+  window.__flirteasy_stop = true;
+  if (typeof removeTinderDeadStateCard === 'function') removeTinderDeadStateCard();
+}
+
+// Global hooks for direct invocation via React Native WebView bridge
+window.__flirteasyStopAutomation = stopAllAutomation;
+window.__linksyStopSwiping = stopAllAutomation;
 let tinderSessionSentIds = new Set(); // FAST session-based double-send lock
 let tinderNetworkOfflineReported = false;
 let lastMatchId = null;
@@ -314,9 +329,19 @@ document.addEventListener('flirteasy:matchDetected', (event) => {
   console.log('[FlirtEasy] Match detected via API interceptor!', event.detail);
   globalMatchesCreated++;
 
+  try {
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'FE_MATCH',
+        matchCount: globalMatchesCreated,
+        matchName: (event.detail && event.detail.name) || null,
+      }));
+    }
+  } catch (_) {}
+
   chrome.runtime.sendMessage({
     action: 'updateCycleStats',
-    stats: { matchesCreated: globalMatchesCreated }
+    stats: { matchesCreated: globalMatchesCreated, currentName: (event.detail && event.detail.name) || null }
   }, () => {
     if (chrome.runtime.lastError) {
       console.warn('[FlirtEasy] Failed to update match stats:', chrome.runtime.lastError.message);
@@ -809,11 +834,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   try {
     if (request.action === 'stopAutomation') {
-      console.log(`[FlirtEasy] ⛔ STOP command received from background at ${new Date().toISOString()}`);
-      console.log(`[FlirtEasy] ⛔ Kill state: autoLikeRunning=${autoLikeRunning}, processChatsRunning=${processChatsRunning}`);
-      autoLikeRunning = false;
-      processChatsRunning = false;
-      if (typeof removeTinderDeadStateCard === 'function') removeTinderDeadStateCard();
+      stopAllAutomation();
       sendResponse({ success: true });
       return false;
     }
@@ -1029,9 +1050,10 @@ async function autoLike(count) {
     return { success: false, likesCompleted: 0, errors: ['Auto-like already in progress'] };
   }
 
+  window.__flirteasy_stop = false;
   autoLikeRunning = true;
   const _myAutoLikeGen = ++_autoLikeGen;
-  const isAutoLikeAborted = () => !autoLikeRunning || _autoLikeGen !== _myAutoLikeGen;
+  const isAutoLikeAborted = () => !autoLikeRunning || _autoLikeGen !== _myAutoLikeGen || window.__flirteasy_stop === true;
   try {
     console.log(`[FlirtEasy] Starting auto-like for ${count} profiles`);
     console.log('[FlirtEasy] Current URL:', window.location.href);
@@ -1152,6 +1174,15 @@ async function autoLike(count) {
         if (hasMatchModal()) {
           console.log('[FlirtEasy] Match modal detected (backup detection), closing...');
           globalMatchesCreated++;
+
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_MATCH',
+                matchCount: globalMatchesCreated,
+              }));
+            }
+          } catch (_) {}
 
           chrome.runtime.sendMessage({
             action: 'updateCycleStats',
@@ -1293,8 +1324,13 @@ async function autoLike(count) {
           continue;
         }
 
-        // STREAMING: Get name for personalized feed BEFORE clicking
-        const currentName = (typeof getSwipeCardName === 'function' ? getSwipeCardName() : getMatchName()) || 'Someone';
+        // STREAMING: Get candidate details for personalized feed BEFORE clicking
+        const profileInfo = typeof getCurrentProfile === 'function' ? getCurrentProfile() : {};
+        const currentAge = typeof getProfileAge === 'function' ? getProfileAge() : null;
+        const currentName = profileInfo.name || (typeof getSwipeCardName === 'function' ? getSwipeCardName() : getMatchName()) || 'Someone';
+        const profileDetail = currentAge
+          ? `Age ${currentAge} · Verified Profile`
+          : (profileInfo.bio ? profileInfo.bio.slice(0, 42).trim() : 'AI Target Match · Safe Paced');
 
         const clicked = clickLikeButton();
         console.log(`[FlirtEasy] Click result: ${clicked}`);
@@ -1303,9 +1339,27 @@ async function autoLike(count) {
           likesCompleted++;
           console.log(`[FlirtEasy] Liked profile ${likesCompleted}/${count}`);
 
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_SWIPE',
+                swipeCount: likesCompleted,
+                total: count,
+                name: currentName,
+                age: currentAge,
+                detail: profileDetail,
+              }));
+            }
+          } catch (_) {}
+
           chrome.runtime.sendMessage({
             action: 'updateCycleStats',
-            stats: { likesCompleted, currentName }
+            stats: { 
+              likesCompleted, 
+              currentName,
+              age: currentAge,
+              detail: profileDetail,
+            }
           }, (response) => {
             if (chrome.runtime.lastError) {
               console.warn('[FlirtEasy] Failed to update stats:', chrome.runtime.lastError.message);
@@ -1328,6 +1382,19 @@ async function autoLike(count) {
     }
 
     console.log(`[FlirtEasy] Auto-like completed: ${likesCompleted}/${count} successful`);
+
+    // Only post FE_CYCLE_DONE if the cycle completed naturally (reached target count or stack empty),
+    // NEVER when aborted or interrupted by stopAutomation!
+    if (!isAutoLikeAborted() && (likesCompleted >= count || (typeof isStackEmpty === 'function' && isStackEmpty()))) {
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FE_CYCLE_DONE',
+            count: likesCompleted,
+          }));
+        }
+      } catch (_) {}
+    }
 
     return {
       success: true,
@@ -1758,9 +1825,10 @@ async function processChats(settings, maxMessagesOverride = null) {
     logAction('processChats already running, skipping duplicate request', {}, 'warn');
     return { success: false, skipped: true, processed: 0, followUps: 0, errors: ['Chat processing already in progress'] };
   }
+  window.__flirteasy_stop = false;
   processChatsRunning = true;
   const _myProcessChatsGen = ++_processChatsGen;
-  const isProcessChatsAborted = () => !processChatsRunning || _processChatsGen !== _myProcessChatsGen;
+  const isProcessChatsAborted = () => !processChatsRunning || _processChatsGen !== _myProcessChatsGen || window.__flirteasy_stop === true;
   const startTime = Date.now();
   logPhaseHeader('MESSAGING CYCLE START');
 
@@ -4442,6 +4510,21 @@ window.addEventListener('message', (event) => {
 // to the React Native home screen via the ReactNativeWebView bridge.
 if (typeof window._feLogoutWatchdogStarted === 'undefined') {
   window._feLogoutWatchdogStarted = true;
+
+  var _extractTinderAuthToken = function() {
+    try {
+      var t = localStorage.getItem('TinderWeb/APIToken');
+      if (t) return String(t).replace(/^["'](.*)["']$/, '$1').trim();
+      var s = localStorage.getItem('TinderWeb/APIStore');
+      if (s) {
+        var p = JSON.parse(s);
+        var tok = p && (p.token || p.auth_token || (p.user && p.user.api_token));
+        if (tok) return String(tok).replace(/^["'](.*)["']$/, '$1').trim();
+      }
+    } catch (_) {}
+    return null;
+  };
+
   // Seed initial state — if already logged in at inject time, mark as such
   let _wasLoggedIn = typeof isLoggedIn === 'function' ? isLoggedIn() : false;
 
@@ -4452,6 +4535,7 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'FE_PAGE_STATUS',
           isLoggedIn: _wasLoggedIn,
+          token: _wasLoggedIn ? _extractTinderAuthToken() : null,
           url: window.location.href,
         }));
       }
@@ -4489,6 +4573,7 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'FE_AUTH_STEP',
             step: 'logged_in',
+            token: _extractTinderAuthToken(),
             url: window.location.href,
           }));
         }

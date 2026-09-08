@@ -5,5 +5,10 @@ const AppState = {
   currentState: 'active',
   addEventListener: jest.fn(() => ({ remove: jest.fn() })),
 };
+const Linking = {
+  canOpenURL: jest.fn(async () => true),
+  openURL: jest.fn(async () => true),
+};
 
-module.exports = { Platform, AppState };
+module.exports = { Platform, AppState, Linking };
+
