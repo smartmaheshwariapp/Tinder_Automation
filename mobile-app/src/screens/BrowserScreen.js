@@ -733,6 +733,76 @@ export default function BrowserScreen({ route, navigation }) {
   }, [onDeviceSwiping]);
   const isTogglingRef = useRef(false);
 
+  // Helper to reliably dispatch auto-like start command into WebView DOM
+  const dispatchStartToDOM = useCallback((targetCount = null) => {
+    if (!webViewRef.current) return;
+    const count = targetCount || extensionSettings?.likesPerCycle || 50;
+    webViewRef.current.injectJavaScript(`
+      (function() {
+        var targetCount = ${count};
+        var attemptsLeft = 30;
+
+        function sendStart() {
+          try {
+            // 1. Direct global hook if content script is loaded
+            if (typeof window.__flirteasyStartAutomation === 'function') {
+              window.__flirteasyStartAutomation(targetCount);
+              console.log('[FlirtEasy Bridge] Started automation via direct global hook');
+              return true;
+            }
+
+            // 2. Dispatch via content script message bridge
+            if (typeof window.__chromeDispatchMessage === 'function') {
+              var countDispatched = window.__chromeDispatchMessage({ action: 'autoLike', count: targetCount });
+              if (countDispatched > 0) {
+                console.log('[FlirtEasy Bridge] Dispatched autoLike to ' + countDispatched + ' listener(s)');
+                return true;
+              }
+            }
+
+            // 3. If not on recs deck, attempt navigation
+            if (!window.location.pathname.includes('/app/recs')) {
+              var recsLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Explore" i]');
+              if (recsLink) recsLink.click();
+            }
+          } catch(e) {
+            console.error('[FlirtEasy Bridge] sendStart error:', e);
+          }
+
+          attemptsLeft--;
+          if (attemptsLeft > 0) {
+            setTimeout(sendStart, 800);
+          }
+        }
+
+        sendStart();
+      })();
+      true;
+    `);
+  }, [extensionSettings]);
+
+  // Auto-start coordination: ensures automation reliably engages once Tinder DOM is loaded and logged in
+  const pendingAutoStartRef = useRef(Boolean(route.params?.autoStartAgent));
+  const hasAutoStartedRef = useRef(false);
+
+  const triggerAutoStartIfReady = useCallback(() => {
+    if (!isOnDevice) return;
+    const isRequested = pendingAutoStartRef.current || (onDeviceSwipingRef.current && !hasAutoStartedRef.current);
+    if (!isRequested) return;
+
+    const auth = getTinderAuthState();
+    if (!auth?.isLoggedIn) return;
+
+    hasAutoStartedRef.current = true;
+    pendingAutoStartRef.current = false;
+    onDeviceSwipingRef.current = true;
+    setOnDeviceSwiping(true);
+    saveOnDeviceSessionState({ isRunning: true });
+
+    addLog('⚡ Tinder loaded & verified — engaging AI Automation engine...', 'success');
+    dispatchStartToDOM();
+  }, [isOnDevice, addLog, dispatchStartToDOM]);
+
   // Toggle local On-Device Tinder automation engine
   const toggleOnDeviceSwiping = useCallback((forceStart = null) => {
     if (!webViewRef.current || isTogglingRef.current) return;
@@ -778,52 +848,14 @@ export default function BrowserScreen({ route, navigation }) {
         addLog('⏸️ FlirtEasy AI Automation paused', 'info');
       } else {
         if (worker) worker.handleMessage({ action: 'startAgent' });
+        dispatchStartToDOM();
         const count = extensionSettings?.likesPerCycle || 50;
-        webViewRef.current.injectJavaScript(`
-          (function() {
-            var targetCount = ${count};
-            var attemptsLeft = 25;
-
-            function sendStart() {
-              try {
-                // 1. If not on recs deck, try navigating via click
-                if (!window.location.pathname.includes('/app/recs')) {
-                  var recsLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Explore" i]');
-                  if (recsLink) recsLink.click();
-                }
-
-                // 2. Dispatch autoLike command to content script bridge
-                if (window.__chromeDispatchMessage) {
-                  window.__chromeDispatchMessage({ action: 'autoLike', count: targetCount });
-                  if (window.__linksyStartSwiping) window.__linksyStartSwiping();
-                  return true;
-                }
-                if (window.__chromeDispatchPortMessage) {
-                  window.__chromeDispatchPortMessage({ action: 'autoLike', count: targetCount, messageId: 'start_' + Date.now() });
-                  if (window.__linksyStartSwiping) window.__linksyStartSwiping();
-                  return true;
-                }
-              } catch(e) {
-                console.error('[FlirtEasy Bridge] Start attempt error:', e);
-              }
-
-              // Retry until content script bridge is attached
-              attemptsLeft--;
-              if (attemptsLeft > 0) {
-                setTimeout(sendStart, 800);
-              }
-            }
-
-            sendStart();
-          })();
-          true;
-        `);
         addLog(`🚀 FlirtEasy AI Automation started (${count} profiles target)`, 'success');
       }
     } finally {
       isTogglingRef.current = false;
     }
-  }, [addLog, extensionSettings]);
+  }, [addLog, extensionSettings, dispatchStartToDOM]);
 
   // Manually trigger processing match chats using FlirtEasy AI
   const triggerProcessChats = useCallback(() => {
@@ -1290,15 +1322,17 @@ export default function BrowserScreen({ route, navigation }) {
     return () => clearTimeout(timer);
   }, [isOnDevice, onDeviceSwipes, onDeviceMatches, onDeviceMessages]);
 
-  // Auto-start agent if launched with autoStartAgent param from Home Screen (runs exactly once on mount)
-  const hasAutoStartedRef = useRef(false);
+  // Auto-start agent safeguard: attempts start if launched with autoStartAgent and Tinder is logged in
   useEffect(() => {
-    if (isOnDevice && route.params?.autoStartAgent && !hasAutoStartedRef.current && getTinderAuthState()?.isLoggedIn) {
-      hasAutoStartedRef.current = true;
-      addLog('⚡ Auto-launching AI Automation engine from Home Screen...', 'action');
-      toggleOnDeviceSwiping(true);
+    if (isOnDevice && route.params?.autoStartAgent) {
+      const timer = setTimeout(() => {
+        if (getTinderAuthState()?.isLoggedIn && pendingAutoStartRef.current) {
+          triggerAutoStartIfReady();
+        }
+      }, 1200);
+      return () => clearTimeout(timer);
     }
-  }, [isOnDevice, route.params?.autoStartAgent, toggleOnDeviceSwiping, addLog]);
+  }, [isOnDevice, route.params?.autoStartAgent, triggerAutoStartIfReady]);
 
   // Sync external stop/pause command from Home Screen
   useEffect(() => {
@@ -1952,7 +1986,9 @@ export default function BrowserScreen({ route, navigation }) {
 
   const finalUrl = React.useMemo(() => {
     if (isOnDevice) {
-      return 'https://tinder.com/';
+      return (getTinderAuthState()?.isLoggedIn || route.params?.autoStartAgent)
+        ? 'https://tinder.com/app/recs'
+        : 'https://tinder.com/';
     }
     if (isHyperbeam) {
       if (hyperbeamEmbedUrl) return hyperbeamEmbedUrl;
@@ -2377,6 +2413,13 @@ export default function BrowserScreen({ route, navigation }) {
                 // The "landing page -> Create account" helper lives in the
                 // content script bundle (injectedJavaScript), so there is
                 // nothing to inject from here.
+
+                // Auto-start or re-engage automation once DOM finishes loading
+                if (isOnDevice && (pendingAutoStartRef.current || onDeviceSwipingRef.current)) {
+                  setTimeout(() => {
+                    triggerAutoStartIfReady();
+                  }, 600);
+                }
               }}
               onNavigationStateChange={(navState) => {
                 setCanGoBackWeb(navState.canGoBack);
@@ -2497,6 +2540,7 @@ export default function BrowserScreen({ route, navigation }) {
                           token: msg.token || undefined,
                           accountName: msg.accountName || 'Tinder Account'
                         });
+                        triggerAutoStartIfReady();
                       } else {
                         const current = getTinderAuthState();
                         // Never clobber a believed-good session while the user is
@@ -2519,6 +2563,7 @@ export default function BrowserScreen({ route, navigation }) {
                         accountName: msg.name || 'Tinder Account'
                       });
                       addLog('Logged into Tinder (Active Session)', 'success');
+                      triggerAutoStartIfReady();
                     } else if (msg.step === 'logged_out') {
                       // Fired both by the purge script and by the watchdog when
                       // the user logs out inside Tinder itself.

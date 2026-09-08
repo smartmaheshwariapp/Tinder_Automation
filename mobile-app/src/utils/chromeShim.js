@@ -396,13 +396,20 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
 
   // Dispatch a message to content script onMessage listeners (called from React Native)
   window.__chromeDispatchMessage = function(request, sendResponseFn) {
+    var dispatched = 0;
     for (var i = 0; i < _onMessageListeners.length; i++) {
       try {
         _onMessageListeners[i](request, { id: 'flirteasy-on-device' }, sendResponseFn || function(){});
+        dispatched++;
       } catch(e) {
         console.warn('[ChromeShim] onMessage listener error:', e);
       }
     }
+    return dispatched;
+  };
+
+  window.__chromeHasListeners = function() {
+    return _onMessageListeners.length > 0;
   };
 
   // Dispatch a port message to content script port listeners (called from React Native)

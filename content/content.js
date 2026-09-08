@@ -223,6 +223,11 @@ function stopAllAutomation() {
 // Global hooks for direct invocation via React Native WebView bridge
 window.__flirteasyStopAutomation = stopAllAutomation;
 window.__linksyStopSwiping = stopAllAutomation;
+window.__flirteasyStartAutomation = function(count) {
+  return autoLike(count || 50);
+};
+window.__linksyStartSwiping = window.__flirteasyStartAutomation;
+window.__flirteasyContentScriptReady = true;
 let tinderSessionSentIds = new Set(); // FAST session-based double-send lock
 let tinderNetworkOfflineReported = false;
 let lastMatchId = null;
