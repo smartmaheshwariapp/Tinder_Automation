@@ -126,10 +126,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
 
     if (isHyperbeam) {
       try {
-        console.log('[Mobile] Starting Hyperbeam Cloud Browser session...');
-        const realProxy = proxyIp === 'http://*****:*****@46.203.181.164:43343'
-          ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
-          : proxyIp;
+        const realProxy = proxyIp;
 
         const { embedUrl, sessionId, profileId } = await startHyperbeamCloudSession({
           platform,

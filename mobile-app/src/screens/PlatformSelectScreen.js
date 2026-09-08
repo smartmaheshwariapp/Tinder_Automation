@@ -72,7 +72,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
   // Connection endpoints
   const [vpsUrl, setVpsUrl] = useState('https://stream.smartmaheshwari.com/?usr=User&pwd=admin');
-  const [vpsProxy, setVpsProxy] = useState('http://*****:*****@46.203.181.164:43343');
+  const [vpsProxy, setVpsProxy] = useState('');
 
   const autoIp = getAutoDetectedLocalIp();
   const [localUrl, setLocalUrl] = useState(`http://${autoIp}:8080/?usr=User&pwd=admin`);
@@ -268,7 +268,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
       : (environment === 'vps' ? vpsUrl : localUrl));
 
   const activeProxy = environment === 'vps'
-    ? (userRegion === 'israel' ? 'http://*****:*****@46.203.181.164:43343' : '')
+    ? vpsProxy
     : (environment === 'hyperbeam' || environment === 'on_device' ? '' : localProxy);
 
   const orchestratorUrl = environment === 'on_device'
@@ -430,9 +430,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
   // Open live browser session (supports autoStartAgent and custom launch parameters)
   const handleOpenLiveFeed = useCallback(async (platformName, extraParams = {}) => {
     const targetPlatform = typeof platformName === 'string' ? platformName : selectedPlatform;
-    const realProxy = activeProxy === 'http://*****:*****@46.203.181.164:43343'
-      ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
-      : activeProxy;
+    const realProxy = activeProxy;
 
     if (environment === 'hyperbeam') {
       setStartingSession(true);
@@ -602,9 +600,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
   const handleLaunch = useCallback((platformName) => {
     const targetPlatform = typeof platformName === 'string' ? platformName : selectedPlatform;
-    const realProxy = activeProxy === 'http://*****:*****@46.203.181.164:43343'
-      ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
-      : activeProxy;
+    const realProxy = activeProxy;
 
     const resolvedUrl = environment === 'hyperbeam' ? 'hyperbeam' : resolveLocalUrl(activeStreamUrl);
 
@@ -617,9 +613,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
   }, [navigation, activeProxy, activeStreamUrl, environment, selectedPlatform]);
 
   const handleOpenCloudHub = useCallback(() => {
-    const realProxy = activeProxy === 'http://*****:*****@46.203.181.164:43343'
-      ? 'http://9gcULQm9X1JxWAZ:zuMSfDYAHi3zJFv@46.203.181.164:43343'
-      : activeProxy;
+    const realProxy = activeProxy;
 
     navigation.navigate('CloudDashboard', {
       orchestratorUrl,
