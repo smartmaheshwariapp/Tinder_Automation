@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
-import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession } from '../utils/sessionManager';
+import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession, getSharedExtensionSettings } from '../utils/sessionManager';
 import NotificationService from '../services/notifications';
 
 const V2_GOALS = [
@@ -41,6 +41,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
   const [likesPerCycle, setLikesPerCycle] = useState(50);
   const [messagesPerCycle, setMessagesPerCycle] = useState(20);
   const [scheduleInterval, setScheduleInterval] = useState(30);
+  const [sessionDuration, setSessionDuration] = useState(30); // 15, 30, 45, 60 mins or 0 (no limit)
 
   // AI Prompt settings
   const [useCustomIntro, setUseCustomIntro] = useState(false);
@@ -93,7 +94,29 @@ export default function PlatformConfigScreen({ route, navigation }) {
     // ─── Terminate any other currently active sessions first ───
     await terminatePreviousSessions(resolvedOrchestratorUrl, HYPERBEAM_KEY);
 
+    const isOnDevice = vpsUrl === 'on_device' || route.params?.environment === 'on_device';
     const isHyperbeam = vpsUrl === 'hyperbeam' || route.params?.environment === 'hyperbeam';
+
+    if (isOnDevice) {
+      setLoading(false);
+      navigation.navigate('Browser', {
+        platform,
+        vpsUrl: 'https://tinder.com',
+        isOnDevice: true,
+        environment: 'on_device',
+        sessionDuration,
+        extensionSettings: {
+          ...getSharedExtensionSettings(),
+          likesPerCycle,
+          messagesPerCycle,
+          selectedGoal,
+          contactHandle,
+          customIntroPrompt,
+          useCustomIntro,
+        }
+      });
+      return;
+    }
 
     // Desktop Web View resolution (1280x720) so full website Login buttons are visible
     const webWidth = 1280;
@@ -119,7 +142,16 @@ export default function PlatformConfigScreen({ route, navigation }) {
           vpsUrl: embedUrl,
           proxyIp: realProxy,
           isHyperbeam: true,
+          sessionDuration,
           orchestratorUrl: resolvedOrchestratorUrl,
+          extensionSettings: {
+            likesPerCycle,
+            messagesPerCycle,
+            selectedGoal,
+            contactHandle,
+            customIntroPrompt,
+            useCustomIntro,
+          }
         });
         return;
       } catch (hbErr) {
@@ -254,6 +286,47 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 />
               </View>
             )}
+          </View>
+
+          {/* Section: Session Duration / Alarm Clock Span */}
+          <View style={styles.sectionCard}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardTitleRow}>
+                <Ionicons name="timer-outline" size={16} color={themeColor} />
+                <Text style={styles.sectionHeader}>Session Duration Timer</Text>
+              </View>
+              <View style={[styles.activePill, { backgroundColor: '#10B98118', borderColor: '#10B98140' }]}>
+                <Text style={[styles.activePillText, { color: '#10B981' }]}>Alarm Clock UI</Text>
+              </View>
+            </View>
+            <Text style={styles.sectionDesc}>Automation automatically stops after the selected duration until you start it again.</Text>
+
+            <View style={styles.durationRow}>
+              {[
+                { mins: 15, label: '15 Min' },
+                { mins: 30, label: '30 Min' },
+                { mins: 45, label: '45 Min' },
+                { mins: 60, label: '60 Min' },
+                { mins: 0, label: 'No Limit' }
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.mins}
+                  style={[
+                    styles.durationPill,
+                    sessionDuration === opt.mins && { backgroundColor: themeColor, borderColor: themeColor }
+                  ]}
+                  onPress={() => setSessionDuration(opt.mins)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[
+                    styles.durationPillText,
+                    sessionDuration === opt.mins && styles.durationPillTextActive
+                  ]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           {/* Section 2: Daily Pacing */}
@@ -609,6 +682,32 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#221E33',
     marginVertical: 12,
+  },
+  durationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+    marginTop: 8,
+  },
+  durationPill: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#1E1B2E',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  durationPillText: {
+    color: '#8E8DA3',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  durationPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   stepperContainer: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-window.SELECTORS = null;
+window.SELECTORS = window.SELECTORS || null;
 
 // Report DOM errors to background.js which forwards to the server
 function reportDomError(error_type, selector_key, error_message) {
@@ -461,20 +461,80 @@ function closeMatchModal() {
   return false;
 }
 
+function hasLocationModal() {
+  const bodyText = (document.body.innerText || document.body.textContent || '').toLowerCase();
+  return (
+    bodyText.includes('enable location') ||
+    bodyText.includes('share location') ||
+    bodyText.includes('allow location') ||
+    bodyText.includes("you'll need to enable location") ||
+    bodyText.includes('location services off') ||
+    bodyText.includes('allow location access')
+  );
+}
+
+function handleLocationModal() {
+  try {
+    const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+    for (let i = 0; i < buttons.length; i++) {
+      const btn = buttons[i];
+      const txt = (btn.innerText || btn.textContent || '').trim().toLowerCase();
+      const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+      if (
+        txt === 'allow' ||
+        txt === 'enable location' ||
+        txt === 'share location' ||
+        txt === 'allow location' ||
+        txt === 'continue' ||
+        txt === 'i understand' ||
+        aria.includes('enable location') ||
+        aria.includes('share location') ||
+        aria.includes('allow location')
+      ) {
+        console.log('[FlirtEasy] Auto-accepting Tinder location prompt button:', txt || aria);
+        btn.click();
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn('[FlirtEasy] handleLocationModal error:', e);
+  }
+  return false;
+}
+
 function isLoggedIn() {
   if (!window.location.pathname.includes('/app')) {
     return false;
   }
 
+  // Never report logged in on login or landing paths
+  const path = window.location.pathname.toLowerCase();
+  if (path.includes('/app/login') || path === '/app' || path === '/app/') {
+    return false;
+  }
+
+  // If login form inputs or login dialogs are visible, user is NOT logged in
+  if (document.querySelector('input[type="tel"], input[name="phone_number"], input[autocomplete="one-time-code"], input[name="code"]')) {
+    return false;
+  }
+
   const loginIndicators = [
-    () => findElement(window.SELECTORS.navigation.explore),
-    () => findElement(window.SELECTORS.navigation.messages),
-    () => findElement(window.SELECTORS.buttons.like),
-    () => findElement(window.SELECTORS.profile.card),
-    () => window.location.pathname.includes('/app/')
+    () => window.SELECTORS?.navigation?.explore && findElement(window.SELECTORS.navigation.explore),
+    () => window.SELECTORS?.navigation?.messages && findElement(window.SELECTORS.navigation.messages),
+    () => window.SELECTORS?.buttons?.like && findElement(window.SELECTORS.buttons.like),
+    () => window.SELECTORS?.profile?.card && findElement(window.SELECTORS.profile.card),
+    () => document.querySelector('[data-testid="gamepad-like"], button[aria-label*="Like" i], a[href*="/app/recs"], a[href*="/app/messages"]'),
+    () => {
+      try {
+        const token = localStorage.getItem('TinderWeb/APIToken');
+        return token && typeof token === 'string' && token.length > 20;
+      } catch(_) { return false; }
+    }
   ];
 
-  return loginIndicators.some(check => check());
+  return loginIndicators.some(check => {
+    try { return Boolean(check()); } catch(_) { return false; }
+  });
 }
 
 function waitRandom(min, max) {

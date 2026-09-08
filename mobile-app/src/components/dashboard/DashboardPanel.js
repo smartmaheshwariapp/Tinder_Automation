@@ -17,6 +17,7 @@ import AutomationV2Panel from './AutomationV2Panel';
 import SettingsPanel from './SettingsPanel';
 import FloatingSaveBar from './FloatingSaveBar';
 import useExtensionSettings from '../../hooks/useExtensionSettings';
+import { resolveLocalUrl } from '../../utils/network';
 
 function LoadingState() {
   return (
@@ -35,17 +36,32 @@ export default function DashboardPanel({
   onToggleAgent,
   onLogout,
   orchestratorUrl,
+  onSaveSettings,
+  settings: propSettings,
+  onSyncProfile,
+  onPushBio,
 }) {
   const [activeTab, setActiveTab] = useState('activity');
+  const [targetSettingsSection, setTargetSettingsSection] = useState(null);
 
-  const handleTabSelect = useCallback((tab) => setActiveTab(tab), []);
+  const handleTabSelect = useCallback((tab) => {
+    setTargetSettingsSection(null);
+    setActiveTab(tab);
+  }, []);
+
+  const handleNavigateToSettings = useCallback((section) => {
+    if (section) setTargetSettingsSection(section);
+    setActiveTab('settings');
+  }, []);
 
   const agentState    = stats?.agentState    ?? null;
   const lifetimeStats = stats?.lifetimeStats ?? null;
   const progressFeed  = stats?.progressFeed  ?? [];
-  const liveSettings  = stats?.settings      ?? null;
+  const liveSettings  = (propSettings || stats?.settings) ?? null;
 
-  // Remote settings hook for Automation V2 & configuration
+  const effectiveOrchestratorUrl = orchestratorUrl || resolveLocalUrl('http://localhost:3001');
+
+  // Remote settings hook for Automation V2 & configuration (when orchestratorUrl is available)
   const {
     settings: v2Settings,
     loading: v2Loading,
@@ -53,9 +69,32 @@ export default function DashboardPanel({
     saveSuccess: v2SaveSuccess,
     error: v2Error,
     saveSettings: handleSaveV2Settings,
-  } = useExtensionSettings(orchestratorUrl);
+  } = useExtensionSettings(effectiveOrchestratorUrl);
 
-  const effectiveSettings = v2Settings || liveSettings;
+  const [localSaving, setLocalSaving] = useState(false);
+  const [localSaveSuccess, setLocalSaveSuccess] = useState(false);
+  const [localSettings, setLocalSettings] = useState(null);
+
+  const effectiveSettings = localSettings || propSettings || v2Settings || liveSettings;
+
+  const handleSave = useCallback(async (updated) => {
+    if (onSaveSettings) {
+      setLocalSaving(true);
+      try {
+        const success = await onSaveSettings(updated);
+        if (success !== false) {
+          setLocalSettings(prev => ({ ...(prev || effectiveSettings || {}), ...updated }));
+          setLocalSaveSuccess(true);
+          setTimeout(() => setLocalSaveSuccess(false), 3000);
+          return true;
+        }
+        return false;
+      } finally {
+        setLocalSaving(false);
+      }
+    }
+    return await handleSaveV2Settings(updated);
+  }, [onSaveSettings, effectiveSettings, handleSaveV2Settings]);
 
   // ─── Global Dynamic Floating Save Bar Controller ───
   const [dirtyState, setDirtyState] = useState({
@@ -130,29 +169,33 @@ export default function DashboardPanel({
 
         {activeTab === 'automation' && (
           <AutomationV2Panel
-            settings={v2Settings}
-            loading={v2Loading}
-            saving={v2Saving}
-            saveSuccess={v2SaveSuccess}
-            error={v2Error}
-            onSave={handleSaveV2Settings}
+            settings={effectiveSettings}
+            loading={onSaveSettings ? false : v2Loading}
+            saving={onSaveSettings ? localSaving : v2Saving}
+            saveSuccess={onSaveSettings ? localSaveSuccess : v2SaveSuccess}
+            error={onSaveSettings ? null : v2Error}
+            onSave={handleSave}
             onDirtyChange={handleDirtyChange}
+            onNavigateToSettings={handleNavigateToSettings}
           />
         )}
 
         {activeTab === 'settings' && (
           <SettingsPanel
-            settings={v2Settings}
-            loading={v2Loading}
-            saving={v2Saving}
-            saveSuccess={v2SaveSuccess}
-            error={v2Error}
-            onSave={handleSaveV2Settings}
+            settings={effectiveSettings}
+            loading={onSaveSettings ? false : v2Loading}
+            saving={onSaveSettings ? localSaving : v2Saving}
+            saveSuccess={onSaveSettings ? localSaveSuccess : v2SaveSuccess}
+            error={onSaveSettings ? null : v2Error}
+            onSave={handleSave}
             onDirtyChange={handleDirtyChange}
             onLogout={onLogout}
             rawControlsContent={controlsContent}
-            orchestratorUrl={orchestratorUrl}
+            orchestratorUrl={effectiveOrchestratorUrl}
             stats={stats}
+            onSyncProfile={onSyncProfile}
+            onPushBio={onPushBio}
+            initialOpenSection={targetSettingsSection}
           />
         )}
       </ScrollView>
@@ -160,9 +203,9 @@ export default function DashboardPanel({
       {/* ─── 5. Global Floating Save Bar (Always Fixed at Viewport Bottom) ─── */}
       <FloatingSaveBar
         visible={dirtyState.isDirty}
-        saving={v2Saving}
-        saveSuccess={v2SaveSuccess}
-        error={v2Error}
+        saving={onSaveSettings ? localSaving : v2Saving}
+        saveSuccess={onSaveSettings ? localSaveSuccess : v2SaveSuccess}
+        error={onSaveSettings ? null : v2Error}
         onSave={handleGlobalSave}
         onDiscard={handleGlobalDiscard}
       />

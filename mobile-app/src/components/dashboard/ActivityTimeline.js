@@ -144,7 +144,7 @@ export default function ActivityTimeline({ progressFeed }) {
         >
           {events.map((event, index) => (
             <TimelineItem
-              key={event.id || `${event.timestamp}_${index}`}
+              key={event.id ? `${event.id}_${index}` : `timeline_event_${index}`}
               event={event}
               isLast={index === events.length - 1}
             />

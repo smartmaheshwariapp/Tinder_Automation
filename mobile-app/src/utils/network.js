@@ -45,3 +45,32 @@ export const resolveLocalUrl = (url) => {
   if (localIp === 'localhost') return url;
   return url.replace(/localhost|127\.0\.0\.1/g, localIp);
 };
+
+/**
+ * POSTs a JSON body with a hard timeout.
+ *
+ * React Native's fetch has no default timeout, so an unreachable or slow host
+ * hangs the caller indefinitely. In the logout flows that meant a spinner with
+ * both modal buttons disabled and no way for the user to recover. Orchestrator
+ * calls are best-effort, so failures and timeouts are reported rather than
+ * thrown.
+ *
+ * @returns {Promise<boolean>} true only when the host answered with a 2xx.
+ */
+export const postJsonWithTimeout = async (url, body, timeoutMs = 4000) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch (_) {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+};

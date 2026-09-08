@@ -39,6 +39,11 @@ const SAFE_DEFAULTS = {
     tone: 'Playful',
     aiCalibration: 0,
   },
+  tinderAccount: {
+    isLoggedIn: false,
+    name: null,
+    email: null,
+  },
 };
 
 // ─── JS snippet evaluated inside Neko Chrome via CDP ───
@@ -293,6 +298,18 @@ function handleExtensionStats(req, res) {
           ...parsed.agentState.currentCycle,
         };
       }
+
+      // Compute tinderAccount auth status
+      const hasProfileName = Boolean(result.settings?.userProfile?.name);
+      const hasSwipes = Boolean((result.lifetimeStats && result.lifetimeStats.totalSwipes > 0) || (result.agentState?.stats?.swipes > 0));
+      const hasLikes = Boolean(Array.isArray(result.progressFeed) && result.progressFeed.some(p => p.type === 'profile_liked'));
+      const isAuthed = hasProfileName || hasSwipes || hasLikes;
+
+      result.tinderAccount = {
+        isLoggedIn: isAuthed,
+        name: result.settings?.userProfile?.name || (isAuthed ? 'Tinder Account' : null),
+        email: result.settings?.userProfile?.email || null,
+      };
 
       console.log(
         `[ExtStats] phase=${result.agentState.currentPhase} ` +

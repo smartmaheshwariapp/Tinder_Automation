@@ -129,6 +129,13 @@ let _redirectPreferences = {
 
 export const NotificationService = {
   /**
+   * Request push notification permissions
+   */
+  async requestPermissions() {
+    return this.registerForPushNotificationsAsync();
+  },
+
+  /**
    * Register for Push Notifications (Expo Push Token)
    */
   async registerForPushNotificationsAsync(userId = null) {
@@ -443,17 +450,9 @@ export const NotificationService = {
       }
     }
 
-    // Platform specific deep links
-    let deepLinkScheme = 'tinder://';
-    let fallbackWebUrl = 'https://tinder.com/app/matches';
-
-    if (cleanPlatform.includes('bumble')) {
-      deepLinkScheme = 'bumble://';
-      fallbackWebUrl = 'https://bumble.com/app';
-    } else if (cleanPlatform.includes('hinge')) {
-      deepLinkScheme = 'hinge://';
-      fallbackWebUrl = 'https://hinge.co';
-    }
+    // Platform specific deep links (Tinder only)
+    const deepLinkScheme = 'tinder://';
+    const fallbackWebUrl = 'https://tinder.com/app/matches';
 
     try {
       const canOpenNative = await Linking.canOpenURL(deepLinkScheme).catch(() => false);

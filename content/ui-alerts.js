@@ -4,9 +4,9 @@
  */
 
 // Re-entry guard: prevent crashes from double content-script injection
-if (typeof UIAlerts !== 'undefined') { /* Already loaded */ } else {
+if (typeof window.UIAlerts !== 'undefined') { /* Already loaded */ } else {
 
-window.UIAlerts = {
+var UIAlerts = window.UIAlerts = {
     injectStyles() {
         if (document.getElementById('flirteasy-alerts-style')) return;
 

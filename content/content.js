@@ -3,75 +3,132 @@ if (window.location.pathname.startsWith('/faq') || window.location.href.includes
   window.location.replace('https://tinder.com/');
 }
 
-// ─── Automated Cookie Consent Auto-Dismiss ───
+// ─── Automated Cookie Consent & Backdrop Auto-Dismiss ───
+// This is driven by a MutationObserver on a React app that mutates constantly,
+// so it MUST stay cheap and MUST stop once it has done its job. The text scan
+// below reads innerText on every button in the document, which forces a
+// synchronous layout per element. Running that on every mutation record is
+// enough to saturate the WebView main thread on a phone: the page still paints
+// but taps never reach React's click handlers, so buttons look dead.
+let _cookieConsentDone = false;
+let _cookieScanCount = 0;
+
 function autoDismissCookies() {
+  if (_cookieConsentDone) return;
   try {
-    const btns = Array.from(document.querySelectorAll('button, a, div[role="button"]'));
-    for (let i = 0; i < btns.length; i++) {
-      const b = btns[i];
-      const txt = (b.innerText || b.textContent || '').trim().toLowerCase();
-      if (txt === 'i accept' || txt === 'accept all' || txt === 'accept' || txt === 'i agree') {
-        b.click();
-        return true;
+    // 1. OneTrust / standard accept button targets (cheap id + attribute lookups)
+    const otBtn = document.getElementById('onetrust-accept-btn-handler') ||
+      document.querySelector('#onetrust-consent-sdk button') ||
+      document.querySelector('[aria-label="Accept all"]') ||
+      document.querySelector('[data-testid="cookie-accept"]');
+    if (otBtn) {
+      otBtn.click();
+      _cookieConsentDone = true;
+    }
+
+    // 2. Clear any sticky backdrop filter that intercepts touches
+    const filter = document.querySelector('.onetrust-pc-dark-filter');
+    if (filter) {
+      filter.style.pointerEvents = 'none';
+      filter.style.display = 'none';
+    }
+
+    // 3. Text-based fallback — expensive, so hard-capped instead of unbounded
+    if (!_cookieConsentDone && _cookieScanCount < 15) {
+      _cookieScanCount++;
+      const btns = Array.from(document.querySelectorAll('button, a, div[role="button"]'));
+      for (let i = 0; i < btns.length; i++) {
+        const b = btns[i];
+        const txt = (b.innerText || b.textContent || '').trim().toLowerCase();
+        if (txt === 'i accept' || txt === 'accept all' || txt === 'accept' || txt === 'i agree' || txt === 'got it') {
+          b.click();
+          _cookieConsentDone = true;
+          break;
+        }
       }
     }
   } catch (_) {}
-  return false;
 }
 
 if (typeof document !== 'undefined') {
   autoDismissCookies();
-  const cookieObserver = new MutationObserver(() => {
-    autoDismissCookies();
-  });
+
+  let cookieObserver = null;
+  let cookieTick = null;
+
+  const stopCookieObserver = () => {
+    if (cookieTick) { clearTimeout(cookieTick); cookieTick = null; }
+    if (cookieObserver) { cookieObserver.disconnect(); cookieObserver = null; }
+  };
+
+  // Coalesce bursts of mutations into at most one scan per 400ms.
+  const scheduleCookieScan = () => {
+    if (_cookieConsentDone) { stopCookieObserver(); return; }
+    if (cookieTick) return;
+    cookieTick = setTimeout(() => {
+      cookieTick = null;
+      autoDismissCookies();
+      if (_cookieConsentDone) stopCookieObserver();
+    }, 400);
+  };
+
+  cookieObserver = new MutationObserver(scheduleCookieScan);
+
+  const startCookieObserver = () => {
+    if (document.body && cookieObserver) {
+      cookieObserver.observe(document.body, { childList: true, subtree: true });
+      // Never watch forever — a consent banner that never appears must not keep
+      // the observer (and its scans) alive for the whole session.
+      setTimeout(stopCookieObserver, 30000);
+    }
+  };
+
   if (document.body) {
-    cookieObserver.observe(document.body, { childList: true, subtree: true });
+    startCookieObserver();
   } else {
-    document.addEventListener('DOMContentLoaded', () => {
-      if (document.body) {
-        cookieObserver.observe(document.body, { childList: true, subtree: true });
-      }
-    });
+    document.addEventListener('DOMContentLoaded', startCookieObserver);
   }
 }
 
-// Inject interceptor into page context (only once)
-if (!document.querySelector('script[data-flirteasy-interceptor]')) {
-  const script = document.createElement('script');
-  script.src = chrome.runtime.getURL('content/api-interceptor.js');
-  script.setAttribute('data-flirteasy-interceptor', 'true');
-  script.onload = function () {
-    this.remove();
-  };
-  script.onerror = function () {
-    console.error('[FlirtEasy] Failed to inject API interceptor');
-  };
-  (document.head || document.documentElement).appendChild(script);
+// Inject interceptor into page context (only once, Chrome Extension context only)
+if (window.chrome?.runtime?.id && window.chrome.runtime.id !== 'flirteasy-on-device') {
+  if (!document.querySelector('script[data-flirteasy-interceptor]')) {
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL('content/api-interceptor.js');
+    script.setAttribute('data-flirteasy-interceptor', 'true');
+    script.onload = function () {
+      this.remove();
+    };
+    script.onerror = function () {
+      console.error('[FlirtEasy] Failed to inject API interceptor');
+    };
+    (document.head || document.documentElement).appendChild(script);
+  }
+
+  // Inject Achievement System
+  const achievementScripts = [
+    'features/achievements/achievements-core.js',
+    'features/achievements/achievements-tracker.js',
+    'features/achievements/achievements-tinder.js'
+  ];
+
+  // Inject CSS
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = chrome.runtime.getURL('features/achievements/achievements-styles.css');
+  (document.head || document.documentElement).appendChild(link);
+
+  // Inject JS Sequentially
+  function injectNextScript(index = 0) {
+    if (index >= achievementScripts.length) return;
+
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL(achievementScripts[index]);
+    script.onload = () => injectNextScript(index + 1);
+    (document.head || document.documentElement).appendChild(script);
+  }
+  injectNextScript();
 }
-
-// Inject Achievement System
-const achievementScripts = [
-  'features/achievements/achievements-core.js',
-  'features/achievements/achievements-tracker.js',
-  'features/achievements/achievements-tinder.js'
-];
-
-// Inject CSS
-const link = document.createElement('link');
-link.rel = 'stylesheet';
-link.href = chrome.runtime.getURL('features/achievements/achievements-styles.css');
-(document.head || document.documentElement).appendChild(link);
-
-// Inject JS Sequentially
-function injectNextScript(index = 0) {
-  if (index >= achievementScripts.length) return;
-
-  const script = document.createElement('script');
-  script.src = chrome.runtime.getURL(achievementScripts[index]);
-  script.onload = () => injectNextScript(index + 1);
-  (document.head || document.documentElement).appendChild(script);
-}
-injectNextScript();
 
 // --- Achievement Bridge (Content Script <-> Page Context) ---
 window.addEventListener('achievement:getData', async () => {
@@ -1026,9 +1083,27 @@ async function autoLike(count) {
 
     console.log('%c[FlirtEasy] ════════════════════════════════════', 'color:#e91e8c;font-weight:bold;');
 
+    if (!isLoggedIn()) {
+      console.warn('[FlirtEasy] Please log into Tinder first before starting AI.');
+      return { success: false, likesCompleted: 0, errors: ['Please log into Tinder to start AI swiping'] };
+    }
+
     if (!window.location.pathname.includes('/app/recs')) {
-      console.warn('[FlirtEasy] Not on explore page, this should have been handled by background');
-      return { success: false, likesCompleted: 0, errors: ['Not on explore page'] };
+      console.log('[FlirtEasy] Not on explore page, auto-navigating to /app/recs...');
+      const navigated = await navigateToSwipingPage();
+      if (!navigated && !window.location.pathname.includes('/app/recs')) {
+        const swipingLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Explore" i]');
+        if (swipingLink) {
+          swipingLink.click();
+          await waitRandom(2500, 3500);
+        } else if (window.location.pathname.includes('/app') && !window.location.pathname.includes('/app/login')) {
+          window.location.href = 'https://tinder.com/app/recs';
+          await waitRandom(3000, 4500);
+        } else {
+          console.warn('[FlirtEasy] Please log into Tinder first before starting AI.');
+          return { success: false, likesCompleted: 0, errors: ['Please log into Tinder to start AI swiping'] };
+        }
+      }
     }
 
     await waitRandom(2000, 3000);
@@ -1089,6 +1164,12 @@ async function autoLike(count) {
 
           closeMatchModal();
           await waitRandom(1000, 2000);
+        }
+
+        if (typeof hasLocationModal === 'function' && hasLocationModal()) {
+          console.log('[FlirtEasy] Location prompt modal detected during swiping cycle, auto-accepting...');
+          handleLocationModal();
+          await waitRandom(800, 1500);
         }
 
         if (hasSubscriptionPopup()) {
@@ -4177,11 +4258,13 @@ function loadAchievementScripts() {
   document.head.appendChild(overlayScript);
 }
 
-// Start loading when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', loadAchievementScripts);
-} else {
-  loadAchievementScripts();
+// Start loading when DOM is ready (Chrome Extension context only)
+if (window.chrome?.runtime?.id && window.chrome.runtime.id !== 'flirteasy-on-device') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadAchievementScripts);
+  } else {
+    loadAchievementScripts();
+  }
 }
 
 // Listen for achievement unlocks from page context
@@ -4202,157 +4285,130 @@ window.addEventListener('achievement:openPanel', () => {
 
 console.log('[FlirtEasy] Achievement system integrated with Tinder UI');
 
-// Check login status on load
+// ── LOGIN HELPER: LANDING PAGE → "CREATE ACCOUNT" ──
+// Deliberately only two steps, and nothing after them:
+//   Step 1 — the WebView lands on tinder.com
+//   Step 2 — click "Create account" on the landing page
+// That opens Tinder's own login / signup sheet and the user finishes manually.
+// No hamburger menu, no nav drawer, no per-provider automation, no page-state
+// polling. Everything the helper does is bounded and it stops for good after it
+// hands over.
 if (typeof isLoggedIn === 'function') {
   if (isLoggedIn()) {
     if (typeof window.ORCHESTRATOR_USER_ID !== 'undefined') {
       fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=tinder`)
         .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
     }
-  } else {
-    console.log('[Content] User is not logged in. Starting Tinder login helper...');
+  } else if (typeof window.__feCreateAccountHelperStarted === 'undefined') {
+    window.__feCreateAccountHelperStarted = true;
 
-    const simulateClick = (element) => {
-      if (!element) return;
-      
-      const rect = element.getBoundingClientRect();
-      const x = rect.left + rect.width / 2;
-      const y = rect.top + rect.height / 2;
-
-      const eventOptions = {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-        clientX: x,
-        clientY: y,
-        screenX: x,
-        screenY: y
-      };
-      
-      const pointerDown = new PointerEvent('pointerdown', eventOptions);
-      element.dispatchEvent(pointerDown);
-      
-      const mouseDown = new MouseEvent('mousedown', eventOptions);
-      element.dispatchEvent(mouseDown);
-      
-      const pointerUp = new PointerEvent('pointerup', eventOptions);
-      element.dispatchEvent(pointerUp);
-      
-      const mouseUp = new MouseEvent('mouseup', eventOptions);
-      element.dispatchEvent(mouseUp);
-      
-      const clickEvent = new MouseEvent('click', eventOptions);
-      element.dispatchEvent(clickEvent);
+    const isVisible = (el) => {
+      if (!el) return false;
+      try {
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return false;
+        const style = window.getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+      } catch (_) {
+        return el.offsetWidth > 0 || el.offsetHeight > 0;
+      }
     };
 
-    const isVisible = (element) => {
-      if (!element) return false;
+    // Full pointer + mouse sequence: React ignores a bare .click() on some of
+    // Tinder's CTAs. Synthetic events are unaffected by pointer-events CSS.
+    const clickElement = (el) => {
+      if (!el) return;
       try {
-        const rect = element.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
+        const rect = el.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const opts = {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: x,
+          clientY: y,
+          screenX: x,
+          screenY: y,
+        };
+        try { el.dispatchEvent(new PointerEvent('pointerdown', opts)); } catch (_) {}
+        try { el.dispatchEvent(new MouseEvent('mousedown', opts)); } catch (_) {}
+        try { el.dispatchEvent(new PointerEvent('pointerup', opts)); } catch (_) {}
+        try { el.dispatchEvent(new MouseEvent('mouseup', opts)); } catch (_) {}
+        try { el.dispatchEvent(new MouseEvent('click', opts)); } catch (_) {}
+      } catch (_) {}
+      try { el.click(); } catch (_) {}
+    };
+
+    // Tinder's login / signup sheet is up, so step 2 landed and we are done.
+    // #rebrand-mobile-menu is the mobile nav drawer, which is also role="dialog"
+    // and must not be mistaken for the sheet.
+    const isLoginSheetOpen = () => {
+      try {
+        if (document.querySelector('input[type="tel"], input[type="email"], input[autocomplete="one-time-code"]')) {
+          return true;
+        }
+        const dialogs = Array.from(document.querySelectorAll(
+          '[aria-labelledby="MODAL_LOGIN"], [role="dialog"], div[aria-modal="true"]'
+        ));
+        return dialogs.some(d => d.id !== 'rebrand-mobile-menu' && isVisible(d));
       } catch (_) {
         return false;
       }
     };
 
-    const clickElement = (element) => {
-      if (!element) return;
-      try {
-        element.click();
-      } catch (err) {
-        console.warn('[Tinder Login] Native click failed:', err);
-      }
-      simulateClick(element);
-    };
-
-    const handleCookieAccept = () => {
-      // 1. Try to find visible button or a tags first to avoid matching outer wrapper divs or hidden elements
-      let acceptBtn = Array.from(document.querySelectorAll('button, a')).find(el => {
+    const findCreateAccount = () => {
+      const candidates = Array.from(document.querySelectorAll('a, button, [role="button"]'));
+      return candidates.find(el => {
         if (!isVisible(el)) return false;
-        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-        return txt === 'i accept' || txt === 'i accept cookies' || txt === 'accept all' || txt === 'accept' || txt === 'i agree';
+        const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+        const aria = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+        const label = text || aria;
+        return label === 'create account' ||
+          label === 'create an account' ||
+          label === 'sign up' ||
+          aria === 'create account' ||
+          aria === 'create an account';
       });
-      // 2. Fallback to other tags
-      if (!acceptBtn) {
-        const elements = Array.from(document.querySelectorAll('.lxn9zzn, div, span'));
-        acceptBtn = elements.find(el => {
-          if (!isVisible(el)) return false;
-          const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-          return txt === 'i accept' || txt === 'i accept cookies' || txt === 'accept all' || txt === 'accept' || txt === 'i agree';
-        });
-      }
-      if (acceptBtn) {
-        console.log('[Tinder Login] Found Cookie Consent Accept button, clicking it!');
-        clickElement(acceptBtn);
-        return true;
-      }
-      return false;
     };
 
-    const handleTinderLoginLanding = () => {
-      // 1. If language select modal is open, immediately dismiss it
-      const langModal = document.querySelector('.language-select-modal, [class*="language-select"]');
-      if (langModal) {
-        const closeBtn = langModal.querySelector('button, [aria-label*="close" i]') ||
-          document.querySelector('button[aria-label*="close" i], button.C\\(\\$c-ds-icon-secondary\\)');
-        if (closeBtn) {
-          console.log('[Tinder Login] Language select modal detected, clicking close button');
-          clickElement(closeBtn);
-          return;
-        }
-      }
+    console.log('[Tinder Login] Waiting for landing page "Create account" button...');
 
-      // 2. Accept cookies
-      handleCookieAccept();
+    let attempts = 0;
+    let clicks = 0;
+    const createAccountTimer = setInterval(() => {
+      attempts++;
 
-      // 3. Check if Tinder login options or input fields are already visible
-      const isLoginOptionsVisible = Array.from(document.querySelectorAll('button, a, div[role="button"]')).some(b => {
-        const txt = (b.innerText || b.textContent || '').trim().toLowerCase();
-        return txt === 'log in with phone number' ||
-               txt === 'continue with google' ||
-               txt === 'log in with facebook' ||
-               txt === 'log in with google' ||
-               txt.includes('trouble logging in');
-      });
-
-      const isInputVisible = document.querySelector('input[type="tel"], input[type="email"], input[name="phone_number"], input[autocomplete="one-time-code"]');
-
-      if (isLoginOptionsVisible || isInputVisible) {
-        // Login options or inputs are already displayed, do not click anything
+      // Hard stop after ~20s so nothing keeps running behind the user.
+      if (attempts > 40) {
+        console.log('[Tinder Login] "Create account" not found in time — leaving the page to the user.');
+        clearInterval(createAccountTimer);
         return;
       }
 
-      // 4. Find the real "Log in" button on the landing page header
-      const clickables = Array.from(document.querySelectorAll('a, button, [role="button"]'));
-      const realLoginBtn = clickables.find(el => {
-        if (!isVisible(el)) return false;
-        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-        const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-        if (txt.includes('language') || aria.includes('language')) return false;
-        return txt === 'log in' || txt === 'login';
-      });
-
-      if (realLoginBtn) {
-        console.log('[Tinder Login] Found real "Log in" button on landing page, clicking it to show login options!');
-        clickElement(realLoginBtn);
-      }
-    };
-
-    if (typeof window._tinderLoginInterval === 'undefined') {
-      window._tinderLoginInterval = setInterval(() => {
-        if (isLoggedIn()) {
-          console.log('[Tinder Login] Logged in successfully! Clearing helper.');
-          if (typeof window.ORCHESTRATOR_USER_ID !== 'undefined') {
-            fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=tinder`)
-              .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
-          }
-          clearInterval(window._tinderLoginInterval);
-          delete window._tinderLoginInterval;
+      try {
+        if (isLoggedIn() || isLoginSheetOpen()) {
+          console.log('[Tinder Login] Login sheet is open — helper done, handing over to the user.');
+          clearInterval(createAccountTimer);
           return;
         }
-        handleTinderLoginLanding();
-      }, 1000);
-    }
+
+        // A couple of retries in case React had not hydrated on the first click.
+        if (clicks >= 3) {
+          clearInterval(createAccountTimer);
+          return;
+        }
+
+        const btn = findCreateAccount();
+        if (btn) {
+          clicks++;
+          console.log(`[Tinder Login] Clicking "Create account" (attempt ${clicks})...`);
+          clickElement(btn);
+        }
+      } catch (_) {
+        clearInterval(createAccountTimer);
+      }
+    }, 500);
   }
 }
 
@@ -4370,7 +4426,75 @@ window.addEventListener('message', (event) => {
     chrome.runtime.sendMessage({ action: 'stopAgent' }, (res) => {
       respond({ success: res?.success ?? true });
     });
+  } else if (action === 'getAuthStatus') {
+    // ← NEW: React Native app can probe current auth status at any time
+    const loggedIn = typeof isLoggedIn === 'function' ? isLoggedIn() : false;
+    respond({ success: true, isLoggedIn: loggedIn, url: window.location.href });
   } else {
     respond({ success: false, error: `Unknown action: ${action}` });
   }
 });
+
+// ── TWO-WAY LOGOUT WATCHDOG (On-Device Mode) ──
+// Continuously monitors isLoggedIn() and fires FE_AUTH_STEP:'logged_out'
+// when the user manually logs out from within the Tinder browser.
+// This enables real-time two-way sync: login AND logout events both propagate
+// to the React Native home screen via the ReactNativeWebView bridge.
+if (typeof window._feLogoutWatchdogStarted === 'undefined') {
+  window._feLogoutWatchdogStarted = true;
+  // Seed initial state — if already logged in at inject time, mark as such
+  let _wasLoggedIn = typeof isLoggedIn === 'function' ? isLoggedIn() : false;
+
+  // Send initial status immediately so app gets the true state on WebView load
+  try {
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      if (!window.__feLogoutInProgress) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'FE_PAGE_STATUS',
+          isLoggedIn: _wasLoggedIn,
+          url: window.location.href,
+        }));
+      }
+    }
+  } catch (_) {}
+
+  setInterval(() => {
+    if (window.__feLogoutInProgress) return;
+    if (typeof isLoggedIn !== 'function') return;
+    const nowLoggedIn = isLoggedIn();
+
+    if (_wasLoggedIn && !nowLoggedIn) {
+      // ── Transition: LOGGED IN → LOGGED OUT ──
+      console.log('[FlirtEasy] Logout detected! Notifying React Native app...');
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FE_AUTH_STEP',
+            step: 'logged_out',
+            url: window.location.href,
+          }));
+        }
+      } catch (_) {}
+    } else if (!_wasLoggedIn && nowLoggedIn) {
+      // ── Transition: LOGGED OUT → LOGGED IN ──
+      console.log('[FlirtEasy] Login detected by watchdog! Notifying React Native app...');
+      // Orchestrator notify for Neko / VPS mode (this used to live in the old
+      // multi-step login interval, which no longer exists).
+      if (typeof window.ORCHESTRATOR_USER_ID !== 'undefined') {
+        fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=tinder`)
+          .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
+      }
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FE_AUTH_STEP',
+            step: 'logged_in',
+            url: window.location.href,
+          }));
+        }
+      } catch (_) {}
+    }
+
+    _wasLoggedIn = nowLoggedIn;
+  }, 2000); // Poll every 2 seconds
+}

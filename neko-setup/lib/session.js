@@ -331,6 +331,7 @@ function handleLogout(req, res) {
     const flagPaths = [
       path.join(__dirname, 'sessions', userId, 'logged_in.flag'),
       path.join(__dirname, '..', 'sessions', userId, 'logged_in.flag'),
+      path.join(__dirname, '..', 'sessions', 'default', 'logged_in.flag'),
     ];
     for (const flagPath of flagPaths) {
       try {
@@ -343,75 +344,68 @@ function handleLogout(req, res) {
       }
     }
 
-    // 2. Clear browser cookies, storage, and navigate to clean landing page via CDP
-    const { PYTHON_WS_CLASS } = require('./cdp');
-    const pyLogout = PYTHON_WS_CLASS + `
-try:
-    tabs = http_get('http://localhost:9222/json')
-    tinder = next((t for t in tabs if t.get('type') == 'page' and 'devtools://' not in t.get('url', '')), None)
-    if tinder:
-        ws = WS(tinder['webSocketDebuggerUrl'])
-        # Clear cookies
-        try: ws.call('Network.clearBrowserCookies')
-        except: pass
-        # Clear storage for tinder and auth domains
-        try: ws.call('Storage.clearDataForOrigin', {'origin': 'https://tinder.com', 'storageTypes': 'all'})
-        except: pass
-        try: ws.call('Storage.clearDataForOrigin', {'origin': 'https://api.gotinder.com', 'storageTypes': 'all'})
-        except: pass
-        try: ws.call('Storage.clearDataForOrigin', {'origin': 'https://accounts.google.com', 'storageTypes': 'all'})
-        except: pass
-        # Clear DOM storage
-        try: ws.call('Runtime.evaluate', {'expression': 'try { localStorage.clear(); sessionStorage.clear(); } catch(e){}'})
-        except: pass
-        # Navigate to clean tinder landing page directly
-        try: ws.call('Page.navigate', {'url': 'https://tinder.com/'})
-        except: pass
-        ws.close()
-        print(json.dumps({'success': True, 'cleared': True}))
-    else:
-        print(json.dumps({'success': True, 'cleared': False, 'message': 'No active page'}))
-except Exception as e:
-    print(json.dumps({'success': False, 'error': str(e)}))
-`;
-
-    const tmpFile = path.join(__dirname, '..', `_logout_${Date.now()}_${Math.floor(Math.random()*10000)}.py`);
-    try {
-      fs.writeFileSync(tmpFile, pyLogout);
-      const containerTmp = `/tmp/${path.basename(tmpFile)}`;
-      exec(`docker cp "${tmpFile}" neko:${containerTmp}`, (cpErr) => {
-        if (cpErr) {
-          try { fs.unlinkSync(tmpFile); } catch (_) {}
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true, warning: 'Container copy failed' }));
-          return;
-        }
-        exec(`docker exec neko python3 ${containerTmp}`, (runErr, stdout) => {
-          try { fs.unlinkSync(tmpFile); } catch (_) {}
-          exec(`docker exec neko rm -f ${containerTmp} || true`, () => {});
-          
-          let result = { success: true };
-          try {
-            if (stdout && stdout.trim()) {
-              result = JSON.parse(stdout.trim());
+    // 2. Remove session files on host
+    const hostDirs = [
+      path.join(__dirname, '..', 'sessions', userId, 'Default'),
+      path.join(__dirname, '..', 'sessions', 'default', 'Default'),
+    ];
+    for (const d of hostDirs) {
+      if (fs.existsSync(d)) {
+        try {
+          const toRemove = ['Cookies', 'Cookies-journal', 'IndexedDB', 'Local Storage', 'Sessions', 'Session Storage', 'Service Worker', 'WebStorage'];
+          for (const item of toRemove) {
+            const fullPath = path.join(d, item);
+            if (fs.existsSync(fullPath)) {
+              fs.rmSync(fullPath, { recursive: true, force: true });
             }
-          } catch (_) {}
-          
-          console.log(`[Orchestrator] User ${userId} logged out successfully.`);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(result));
-        });
-      });
-    } catch (err) {
-      console.error('[Orchestrator] Logout error:', err);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: err.message }));
+          }
+          console.log(`[Orchestrator] Cleaned host session files in ${d}`);
+        } catch (e) {
+          console.warn(`[Orchestrator] Could not clean host dir ${d}:`, e.message);
+        }
+      }
     }
+
+    // 3. Clean inside Docker container and restart Chromium cleanly
+    const cleanCmd = `docker exec neko bash -c "rm -rf /home/neko/.config/chromium/Default/Cookies* /home/neko/.config/chromium/Default/IndexedDB /home/neko/.config/chromium/Default/Local\\ Storage /home/neko/.config/chromium/Default/Sessions /home/neko/.config/chromium/Default/Session\\ Storage /home/neko/.config/chromium/Default/Service\\ Worker /home/neko/.config/chromium/Default/WebStorage && supervisorctl restart chromium"`;
+
+    exec(cleanCmd, (cleanErr, stdout, stderr) => {
+      if (cleanErr) {
+        console.warn('[Orchestrator] Docker clean command warning (container may not be running):', cleanErr.message);
+      } else {
+        console.log('[Orchestrator] Docker container Chromium cleaned and restarted successfully.');
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, cleared: true }));
+    });
   });
+}
+
+function handleAuthStatus(req, res) {
+  let userId = 'dev_user_1';
+  try {
+    const urlObj = new URL(req.url, 'http://localhost');
+    userId = urlObj.searchParams.get('userId') || userId;
+  } catch (_) {}
+
+  const flagPaths = [
+    path.join(__dirname, 'sessions', userId, 'logged_in.flag'),
+    path.join(__dirname, '..', 'sessions', userId, 'logged_in.flag'),
+    path.join(__dirname, 'sessions', 'default', 'logged_in.flag'),
+    path.join(__dirname, '..', 'sessions', 'default', 'logged_in.flag'),
+  ];
+  const hasFlag = flagPaths.some(p => fs.existsSync(p));
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    success: true,
+    isLoggedIn: hasFlag,
+  }));
 }
 
 module.exports = {
   handleStartSession,
   handleStopSession,
   handleLogout,
+  handleAuthStatus,
 };

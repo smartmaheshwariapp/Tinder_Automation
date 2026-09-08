@@ -1,13 +1,294 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView } from 'react-native';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import { resolveLocalUrl } from '../utils/network';
-import { cleanupCurrentSession, startHyperbeamCloudSession } from '../utils/sessionManager';
+import { resolveLocalUrl, postJsonWithTimeout } from '../utils/network';
+import {
+  cleanupCurrentSession,
+  startHyperbeamCloudSession,
+  setTinderAuthState,
+  clearTinderAuthState,
+  getTinderAuthState,
+  subscribeTinderAuthState,
+  getPendingWebViewPurge,
+  setPendingWebViewPurge,
+  getPendingStorageTeardown,
+  setPendingStorageTeardown,
+  updateSharedAgentState,
+  subscribeSharedAgentState,
+  getSharedExtensionSettings,
+  setSharedExtensionSettings,
+  subscribeSharedExtensionSettings,
+  setSelectedEnvironment,
+  getSelectedEnvironment,
+  getOnDeviceSessionState,
+  saveOnDeviceSessionState,
+  getOnDeviceWorker,
+  updateOnDeviceWorkerCallbacks,
+} from '../utils/sessionManager';
+import { generateChromeShim } from '../utils/chromeShim';
+import { SELECTORS_JSON } from '../utils/selectorsData';
+import { CONTENT_SCRIPT_BUNDLE } from '../utils/contentScriptBundle';
 import { DashboardPanel } from '../components/dashboard';
 import { useExtensionStats } from '../hooks/useExtensionStats';
 
+// Maximum time the UI waits for the WebView to confirm a purge before it
+// releases the logout modal on its own. Covers the purge script's own bounded
+// waits (2.5s server logout + 2s storage teardown) plus a margin.
+const LOGOUT_CONFIRM_TIMEOUT_MS = 6000;
+
+const MASTER_PURGE_SCRIPT = `
+(async function() {
+  // Re-entrancy guard. A second purge racing the first would wipe storage
+  // mid-flight and emit a duplicate logged_out report to the app.
+  if (window.__feLogoutInProgress) return;
+  window.__feLogoutInProgress = true;
+
+  var LANDING_URL = 'https://tinder.com/';
+
+  // Every wait below is bounded. None of these APIs time out on their own, and
+  // a single hung promise used to abort the entire purge — leaving the WebView
+  // fully authenticated after the user tapped "Log Out".
+  var bounded = function(promise, ms) {
+    return Promise.race([
+      Promise.resolve(promise).catch(function() {}),
+      new Promise(function(resolve) { setTimeout(resolve, ms); })
+    ]);
+  };
+
+  var reportLoggedOut = function(purged) {
+    try {
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'FE_AUTH_STEP',
+          step: 'logged_out',
+          purged: purged
+        }));
+      }
+    } catch (_) {}
+  };
+
+  var goToLanding = function() {
+    try {
+      window.location.replace(LANDING_URL);
+    } catch (_) {
+      try { window.location.href = LANDING_URL; } catch (__) {}
+    }
+  };
+
+  var readAuthToken = function() {
+    var token = null;
+    try {
+      token = localStorage.getItem('TinderWeb/APIToken');
+
+      if (!token) {
+        var apiStore = localStorage.getItem('TinderWeb/APIStore');
+        if (apiStore) {
+          try {
+            var parsed = JSON.parse(apiStore);
+            token = parsed.token || parsed.auth_token || (parsed.user && parsed.user.api_token);
+          } catch (_) {}
+        }
+      }
+
+      if (!token) {
+        for (var i = 0; i < localStorage.length; i++) {
+          var key = localStorage.key(i);
+          if (key && (key.indexOf('APIToken') !== -1 || key.indexOf('authToken') !== -1)) {
+            token = localStorage.getItem(key);
+            if (token) break;
+          }
+        }
+      }
+
+      if (token) token = String(token).replace(/^["'](.*)["']$/, '$1').trim();
+    } catch (_) {}
+    return token || null;
+  };
+
+  // Invalidating the token server-side is the step that actually ends the
+  // session: document.cookie cannot remove Tinder's HttpOnly session cookies,
+  // so local clearing alone is not enough.
+  var revokeSessionServerSide = function(token) {
+    var headers = {
+      'Content-Type': 'application/json',
+      'x-auth-token': token,
+      'platform': 'web'
+    };
+    return Promise.allSettled([
+      fetch('https://api.gotinder.com/v2/auth/logout', { method: 'POST', headers: headers, body: '{}' }),
+      fetch('https://api.gotinder.com/auth/logout', { method: 'POST', headers: headers })
+    ]);
+  };
+
+  var purgeCookies = function() {
+    var names = [];
+    var raw = document.cookie.split(';');
+    for (var c = 0; c < raw.length; c++) {
+      var cookie = raw[c].trim();
+      if (!cookie) continue;
+      var eq = cookie.indexOf('=');
+      var name = eq > -1 ? cookie.substring(0, eq).trim() : cookie;
+      if (name && names.indexOf(name) === -1) names.push(name);
+    }
+
+    // Session cookies that may not be enumerable from this document.
+    var known = ['app_session', 'app_session_id', 'auth_token', 'tinder_web_token', 'refresh_token', '_session', 'session_id', 'x-auth-token'];
+    for (var k = 0; k < known.length; k++) {
+      if (names.indexOf(known[k]) === -1) names.push(known[k]);
+    }
+
+    var host = window.location.hostname;
+    var domains = ['', host, '.' + host, '.tinder.com', 'tinder.com', '.gotinder.com', 'gotinder.com', 'auth.gotinder.com', '.auth.gotinder.com'];
+    var paths = ['/', '/app', '/app/', '/app/login', '/v2'];
+    var expired = '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=';
+
+    for (var n = 0; n < names.length; n++) {
+      for (var d = 0; d < domains.length; d++) {
+        for (var p = 0; p < paths.length; p++) {
+          document.cookie = names[n] + expired + paths[p] + (domains[d] ? ';domain=' + domains[d] : '');
+        }
+      }
+    }
+  };
+
+  var purged = false;
+  try {
+    // Revoking the token server-side happens while the page is still fully
+    // intact, so this await is safe. It is also the step that actually ends the
+    // session, since document.cookie cannot remove HttpOnly session cookies.
+    var token = readAuthToken();
+    if (token) {
+      await bounded(revokeSessionServerSide(token), 2500);
+    }
+
+    // From here to goToLanding() there is no await on purpose. Tinder's SPA is
+    // still mounted and reads localStorage continuously; leaving it running on
+    // demolished storage crashed the WebView renderer, which takes the whole
+    // session down. Everything below is synchronous, so the SPA gets no chance
+    // to execute between the wipe and the navigation.
+    try { localStorage.clear(); } catch (_) {}
+    try { sessionStorage.clear(); } catch (_) {}
+    try {
+      if (window.chrome && window.chrome.storage && window.chrome.storage.local) {
+        window.chrome.storage.local.clear();
+      }
+    } catch (_) {}
+    try { purgeCookies(); } catch (_) {}
+
+    purged = true;
+  } catch (error) {
+    console.warn('[FlirtEasy] Master purge failed:', error);
+  }
+
+  reportLoggedOut(purged);
+
+  // If the navigation below somehow does not happen, un-mute the logout
+  // watchdog and release the re-entrancy guard so the app is not stuck with a
+  // stale view of the auth state. On a successful navigation this timer dies
+  // with the document, and the fresh one starts with no flag at all.
+  setTimeout(function() { window.__feLogoutInProgress = false; }, 5000);
+
+  // Navigate in the same task that wiped storage. IndexedDB, CacheStorage and
+  // service workers are torn down afterwards by STORAGE_TEARDOWN_SCRIPT on the
+  // landing page, where no SPA holds those handles open.
+  goToLanding();
+})();
+true;
+`;
+
+/**
+ * Second stage of logout, injected on the landing page once MASTER_PURGE_SCRIPT
+ * has confirmed the session is gone.
+ *
+ * These teardowns are deliberately not part of the purge itself. Deleting an
+ * IndexedDB database fires `versionchange` on every open connection, and doing
+ * that underneath a live Tinder SPA — with localStorage already wiped — is what
+ * killed the WebView renderer. On the landing page nothing holds these handles,
+ * so the same work is inert.
+ *
+ * This is storage hygiene, not authentication: the session is already dead by
+ * the time this runs, so failures here are not worth reporting.
+ */
+const STORAGE_TEARDOWN_SCRIPT = `
+(function() {
+  if (window.__feStorageTeardownDone) return;
+  window.__feStorageTeardownDone = true;
+
+  try {
+    if (window.indexedDB) {
+      var known = [
+        'keyval-store',
+        'localforage',
+        'tinder-web',
+        'tinder',
+        'sw-precache',
+        'workbox-expiration',
+        'firebase-messaging-database',
+        'firebaseLocalStorageDb'
+      ];
+
+      var drop = function(name) {
+        try { indexedDB.deleteDatabase(name); } catch (_) {}
+      };
+
+      if (typeof indexedDB.databases === 'function') {
+        indexedDB.databases().then(function(dbs) {
+          if (!Array.isArray(dbs)) return;
+          dbs.forEach(function(db) {
+            if (db && db.name && known.indexOf(db.name) === -1) drop(db.name);
+          });
+        }).catch(function() {});
+      }
+
+      known.forEach(drop);
+    }
+  } catch (_) {}
+
+  try {
+    if (window.caches && typeof caches.keys === 'function') {
+      caches.keys().then(function(keys) {
+        keys.forEach(function(key) {
+          caches.delete(key).catch(function() {});
+        });
+      }).catch(function() {});
+    }
+  } catch (_) {}
+
+  try {
+    if (navigator.serviceWorker && typeof navigator.serviceWorker.getRegistrations === 'function') {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        regs.forEach(function(reg) {
+          reg.unregister().catch(function() {});
+        });
+      }).catch(function() {});
+    }
+  } catch (_) {}
+})();
+true;
+`;
+
+// ── Tri-state Tinder session status for the header controls ──
+// 'unknown' matters: until the WebView reports, neither a logout control nor a
+// signed-out chip would be truthful, so the header shows neither.
+const SESSION_UNKNOWN = 'unknown';
+const SESSION_SIGNED_IN = 'signed_in';
+const SESSION_SIGNED_OUT = 'signed_out';
+
+/**
+ * Derives the tri-state status from the shared auth cache.
+ *
+ * `lastUpdated` stays 0 until something actually writes the cache — a restore
+ * from AsyncStorage, a page status report, or an explicit logout. A raw
+ * `isLoggedIn` read cannot express that, because it defaults to false and is
+ * therefore indistinguishable from a confirmed signed-out session.
+ */
+const readSessionStatus = () => {
+  const state = getTinderAuthState();
+  if (!state || !state.lastUpdated) return SESSION_UNKNOWN;
+  return state.isLoggedIn ? SESSION_SIGNED_IN : SESSION_SIGNED_OUT;
+};
 
 // Neko container screen resolution (must match NEKO_DESKTOP_SCREEN in docker-compose)
 // 414x896 — Modern mobile phone portrait aspect ratio (iPhone / Pixel)
@@ -24,16 +305,93 @@ const maskProxy = (proxy) => {
   return proxy;
 };
 
+const persistentLoginCache = {};
+
 export default function BrowserScreen({ route, navigation }) {
-  const { platform, vpsUrl: rawVpsUrl, proxyIp, extensionSettings, orchestratorUrl: paramOrchestratorUrl } = route.params;
-  const isHyperbeam = Boolean((rawVpsUrl && rawVpsUrl.includes('hyperbeam.com')) || route.params?.isHyperbeam || rawVpsUrl === 'hyperbeam');
-  const vpsUrl = isHyperbeam ? rawVpsUrl : resolveLocalUrl(rawVpsUrl);
+  const { platform, vpsUrl: rawVpsUrl, proxyIp, extensionSettings: initialSettings, orchestratorUrl: paramOrchestratorUrl } = route.params;
+  const [extensionSettings, setExtensionSettings] = useState(() => initialSettings || getSharedExtensionSettings());
+
+  useEffect(() => {
+    return subscribeSharedExtensionSettings((newSettings) => {
+      setExtensionSettings(newSettings);
+      if (backgroundWorkerRef.current) {
+        backgroundWorkerRef.current.updateSettings(newSettings);
+      }
+    });
+  }, []);
+
+  const isOnDevice = Boolean(
+    route.params?.isOnDevice ||
+    route.params?.environment === 'on_device' ||
+    rawVpsUrl === 'on_device' ||
+    getSelectedEnvironment() === 'on_device'
+  );
+  const isHyperbeam = Boolean(!isOnDevice && ((rawVpsUrl && rawVpsUrl.includes('hyperbeam.com')) || route.params?.isHyperbeam || rawVpsUrl === 'hyperbeam'));
+  const vpsUrl = isOnDevice ? 'https://tinder.com' : (isHyperbeam ? rawVpsUrl : resolveLocalUrl(rawVpsUrl));
+
+  const shouldForceLogout = Boolean(route.params?.forceLogout || route.params?.clearSession || getPendingWebViewPurge() || !getTinderAuthState()?.isLoggedIn);
+
+  useEffect(() => {
+    if (isOnDevice) {
+      setSelectedEnvironment('on_device');
+    }
+  }, [isOnDevice]);
+
   const webViewRef = useRef(null);
+  const isLoggingOutRef = useRef(false);
+  const hasExecutedPurgeRef = useRef(false);
+  // Guards the logout flow, which is resolved asynchronously by a WebView
+  // message and must not touch state after the screen is gone.
+  const isMountedRef = useRef(true);
+  const logoutFailsafeRef = useRef(null);
+  // True when this logout should close the session screen. Set only by
+  // handleLogout on the on-device path, so a manual logout inside Tinder or a
+  // renderer crash never ejects the user unexpectedly.
+  const exitAfterLogoutRef = useRef(false);
+  // Latched once this screen starts closing. Never reset: navigation is async, so
+  // the WebView can still fire onLoadEnd after the navigate call, and work
+  // started there would be cut short by the unmount.
+  const isExitingRef = useRef(false);
+
+  useEffect(() => () => {
+    isMountedRef.current = false;
+    if (logoutFailsafeRef.current) {
+      clearTimeout(logoutFailsafeRef.current);
+      logoutFailsafeRef.current = null;
+    }
+  }, []);
+
+  const profileSyncCallbacksRef = useRef(new Map());
+  const pushBioCallbacksRef = useRef(new Map());
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(null);
-  const isBumble = platform?.toLowerCase() === 'bumble';
-  const [loginStep, setLoginStep] = useState(isBumble ? 'navigating' : 'options');
+  const sessionKey = `${platform || 'tinder'}_login_step`;
+  const [loginStep, setLoginStepState] = useState(() => {
+    if (shouldForceLogout) return 'options';
+    return persistentLoginCache[sessionKey] || 'options';
+  });
+
+  const setLoginStep = (step) => {
+    persistentLoginCache[sessionKey] = step;
+    setLoginStepState(step);
+  };
+
+  // Drives the header's auth-dependent controls. Kept in React state (rather than
+  // read imperatively) so the header actually re-renders when the session changes.
+  const [sessionStatus, setSessionStatus] = useState(readSessionStatus);
+
+  // Two-way auth synchronization: if home page or background logs out, reset UI state
+  useEffect(() => {
+    const unsub = subscribeTinderAuthState((state) => {
+      setSessionStatus(readSessionStatus());
+      if (!state?.isLoggedIn) {
+        setLoginStep('options');
+        delete persistentLoginCache[sessionKey];
+      }
+    });
+    return unsub;
+  }, [sessionKey]);
   const [showNeko, setShowNeko] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -47,46 +405,144 @@ export default function BrowserScreen({ route, navigation }) {
   const [submittedEmail, setSubmittedEmail] = useState('');
   const [submittedPhone, setSubmittedPhone] = useState('');
   const [rateLimitTimer, setRateLimitTimer] = useState(0);
+  const [onDeviceSwiping, setOnDeviceSwiping] = useState(false);
+  const [onDeviceSwipes, setOnDeviceSwipes] = useState(() => getOnDeviceSessionState().swipes);
+  const [onDeviceMatches, setOnDeviceMatches] = useState(() => getOnDeviceSessionState().matches);
+  const [onDeviceMessages, setOnDeviceMessages] = useState(() => getOnDeviceSessionState().messages);
+  const [canGoBackWeb, setCanGoBackWeb] = useState(false);
+
+  // Handle Android hardware back press: navigate back inside WebView instead of kicking to home screen
+  // ── Session Duration Countdown Timer (Alarm Clock Span) ──
+  const sessionDuration = route.params?.sessionDuration !== undefined ? route.params.sessionDuration : 30;
+  const [timeLeft, setTimeLeft] = useState(sessionDuration > 0 ? sessionDuration * 60 : null);
   const [dummyText, setDummyText] = useState('');
   const [showDashboard, setShowDashboard] = useState(false);
-  const [showLogsModal, setShowLogsModal] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // Android hardware back. An open modal has to be dismissed before the WebView
+  // gets a chance to consume the press: this listener used to swallow every back
+  // press while the page had history, so no dialog on this screen could be
+  // closed with the back button. Combined with a dialog that failed to render,
+  // that left the screen with no way out at all.
+  useEffect(() => {
+    const onBackPress = () => {
+      if (showLogoutConfirm) {
+        // Deliberately inert while the logout is running so the purge is not
+        // abandoned halfway; it is time-bounded by LOGOUT_CONFIRM_TIMEOUT_MS.
+        if (!loggingOut) setShowLogoutConfirm(false);
+        return true;
+      }
+      if (showDashboard) {
+        setShowDashboard(false);
+        return true;
+      }
+      if (canGoBackWeb && webViewRef.current) {
+        webViewRef.current.goBack();
+        return true; // handled inside the WebView
+      }
+      return false; // let react-navigation handle exit
+    };
+
+    const backSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backSub.remove();
+  }, [canGoBackWeb, showLogoutConfirm, showDashboard, loggingOut]);
   const [hyperbeamEmbedUrl, setHyperbeamEmbedUrl] = useState(
     vpsUrl && vpsUrl.includes('hyperbeam.com') ? vpsUrl : ''
   );
   const [startingHyperbeam, setStartingHyperbeam] = useState(false);
   const [lastCoord, setLastCoord] = useState(null);
-  const [lastToast, setLastToast] = useState('🟢 Linksy In-Page Engine Ready');
   const [logs, setLogs] = useState([
-    { id: '1', time: new Date().toLocaleTimeString(), text: 'Linksy Automation Engine initialized.', type: 'info' },
-    { id: '2', time: new Date().toLocaleTimeString(), text: 'Desktop Web View (1280x720) ready for interaction.', type: 'info' }
+    { id: 'log_init_1', time: new Date().toLocaleTimeString(), text: 'Linksy Automation Engine initialized.', type: 'info' },
+    { id: 'log_init_2', time: new Date().toLocaleTimeString(), text: 'Desktop Web View (1280x720) ready for interaction.', type: 'info' }
   ]);
 
-  const addLog = (text, type = 'info') => {
+  const logCounterRef = useRef(0);
+
+  const addLog = useCallback((text, type = 'info') => {
     const time = new Date().toLocaleTimeString();
+    logCounterRef.current += 1;
+    const uniqueId = `log_${Date.now()}_${logCounterRef.current}_${Math.random().toString(36).slice(2, 8)}`;
     console.log(`[FE-LOG ${time}] [${type.toUpperCase()}] ${text}`);
-    setLastToast(`${type === 'action' ? '⚡' : type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'} ${text}`);
-    setLogs(prev => [{ id: String(Date.now() + Math.random()), time, text, type }, ...prev].slice(0, 80));
-  };
+    setLogs(prev => [{ id: uniqueId, time, text, type }, ...prev].slice(0, 80));
+  }, []);
+
+  // ── On-Device FlirtEasy Background Worker Singleton ──
+  // The worker is obtained from sessionManager's module-level singleton so its
+  // accumulated state (stoppedChats, matchLanguage, matchData Maps) survives
+  // back-navigation and re-mounts. Callbacks are updated on every mount to
+  // point at the current render tree's setState functions.
+  const backgroundWorkerRef = useRef(null);
+  if (!backgroundWorkerRef.current) {
+    backgroundWorkerRef.current = getOnDeviceWorker(
+      extensionSettings || {},
+      (state) => {
+        if (state.stats) {
+          setOnDeviceSwipes(state.stats.swipes || 0);
+          setOnDeviceMatches(state.stats.matches || 0);
+          setOnDeviceMessages(state.stats.messages || 0);
+        }
+        if (state.isRunning !== undefined) {
+          setOnDeviceSwiping(state.isRunning);
+        }
+      },
+      (logText) => {
+        addLog(logText, 'info');
+      }
+    );
+  }
+
+  // Keep the worker's callbacks pointing at the live component after any
+  // re-render that doesn't re-create the worker (normal React operation).
+  useEffect(() => {
+    updateOnDeviceWorkerCallbacks(
+      (state) => {
+        if (state.stats) {
+          setOnDeviceSwipes(state.stats.swipes || 0);
+          setOnDeviceMatches(state.stats.matches || 0);
+          setOnDeviceMessages(state.stats.messages || 0);
+        }
+        if (state.isRunning !== undefined) setOnDeviceSwiping(state.isRunning);
+      },
+      (logText) => addLog(logText, 'info')
+    );
+  }, [addLog]);
+
+  useEffect(() => {
+    if (backgroundWorkerRef.current && extensionSettings) {
+      backgroundWorkerRef.current.updateSettings(extensionSettings);
+    }
+  }, [extensionSettings]);
+
   const appState = useRef(AppState.currentState);
 
   const lastSwipeTime = useRef(0);
 
-  // 60-second countdown timer for email rate limit
+  // ── Session Countdown Interval ──
   useEffect(() => {
-    if (rateLimitTimer <= 0) return;
+    if (timeLeft === null || timeLeft <= 0) return;
     const interval = setInterval(() => {
-      setRateLimitTimer((prev) => {
+      setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(interval);
+          if (webViewRef.current) {
+            webViewRef.current.injectJavaScript('window.__linksyStopSwiping && window.__linksyStopSwiping(); true;');
+          }
+          Alert.alert(
+            '⏱️ Automation Session Complete',
+            `Your ${sessionDuration}-minute automation span has completed. Swiping has paused to keep your profile safe.`,
+            [
+              { text: 'Add 15 Mins', onPress: () => setTimeLeft(15 * 60) },
+              { text: 'Done', style: 'cancel' }
+            ]
+          );
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [rateLimitTimer]);
+  }, [timeLeft, sessionDuration]);
 
   // Safety timeout to dismiss loading overlay after 3 seconds max
   useEffect(() => {
@@ -131,44 +587,9 @@ export default function BrowserScreen({ route, navigation }) {
     })
   ).current;
 
-  // Poll orchestrator /nav-status while on navigating step (Neko only).
-  useEffect(() => {
-    if (isHyperbeam || !isBumble || loginStep !== 'navigating') return;
-
-    let cancelled = false;
-    const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-
-    const poll = async () => {
-      if (cancelled) return;
-      try {
-        const resp = await fetch(`${orchestratorUrl}/nav-status`);
-        const data = await resp.json();
-        if (data.ready && !cancelled) {
-          setLoginStep('phone');
-          return;
-        }
-      } catch (_) { }
-      if (!cancelled) setTimeout(poll, 500);
-    };
-
-    // Start polling after 500ms
-    const startTimer = setTimeout(poll, 500);
-
-    // Safety: auto-advance after 10s regardless
-    const safetyTimer = setTimeout(() => {
-      if (!cancelled) setLoginStep('phone');
-    }, 10000);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(startTimer);
-      clearTimeout(safetyTimer);
-    };
-  }, [loginStep, isBumble, isHyperbeam]);
-
   // Poll /check-page-state while we are in the login process (Neko only)
   useEffect(() => {
-    if (isHyperbeam || loginStep === 'done') return;
+    if (isOnDevice || isHyperbeam || loginStep === 'done') return;
 
     let cancelled = false;
     const orchestratorUrl = getOrchestratorUrl(vpsUrl);
@@ -248,7 +669,7 @@ export default function BrowserScreen({ route, navigation }) {
       cancelled = true;
       clearTimeout(pollTimer);
     };
-  }, [loginStep, vpsUrl]);
+  }, [loginStep, vpsUrl, isOnDevice, isHyperbeam]);
 
   // When loginStep reaches 'done', automatically dismiss post-login Privacy / Consent modal (1263, 478)
   useEffect(() => {
@@ -262,6 +683,9 @@ export default function BrowserScreen({ route, navigation }) {
 
   const getOrchestratorUrl = (nekoUrl) => {
     if (paramOrchestratorUrl) return paramOrchestratorUrl;
+    if (isOnDevice || !nekoUrl || nekoUrl.includes('tinder.com')) {
+      return resolveLocalUrl('http://localhost:3001');
+    }
     try {
       const resolvedNekoUrl = resolveLocalUrl(nekoUrl);
       const urlObj = new URL(resolvedNekoUrl.split('/?')[0]);
@@ -272,7 +696,7 @@ export default function BrowserScreen({ route, navigation }) {
       urlObj.port = '3001';
       return urlObj.origin;
     } catch (e) {
-      return 'https://api.smartmaheshwari.com';
+      return resolveLocalUrl('http://localhost:3001');
     }
   };
 
@@ -280,11 +704,107 @@ export default function BrowserScreen({ route, navigation }) {
   const orchestratorUrl = getOrchestratorUrl(vpsUrl);
   const { stats: extensionStats, loading: statsLoading, error: statsError } = useExtensionStats(
     orchestratorUrl,
-    true  // Always poll — dashboard is accessible at any loginStep
+    !isOnDevice  // Only poll orchestrator if not in local on-device mode
   );
 
-  // Remotely start / stop FlirtEasy AI swiping & messaging agent via Orchestrator CDP bridge
-  const handleToggleAgent = async () => {
+  // Toggle local On-Device Tinder automation engine
+  const toggleOnDeviceSwiping = useCallback((forceStart = null) => {
+    if (!webViewRef.current) return;
+    const worker = backgroundWorkerRef.current;
+    const shouldStart = forceStart !== null ? forceStart : !onDeviceSwiping;
+
+    if (shouldStart && !getTinderAuthState()?.isLoggedIn) {
+      addLog('Cannot start automation: Please log into Tinder first', 'warn');
+      return;
+    }
+
+    if (!shouldStart) {
+      if (worker) worker.handleMessage({ action: 'stopAgent' });
+      webViewRef.current.injectJavaScript(`
+        (function() {
+          try {
+            if (window.__chromeDispatchMessage) {
+              window.__chromeDispatchMessage({ action: 'stopAutomation' });
+            }
+            if (window.__linksyStopSwiping) window.__linksyStopSwiping();
+          } catch(e) {}
+        })();
+        true;
+      `);
+      setOnDeviceSwiping(false);
+      addLog('⏸️ FlirtEasy AI Automation paused', 'info');
+    } else {
+      if (worker) worker.handleMessage({ action: 'startAgent' });
+      const count = extensionSettings?.likesPerCycle || 50;
+      webViewRef.current.injectJavaScript(`
+        (function() {
+          var targetCount = ${count};
+          var attemptsLeft = 25;
+
+          function sendStart() {
+            try {
+              // 1. If not on recs deck, try navigating via click
+              if (!window.location.pathname.includes('/app/recs')) {
+                var recsLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Explore" i]');
+                if (recsLink) recsLink.click();
+              }
+
+              // 2. Dispatch autoLike command to content script bridge
+              if (window.__chromeDispatchMessage) {
+                window.__chromeDispatchMessage({ action: 'autoLike', count: targetCount });
+                if (window.__linksyStartSwiping) window.__linksyStartSwiping();
+                return true;
+              }
+              if (window.__chromeDispatchPortMessage) {
+                window.__chromeDispatchPortMessage({ action: 'autoLike', count: targetCount, messageId: 'start_' + Date.now() });
+                if (window.__linksyStartSwiping) window.__linksyStartSwiping();
+                return true;
+              }
+            } catch(e) {
+              console.error('[FlirtEasy Bridge] Start attempt error:', e);
+            }
+
+            // Retry until content script bridge is attached
+            attemptsLeft--;
+            if (attemptsLeft > 0) {
+              setTimeout(sendStart, 800);
+            }
+          }
+
+          sendStart();
+        })();
+        true;
+      `);
+      setOnDeviceSwiping(true);
+      addLog(`🚀 FlirtEasy AI Automation started (${count} profiles target)`, 'success');
+    }
+  }, [onDeviceSwiping, addLog, extensionSettings]);
+
+  // Manually trigger processing match chats using FlirtEasy AI
+  const triggerProcessChats = useCallback(() => {
+    if (!webViewRef.current) return;
+    const worker = backgroundWorkerRef.current;
+    const settings = worker?.settings || extensionSettings || {};
+    const maxMsgs = settings.messagesPerCycle || 50;
+    webViewRef.current.injectJavaScript(`
+      if (window.__chromeDispatchMessage) {
+        window.__chromeDispatchMessage({
+          action: 'processChats',
+          settings: ${JSON.stringify(settings)},
+          maxMessages: ${maxMsgs}
+        });
+      }
+      true;
+    `);
+    addLog('💬 Processing unread match chats with AI...', 'action');
+  }, [extensionSettings, addLog]);
+
+  // Start / stop FlirtEasy AI swiping & messaging agent (local on-device or remote orchestrator CDP bridge)
+  const handleToggleAgent = useCallback(async () => {
+    if (isOnDevice) {
+      toggleOnDeviceSwiping();
+      return;
+    }
     try {
       const isRunning = Boolean(
         extensionStats?.agentState?.isRunning ||
@@ -300,7 +820,421 @@ export default function BrowserScreen({ route, navigation }) {
     } catch (e) {
       console.error('[Browser] handleToggleAgent error:', e);
     }
-  };
+  }, [isOnDevice, toggleOnDeviceSwiping, extensionStats, orchestratorUrl]);
+
+  // Save settings for on-device mode directly to BackgroundWorker, sessionManager, and WebView chrome.storage.local
+  const handleSaveOnDeviceSettings = useCallback(async (updatedSettings) => {
+    try {
+      const merged = { ...(extensionSettings || {}), ...updatedSettings };
+      setExtensionSettings(merged);
+      setSharedExtensionSettings(merged);
+      const worker = backgroundWorkerRef.current;
+      if (worker) {
+        worker.updateSettings(merged);
+      }
+      if (webViewRef.current) {
+        const jsonStr = JSON.stringify(merged);
+        const cityStr = JSON.stringify(merged.locationCity || '');
+        webViewRef.current.injectJavaScript(`
+          if (window.chrome && window.chrome.storage && window.chrome.storage.local) {
+            window.chrome.storage.local.set({ extensionSettings: ${jsonStr} });
+          }
+          if (typeof window.__feSetLocation === 'function' && ${merged.locationLatitude} && ${merged.locationLongitude}) {
+            window.__feSetLocation(${merged.locationLatitude}, ${merged.locationLongitude}, ${cityStr});
+          }
+          true;
+        `);
+      }
+      if (updatedSettings.locationCity || updatedSettings.locationLatitude) {
+        addLog(`📍 Target location synced: ${merged.locationCity || 'Target'} (${merged.locationLatitude}, ${merged.locationLongitude})`, 'success');
+      } else {
+        addLog('⚙️ FlirtEasy settings saved and applied', 'success');
+      }
+      return true;
+    } catch(e) {
+      console.error('[Browser] handleSaveOnDeviceSettings error:', e);
+      addLog('Failed to save settings: ' + e.message, 'error');
+      return false;
+    }
+  }, [extensionSettings, addLog]);
+
+  // Live profile extraction directly from Tinder WebView (On-Device Mode)
+  const handleSyncProfileOnDevice = useCallback(() => {
+    return new Promise((resolve) => {
+      if (!webViewRef.current) {
+        resolve({ success: false, error: 'Tinder browser session is not ready.' });
+        return;
+      }
+      const requestId = 'sync_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+      const timer = setTimeout(() => {
+        profileSyncCallbacksRef.current.delete(requestId);
+        resolve({ success: false, error: 'Sync request timed out. Please check your Tinder login in the browser.' });
+      }, 12000);
+
+      profileSyncCallbacksRef.current.set(requestId, (res) => {
+        clearTimeout(timer);
+        resolve(res);
+      });
+
+      const script = `
+        (async function() {
+          try {
+            var token = null;
+            try {
+              token = localStorage.getItem('TinderWeb/APIToken');
+              if (!token) {
+                for (var i = 0; i < localStorage.length; i++) {
+                  var k = localStorage.key(i);
+                  if (k && (k.indexOf('APIToken') !== -1 || k.indexOf('authToken') !== -1)) {
+                    token = localStorage.getItem(k);
+                    if (token) break;
+                  }
+                }
+              }
+            } catch (_) {}
+
+            var apiUser = null;
+            if (token) {
+              try {
+                var cleanToken = token.replace(/^"(.*)"$/, '$1');
+                var res = await fetch('https://api.gotinder.com/v2/profile?include=account%2Cuser', {
+                  headers: { 'x-auth-token': cleanToken, 'platform': 'web' }
+                });
+                if (res.ok) {
+                  var data = await res.json();
+                  if (data && data.data && data.data.user) {
+                    apiUser = data.data.user;
+                  }
+                }
+              } catch (_) {}
+            }
+
+            var domProfile = {};
+            try {
+              var nameEl = document.querySelector('h1, [data-testid="profile-name"], .profileContent h1');
+              if (nameEl) domProfile.name = nameEl.textContent.trim().replace(/\\d+$/, '').trim();
+              var bioEl = document.querySelector('textarea, [data-testid="profile-bio"], .BreakWord');
+              if (bioEl) domProfile.bio = (bioEl.value || bioEl.textContent || '').trim();
+            } catch (_) {}
+
+            if (apiUser) {
+              var interests = (apiUser.user_interests || apiUser.interests || []).map(function(item) { return item.name || item; }).filter(Boolean);
+              var jobs = (apiUser.jobs || []).map(function(j) { return (j.title && j.title.name) || (j.company && j.company.name) || ''; }).filter(Boolean);
+              var schools = (apiUser.schools || []).map(function(s) { return s.name; }).filter(Boolean);
+              var desc = apiUser.selected_descriptors || [];
+              var getDesc = function(term) {
+                var found = desc.find(function(d) {
+                  return (d.prompt_title && d.prompt_title.toLowerCase().indexOf(term) !== -1) ||
+                         (d.name && d.name.toLowerCase().indexOf(term) !== -1);
+                });
+                return found ? ((found.choice_selections && found.choice_selections[0] && found.choice_selections[0].name) || found.name) : null;
+              };
+
+              var unified = {
+                name: apiUser.name || domProfile.name || null,
+                bio: apiUser.bio || domProfile.bio || '',
+                interests: interests,
+                job: jobs.join(', ') || null,
+                school: schools.join(', ') || null,
+                height: getDesc('height'),
+                lookingFor: getDesc('looking') || getDesc('relationship'),
+                relationshipType: getDesc('type'),
+                languages: (apiUser.languages || []).map(function(l) { return l.name || l; }).filter(Boolean),
+                zodiac: getDesc('zodiac'),
+                education: getDesc('education') || (schools[0] || null),
+                gender: apiUser.gender === 0 ? 'Man' : (apiUser.gender === 1 ? 'Woman' : null),
+                city: (apiUser.city && apiUser.city.name) || null,
+                drinking: getDesc('drinking'),
+                smoking: getDesc('smoking'),
+                workout: getDesc('workout'),
+                pets: getDesc('pet'),
+                communicationStyle: getDesc('communication'),
+                loveStyle: getDesc('love'),
+              };
+
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_PROFILE_SYNC_RESPONSE',
+                requestId: '${requestId}',
+                success: true,
+                profile: unified
+              }));
+              return;
+            }
+
+            if (domProfile.name || (domProfile.bio && domProfile.bio.length > 2)) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_PROFILE_SYNC_RESPONSE',
+                requestId: '${requestId}',
+                success: true,
+                profile: domProfile
+              }));
+              return;
+            }
+
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'FE_PROFILE_SYNC_RESPONSE',
+              requestId: '${requestId}',
+              success: false,
+              error: 'Please log in to Tinder in the browser session first.'
+            }));
+          } catch (e) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'FE_PROFILE_SYNC_RESPONSE',
+              requestId: '${requestId}',
+              success: false,
+              error: e.message
+            }));
+          }
+        })();
+        true;
+      `;
+      webViewRef.current.injectJavaScript(script);
+    });
+  }, []);
+
+  // Live push bio directly to Tinder WebView (On-Device Mode)
+  const handlePushBioOnDevice = useCallback((newBio) => {
+    return new Promise((resolve) => {
+      if (!webViewRef.current) {
+        resolve({ success: false, error: 'Tinder browser session is not ready.' });
+        return;
+      }
+      const requestId = 'push_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+      const timer = setTimeout(() => {
+        pushBioCallbacksRef.current.delete(requestId);
+        resolve({ success: false, error: 'Push request timed out. Please check your Tinder connection.' });
+      }, 15000);
+
+      pushBioCallbacksRef.current.set(requestId, (res) => {
+        clearTimeout(timer);
+        resolve(res);
+      });
+
+      const escapedBio = JSON.stringify(newBio || '');
+
+      const script = `
+        (async function() {
+          try {
+            var bioText = ${escapedBio};
+            var token = null;
+            try {
+              token = localStorage.getItem('TinderWeb/APIToken');
+              if (!token) {
+                var apiStore = localStorage.getItem('TinderWeb/APIStore');
+                if (apiStore) {
+                  try {
+                    var parsedStore = JSON.parse(apiStore);
+                    token = parsedStore.token || parsedStore.auth_token || (parsedStore.user && parsedStore.user.api_token);
+                  } catch (_) {}
+                }
+              }
+              if (!token) {
+                for (var i = 0; i < localStorage.length; i++) {
+                  var k = localStorage.key(i);
+                  if (k && (k.indexOf('APIToken') !== -1 || k.indexOf('authToken') !== -1)) {
+                    token = localStorage.getItem(k);
+                    if (token) break;
+                  }
+                }
+              }
+              if (!token) {
+                try {
+                  token = sessionStorage.getItem('authToken') || sessionStorage.getItem('x-auth-token');
+                } catch (_) {}
+              }
+              if (!token) {
+                try {
+                  var cookieMatch = document.cookie.split('; ').find(function(row) { return row.startsWith('x-auth-token='); });
+                  if (cookieMatch) token = cookieMatch.split('=')[1];
+                } catch (_) {}
+              }
+            } catch (_) {}
+
+            var apiSuccess = false;
+            var lastError = '';
+
+            if (token) {
+              var cleanToken = token.replace(/^"(.*)"$/, '$1').trim();
+              var payloads = [
+                { url: 'https://api.gotinder.com/v2/profile?locale=en', body: JSON.stringify({ user: { bio: bioText } }) },
+                { url: 'https://api.gotinder.com/v2/profile?locale=en', body: JSON.stringify({ bio: bioText }) },
+                { url: 'https://api.gotinder.com/v2/profile', body: JSON.stringify({ user: { bio: bioText } }) },
+                { url: 'https://api.gotinder.com/v2/profile', body: JSON.stringify({ bio: bioText }) },
+                { url: 'https://api.gotinder.com/profile', body: JSON.stringify({ bio: bioText }) }
+              ];
+
+              for (var i = 0; i < payloads.length; i++) {
+                try {
+                  var p = payloads[i];
+                  var res = await fetch(p.url, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json',
+                      'x-auth-token': cleanToken,
+                      'platform': 'web'
+                    },
+                    body: p.body
+                  });
+                  if (res.ok || res.status === 200) {
+                    apiSuccess = true;
+                    break;
+                  } else {
+                    var errBody = '';
+                    try { errBody = await res.text(); } catch (_) {}
+                    lastError = 'HTTP ' + res.status + ': ' + errBody.slice(0, 80);
+                  }
+                } catch (e) {
+                  lastError = e.message;
+                }
+              }
+            }
+
+            var domSuccess = false;
+            try {
+              var isEditPage = window.location.pathname.indexOf('/app/profile') !== -1;
+              if (isEditPage) {
+                var textareas = Array.from(document.querySelectorAll('textarea'));
+                var realBioTextarea = textareas.find(function(t) {
+                  return t.offsetParent !== null && t.offsetWidth > 50 && (
+                    t.getAttribute('maxlength') === '500' ||
+                    (t.placeholder && t.placeholder.toLowerCase().indexOf('bio') !== -1) ||
+                    (t.getAttribute('aria-label') && t.getAttribute('aria-label').toLowerCase().indexOf('bio') !== -1)
+                  );
+                }) || textareas.find(function(t) { return t.offsetParent !== null && t.offsetWidth > 100; });
+
+                if (realBioTextarea) {
+                  realBioTextarea.focus();
+                  var proto = window.HTMLTextAreaElement.prototype;
+                  var nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+                  if (nativeSetter) nativeSetter.call(realBioTextarea, bioText);
+                  else realBioTextarea.value = bioText;
+                  realBioTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                  realBioTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+                  realBioTextarea.blur();
+                  var doneBtn = Array.from(document.querySelectorAll('button')).find(function(b) {
+                    var t = (b.innerText || b.textContent || '').trim().toLowerCase();
+                    return (t === 'done' || t === 'save') && b.offsetParent !== null;
+                  });
+                  if (doneBtn) {
+                    doneBtn.click();
+                    domSuccess = true;
+                  }
+                }
+              }
+            } catch (_) {}
+
+            if (apiSuccess || domSuccess) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_PUSH_BIO_RESPONSE',
+                requestId: '${requestId}',
+                success: true,
+                bio: bioText,
+                method: apiSuccess ? 'api' : 'dom'
+              }));
+              return;
+            }
+
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'FE_PUSH_BIO_RESPONSE',
+              requestId: '${requestId}',
+              success: false,
+              error: token
+                ? ('Tinder rejected bio push (' + (lastError || 'API rejected update') + '). Please log into Tinder or navigate to Profile > Edit.')
+                : 'Please log in to Tinder in the browser first.'
+            }));
+          } catch (e) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'FE_PUSH_BIO_RESPONSE',
+              requestId: '${requestId}',
+              success: false,
+              error: e.message
+            }));
+          }
+        })();
+        true;
+      `;
+      webViewRef.current.injectJavaScript(script);
+    });
+  }, []);
+
+  // Unified on-device statistics object for DashboardPanel
+  const onDeviceStats = useMemo(() => ({
+    agentState: {
+      isRunning: onDeviceSwiping,
+      isPaused: !onDeviceSwiping,
+      currentPhase: onDeviceSwiping ? 'liking' : 'stopped',
+      stats: {
+        swipes: onDeviceSwipes,
+        matches: onDeviceMatches,
+        messages: onDeviceMessages,
+        likesCompleted: onDeviceSwipes,
+        matchesCreated: onDeviceMatches,
+        messagesSent: onDeviceMessages,
+      }
+    },
+    lifetimeStats: {
+      totalLikes: onDeviceSwipes,
+      matchesCreated: onDeviceMatches,
+      messagesSent: onDeviceMessages,
+      activeConversations: onDeviceMatches,
+    },
+    progressFeed: logs.map(l => ({
+      id: l.id,
+      time: l.time,
+      message: l.text,
+      type: l.logType || (l.text.includes('Liked') ? 'like' : (l.text.includes('Match') ? 'match' : 'info'))
+    })),
+    settings: extensionSettings
+  }), [onDeviceSwiping, onDeviceSwipes, onDeviceMatches, onDeviceMessages, logs, extensionSettings]);
+
+  // Live sync on-device telemetry and phase to shared parent state (so Home Screen is always in sync)
+  useEffect(() => {
+    if (isOnDevice) {
+      updateSharedAgentState(onDeviceStats);
+    }
+  }, [isOnDevice, onDeviceStats]);
+
+  // Persist session counters so they survive back-navigation, force-close, and
+  // app restart. Debounced at 1 s so a rapid swipe burst doesn't hammer
+  // AsyncStorage on every single update from the WebView.
+  useEffect(() => {
+    if (!isOnDevice) return;
+    const timer = setTimeout(() => {
+      saveOnDeviceSessionState({
+        swipes: onDeviceSwipes,
+        matches: onDeviceMatches,
+        messages: onDeviceMessages,
+        isRunning: onDeviceSwiping,
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [isOnDevice, onDeviceSwipes, onDeviceMatches, onDeviceMessages, onDeviceSwiping]);
+
+  // Auto-start agent if launched with autoStartAgent param from Home Screen (runs exactly once on mount)
+  const hasAutoStartedRef = useRef(false);
+  useEffect(() => {
+    if (isOnDevice && route.params?.autoStartAgent && !hasAutoStartedRef.current && getTinderAuthState()?.isLoggedIn) {
+      hasAutoStartedRef.current = true;
+      addLog('⚡ Auto-launching AI Automation engine from Home Screen...', 'action');
+      toggleOnDeviceSwiping(true);
+    }
+  }, [isOnDevice, route.params?.autoStartAgent, toggleOnDeviceSwiping, addLog]);
+
+  // Sync external stop/pause command from Home Screen
+  const onDeviceSwipingRef = useRef(onDeviceSwiping);
+  useEffect(() => {
+    onDeviceSwipingRef.current = onDeviceSwiping;
+  }, [onDeviceSwiping]);
+
+  useEffect(() => {
+    const unsub = subscribeSharedAgentState((state) => {
+      if (state?.agentState?.isRunning === false && onDeviceSwipingRef.current) {
+        toggleOnDeviceSwiping(false);
+      }
+    });
+    return unsub;
+  }, [toggleOnDeviceSwiping]);
 
   // Helper to execute coordinate-based click on WebRTC player and Orchestrator backend
   const dispatchCoordClick = async (x, y, label = '') => {
@@ -394,6 +1328,33 @@ export default function BrowserScreen({ route, navigation }) {
     try {
       console.log(`[Browser] Executing command: ${action}`, payload);
       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+
+      if (isOnDevice) {
+        if (action === 'CLICK_LOGIN') {
+          webViewRef.current?.injectJavaScript('window.__linksyOpenEmailLogin ? true : false; true;');
+        } else if (action === 'CLICK_EMAIL_LOGIN') {
+          setLoginStep('email');
+          webViewRef.current?.injectJavaScript('window.__linksyOpenEmailLogin && window.__linksyOpenEmailLogin(); true;');
+        } else if (action === 'CLICK_PHONE_LOGIN') {
+          setLoginStep('phone');
+          webViewRef.current?.injectJavaScript('window.__linksyOpenPhoneLogin && window.__linksyOpenPhoneLogin(); true;');
+        } else if (action === 'CLICK_GOOGLE_LOGIN') {
+          setLoginStep('google_email');
+          webViewRef.current?.injectJavaScript('window.__linksyOpenGoogleLogin && window.__linksyOpenGoogleLogin(); true;');
+        } else if (action === 'CLICK_TROUBLE') {
+          webViewRef.current?.injectJavaScript('window.__linksyOpenTroubleLogin && window.__linksyOpenTroubleLogin(); true;');
+        } else if (action === 'SUBMIT_EMAIL') {
+          addLog(`On-Device: Submitting email ${payload.email}`, 'action');
+          webViewRef.current?.injectJavaScript(`window.__linksyFillEmail && window.__linksyFillEmail(${JSON.stringify(payload.email)}); true;`);
+        } else if (action === 'SUBMIT_PHONE') {
+          addLog(`On-Device: Submitting phone ${payload.phone}`, 'action');
+          webViewRef.current?.injectJavaScript(`window.__linksyFillPhone && window.__linksyFillPhone(${JSON.stringify(payload.phone)}, ${JSON.stringify(payload.countryCode)}); true;`);
+        } else if (action === 'SUBMIT_OTP') {
+          addLog('On-Device: Verifying OTP...', 'action');
+          webViewRef.current?.injectJavaScript(`window.__linksyFillOTP && window.__linksyFillOTP(${JSON.stringify(payload.otp)}); true;`);
+        }
+        return;
+      }
 
       if (isHyperbeam) {
         if (action === 'CLICK_LOGIN') {
@@ -539,24 +1500,124 @@ export default function BrowserScreen({ route, navigation }) {
 
 
 
-  const handleLogout = async () => {
-    setLoggingOut(true);
-    try {
-      setShowDashboard(false);
-      setLoginStep('options');
-      setInputText('');
-      setSubmittedEmail('');
-      setSubmittedPhone('');
-      setEmailErrorText('');
-      const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-      await fetch(`${orchestratorUrl}/logout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: 'tinder' }),
-      });
-    } catch (_) { }
+  /**
+   * The single exit point of the logout flow. Cancels the failsafe timer,
+   * releases the re-entrancy lock and closes the modal. Idempotent, and safe to
+   * call after unmount — the on-device path is resolved by a WebView message
+   * that can arrive at any time, including never.
+   */
+  const finishLogout = useCallback(() => {
+    if (logoutFailsafeRef.current) {
+      clearTimeout(logoutFailsafeRef.current);
+      logoutFailsafeRef.current = null;
+    }
+    if (!isLoggingOutRef.current) return;
+    isLoggingOutRef.current = false;
+    if (!isMountedRef.current) return;
     setLoggingOut(false);
     setShowLogoutConfirm(false);
+  }, []);
+
+  /**
+   * Ends the logout flow and, when the logout came from this screen's own
+   * controls in on-device mode, returns to the home screen.
+   *
+   * Signing back in on-device happens through Tinder's own page, and the browser
+   * re-opens straight into it. Leaving the user parked in a session they just
+   * ended means the landing-page helper immediately reopens Tinder's signup
+   * sheet — the app would answer "log me out" with "let's sign up".
+   */
+  const finishLogoutAndExit = useCallback(() => {
+    const shouldExit = exitAfterLogoutRef.current;
+    exitAfterLogoutRef.current = false;
+    finishLogout();
+    if (!shouldExit || !isMountedRef.current) return;
+    isExitingRef.current = true;
+    cleanupCurrentSession();
+    navigation.navigate('PlatformSelect', { justSignedOut: true });
+  }, [finishLogout, navigation]);
+
+  /**
+   * Brings the WebView back after its renderer process died. The old instance is
+   * unusable, so it is reloaded rather than reused. If this happened mid-logout,
+   * the flow is released too — otherwise the modal would sit waiting for a
+   * confirmation that can no longer arrive. The user stays on this screen: a
+   * crash is not a logout, and the header already reflects the cleared session.
+   */
+  const recoverFromRendererLoss = useCallback(() => {
+    if (!isMountedRef.current) return;
+    exitAfterLogoutRef.current = false;
+    setLoading(true);
+    setConnectionError(null);
+    try { webViewRef.current?.reload(); } catch (_) {}
+    finishLogout();
+  }, [finishLogout]);
+
+  const handleLogout = async () => {
+    // `disabled={loggingOut}` is driven by async state, so a double tap within
+    // the same frame can still reach this twice. The ref is the real lock.
+    if (isLoggingOutRef.current) return;
+    isLoggingOutRef.current = true;
+    setLoggingOut(true);
+
+    // Local surfaces are reset first: if any later step fails, the app must
+    // never be left showing a logged-in view of a dead session.
+    setShowDashboard(false);
+    setLoginStep('options');
+    delete persistentLoginCache[sessionKey];
+    setInputText('');
+    setSubmittedEmail('');
+    setSubmittedPhone('');
+    setEmailErrorText('');
+
+    // Also arms pendingWebViewPurge, which is what makes an interrupted logout
+    // recoverable on the next launch.
+    await clearTinderAuthState();
+    setSharedExtensionSettings({ userProfile: null });
+
+    if (isOnDevice) {
+      // On-device the session lives entirely in the WebView, so there is no
+      // orchestrator to notify. Purge the native caches, then hand off to the
+      // in-page purge which reports back via FE_AUTH_STEP { purged: true }.
+      // pendingWebViewPurge is deliberately left armed until that confirmation
+      // arrives; clearing it up front would mark a failed purge as done.
+      // Close the session screen once the purge settles. Navigating on tap
+      // instead would unmount the WebView before the in-page purge could revoke
+      // the token, leaving the app "signed out" while the Tinder session lived on.
+      exitAfterLogoutRef.current = true;
+
+      if (webViewRef.current) {
+        // Native cache/history clearing is deliberately deferred until the
+        // WebView has reached the landing page. Doing it here, against a loaded
+        // authenticated document that is about to be purged and navigated, is
+        // needless pressure on the renderer.
+        webViewRef.current.injectJavaScript(MASTER_PURGE_SCRIPT);
+        // injectJavaScript is fire-and-forget, so the UI cannot depend on the
+        // page answering. If it stays silent, the purge stays armed and
+        // onLoadEnd retries it on the next load. The user still leaves: local
+        // auth is already cleared, so keeping them in the session is the exact
+        // confusion this flow exists to remove.
+        logoutFailsafeRef.current = setTimeout(finishLogoutAndExit, LOGOUT_CONFIRM_TIMEOUT_MS);
+        return;
+      }
+      finishLogoutAndExit();
+      return;
+    }
+
+    // Neko / Hyperbeam: the browser session lives on the orchestrator. Keep the
+    // purge armed so the WebView is cleaned the next time one is mounted.
+    await setPendingWebViewPurge(true);
+    const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+    if (orchestratorUrl) {
+      // Best-effort and bounded: an unreachable orchestrator must not hold the
+      // modal open with both buttons disabled.
+      await postJsonWithTimeout(`${orchestratorUrl}/logout`, {
+        userId: route?.params?.userId || 'dev_user_1',
+        platform: 'tinder',
+      });
+      if (webViewRef.current) webViewRef.current.reload();
+    }
+    finishLogout();
   };
 
   const confirmLogout = () => {
@@ -653,15 +1714,44 @@ export default function BrowserScreen({ route, navigation }) {
 
   React.useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
+      const wasBackground = appState.current.match(/inactive|background/);
+      const isReturning = wasBackground && nextAppState === 'active';
+
+      if (isOnDevice && isReturning) {
+        // ── On-device foreground recovery ──
+        // The WebView renderer can be killed by the OS while backgrounded.
+        // Probe whether the content script is still alive by asking it to echo
+        // back. If the bridge is gone, the page is blank and we reload.
+        // We also flush the last-known swiping state back to the worker so it
+        // stays in sync if the callbacks were stale during backgrounding.
+        if (webViewRef.current) {
+          webViewRef.current.injectJavaScript(`
+            (function() {
+              try {
+                // If the bundle loaded flag is missing the renderer was reset.
+                if (!window.__flirtEasyBundleLoaded) {
+                  window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
+                    JSON.stringify({ type: 'FE_RENDERER_NEEDS_RELOAD' })
+                  );
+                }
+              } catch(e) {
+                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
+                  JSON.stringify({ type: 'FE_RENDERER_NEEDS_RELOAD' })
+                );
+              }
+            })(); true;
+          `);
+        }
+        console.log('[Browser] On-device: returned to foreground, checked renderer health.');
+      } else if (!isOnDevice && !isHyperbeam && isReturning) {
+        // ── Neko/VPS stream reconnect ──
+        // NEVER reload on-device — it would destroy the live Tinder login.
         console.log('[Browser] App returned to foreground. Reloading WebView to refresh Neko connection...');
         if (webViewRef.current) {
           webViewRef.current.reload();
         }
       }
+
       appState.current = nextAppState;
     });
 
@@ -689,7 +1779,7 @@ export default function BrowserScreen({ route, navigation }) {
   }, []);
 
   const injectConfigScript = () => {
-    if (isHyperbeam) return; // Hyperbeam manages its own touch/WebRTC viewport natively
+    if (isHyperbeam || isOnDevice) return; // Only apply Neko stream layout CSS for self-hosted Docker streaming
     const settingsJson = JSON.stringify(extensionSettings || {});
     const cssCode = `
       html, body, #app, #neko, .v-application, .v-main, .neko-main, .video-container, .neko-video, video, canvas {
@@ -787,6 +1877,9 @@ export default function BrowserScreen({ route, navigation }) {
   }, [isHyperbeam, vpsUrl, platform, proxyIp]);
 
   const finalUrl = React.useMemo(() => {
+    if (isOnDevice) {
+      return 'https://tinder.com/';
+    }
     if (isHyperbeam) {
       if (hyperbeamEmbedUrl) return hyperbeamEmbedUrl;
       if (vpsUrl && vpsUrl.includes('hyperbeam.com')) return vpsUrl;
@@ -826,13 +1919,13 @@ export default function BrowserScreen({ route, navigation }) {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
         {/* ─── Upgraded Modern Glass Header ─── */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={styles.backBtn}
+            style={styles.closeBtnCircular}
             onPress={() => {
               cleanupCurrentSession();
               navigation.goBack();
@@ -840,13 +1933,90 @@ export default function BrowserScreen({ route, navigation }) {
           >
             <Ionicons name="close" size={18} color="#D8D6E8" />
           </TouchableOpacity>
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{platform} Session</Text>
+          <View style={styles.headerLeft}>
+            <View style={styles.headerTitleRow}>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {isOnDevice ? 'Tinder' : `${platform} Session`}
+              </Text>
+              {/* On-device intentionally has no state badge here: it would repeat
+                  what the AI Controls button already shows, and the header has no
+                  horizontal room to spare. The Neko countdown is not a duplicate,
+                  so it stays. */}
+              {!isOnDevice && timeLeft !== null && (
+                <View style={styles.countdownBadge}>
+                  <Ionicons name="timer-outline" size={11} color="#10B981" />
+                  <Text style={styles.countdownBadgeText}>
+                    {Math.floor(timeLeft / 60)}:{(timeLeft % 60) < 10 ? '0' : ''}{timeLeft % 60}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.subtitle} numberOfLines={1}>
-              {isHyperbeam ? '⚡ Hyperbeam Cloud Stream' : (proxyIp ? `IP: ${maskProxy(proxyIp)}` : 'Direct Connection')}
+              {isOnDevice
+                ? (sessionStatus === SESSION_SIGNED_IN
+                    ? `${onDeviceSwipes} swipes · ${onDeviceMatches} matches`
+                    : sessionStatus === SESSION_SIGNED_OUT
+                      ? 'Not signed in'
+                      : 'Checking session…')
+                : (isHyperbeam ? '⚡ Hyperbeam Cloud Stream' : (proxyIp ? `IP: ${maskProxy(proxyIp)}` : 'Direct Connection'))}
             </Text>
           </View>
-          {loginStep !== 'done' ? (
+          {isOnDevice ? (
+            <View style={styles.headerActions}>
+              {/* Automation needs a live Tinder session, so this stays disabled
+                  until one is confirmed rather than accepting taps and then
+                  refusing inside toggleAgent. */}
+              <TouchableOpacity
+                style={[
+                  styles.onDeviceDashboardBtn,
+                  onDeviceSwiping ? styles.onDeviceDashboardBtnActive : styles.onDeviceDashboardBtnIdle,
+                  sessionStatus !== SESSION_SIGNED_IN && styles.headerBtnDisabled,
+                ]}
+                onPress={() => setShowDashboard(true)}
+                disabled={sessionStatus !== SESSION_SIGNED_IN}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={onDeviceSwiping ? `AI automation active, ${onDeviceSwipes} swipes` : 'AI controls'}
+                accessibilityHint={
+                  sessionStatus === SESSION_SIGNED_IN ? undefined : 'Sign in to Tinder to enable AI controls'
+                }
+              >
+                <Ionicons
+                  name={onDeviceSwiping ? "flash" : "options"}
+                  size={13}
+                  color={onDeviceSwiping ? "#10B981" : "#FE3C72"}
+                />
+                {/* No swipe count here: it is already on the subtitle line and in
+                    the dashboard, and an unbounded number in this label is what
+                    pushed the row past the width of a 360dp screen. */}
+                <Text style={[styles.onDeviceDashboardBtnText, { color: onDeviceSwiping ? "#10B981" : "#FFF" }]}>
+                  {onDeviceSwiping ? 'AI Active' : 'AI Controls'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Tri-state: a logout control only exists when there is a session to
+                  end. The other two states hold the slot with an equally sized
+                  spacer so resolving the session never reflows the row, and the
+                  wording lives on the subtitle line where there is room for it. */}
+              {sessionStatus === SESSION_SIGNED_IN ? (
+                <TouchableOpacity
+                  style={[styles.onDeviceLogsBtn, { backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
+                  onPress={confirmLogout}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Log out of Tinder"
+                >
+                  <Ionicons name="log-out-outline" size={14} color="#EF4444" />
+                </TouchableOpacity>
+              ) : (
+                <View
+                  style={styles.headerActionSlot}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                />
+              )}
+            </View>
+          ) : (loginStep !== 'done' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity
                 style={[styles.toggleNekoBtn, { marginRight: 4 }]}
@@ -867,16 +2037,16 @@ export default function BrowserScreen({ route, navigation }) {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.dashboardBtn, { marginRight: 4, backgroundColor: '#10B98115', borderColor: '#10B98140' }]}
-                onPress={() => setShowLogsModal(true)}
-              >
-                <Ionicons name="terminal-outline" size={14} color="#10B981" />
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={[styles.dashboardBtn, { marginRight: 4 }]}
                 onPress={() => setShowDashboard(true)}
               >
                 <Ionicons name="stats-chart-outline" size={15} color="#FE3C72" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dashboardBtn, { marginRight: 4, backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
+                onPress={confirmLogout}
+              >
+                <Ionicons name="log-out-outline" size={14} color="#EF4444" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.skipBtn} onPress={() => setLoginStep('done')}>
                 <Text style={styles.skipBtnText}>Skip</Text>
@@ -885,16 +2055,16 @@ export default function BrowserScreen({ route, navigation }) {
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity
-                style={[styles.dashboardBtn, { marginRight: 6, backgroundColor: '#10B98115', borderColor: '#10B98140' }]}
-                onPress={() => setShowLogsModal(true)}
-              >
-                <Ionicons name="terminal-outline" size={14} color="#10B981" />
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={[styles.dashboardBtn, { marginRight: 6 }]}
                 onPress={() => setShowDashboard(true)}
               >
                 <Ionicons name="stats-chart-outline" size={15} color="#FE3C72" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dashboardBtn, { marginRight: 6, backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
+                onPress={confirmLogout}
+              >
+                <Ionicons name="log-out-outline" size={14} color="#EF4444" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.menuBtn, { marginRight: 8, backgroundColor: '#3A3A4A15', borderColor: '#3A3A4A40' }]}
@@ -904,94 +2074,8 @@ export default function BrowserScreen({ route, navigation }) {
                 <Text style={[styles.menuBtnText, { color: '#FFF' }]}>Keyboard</Text>
               </TouchableOpacity>
             </View>
-          )}
+          ))}
         </View>
-
-        {/* ─── Live Activity Log Toast Banner ─── */}
-        <TouchableOpacity
-          style={styles.liveLogBanner}
-          onPress={() => setShowLogsModal(true)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.liveLogDot, { backgroundColor: lastToast.includes('❌') ? '#EF4444' : '#10B981' }]} />
-          <Text style={styles.liveLogText} numberOfLines={1}>{lastToast}</Text>
-          <View style={styles.liveLogBadge}>
-            <Text style={styles.liveLogBadgeText}>Logs ({logs.length}) ➔</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* ─── Full-screen Live Logs Modal ─── */}
-        <Modal
-          visible={showLogsModal}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setShowLogsModal(false)}
-        >
-          <SafeAreaView style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="terminal" size={16} color="#10B981" />
-                <Text style={styles.modalTitle}>Linksy Automation Logs</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <TouchableOpacity
-                  style={[styles.modalCloseBtn, { backgroundColor: '#3A3A4A20', borderColor: '#3A3A4A50' }]}
-                  onPress={() => setLogs([])}
-                >
-                  <Text style={[styles.modalCloseBtnText, { color: '#A0A0B0' }]}>Clear</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalCloseBtn}
-                  onPress={() => setShowLogsModal(false)}
-                >
-                  <Ionicons name="close" size={16} color="#D8D6E8" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Status Info Card */}
-            <View style={styles.logsStatusCard}>
-              <View style={styles.logsStatusRow}>
-                <Text style={styles.logsStatusLabel}>Engine Status:</Text>
-                <Text style={styles.logsStatusValue}>🟢 Connected & Active</Text>
-              </View>
-              <View style={styles.logsStatusRow}>
-                <Text style={styles.logsStatusLabel}>Packaging Speed:</Text>
-                <Text style={styles.logsStatusValue}>⚡ ~40ms (In-Memory Buffer)</Text>
-              </View>
-              <View style={styles.logsStatusRow}>
-                <Text style={styles.logsStatusLabel}>Mode:</Text>
-                <Text style={styles.logsStatusValue}>{isHyperbeam ? 'Hyperbeam Cloud + In-Page DOM' : 'Local / VPS Docker CDP'}</Text>
-              </View>
-            </View>
-
-            {/* Scrollable Logs List */}
-            <View style={{ flex: 1, paddingHorizontal: 14 }}>
-              {logs.length === 0 ? (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                  <Text style={{ color: '#6E6E7F', fontSize: 14 }}>No logs yet. Actions will appear here live.</Text>
-                </View>
-              ) : (
-                logs.map((item) => (
-                  <View key={item.id} style={styles.logRow}>
-                    <View style={styles.logMetaRow}>
-                      <Text style={styles.logTime}>{item.time}</Text>
-                      <View style={[
-                        styles.logTypeTag,
-                        item.type === 'action' && styles.logTagAction,
-                        item.type === 'success' && styles.logTagSuccess,
-                        item.type === 'error' && styles.logTagError,
-                      ]}>
-                        <Text style={styles.logTypeText}>{(item.type || 'INFO').toUpperCase()}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.logMessage}>{item.text}</Text>
-                  </View>
-                ))
-              )}
-            </View>
-          </SafeAreaView>
-        </Modal>
 
         {/* ─── Full-screen Dashboard Modal (accessible at any loginStep) ─── */}
         <Modal
@@ -1006,46 +2090,76 @@ export default function BrowserScreen({ route, navigation }) {
                 <Ionicons name="stats-chart" size={16} color="#FD297B" />
                 <Text style={styles.modalTitle}>Linksy Dashboard</Text>
               </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowDashboard(false)}
-              >
-                <Ionicons name="close" size={16} color="#D8D6E8" />
-              </TouchableOpacity>
+              <View style={styles.headerRightActions}>
+                <TouchableOpacity
+                  style={styles.headerLogoutBtn}
+                  onPress={confirmLogout}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="log-out-outline" size={15} color="#EF4444" />
+                  <Text style={styles.headerLogoutBtnText}>Log Out</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => setShowDashboard(false)}
+                >
+                  <Ionicons name="close" size={16} color="#D8D6E8" />
+                </TouchableOpacity>
+              </View>
             </View>
             <DashboardPanel
-              stats={extensionStats}
-              loading={statsLoading}
-              error={statsError}
-              orchestratorUrl={orchestratorUrl}
+              stats={isOnDevice ? onDeviceStats : extensionStats}
+              loading={isOnDevice ? false : statsLoading}
+              error={isOnDevice ? null : statsError}
+              orchestratorUrl={orchestratorUrl || resolveLocalUrl('http://localhost:3001')}
               onToggleAgent={handleToggleAgent}
               onLogout={handleLogout}
+              onSaveSettings={isOnDevice ? handleSaveOnDeviceSettings : undefined}
+              settings={isOnDevice ? extensionSettings : undefined}
+              onSyncProfile={handleSyncProfileOnDevice}
+              onPushBio={handlePushBioOnDevice}
               controlsContent={
-                <View style={styles.inputPanel}>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Paste Phone No. or OTP code here..."
-                    placeholderTextColor="#8E8E9F"
-                    value={inputText}
-                    onChangeText={setInputText}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <TouchableOpacity
-                    style={styles.sendBtn}
-                    onPress={handleSendText}
-                    disabled={sendingText}
-                  >
-                    {sendingText ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                      <Text style={styles.sendBtnText}>Send</Text>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
-                    <Text style={styles.enterBtnText}>⏎ Enter</Text>
-                  </TouchableOpacity>
-                </View>
+                isOnDevice ? (
+                  <View style={styles.onDeviceControlsBox}>
+                    <TouchableOpacity
+                      style={styles.onDeviceQuickChatsBtn}
+                      onPress={() => {
+                        setShowDashboard(false);
+                        triggerProcessChats();
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="chatbubbles" size={15} color="#818CF8" />
+                      <Text style={styles.onDeviceQuickChatsBtnText}>💬 Reply to Unread Matches with AI</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.inputPanel}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Paste Phone No. or OTP code here..."
+                      placeholderTextColor="#8E8E9F"
+                      value={inputText}
+                      onChangeText={setInputText}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity
+                      style={styles.sendBtn}
+                      onPress={handleSendText}
+                      disabled={sendingText}
+                    >
+                      {sendingText ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <Text style={styles.sendBtnText}>Send</Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
+                      <Text style={styles.enterBtnText}>⏎ Enter</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
               }
             />
           </SafeAreaView>
@@ -1102,10 +2216,10 @@ export default function BrowserScreen({ route, navigation }) {
 
         {/* ─── Rounded Glass Browser Container ─── */}
         <View
-          {...(isHyperbeam ? {} : panResponder.panHandlers)}
+          {...((isHyperbeam || isOnDevice) ? {} : panResponder.panHandlers)}
           style={[
             styles.webviewContainer,
-            loginStep === 'done'
+            (isOnDevice || loginStep === 'done')
               ? styles.webviewContainerFull
               : (showNeko
                 ? (isExpanded || loginStep === 'captcha' ? styles.webviewContainerFull : styles.webviewContainerSplit)
@@ -1116,10 +2230,12 @@ export default function BrowserScreen({ route, navigation }) {
             <WebView
               ref={webViewRef}
               source={{ uri: finalUrl }}
-              style={styles.webview}
+              style={[styles.webview, isOnDevice && styles.onDeviceWebview]}
               scrollEnabled={true}
               bounces={false}
-              scalesPageToFit={true}
+              scalesPageToFit={!isOnDevice && Platform.OS === 'ios'}
+              nestedScrollEnabled={false}
+              setSupportMultipleWindows={false}
               setBuiltInZoomControls={false}
               showsHorizontalScrollIndicator={false}
               showsVerticalScrollIndicator={false}
@@ -1128,22 +2244,120 @@ export default function BrowserScreen({ route, navigation }) {
               sharedCookiesEnabled={true}
               thirdPartyCookiesEnabled={true}
               cacheEnabled={true}
+              cacheMode="LOAD_DEFAULT"
+              incognito={false}
+              saveFormDataDisabled={false}
               geolocationEnabled={true}
               allowsBackForwardNavigationGestures={true}
               allowsInlineMediaPlayback={true}
               mediaPlaybackRequiresUserAction={false}
               androidHardwareAccelerationDisabled={false}
+              androidLayerType="hardware"
               originWhitelist={['*']}
+              userAgent={
+                isOnDevice
+                  ? (Platform.OS === 'ios'
+                      ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+                      : 'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.127 Mobile Safari/537.36')
+                  : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+              }
               onLoadStart={() => {
                 setConnectionError(null);
               }}
               onLoadEnd={() => {
                 setLoading(false);
                 injectConfigScript();
+                // If opening after an external logout (from Home Screen), purge and reset session cleanly once
+                if (isOnDevice && (getPendingWebViewPurge() || (shouldForceLogout && !hasExecutedPurgeRef.current))) {
+                  hasExecutedPurgeRef.current = true;
+                  setPendingWebViewPurge(false);
+                  delete persistentLoginCache[sessionKey];
+                  try { webViewRef.current?.clearCache(true); } catch (_) {}
+                  try { webViewRef.current?.clearFormData(); } catch (_) {}
+                  try { webViewRef.current?.clearHistory(); } catch (_) {}
+                  webViewRef.current?.injectJavaScript(MASTER_PURGE_SCRIPT);
+                }
+
+                // Deferred logout stage: a loaded page with no Tinder SPA holding
+                // the handles. Skipped while this screen is on its way out, so the
+                // flag stays armed and the work happens on the next open rather
+                // than being cut short by the unmount.
+                if (isOnDevice && getPendingStorageTeardown() && !isExitingRef.current) {
+                  setPendingStorageTeardown(false);
+                  try { webViewRef.current?.clearCache(true); } catch (_) {}
+                  try { webViewRef.current?.clearFormData(); } catch (_) {}
+                  try { webViewRef.current?.clearHistory(); } catch (_) {}
+                  webViewRef.current?.injectJavaScript(STORAGE_TEARDOWN_SCRIPT);
+                }
+                // The "landing page -> Create account" helper lives in the
+                // content script bundle (injectedJavaScript), so there is
+                // nothing to inject from here.
               }}
-              onMessage={(event) => {
+              onNavigationStateChange={(navState) => {
+                setCanGoBackWeb(navState.canGoBack);
+              }}
+              onMessage={async (event) => {
                 try {
                   const msg = JSON.parse(event.nativeEvent.data);
+
+                  // ── Foreground renderer health probe response ──
+                  if (msg.type === 'FE_RENDERER_NEEDS_RELOAD') {
+                    addLog('Browser engine was reset while backgrounded — reloading session', 'warn');
+                    if (webViewRef.current) webViewRef.current.reload();
+                    return;
+                  }
+
+                  // ── Chrome Extension Runtime Bridge (On-Device Mode) ──
+                  if (msg.type === 'FE_CHROME_MSG') {
+                    const { _callbackId } = msg;
+                    const worker = backgroundWorkerRef.current;
+                    if (worker) {
+                      const response = await worker.handleMessage(msg);
+                      if (_callbackId && webViewRef.current) {
+                        const respStr = JSON.stringify(response !== undefined ? response : null);
+                        webViewRef.current.injectJavaScript(
+                          `window.__chromeCallbacks && window.__chromeCallbacks.resolve(${_callbackId}, ${respStr}); true;`
+                        );
+                      }
+                    }
+                    return;
+                  }
+
+                  if (msg.type === 'FE_PORT_MSG') {
+                    return;
+                  }
+
+                  if (msg.type === 'FE_PROFILE_SYNC_RESPONSE') {
+                    const cb = profileSyncCallbacksRef.current.get(msg.requestId);
+                    if (cb) {
+                      profileSyncCallbacksRef.current.delete(msg.requestId);
+                      cb(msg);
+                    }
+                    if (msg.success && msg.profile) {
+                      if (msg.profile.name) {
+                        setTinderAuthState({ isLoggedIn: true, accountName: msg.profile.name });
+                      }
+                      addLog(`Profile synced for ${msg.profile.name || 'user'}`, 'success');
+                      handleSaveOnDeviceSettings({ userProfile: msg.profile, manualBio: msg.profile.bio || undefined });
+                    }
+                    return;
+                  }
+
+                  if (msg.type === 'FE_PUSH_BIO_RESPONSE') {
+                    const cb = pushBioCallbacksRef.current.get(msg.requestId);
+                    if (cb) {
+                      pushBioCallbacksRef.current.delete(msg.requestId);
+                      cb(msg);
+                    }
+                    if (msg.success && msg.bio) {
+                      addLog(`Pushed new bio to Tinder (${msg.method === 'dom' ? 'DOM' : 'API'})`, 'success');
+                      handleSaveOnDeviceSettings({ manualBio: msg.bio });
+                    } else if (!msg.success) {
+                      addLog(`Bio push failed: ${msg.error || 'Unknown error'}`, 'error');
+                    }
+                    return;
+                  }
+
                   if (msg.type === 'FE_LOG') {
                     addLog(msg.text, msg.logType || 'info');
                   }
@@ -1151,16 +2365,70 @@ export default function BrowserScreen({ route, navigation }) {
                     setLastCoord({ x: msg.x, y: msg.y });
                     addLog(`📍 Tap Coordinate: X=${msg.x}, Y=${msg.y}`, 'action');
                   }
-                  // Extension signals phone input is ready — advance wizard automatically to phone
-                  if (msg.type === 'bumble:phoneInputReady' && loginStep === 'navigating') {
-                    console.log('[Browser] Bumble phone input ready — advancing wizard to phone');
-                    addLog('Bumble phone input ready', 'success');
-                    setLoginStep('phone');
+                  if (msg.type === 'FE_SWIPE') {
+                    setOnDeviceSwipes(msg.swipeCount || 0);
+                    setOnDeviceSwiping(true);
+                    setTinderAuthState({ isLoggedIn: true, accountName: 'Tinder Account' });
+                    addLog(`❤️ Swiped profile (${msg.swipeCount}/${msg.total || 50})`, 'action');
                   }
-                  // Extension signals OTP input is ready
-                  if (msg.type === 'bumble:otpInputReady') {
-                    console.log('[Browser] Bumble OTP input ready');
-                    addLog('Bumble OTP input ready', 'success');
+                  if (msg.type === 'FE_MATCH') {
+                    setOnDeviceMatches(msg.matchCount || 0);
+                    setTinderAuthState({ isLoggedIn: true, accountName: 'Tinder Account' });
+                    addLog(`🎉 New Match detected (#${msg.matchCount})!`, 'success');
+                  }
+                  if (msg.type === 'FE_CYCLE_DONE') {
+                    setOnDeviceSwiping(false);
+                    addLog(`Cycle target reached (${msg.count} likes). Paused.`, 'info');
+                  }
+                  if (msg.type === 'FE_PAGE_STATUS') {
+                    // Ignore page status reports while a logout is actively executing or pending
+                    if (isLoggingOutRef.current || getPendingWebViewPurge()) return;
+                    // ── Initial Page Status Report (fired on content.js inject) ──
+                    // Syncs the home screen to the live WebView page state on load.
+                    if (typeof msg.isLoggedIn === 'boolean') {
+                      if (msg.isLoggedIn) {
+                        setTinderAuthState({ isLoggedIn: true, accountName: 'Tinder Account' });
+                      } else {
+                        const current = getTinderAuthState();
+                        // Never clobber a believed-good session while the user is
+                        // partway through entering a code or number.
+                        const midLogin = loginStep === 'otp' || loginStep === 'phone';
+                        // Commit when this is the first report (so the header can
+                        // stop showing 'unknown') or when it is a real
+                        // signed-in -> signed-out transition. Skip when it merely
+                        // repeats an already-known signed-out state.
+                        if (!midLogin && (!current?.lastUpdated || current.isLoggedIn)) {
+                          setTinderAuthState({ isLoggedIn: false, accountName: null });
+                        }
+                      }
+                    }
+                  }
+                  if (msg.type === 'FE_AUTH_STEP') {
+                    if (msg.step === 'logged_in') {
+                      if (isLoggingOutRef.current || getPendingWebViewPurge()) return;
+                      setLoginStep('done');
+                      setTinderAuthState({ isLoggedIn: true, accountName: msg.name || 'Tinder Account' });
+                      addLog('Logged into Tinder (Active Session)', 'success');
+                    } else if (msg.step === 'logged_out') {
+                      // Fired both by the purge script and by the watchdog when
+                      // the user logs out inside Tinder itself.
+                      setTinderAuthState({ isLoggedIn: false, accountName: null });
+                      setLoginStep('options');
+                      if (msg.purged) {
+                        // The WebView confirmed a completed purge, so it is now
+                        // clean and onLoadEnd must not purge it again. The
+                        // leftover storage teardown is persisted rather than run
+                        // here, because this screen may be closing.
+                        setPendingWebViewPurge(false);
+                        hasExecutedPurgeRef.current = true;
+                        setPendingStorageTeardown(true);
+                      }
+                      addLog('Tinder session ended — user logged out', 'warn');
+                      // Resolves on the actual outcome instead of a fixed delay,
+                      // and closes the screen when this logout asked for it.
+                      // No-op for a manual in-page logout.
+                      finishLogoutAndExit();
+                    }
                   }
                 } catch (_) { }
               }}
@@ -1171,9 +2439,42 @@ export default function BrowserScreen({ route, navigation }) {
                 setLoading(false);
                 setConnectionError(nativeEvent);
               }}
+              // Android: without this handler a dead renderer process propagates
+              // as a native crash and takes the whole app down. Returning true
+              // tells react-native-webview we handled it, and the reload below
+              // brings the session back on the landing page.
+              onRenderProcessGone={(syntheticEvent) => {
+                const { didCrash } = syntheticEvent.nativeEvent;
+                console.warn('[Browser] WebView renderer gone. didCrash:', didCrash);
+                addLog(
+                  didCrash
+                    ? 'Browser engine crashed — reloading session'
+                    : 'Browser engine was killed by the system — reloading session',
+                  'error'
+                );
+                recoverFromRendererLoss();
+                return true;
+              }}
+              // iOS equivalent of the above.
+              onContentProcessDidTerminate={() => {
+                console.warn('[Browser] WebView content process terminated.');
+                addLog('Browser engine restarted — reloading session', 'error');
+                recoverFromRendererLoss();
+              }}
               mediaCapturePermissionGrantType="grant"
               mixedContentMode="always"
-              injectedJavaScript={`
+              injectedJavaScriptBeforeContentLoaded={
+                isOnDevice
+                  ? generateChromeShim(SELECTORS_JSON, {
+                      latitude: extensionSettings?.locationLatitude || 40.7128,
+                      longitude: extensionSettings?.locationLongitude || -74.0060,
+                    })
+                  : undefined
+              }
+              injectedJavaScript={
+                isOnDevice
+                  ? CONTENT_SCRIPT_BUNDLE
+                  : `
               (function() {
                 window.__logToApp = function(txt, t) {
                   try {
@@ -1239,11 +2540,13 @@ export default function BrowserScreen({ route, navigation }) {
             `}
               overScrollMode="never"
               keyboardDisplayRequiresUserAction={false}
-              userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+              startInLoadingState={false}
+              textInteractionEnabled={true}
+              allowFileAccessFromFileURLs={true}
             />
           )}
           {lastCoord && (
-            <View style={styles.coordHudBadge}>
+            <View style={styles.coordHudBadge} pointerEvents="box-none">
               <Ionicons name="locate" size={13} color="#10B981" />
               <Text style={styles.coordHudText}>
                 X: {lastCoord.x}  |  Y: {lastCoord.y}
@@ -1257,13 +2560,13 @@ export default function BrowserScreen({ route, navigation }) {
             </View>
           )}
           {startingHyperbeam && (
-            <View style={styles.loaderContainer}>
+            <View style={styles.loaderContainer} pointerEvents="none">
               <ActivityIndicator size="large" color="#FE3C72" />
               <Text style={styles.loaderText}>Starting Hyperbeam Cloud Browser...</Text>
             </View>
           )}
           {loading && !startingHyperbeam && !connectionError && Boolean(finalUrl) && (
-            <View style={styles.loaderContainer}>
+            <View style={styles.loaderContainer} pointerEvents="none">
               <ActivityIndicator size="large" color="#FE3C72" />
               <Text style={styles.loaderText}>Connecting to Virtual Browser...</Text>
             </View>
@@ -1308,8 +2611,8 @@ export default function BrowserScreen({ route, navigation }) {
           )}
         </View>
 
-        {/* ─── Bottom Controls / Wizard Section ─── */}
-        {loginStep !== 'done' && (
+        {/* ─── Bottom Controls / Wizard Section (Neko / Remote Stream Only) ─── */}
+        {!isOnDevice && loginStep !== 'done' && (
           <View style={[styles.wizardPanel, !showNeko && styles.wizardPanelFull]}>
             {loginStep === 'options' && (
               <View style={styles.wizardStep}>
@@ -1488,28 +2791,6 @@ export default function BrowserScreen({ route, navigation }) {
                   ) : (
                     <Text style={styles.wizardBtnText}>Sign In ➔</Text>
                   )}
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {loginStep === 'navigating' && (
-              <View style={styles.wizardStep}>
-                <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
-                    <Text style={styles.wizardBackBtnText}>Back</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Opening Phone Login...</Text>
-                </View>
-                <ActivityIndicator size="large" color="#FFCB37" style={{ marginVertical: 10 }} />
-                <Text style={styles.wizardDesc}>
-                  Automatically navigating to the phone number screen. Just a moment.
-                </Text>
-                <TouchableOpacity
-                  style={styles.wizardGhostBtn}
-                  onPress={() => setLoginStep('phone')}
-                >
-                  <Text style={styles.wizardGhostBtnText}>Skip — I'll navigate manually</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1935,6 +3216,7 @@ export default function BrowserScreen({ route, navigation }) {
         <TextInput
           ref={inputRef}
           style={styles.hiddenInput}
+          pointerEvents="none"
           value={dummyText}
           onChangeText={handleTextChange}
           autoCapitalize="none"
@@ -1953,17 +3235,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#050505',
   },
   header: {
-    height: 56,
+    // minHeight, not height: with the Android status-bar paddingTop below, a
+    // fixed 56 left an 8px content box for 38px-tall children, so the row
+    // squeezed and spilled into the WebView.
+    minHeight: 56,
     marginTop: Platform.OS === 'android' ? 6 : 0,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     paddingTop: Platform.OS === 'android' ? 38 : 6,
     paddingBottom: 10,
   },
+  // The flexible zone between the fixed close button and the fixed action group.
+  // Without flex + minWidth: 0 it sized to its content and shoved the buttons off
+  // the right edge instead of letting the title truncate.
   headerLeft: {
+    flex: 1,
+    minWidth: 0,
+    marginHorizontal: 8,
     flexDirection: 'column',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  // Keeps its intrinsic width; headerLeft is what gives way.
+  headerActions: {
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  // Same footprint as the icon buttons, so all three session states are identical
+  // in width.
+  headerActionSlot: {
+    width: 32,
+    height: 32,
   },
   statusIndicatorRow: {
     flexDirection: 'row',
@@ -1990,6 +3298,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   headerTitle: {
+    flexShrink: 1,
     color: '#FFFFFF',
     fontSize: 21,
     fontWeight: '800',
@@ -2019,6 +3328,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   closeBtnCircular: {
+    flexShrink: 0,
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -2069,7 +3379,27 @@ const styles = StyleSheet.create({
     flex: 0.62,
   },
   webviewContainerFull: {
+    // No explicit height here on purpose. Yoga defaults flexShrink to 0, so a
+    // height:'100%' becomes an unshrinkable flex-basis and this container
+    // overflows its parent by the height of the header + log banner above it.
+    // The overflow still paints on Android but falls outside the parent's touch
+    // bounds, leaving a visible-but-dead strip exactly where Tinder puts its
+    // login buttons.
     flex: 1,
+    minHeight: 0,
+    width: '100%',
+    marginHorizontal: 0,
+    paddingHorizontal: 0,
+  },
+  onDeviceWebview: {
+    width: '100%',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    opacity: 0,
+    bottom: -100,
   },
   webviewContainerHidden: {
     height: 0,
@@ -2568,111 +3898,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // ── Live Log Toast Banner ──
-  liveLogBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#161622',
-    borderBottomWidth: 1,
-    borderBottomColor: '#252535',
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  liveLogDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-    marginRight: 8,
-  },
-  liveLogText: {
-    flex: 1,
-    color: '#D1D1DF',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  liveLogBadge: {
-    backgroundColor: '#10B98120',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#10B98140',
-  },
-  liveLogBadgeText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontWeight: '700',
-  },
 
-  // ── Logs Modal Component Styles ──
-  logsStatusCard: {
-    backgroundColor: '#181824',
-    marginHorizontal: 14,
-    marginTop: 12,
-    marginBottom: 10,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#262638',
-  },
-  logsStatusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 2,
-  },
-  logsStatusLabel: {
-    color: '#8E8E9F',
-    fontSize: 12,
-  },
-  logsStatusValue: {
-    color: '#E0E0EC',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  logRow: {
-    backgroundColor: '#14141E',
-    borderWidth: 1,
-    borderColor: '#222230',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-  },
-  logMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  logTime: {
-    color: '#6E6E7F',
-    fontSize: 11,
-  },
-  logTypeTag: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: '#818CF820',
-  },
-  logTagAction: {
-    backgroundColor: '#38BDF820',
-  },
-  logTagSuccess: {
-    backgroundColor: '#10B98120',
-  },
-  logTagError: {
-    backgroundColor: '#EF444420',
-  },
-  logTypeText: {
-    color: '#E0E0EC',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  logMessage: {
-    color: '#F0F0F5',
-    fontSize: 12.5,
-    lineHeight: 17,
-  },
   coordHudBadge: {
     position: 'absolute',
     top: 12,
@@ -2698,5 +3924,301 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.4,
+  },
+  countdownBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#10B98118',
+    borderWidth: 1,
+    borderColor: '#10B98140',
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+    borderRadius: 12,
+    marginLeft: 6,
+  },
+  countdownBadgeText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  // ── On-Device Header Controls ──
+  onDeviceDashboardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  onDeviceDashboardBtnIdle: {
+    backgroundColor: 'rgba(254, 60, 114, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 60, 114, 0.4)',
+  },
+  onDeviceDashboardBtnActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  onDeviceDashboardBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  onDeviceLogsBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  onDeviceControlsBox: {
+    paddingVertical: 4,
+  },
+  onDeviceQuickChatsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(99, 102, 241, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.4)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  onDeviceQuickChatsBtnText: {
+    color: '#818CF8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // ── Header ──
+  headerBtnDisabled: {
+    opacity: 0.4,
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.45)',
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  // Square icon button used for the header action row (dashboard, logs, logout).
+  // Callers layer their own backgroundColor / borderColor on top, so the base
+  // only owns geometry plus a neutral glass fallback.
+  dashboardBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Header chips (remote / Neko session controls) ──
+  toggleNekoBtn: {
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleNekoBtnText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  menuBtn: {
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuBtnText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  skipBtn: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(253, 41, 123, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(253, 41, 123, 0.30)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skipBtnText: {
+    color: '#FD297B',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  modalCloseBtnText: {
+    color: '#FD297B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // ── Manual text input panel (remote / Neko session) ──
+  inputPanel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  textInput: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  sendBtn: {
+    height: 42,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: '#FD297B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  enterBtn: {
+    height: 42,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  enterBtnText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // ── Logout Confirmation Modal ──
+  // These were referenced by the modal but never defined in this file, so every
+  // style resolved to undefined: the dialog collapsed to unstyled content in the
+  // top-left corner while its transparent full-screen Modal kept swallowing
+  // every touch. Values mirror the identical dialog in PlatformSelectScreen.
+  logoutModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(5, 4, 10, 0.80)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  logoutModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#141220',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.28)',
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  logoutIconBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.32)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  logoutModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  logoutModalSubtitle: {
+    color: '#8E8DA3',
+    fontSize: 12.5,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 22,
+  },
+  logoutModalBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+  },
+  logoutModalCancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoutModalCancelText: {
+    color: '#D8D6E8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  logoutModalConfirmBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  logoutModalConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

@@ -1,0 +1,146 @@
+{
+  "pbtResults": {
+    "1. Write bug condition exploration test": {
+      "status": "passed",
+      "failingExample": "3 timing-gap tests failed on unfixed chromeShim.js, confirming the bug:\n\n1. TIMING GAP Sub-condition 1 (aria-modal):\n   When #rebrand-mobile-menu[aria-modal=\"true\"] exists and shim loads with NO login modal in DOM,\n   then login modal arrives → aria-modal is still \"true\" (not removed proactively).\n   Expected: null, Received: \"true\"\n   Counterexample: tap on 'Continue with Google' with #rebrand-mobile-menu[aria-modal=true] present\n   and modal injected after shim — aria-modal still set, focus-trap intercepts all touch events.\n\n2. TIMING GAP Sub-condition 2 (pointer-events):\n   StretchedBox has pointer-events:none. Shim runs, finds no modal, does nothing.\n   Modal inserted after shim. pointer-events still \"none\".\n   Expected: \"auto\", Received: \"none\"\n   Counterexample: tap on 'Log in with email' — StretchedBox ancestor absorbs the touch event.\n\n3. TIMING GAP Sub-condition 3 (z-index):\n   StretchedBox has z-index:1. Modal inserted after shim. z-index still 1.\n   Expected: 9999999, Received: 1\n   Counterexample: drawer/overlay with higher z-index (e.g. #rebrand-mobile-menu at z-index:10000000)\n   renders on top of login buttons — tap intercepted by overlay.\n\nRoot cause confirmed: _ensureModalInteractive is NOT called proactively before first user tap\nwhen the login modal arrives after shim injection (no requestAnimationFrame scheduling).",
+      "lastRunTimestamp": 1788779882443
+    }
+  },
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779295447
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779306098
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779908389
+      }
+    ],
+    "2. Write preservation property tests (BEFORE implementing fix)": [
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779295806
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779919374
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788780170281
+      }
+    ],
+    "3.1 Replace `:has()` CSS rule with `.fe-login-ancestor` class-based equivalent": [
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779295981
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788780179454
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788780674873
+      }
+    ],
+    "3.2 Remove `aria-modal` unconditionally in `_ensureModalInteractive` and add defense-in-depth CSS": [
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779296130
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788780679591
+      }
+    ],
+    "3.3 Add `fe-login-ancestor` class assignment in `_ensureModalInteractive`": [
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779296233
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788780685521
+      }
+    ],
+    "3.4 Schedule `_ensureModalInteractive` via `requestAnimationFrame` after injection": [
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779296340
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788780691508
+      }
+    ],
+    "3.5 Add timed fallback retries in `_ensureModalInteractive`": [
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779296465
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788780696108
+      }
+    ],
+    "3.6 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779296649
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788780707370
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788780772906
+      }
+    ],
+    "3.7 Verify preservation tests still pass": [
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779296756
+      },
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788780778505
+      }
+    ],
+    "4. Checkpoint — Ensure all tests pass": [
+      {
+        "executionId": "18f9d789-e77b-4127-9b40-d71199d8559f",
+        "chatSessionId": "sess_9545e4b4-1826-42f0-8fa6-b76160063582",
+        "timestamp": 1788779296865
+      }
+    ]
+  }
+}

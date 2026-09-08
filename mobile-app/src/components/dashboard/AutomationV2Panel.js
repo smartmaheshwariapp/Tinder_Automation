@@ -1,5 +1,5 @@
 // src/components/dashboard/AutomationV2Panel.js — Comprehensive FlirtEasy V2 Panel with Style Training & Safety Controls
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import RangeSlider from '../common/RangeSlider';
 import MultiRangeSlider from '../common/MultiRangeSlider';
 import TimeRangeSlider, { timeToMins, minsToDisplay, minsTo24 } from '../common/TimeRangeSlider';
 import V2Dropdown from '../common/V2Dropdown';
+import { CITY_PRESETS } from '../../utils/locationHubs';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -673,7 +674,7 @@ const getPersonaForLang = (langCode) => {
   return LOCALIZED_TRAINING_PERSONAS[code] || LOCALIZED_TRAINING_PERSONAS.en;
 };
 
-export default function AutomationV2Panel({ settings, loading, saving, saveSuccess, error, onSave, onDirtyChange }) {
+export default function AutomationV2Panel({ settings, loading, saving, saveSuccess, error, onSave, onDirtyChange, onNavigateToSettings }) {
   const [form, setForm] = useState(null);
   const formRef = useRef(null);
 
@@ -702,6 +703,11 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
   const [inlineSaved, setInlineSaved] = useState(false);
   const [simLangModalOpen, setSimLangModalOpen] = useState(false);
   const [tooltipModal, setTooltipModal] = useState(null);
+
+  // ─── Location Hub State (Global Geolocation Sync) ───
+
+
+
 
   // Desktop V2 Animated Save Bar & Change Tracking Controller
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -769,6 +775,9 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
       if (cloned.stopAfterGoal === undefined && cloned.stopAfterGoalEnabled !== undefined) {
         cloned.stopAfterGoal = cloned.stopAfterGoalEnabled;
       }
+      if (cloned.locationLatitude === undefined) cloned.locationLatitude = 40.7128;
+      if (cloned.locationLongitude === undefined) cloned.locationLongitude = -74.0060;
+      if (!cloned.locationCity) cloned.locationCity = 'New York, USA';
 
       setForm(cloned);
       formRef.current = cloned;
@@ -900,6 +909,8 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
       onDirtyChange(true, () => handleSavePress(nextState), handleDiscard);
     }
   };
+
+
 
   // ─── Desktop V2 Style Analysis & Quality Guardrails (Exact 1:1 Parity) ───
   const isGarbageMessage = (text) => {
@@ -2092,6 +2103,56 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   </View>
                 )}
               </View>
+
+              {/* ─── Active Dating Location Capsule (Single Source of Truth in Settings) ─── */}
+              <View style={styles.swipingLocationCapsule}>
+                <View style={styles.swipingLocationLeft}>
+                  <View style={styles.swipingLocationTopRow}>
+                    <Text style={styles.swipingLocationTitle}>Dating Location</Text>
+                    <View style={[
+                      styles.swipingLocationBadge,
+                      form?.useDeviceLocation ? styles.swipingLocationBadgeGps : styles.swipingLocationBadgePassport
+                    ]}>
+                      <Ionicons
+                        name={form?.useDeviceLocation ? "navigate" : "airplane"}
+                        size={10}
+                        color={form?.useDeviceLocation ? "#10B981" : "#FE3C72"}
+                      />
+                      <Text style={[
+                        styles.swipingLocationBadgeText,
+                        form?.useDeviceLocation ? { color: "#10B981" } : { color: "#FE3C72" }
+                      ]}>
+                        {form?.useDeviceLocation ? 'LIVE GPS' : 'PASSPORT'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.swipingLocationCityRow}>
+                    <Text style={styles.swipingLocationCityText} numberOfLines={1}>
+                      {CITY_PRESETS.find(p => (form?.locationCity || '').includes(p.short))?.flag || '📍'}{' '}
+                      {form?.locationCity || 'New York, USA'}
+                    </Text>
+                    <Text style={styles.swipingLocationSub}>
+                      {form?.useDeviceLocation
+                        ? 'Matching near your physical phone location'
+                        : 'Matching in selected passport destination'}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.swipingLocationActionBtn}
+                  onPress={() => {
+                    if (onNavigateToSettings) {
+                      onNavigateToSettings('location');
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.swipingLocationActionText}>Change</Text>
+                  <Ionicons name="arrow-forward" size={12} color="#FE3C72" />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -3205,6 +3266,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           </View>
         </TouchableOpacity>
       </Modal>
+
     </View>
   );
 }
@@ -4394,5 +4456,88 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     marginBottom: 6,
+  },
+
+  // ─── Swiping Location Capsule ───
+  swipingLocationCapsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0E0C18',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#26223B',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 10,
+  },
+  swipingLocationLeft: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  swipingLocationTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  swipingLocationTitle: {
+    color: '#8E8DA3',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  swipingLocationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  swipingLocationBadgeGps: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  swipingLocationBadgePassport: {
+    backgroundColor: 'rgba(254, 60, 114, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 60, 114, 0.22)',
+  },
+  swipingLocationBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  swipingLocationCityRow: {
+    marginTop: 2,
+  },
+  swipingLocationCityText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  swipingLocationSub: {
+    color: '#65637D',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  swipingLocationActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(254, 60, 114, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 60, 114, 0.25)',
+  },
+  swipingLocationActionText: {
+    color: '#FE3C72',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

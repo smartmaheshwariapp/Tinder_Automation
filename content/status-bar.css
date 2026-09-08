@@ -2,6 +2,41 @@
  * FlirtEasy In-Page Status Bar — 6 State Variations
  */
 
+/* ── Mobile Touch Defense for Tinder Dialogs ── */
+/* Ensure the mobile navigation drawer doesn't trap aria-modal or block touches when login modal is active */
+body.fe-login-modal-active #rebrand-mobile-menu,
+body:has([aria-labelledby="MODAL_LOGIN"]) #rebrand-mobile-menu,
+.mobile-navigation-drawer-overlay, [class*="drawer-overlay"] {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    z-index: -9999 !important;
+}
+
+/* Elevate ONLY the login modal / dialog, NOT #rebrand-mobile-menu (which is also role="dialog") */
+[aria-labelledby="MODAL_LOGIN"],
+.StretchedBox:has([aria-labelledby="MODAL_LOGIN"]),
+div[aria-modal="true"]:not(#rebrand-mobile-menu),
+[role="dialog"]:not(#rebrand-mobile-menu) {
+    z-index: 9999999 !important;
+    pointer-events: auto !important;
+}
+
+[aria-labelledby="MODAL_LOGIN"] button,
+[aria-labelledby="MODAL_LOGIN"] a,
+[aria-labelledby="MODAL_LOGIN"] input,
+[aria-labelledby="MODAL_LOGIN"] iframe,
+[role="dialog"]:not(#rebrand-mobile-menu) button,
+[role="dialog"]:not(#rebrand-mobile-menu) a,
+[role="dialog"]:not(#rebrand-mobile-menu) input,
+[role="dialog"]:not(#rebrand-mobile-menu) iframe {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    cursor: pointer !important;
+    -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+}
+
 #flirteasy-status-bar {
     display: block !important;
     position: fixed !important;
@@ -2437,4 +2472,62 @@
     color: #fd297b !important;
     flex-shrink: 0 !important;
     font-weight: 700 !important;
+}
+
+/* ── Tinder Login Modal Touch Defense (On-Device Mode) ── */
+#modal-manager, .modal-manager-portal {
+    position: relative !important;
+    z-index: 9999999 !important;
+    pointer-events: auto !important;
+}
+.modal-wrapper {
+    z-index: 9999999 !important;
+    pointer-events: auto !important;
+}
+[role="dialog"]:not(#rebrand-mobile-menu),
+div[aria-modal="true"]:not(#rebrand-mobile-menu),
+.modal:not(#rebrand-mobile-menu) {
+    z-index: 9999999 !important;
+    pointer-events: auto !important;
+}
+
+/* #rebrand-mobile-menu is Tinder's mobile nav drawer. It is also role="dialog",
+   it stays in the DOM while closed, and it fills the viewport. Force-enabling
+   pointer-events on it (as the rule above used to do) makes the invisible closed
+   drawer sit on top of the login modal and swallow every tap — the 3 login
+   buttons paint fine but are completely untappable. Keep the container
+   transparent to touch; only re-enable its own controls when it is really open. */
+#rebrand-mobile-menu {
+    pointer-events: none !important;
+}
+#rebrand-mobile-menu[aria-modal="true"] a,
+#rebrand-mobile-menu[aria-modal="true"] button {
+    pointer-events: auto !important;
+}
+
+[role="dialog"]:not(#rebrand-mobile-menu) button,
+[role="dialog"]:not(#rebrand-mobile-menu) a,
+[role="dialog"]:not(#rebrand-mobile-menu) input,
+[role="dialog"]:not(#rebrand-mobile-menu) iframe {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    cursor: pointer !important;
+}
+body.fe-modal-open .mobile-navigation-drawer,
+body.fe-modal-open .mobile-navigation-drawer-overlay,
+body:has([role="dialog"]) .mobile-navigation-drawer,
+body:has([role="dialog"]) .mobile-navigation-drawer-overlay {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    z-index: -9999 !important;
+}
+.mobile-navigation-drawer-overlay, [class*="drawer-overlay"] {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    z-index: -9999 !important;
+    height: 0 !important;
+    width: 0 !important;
 }

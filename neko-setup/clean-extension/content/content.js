@@ -1026,9 +1026,27 @@ async function autoLike(count) {
 
     console.log('%c[FlirtEasy] ════════════════════════════════════', 'color:#e91e8c;font-weight:bold;');
 
+    if (!isLoggedIn()) {
+      console.warn('[FlirtEasy] Please log into Tinder first before starting AI.');
+      return { success: false, likesCompleted: 0, errors: ['Please log into Tinder to start AI swiping'] };
+    }
+
     if (!window.location.pathname.includes('/app/recs')) {
-      console.warn('[FlirtEasy] Not on explore page, this should have been handled by background');
-      return { success: false, likesCompleted: 0, errors: ['Not on explore page'] };
+      console.log('[FlirtEasy] Not on explore page, auto-navigating to /app/recs...');
+      const navigated = await navigateToSwipingPage();
+      if (!navigated && !window.location.pathname.includes('/app/recs')) {
+        const swipingLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Explore" i]');
+        if (swipingLink) {
+          swipingLink.click();
+          await waitRandom(2500, 3500);
+        } else if (window.location.pathname.includes('/app') && !window.location.pathname.includes('/app/login')) {
+          window.location.href = 'https://tinder.com/app/recs';
+          await waitRandom(3000, 4500);
+        } else {
+          console.warn('[FlirtEasy] Please log into Tinder first before starting AI.');
+          return { success: false, likesCompleted: 0, errors: ['Please log into Tinder to start AI swiping'] };
+        }
+      }
     }
 
     await waitRandom(2000, 3000);
@@ -1089,6 +1107,12 @@ async function autoLike(count) {
 
           closeMatchModal();
           await waitRandom(1000, 2000);
+        }
+
+        if (typeof hasLocationModal === 'function' && hasLocationModal()) {
+          console.log('[FlirtEasy] Location prompt modal detected during swiping cycle, auto-accepting...');
+          handleLocationModal();
+          await waitRandom(800, 1500);
         }
 
         if (hasSubscriptionPopup()) {
@@ -4289,6 +4313,7 @@ if (typeof isLoggedIn === 'function') {
       return false;
     };
 
+    let _tinderLoginAttempts = 0;
     const handleTinderLoginLanding = () => {
       // 1. If language select modal is open, immediately dismiss it
       const langModal = document.querySelector('.language-select-modal, [class*="language-select"]');
@@ -4305,24 +4330,51 @@ if (typeof isLoggedIn === 'function') {
       // 2. Accept cookies
       handleCookieAccept();
 
-      // 3. Check if Tinder login options or input fields are already visible
-      const isLoginOptionsVisible = Array.from(document.querySelectorAll('button, a, div[role="button"]')).some(b => {
-        const txt = (b.innerText || b.textContent || '').trim().toLowerCase();
-        return txt === 'log in with phone number' ||
-               txt === 'continue with google' ||
-               txt === 'log in with facebook' ||
-               txt === 'log in with google' ||
-               txt.includes('trouble logging in');
-      });
-
-      const isInputVisible = document.querySelector('input[type="tel"], input[type="email"], input[name="phone_number"], input[autocomplete="one-time-code"]');
-
-      if (isLoginOptionsVisible || isInputVisible) {
-        // Login options or inputs are already displayed, do not click anything
+      // 3. Check if any dialog, modal, or overlay is already open
+      const dialog = document.querySelector('[role="dialog"], [aria-modal="true"], [class*="modal"]');
+      if (dialog) {
+        if (window._tinderLoginInterval) {
+          clearInterval(window._tinderLoginInterval);
+          delete window._tinderLoginInterval;
+        }
         return;
       }
 
-      // 4. Find the real "Log in" button on the landing page header
+      const isInputVisible = document.querySelector('input[type="tel"], input[type="email"], input[name="phone_number"], input[autocomplete="one-time-code"], input[name="code"]');
+      if (isInputVisible) {
+        if (window._tinderLoginInterval) {
+          clearInterval(window._tinderLoginInterval);
+          delete window._tinderLoginInterval;
+        }
+        return;
+      }
+
+      // 4. Check if Tinder login options are already visible
+      const isLoginOptionsVisible = Array.from(document.querySelectorAll('button, a, div[role="button"]')).some(b => {
+        const txt = (b.innerText || b.textContent || '').trim().toLowerCase();
+        return txt.includes('log in with') ||
+               txt.includes('continue with') ||
+               txt.includes('trouble logging in');
+      });
+
+      if (isLoginOptionsVisible) {
+        if (window._tinderLoginInterval) {
+          clearInterval(window._tinderLoginInterval);
+          delete window._tinderLoginInterval;
+        }
+        return;
+      }
+
+      // 5. Max attempt limit (2 attempts maximum)
+      if (_tinderLoginAttempts >= 2) {
+        if (window._tinderLoginInterval) {
+          clearInterval(window._tinderLoginInterval);
+          delete window._tinderLoginInterval;
+        }
+        return;
+      }
+
+      // 6. Find the real "Log in" button on the landing page header
       const clickables = Array.from(document.querySelectorAll('a, button, [role="button"]'));
       const realLoginBtn = clickables.find(el => {
         if (!isVisible(el)) return false;
@@ -4333,7 +4385,8 @@ if (typeof isLoggedIn === 'function') {
       });
 
       if (realLoginBtn) {
-        console.log('[Tinder Login] Found real "Log in" button on landing page, clicking it to show login options!');
+        _tinderLoginAttempts++;
+        console.log(`[Tinder Login] Found real "Log in" button on landing page, clicking it (attempt ${_tinderLoginAttempts}/2)!`);
         clickElement(realLoginBtn);
       }
     };
@@ -4346,6 +4399,14 @@ if (typeof isLoggedIn === 'function') {
             fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=tinder`)
               .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
           }
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_AUTH_STEP',
+                step: 'logged_in'
+              }));
+            }
+          } catch (_) {}
           clearInterval(window._tinderLoginInterval);
           delete window._tinderLoginInterval;
           return;
@@ -4370,7 +4431,69 @@ window.addEventListener('message', (event) => {
     chrome.runtime.sendMessage({ action: 'stopAgent' }, (res) => {
       respond({ success: res?.success ?? true });
     });
+  } else if (action === 'getAuthStatus') {
+    // ← NEW: React Native app can probe current auth status at any time
+    const loggedIn = typeof isLoggedIn === 'function' ? isLoggedIn() : false;
+    respond({ success: true, isLoggedIn: loggedIn, url: window.location.href });
   } else {
     respond({ success: false, error: `Unknown action: ${action}` });
   }
 });
+
+// ── TWO-WAY LOGOUT WATCHDOG (On-Device Mode) ──
+// Continuously monitors isLoggedIn() and fires FE_AUTH_STEP:'logged_out'
+// when the user manually logs out from within the Tinder browser.
+// This enables real-time two-way sync: login AND logout events both propagate
+// to the React Native home screen via the ReactNativeWebView bridge.
+if (typeof window._feLogoutWatchdogStarted === 'undefined') {
+  window._feLogoutWatchdogStarted = true;
+  // Seed initial state — if already logged in at inject time, mark as such
+  let _wasLoggedIn = typeof isLoggedIn === 'function' ? isLoggedIn() : false;
+
+  // Send initial status immediately so app gets the true state on WebView load
+  try {
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      if (!window.__feLogoutInProgress) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'FE_PAGE_STATUS',
+          isLoggedIn: _wasLoggedIn,
+          url: window.location.href,
+        }));
+      }
+    }
+  } catch (_) {}
+
+  setInterval(() => {
+    if (window.__feLogoutInProgress) return;
+    if (typeof isLoggedIn !== 'function') return;
+    const nowLoggedIn = isLoggedIn();
+
+    if (_wasLoggedIn && !nowLoggedIn) {
+      // ── Transition: LOGGED IN → LOGGED OUT ──
+      console.log('[FlirtEasy] Logout detected! Notifying React Native app...');
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FE_AUTH_STEP',
+            step: 'logged_out',
+            url: window.location.href,
+          }));
+        }
+      } catch (_) {}
+    } else if (!_wasLoggedIn && nowLoggedIn) {
+      // ── Transition: LOGGED OUT → LOGGED IN ──
+      console.log('[FlirtEasy] Login detected by watchdog! Notifying React Native app...');
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FE_AUTH_STEP',
+            step: 'logged_in',
+            url: window.location.href,
+          }));
+        }
+      } catch (_) {}
+    }
+
+    _wasLoggedIn = nowLoggedIn;
+  }, 2000); // Poll every 2 seconds
+}

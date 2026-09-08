@@ -2,7 +2,7 @@
 'use strict';
 
 const http = require('http');
-const { handleStartSession, handleStopSession, handleLogout } = require('./session');
+const { handleStartSession, handleStopSession, handleLogout, handleAuthStatus } = require('./session');
 const { handleNavStatus, handleCheckPageState } = require('./pageState');
 const { handleTypeText, handleSubmitOtp, handleResendCode, handleSubmitPhone } = require('./routes/auth');
 const tinderAuth = require('./routes/tinder-auth');
@@ -11,7 +11,7 @@ const { handleGoBackMain, handleClick, handlePressEnter, handleGoBack2, handleCl
 const { handleLoginSuccess, handleResendCode3 } = require('./routes/misc');
 const { handleExtensionStats } = require('./routes/extension-stats');
 const { handleStartAgent, handleStopAgent, handleRunNow } = require('./routes/agent-control');
-const { handleGetSettings, handleUpdateSettings, handleSyncProfile, handlePushBio } = require('./routes/settings');
+const { handleGetSettings, handleUpdateSettings, handleSyncProfile, handlePushBio, handleGenerateBio } = require('./routes/settings');
 
 
 const server = http.createServer((req, res) => {
@@ -46,6 +46,8 @@ const server = http.createServer((req, res) => {
     handleSyncProfile(req, res);
   } else if (req.method === 'POST' && req.url === '/push-bio') {
     handlePushBio(req, res);
+  } else if (req.method === 'POST' && req.url === '/generate-bio') {
+    handleGenerateBio(req, res);
   } else if (req.method === 'POST' && req.url === '/go-back') {
     handleGoBackMain(req, res);
   } else if (req.method === 'POST' && req.url === '/type-text') {
@@ -74,6 +76,8 @@ const server = http.createServer((req, res) => {
     handleSwipe(req, res);
   } else if (req.method === 'GET' && req.url === '/nav-status') {
     handleNavStatus(req, res);
+  } else if (req.method === 'GET' && req.url === '/auth-status') {
+    handleAuthStatus(req, res);
   } else if (req.method === 'GET' && req.url === '/check-page-state') {
     handleCheckPageState(req, res);
   } else if (req.method === 'GET' && req.url === '/extension-stats') {

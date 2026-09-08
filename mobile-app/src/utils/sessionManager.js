@@ -3,6 +3,7 @@
 // Supports Hyperbeam Cloud VMs (with stateful profile persistence & auto-fallback) and Self-Hosted Neko.
 
 import SupabaseService from '../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const HYPERBEAM_KEY = 'sk_test_fsuC8naqJLF2lGcL8Vak2ogGyhYFldLzqCEbX2zQYf0';
 
@@ -182,7 +183,7 @@ export const startHyperbeamCloudSession = async ({
   apiKey = HYPERBEAM_KEY,
 } = {}) => {
   const platformKey = (platform || 'tinder').toLowerCase();
-  const startUrl = platformKey === 'bumble' ? 'https://bumble.com' : 'https://tinder.com';
+  const startUrl = 'https://tinder.com';
   const webWidth = 1280;
   const webHeight = 720;
 
@@ -291,4 +292,420 @@ export const startHyperbeamCloudSession = async ({
   });
 
   return { embedUrl, sessionId, profileId };
+};
+
+// ── Shared Tinder Auth State Cache with Persistent Storage ──
+const STORAGE_KEY_AUTH = '@linksy_tinder_auth_state';
+const authListeners = new Set();
+
+let tinderAuthState = {
+  isLoggedIn: false,
+  accountName: null,
+  accountEmail: null,
+  lastUpdated: 0,
+};
+
+const STORAGE_KEY_PENDING_PURGE = '@fe_pending_webview_purge';
+let pendingWebViewPurge = false;
+
+try {
+  AsyncStorage.getItem(STORAGE_KEY_PENDING_PURGE).then((raw) => {
+    if (raw === 'true') {
+      pendingWebViewPurge = true;
+    }
+  }).catch(() => {});
+} catch (_) {}
+
+export const getPendingWebViewPurge = () => pendingWebViewPurge;
+
+export const setPendingWebViewPurge = async (val) => {
+  pendingWebViewPurge = Boolean(val);
+  try {
+    if (pendingWebViewPurge) {
+      await AsyncStorage.setItem(STORAGE_KEY_PENDING_PURGE, 'true');
+    } else {
+      await AsyncStorage.removeItem(STORAGE_KEY_PENDING_PURGE);
+    }
+  } catch (_) {}
+};
+
+// ── Deferred storage teardown (IndexedDB / CacheStorage / service workers) ──
+// The session-critical part of logout (server-side token revoke, localStorage,
+// cookies) happens inline. This leftover teardown needs a loaded page with no
+// Tinder SPA holding the handles, which is not available when logout ends by
+// closing the browser screen. Persisting the intent means it still runs the next
+// time a WebView is mounted, instead of being silently skipped.
+const STORAGE_KEY_PENDING_TEARDOWN = '@fe_pending_storage_teardown';
+let pendingStorageTeardown = false;
+
+try {
+  AsyncStorage.getItem(STORAGE_KEY_PENDING_TEARDOWN).then((raw) => {
+    if (raw === 'true') {
+      pendingStorageTeardown = true;
+    }
+  }).catch(() => {});
+} catch (_) {}
+
+export const getPendingStorageTeardown = () => pendingStorageTeardown;
+
+export const setPendingStorageTeardown = async (val) => {
+  pendingStorageTeardown = Boolean(val);
+  try {
+    if (pendingStorageTeardown) {
+      await AsyncStorage.setItem(STORAGE_KEY_PENDING_TEARDOWN, 'true');
+    } else {
+      await AsyncStorage.removeItem(STORAGE_KEY_PENDING_TEARDOWN);
+    }
+  } catch (_) {}
+};
+
+// Eagerly restore persisted auth state on bundle load
+try {
+  AsyncStorage.getItem(STORAGE_KEY_AUTH).then((raw) => {
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.isLoggedIn === 'boolean') {
+          tinderAuthState = { ...tinderAuthState, ...parsed };
+          console.log('[SessionManager] Restored persisted Tinder auth state:', tinderAuthState);
+          authListeners.forEach((fn) => {
+            try { fn(tinderAuthState); } catch (_) {}
+          });
+        }
+      } catch (_) {}
+    }
+  }).catch(() => {});
+} catch (_) {}
+
+export const setTinderAuthState = (data) => {
+  if (data && data.isLoggedIn) {
+    pendingWebViewPurge = false;
+    AsyncStorage.removeItem(STORAGE_KEY_PENDING_PURGE).catch(() => {});
+  }
+  tinderAuthState = {
+    ...tinderAuthState,
+    ...data,
+    lastUpdated: Date.now()
+  };
+  console.log('[SessionManager] Updated Tinder auth state:', tinderAuthState);
+  try {
+    AsyncStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(tinderAuthState)).catch(() => {});
+  } catch (_) {}
+  authListeners.forEach((fn) => {
+    try { fn(tinderAuthState); } catch (_) {}
+  });
+};
+
+export const clearTinderAuthState = async () => {
+  tinderAuthState = {
+    isLoggedIn: false,
+    accountName: null,
+    accountEmail: null,
+    lastUpdated: Date.now()
+  };
+  pendingWebViewPurge = true;
+  console.log('[SessionManager] Cleared Tinder auth state, marked pendingWebViewPurge = true');
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(tinderAuthState));
+    await AsyncStorage.setItem(STORAGE_KEY_PENDING_PURGE, 'true');
+  } catch (_) {}
+  // Reset session counters so the next login starts at zero.
+  // clearOnDeviceSessionState is defined later in this file but the call
+  // happens at runtime, so the forward reference is safe in a module scope.
+  try { await clearOnDeviceSessionState(); } catch (_) {}
+  // Destroy the worker singleton so the new session starts with clean chat Maps.
+  try { destroyOnDeviceWorker(); } catch (_) {}
+  authListeners.forEach((fn) => {
+    try { fn(tinderAuthState); } catch (_) {}
+  });
+};
+
+export const subscribeTinderAuthState = (listener) => {
+  authListeners.add(listener);
+  return () => authListeners.delete(listener);
+};
+
+export const getTinderAuthState = () => {
+  return tinderAuthState;
+};
+
+// ── Shared Automation Agent State (Synced between Home Screen & BrowserScreen) ──
+let sharedAgentState = {
+  agentState: {
+    isRunning: false,
+    isPaused: true,
+    currentPhase: 'stopped',
+    stats: {
+      swipes: 0,
+      matches: 0,
+      messages: 0,
+      likesCompleted: 0,
+      matchesCreated: 0,
+      messagesSent: 0,
+    },
+  },
+  lifetimeStats: {
+    totalLikes: 0,
+    matchesCreated: 0,
+    messagesSent: 0,
+    activeConversations: 0,
+  },
+  progressFeed: [],
+  settings: null,
+};
+
+const agentListeners = new Set();
+
+export const getSharedAgentState = () => sharedAgentState;
+
+export const updateSharedAgentState = (updater) => {
+  if (typeof updater === 'function') {
+    sharedAgentState = updater(sharedAgentState);
+  } else if (updater && typeof updater === 'object') {
+    sharedAgentState = {
+      ...sharedAgentState,
+      ...updater,
+      agentState: {
+        ...sharedAgentState.agentState,
+        ...(updater.agentState || {}),
+        stats: {
+          ...sharedAgentState.agentState?.stats,
+          ...(updater.agentState?.stats || updater.stats || {}),
+        },
+      },
+      lifetimeStats: {
+        ...sharedAgentState.lifetimeStats,
+        ...(updater.lifetimeStats || {}),
+      },
+      progressFeed: updater.progressFeed || sharedAgentState.progressFeed,
+    };
+  }
+  agentListeners.forEach((fn) => {
+    try {
+      fn(sharedAgentState);
+    } catch (_) {}
+  });
+};
+
+export const subscribeSharedAgentState = (listener) => {
+  agentListeners.add(listener);
+  return () => agentListeners.delete(listener);
+};
+
+// ── Shared Extension & Plugin Settings ──
+let sharedExtensionSettings = {
+  likesPerCycle: 50,
+  messagesPerCycle: 50,
+  replyDelayMin: 5,
+  replyDelayMax: 15,
+  customPrompt: '',
+  userBio: '',
+  safetyMode: true,
+  locationLatitude: 40.7128,
+  locationLongitude: -74.0060,
+  locationCity: 'New York, NY',
+  useDeviceLocation: false,
+  userProfile: null,
+};
+
+const settingsListeners = new Set();
+
+export const getSharedExtensionSettings = () => sharedExtensionSettings;
+
+export const setSharedExtensionSettings = (newSettings) => {
+  const mergedUserProfile = newSettings?.userProfile !== undefined
+    ? (newSettings.userProfile ? { ...(sharedExtensionSettings.userProfile || {}), ...newSettings.userProfile } : newSettings.userProfile)
+    : sharedExtensionSettings.userProfile;
+
+  sharedExtensionSettings = {
+    ...sharedExtensionSettings,
+    ...newSettings,
+    userProfile: mergedUserProfile,
+  };
+  settingsListeners.forEach((fn) => {
+    try {
+      fn(sharedExtensionSettings);
+    } catch (_) {}
+  });
+};
+
+export const subscribeSharedExtensionSettings = (listener) => {
+  settingsListeners.add(listener);
+  return () => settingsListeners.delete(listener);
+};
+
+// ── Shared Selected Environment (Defaults to 'on_device') ──
+let currentEnvironment = 'on_device';
+
+export const getSelectedEnvironment = () => currentEnvironment;
+
+export const setSelectedEnvironment = (env) => {
+  if (env) currentEnvironment = env;
+};
+
+// ── App Permissions Pre-Prompt Status ──
+let hasPromptedPermissions = false;
+
+export const getHasPromptedPermissions = () => hasPromptedPermissions;
+
+export const setHasPromptedPermissions = (val) => {
+  hasPromptedPermissions = !!val;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── On-Device Session State (AsyncStorage-persisted) ──
+//
+// Survives app kill/restart so BrowserScreen can restore swipe and match counts
+// without the user ever seeing them reset to zero. Kept strictly separate from
+// sharedAgentState (which is an in-memory pub/sub bus, never persisted) so the
+// two concerns don't entangle.
+//
+// Schema: { swipes, matches, messages, isRunning, lastSavedAt }
+// ─────────────────────────────────────────────────────────────────────────────
+const STORAGE_KEY_ON_DEVICE_SESSION = '@fe_on_device_session_state';
+
+/** Defaults — what a brand-new / cleared session looks like. */
+const ON_DEVICE_SESSION_DEFAULTS = {
+  swipes: 0,
+  matches: 0,
+  messages: 0,
+  // isRunning is intentionally NOT restored to true on launch. Restarting
+  // automation automatically after a kill/restart would be surprising and
+  // could violate Tinder's rate limits without the user expecting it.
+  isRunning: false,
+  lastSavedAt: 0,
+};
+
+let onDeviceSessionState = { ...ON_DEVICE_SESSION_DEFAULTS };
+
+// Eager restore on module load — identical pattern to tinderAuthState.
+try {
+  AsyncStorage.getItem(STORAGE_KEY_ON_DEVICE_SESSION).then((raw) => {
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          onDeviceSessionState = { ...ON_DEVICE_SESSION_DEFAULTS, ...parsed };
+          console.log('[SessionManager] Restored on-device session state:', onDeviceSessionState);
+        }
+      } catch (_) {}
+    }
+  }).catch(() => {});
+} catch (_) {}
+
+export const getOnDeviceSessionState = () => ({ ...onDeviceSessionState });
+
+/**
+ * Merges a partial update into the persisted on-device session state and writes
+ * to AsyncStorage. All fields are optional — only the keys present in `patch`
+ * are updated.
+ */
+export const saveOnDeviceSessionState = async (patch) => {
+  onDeviceSessionState = {
+    ...onDeviceSessionState,
+    ...patch,
+    lastSavedAt: Date.now(),
+  };
+  try {
+    await AsyncStorage.setItem(
+      STORAGE_KEY_ON_DEVICE_SESSION,
+      JSON.stringify(onDeviceSessionState)
+    );
+  } catch (_) {}
+};
+
+/**
+ * Resets the persisted session counters back to zero and removes the stored
+ * entry. Called by clearTinderAuthState (logout) so stale numbers are never
+ * shown after signing back in.
+ */
+export const clearOnDeviceSessionState = async () => {
+  onDeviceSessionState = { ...ON_DEVICE_SESSION_DEFAULTS };
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY_ON_DEVICE_SESSION);
+  } catch (_) {}
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── OnDeviceBackgroundWorker Singleton ──
+//
+// The worker is a stateful JS class instance whose Maps (stoppedChats,
+// matchLanguage, matchData, moveOffAppStates) accumulate data across the
+// lifetime of a Tinder session. When it was re-created on every BrowserScreen
+// mount those Maps were wiped: any chat that was explicitly stopped by the user
+// (markChatStopped) became unblocked again on back-navigation.
+//
+// A module-level singleton fixes that. BrowserScreen mounts call
+// getOnDeviceWorker() to obtain the shared instance and then update its
+// callbacks to point at the new component lifecycle (so logs and state changes
+// reach the current render tree, not a stale closure from a previous mount).
+// ─────────────────────────────────────────────────────────────────────────────
+let _onDeviceWorker = null;
+
+/**
+ * Returns the singleton OnDeviceBackgroundWorker, creating it the first time.
+ *
+ * @param {object}   initialSettings  - Merged into the worker's settings on
+ *                                       first creation only. Use
+ *                                       updateOnDeviceWorkerCallbacks or
+ *                                       worker.updateSettings() for subsequent
+ *                                       setting changes.
+ * @param {function} onStateChange    - Called whenever the worker's agentState
+ *                                       changes. Replaced on every BrowserScreen
+ *                                       mount so it always points at the live
+ *                                       React setState functions.
+ * @param {function} onLog            - Called for each worker log line.
+ *                                       Same replacement semantics.
+ */
+export const getOnDeviceWorker = (initialSettings = {}, onStateChange = null, onLog = null) => {
+  // Lazy import avoids a circular-dependency risk: onDeviceBackgroundWorker
+  // does not import sessionManager, so the load order is safe.
+  if (!_onDeviceWorker) {
+    const { OnDeviceBackgroundWorker } = require('./onDeviceBackgroundWorker');
+    _onDeviceWorker = new OnDeviceBackgroundWorker(initialSettings, onStateChange, onLog);
+    console.log('[SessionManager] OnDeviceBackgroundWorker singleton created.');
+  } else {
+    // Update the callbacks so the new BrowserScreen mount receives state
+    // changes and logs, while the accumulated chat/match Maps are preserved.
+    if (onStateChange !== null && onStateChange !== undefined) {
+      _onDeviceWorker.onStateChange = onStateChange;
+    }
+    if (onLog !== null && onLog !== undefined) {
+      _onDeviceWorker.onLog = onLog;
+    }
+    // Merge any settings that may have changed while the screen was off-stack.
+    if (initialSettings && Object.keys(initialSettings).length > 0) {
+      _onDeviceWorker.settings = { ..._onDeviceWorker.settings, ...initialSettings };
+    }
+  }
+  return _onDeviceWorker;
+};
+
+/**
+ * Replaces the worker's callbacks without touching its state. Called at the
+ * top of each BrowserScreen render so logs and agent-state updates always
+ * reach the live component tree.
+ */
+export const updateOnDeviceWorkerCallbacks = (onStateChange, onLog) => {
+  if (!_onDeviceWorker) return;
+  _onDeviceWorker.onStateChange = onStateChange;
+  _onDeviceWorker.onLog = onLog;
+};
+
+/**
+ * Destroys the singleton. Only needed when the user logs out — a new session
+ * should start with a completely fresh worker so chat Maps from the previous
+ * account are not carried over.
+ */
+export const destroyOnDeviceWorker = () => {
+  if (!_onDeviceWorker) return;
+  // Best-effort stop: prevents the worker from processing messages after the
+  // session ends.
+  try {
+    _onDeviceWorker.handleMessage({ action: 'stopAgent' });
+  } catch (_) {}
+  _onDeviceWorker.onStateChange = null;
+  _onDeviceWorker.onLog = null;
+  _onDeviceWorker = null;
+  console.log('[SessionManager] OnDeviceBackgroundWorker singleton destroyed.');
 };
