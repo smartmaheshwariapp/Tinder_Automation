@@ -90,10 +90,11 @@ export class OnDeviceBackgroundWorker {
 
     // In-memory state (mirrors extension background state)
     const session = typeof getOnDeviceSessionState === 'function' ? getOnDeviceSessionState() : {};
+    const initialRunning = Boolean(session?.isRunning || initialSettings?.autoStart);
     this.agentState = {
-      isRunning: false,
-      isPaused: false,
-      currentPhase: 'idle', // 'swiping' | 'messaging' | 'idle' | 'waiting'
+      isRunning: initialRunning,
+      isPaused: !initialRunning,
+      currentPhase: initialRunning ? 'swiping' : 'idle', // 'swiping' | 'messaging' | 'idle' | 'waiting'
       stats: {
         swipes: session?.swipes || 0,
         matches: session?.matches || 0,
@@ -158,10 +159,11 @@ export class OnDeviceBackgroundWorker {
 
       case 'getAgentState':
         return {
-          isRunning: this.agentState.isRunning,
-          isPaused: this.agentState.isPaused,
-          currentPhase: this.agentState.currentPhase,
-          stats: this.agentState.stats,
+          isRunning: Boolean(this.agentState.isRunning),
+          isPaused: Boolean(this.agentState.isPaused),
+          currentPhase: this.agentState.currentPhase || (this.agentState.isRunning ? 'swiping' : 'idle'),
+          stats: this.agentState.stats || { swipes: 0, matches: 0, messages: 0 },
+          currentCycle: this.agentState.currentCycle || { likesCompleted: 0, messagesProcessed: 0 },
           success: true
         };
 
@@ -430,14 +432,6 @@ export class OnDeviceBackgroundWorker {
       }
 
       // ── Agent Run Controls & State Query ──
-      case 'getAgentState':
-        return {
-          isRunning: Boolean(this.agentState.isRunning),
-          isPaused: Boolean(this.agentState.isPaused),
-          currentPhase: this.agentState.currentPhase || 'idle',
-          stats: this.agentState.stats || { swipes: 0, matches: 0, messages: 0 },
-          currentCycle: this.agentState.currentCycle || { likesCompleted: 0, messagesProcessed: 0 },
-        };
 
       case 'startAgent':
         this.agentState.isRunning = true;

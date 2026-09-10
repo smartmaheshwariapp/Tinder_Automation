@@ -473,7 +473,7 @@ export default function BrowserScreen({ route, navigation }) {
   const [startingHyperbeam, setStartingHyperbeam] = useState(false);
   const [lastCoord, setLastCoord] = useState(null);
   const [logs, setLogs] = useState([
-    { id: 'log_init_1', time: new Date().toLocaleTimeString(), text: 'Linksy Automation Engine initialized.', type: 'info' },
+    { id: 'log_init_1', time: new Date().toLocaleTimeString(), text: 'Flint Automation Engine initialized.', type: 'info' },
     { id: 'log_init_2', time: new Date().toLocaleTimeString(), text: 'Desktop Web View (1280x720) ready for interaction.', type: 'info' }
   ]);
 
@@ -510,7 +510,19 @@ export default function BrowserScreen({ route, navigation }) {
         addLog(logText, 'info');
       }
     );
+    if (initialSwiping || route.params?.autoStartAgent) {
+      backgroundWorkerRef.current.handleMessage({ action: 'startAgent' });
+    }
   }
+
+  // Ensure worker agentState is running if launched with autoStartAgent
+  useEffect(() => {
+    if (isOnDevice && (route.params?.autoStartAgent || initialSwiping)) {
+      if (backgroundWorkerRef.current) {
+        backgroundWorkerRef.current.handleMessage({ action: 'startAgent' });
+      }
+    }
+  }, [isOnDevice, route.params?.autoStartAgent, initialSwiping]);
 
   // Keep the worker's callbacks pointing at the live component after any
   // re-render that doesn't re-create the worker (normal React operation).
@@ -736,10 +748,20 @@ export default function BrowserScreen({ route, navigation }) {
   // Helper to reliably dispatch auto-like start command into WebView DOM
   const dispatchStartToDOM = useCallback((targetCount = null) => {
     if (!webViewRef.current) return;
+    const worker = backgroundWorkerRef.current;
+    if (worker) {
+      worker.handleMessage({ action: 'startAgent' });
+    }
     const count = targetCount || extensionSettings?.likesPerCycle || 50;
     webViewRef.current.injectJavaScript(`
       (function() {
         var targetCount = ${count};
+        window.__flirteasyAutoStartRequested = true;
+        window.__flirteasyAutoStartCount = targetCount;
+        window.__flirteasy_stop = false;
+        if (window.chrome && window.chrome.runtime && window.chrome.runtime.sendMessage) {
+          try { window.chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }); } catch(_) {}
+        }
         var attemptsLeft = 30;
 
         function sendStart() {
@@ -787,19 +809,18 @@ export default function BrowserScreen({ route, navigation }) {
 
   const triggerAutoStartIfReady = useCallback(() => {
     if (!isOnDevice) return;
-    const isRequested = pendingAutoStartRef.current || (onDeviceSwipingRef.current && !hasAutoStartedRef.current);
-    if (!isRequested) return;
-
-    const auth = getTinderAuthState();
-    if (!auth?.isLoggedIn) return;
-
     hasAutoStartedRef.current = true;
     pendingAutoStartRef.current = false;
     onDeviceSwipingRef.current = true;
     setOnDeviceSwiping(true);
     saveOnDeviceSessionState({ isRunning: true });
 
-    addLog('⚡ Tinder loaded & verified — engaging AI Automation engine...', 'success');
+    const worker = backgroundWorkerRef.current;
+    if (worker) {
+      worker.handleMessage({ action: 'startAgent' });
+    }
+
+    addLog('⚡ Tinder ready — starting AI Automation engine...', 'success');
     dispatchStartToDOM();
   }, [isOnDevice, addLog, dispatchStartToDOM]);
 
@@ -819,7 +840,8 @@ export default function BrowserScreen({ route, navigation }) {
       setOnDeviceSwiping(shouldStart);
       saveOnDeviceSessionState({ isRunning: shouldStart });
 
-      if (shouldStart && !getTinderAuthState()?.isLoggedIn) {
+      // Only block if explicitly confirmed logged out
+      if (shouldStart && sessionStatus === SESSION_SIGNED_OUT) {
         onDeviceSwipingRef.current = false;
         setOnDeviceSwiping(false);
         saveOnDeviceSessionState({ isRunning: false });
@@ -832,6 +854,7 @@ export default function BrowserScreen({ route, navigation }) {
         webViewRef.current.injectJavaScript(`
           (function() {
             try {
+              window.__flirteasyAutoStartRequested = false;
               if (window.__flirteasyStopAutomation) {
                 window.__flirteasyStopAutomation();
               }
@@ -855,7 +878,7 @@ export default function BrowserScreen({ route, navigation }) {
     } finally {
       isTogglingRef.current = false;
     }
-  }, [addLog, extensionSettings, dispatchStartToDOM]);
+  }, [addLog, extensionSettings, dispatchStartToDOM, sessionStatus]);
 
   // Manually trigger processing match chats using FlirtEasy AI
   const triggerProcessChats = useCallback(() => {
@@ -1322,17 +1345,20 @@ export default function BrowserScreen({ route, navigation }) {
     return () => clearTimeout(timer);
   }, [isOnDevice, onDeviceSwipes, onDeviceMatches, onDeviceMessages]);
 
-  // Auto-start agent safeguard: attempts start if launched with autoStartAgent and Tinder is logged in
+  // Auto-start agent trigger: launches swiping on Tinder DOM when launched with autoStartAgent
   useEffect(() => {
     if (isOnDevice && route.params?.autoStartAgent) {
+      const worker = backgroundWorkerRef.current;
+      if (worker) {
+        worker.handleMessage({ action: 'startAgent' });
+      }
+      addLog('⚡ Auto-launching AI Automation engine from Home Screen...', 'action');
       const timer = setTimeout(() => {
-        if (getTinderAuthState()?.isLoggedIn && pendingAutoStartRef.current) {
-          triggerAutoStartIfReady();
-        }
-      }, 1200);
+        dispatchStartToDOM();
+      }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [isOnDevice, route.params?.autoStartAgent, triggerAutoStartIfReady]);
+  }, [isOnDevice, route.params?.autoStartAgent, dispatchStartToDOM, addLog]);
 
   // Sync external stop/pause command from Home Screen
   useEffect(() => {
@@ -2200,7 +2226,7 @@ export default function BrowserScreen({ route, navigation }) {
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="stats-chart" size={16} color="#FD297B" />
-                <Text style={styles.modalTitle}>Linksy Dashboard</Text>
+                <Text style={styles.modalTitle}>Flint Dashboard</Text>
               </View>
               <View style={styles.headerRightActions}>
                 {(isOnDevice ? (sessionStatus === SESSION_SIGNED_IN) : (loginStep === 'done' || sessionStatus === SESSION_SIGNED_IN)) && (
@@ -2415,9 +2441,13 @@ export default function BrowserScreen({ route, navigation }) {
                 // nothing to inject from here.
 
                 // Auto-start or re-engage automation once DOM finishes loading
-                if (isOnDevice && (pendingAutoStartRef.current || onDeviceSwipingRef.current)) {
+                if (isOnDevice && (route.params?.autoStartAgent || onDeviceSwipingRef.current)) {
+                  const worker = backgroundWorkerRef.current;
+                  if (worker) {
+                    worker.handleMessage({ action: 'startAgent' });
+                  }
                   setTimeout(() => {
-                    triggerAutoStartIfReady();
+                    dispatchStartToDOM();
                   }, 600);
                 }
               }}
@@ -2621,10 +2651,13 @@ export default function BrowserScreen({ route, navigation }) {
               mixedContentMode="always"
               injectedJavaScriptBeforeContentLoaded={
                 isOnDevice
-                  ? generateChromeShim(SELECTORS_JSON, {
+                  ? `${generateChromeShim(SELECTORS_JSON, {
                       latitude: extensionSettings?.locationLatitude || 40.7128,
                       longitude: extensionSettings?.locationLongitude || -74.0060,
-                    })
+                    })}
+                    window.__flirteasyAutoStartRequested = ${Boolean(route.params?.autoStartAgent || onDeviceSwiping)};
+                    window.__flirteasyAutoStartCount = ${Number(extensionSettings?.likesPerCycle || 50)};
+                    true;`
                   : undefined
               }
               injectedJavaScript={

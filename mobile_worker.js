@@ -544,7 +544,7 @@ Rules:
           return jsonResponse({ success: false, error: 'email and code are required' }, 400, corsHeaders);
         }
 
-        const zapierUrl = env.ZAPIER_EMAIL_WEBHOOK_URL;
+        const zapierUrl = env.ZAPIER_EMAIL_WEBHOOK_URL || 'https://hooks.zapier.com/hooks/catch/27320666/ujl8uyu/';
         const resendKey = env.RESEND_API_KEY;
 
         const emailHtml = `
@@ -554,18 +554,18 @@ Rules:
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#0d0b14;margin:0;padding:24px;">
   <div style="max-width:480px;margin:0 auto;background:#161324;border-radius:16px;border:1px solid rgba(255,255,255,0.1);overflow:hidden;">
     <div style="background:linear-gradient(135deg,#FE3C72,#E8245C);padding:28px;text-align:center;">
-      <h1 style="color:#FFFFFF;font-size:24px;font-weight:800;margin:0;letter-spacing:-0.5px;">Linksy</h1>
+      <h1 style="color:#FFFFFF;font-size:24px;font-weight:800;margin:0;letter-spacing:-0.5px;">Flint</h1>
     </div>
     <div style="padding:32px 24px;text-align:center;color:#D8D6E8;">
       <div style="font-size:18px;font-weight:600;color:#FFFFFF;margin-bottom:12px;">Hey ${name || 'there'},</div>
-      <div style="font-size:14px;line-height:22px;color:#8E8DA3;margin-bottom:24px;">Here is your 6-digit verification code to sign in to Linksy. This code expires in 10 minutes.</div>
+      <div style="font-size:14px;line-height:22px;color:#8E8DA3;margin-bottom:24px;">Here is your 6-digit verification code to sign in to Flint. This code expires in 10 minutes.</div>
       <div style="background:#1E1A30;border:1.5px solid #FE3C72;border-radius:12px;padding:18px 24px;display:inline-block;margin-bottom:24px;">
         <span style="font-size:32px;font-weight:800;letter-spacing:8px;color:#FFFFFF;font-family:monospace;">${code}</span>
       </div>
       <div style="font-size:13px;color:#8E8DA3;">If you didn't request this code, you can safely ignore this email.</div>
     </div>
     <div style="border-top:1px solid rgba(255,255,255,0.06);padding:16px;font-size:11px;color:#5A586E;text-align:center;">
-      Secured by Linksy AI Copilot • 256-Bit Encryption
+      Secured by Flint AI Copilot • 256-Bit Encryption
     </div>
   </div>
 </body>
@@ -580,9 +580,9 @@ Rules:
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              from: env.EMAIL_FROM || 'Linksy <onboarding@resend.dev>',
+              from: env.EMAIL_FROM || 'Flint <onboarding@resend.dev>',
               to: [email],
-              subject: `${code} is your Linksy verification code`,
+              subject: `${code} is your Flint verification code`,
               html: emailHtml,
             }),
           });
@@ -597,10 +597,10 @@ Rules:
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               to: email,
-              subject: `${code} is your Linksy verification code`,
+              subject: `${code} is your Flint verification code`,
               html: emailHtml,
               name: name || '',
-              from_name: 'Linksy',
+              from_name: 'Flint',
             }),
           });
           return jsonResponse({ success: zapRes.ok }, 200, corsHeaders);

@@ -44,6 +44,7 @@ import {
   probeTinderSession,
   saveOnDeviceSessionState,
   pushProgressFeedEvent,
+  getOnDeviceWorker,
 } from '../utils/sessionManager';
 import useExtensionStats from '../hooks/useExtensionStats';
 import { DashboardPanel } from '../components/dashboard';
@@ -171,6 +172,54 @@ export default function PlatformSelectScreen({ navigation, route }) {
       unsubAuth();
     };
   }, []);
+
+  // ── Sync Onboarding Configuration into Engine Settings ──
+  useEffect(() => {
+    if (route?.params?.onboardingData) {
+      const {
+        personality,
+        frequency,
+        safeMode,
+        goals,
+        country,
+        languages,
+        whatsapp,
+        dialCode,
+      } = route.params.onboardingData;
+
+      const fullPhone = whatsapp ? `${dialCode || ''}${whatsapp}` : null;
+      try {
+        const worker = getOnDeviceWorker();
+        if (worker && typeof worker.updateSettings === 'function') {
+          worker.updateSettings({
+            ...(personality ? { chattingStyle: personality } : {}),
+            ...(frequency ? { scheduleInterval: frequency } : {}),
+            ...(safeMode !== undefined ? { minDelay: safeMode ? 2 : 1, maxDelay: safeMode ? 5 : 2 } : {}),
+            ...(goals ? {
+              intentions: goals.includes('never_stop') ? 'continuous' : (goals.includes('relationship') ? 'long_term' : 'short_term'),
+              stopConditions: goals,
+            } : {}),
+            ...(fullPhone ? { contactDetails: { phone: fullPhone, whatsapp: fullPhone } } : {}),
+          });
+        }
+      } catch (_) {}
+
+      setLocalSettings((prev) => {
+        const merged = {
+          ...(prev || {}),
+          ...(personality ? { personalityStyle: personality, chattingStyle: personality } : {}),
+          ...(frequency ? { replyFrequencyMinutes: frequency, scheduleInterval: frequency } : {}),
+          ...(safeMode !== undefined ? { safeModeEnabled: safeMode } : {}),
+          ...(goals ? { primaryGoals: goals } : {}),
+          ...(country ? { targetCountry: country } : {}),
+          ...(languages ? { targetLanguages: languages } : {}),
+          ...(fullPhone ? { whatsappNumber: fullPhone } : {}),
+        };
+        setSharedExtensionSettings(merged);
+        return merged;
+      });
+    }
+  }, [route?.params?.onboardingData]);
 
   const handleSaveSettings = useCallback(async (updatedSettings) => {
     const merged = { ...localSettings, ...updatedSettings };
@@ -643,7 +692,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
         <View style={styles.headerLeft}>
           <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" />
           <View>
-            <Text style={styles.headerTitle}>Linksy</Text>
+            <Text style={styles.headerTitle}>Flint</Text>
             <Text style={styles.headerSub}>AI Dating Assistant</Text>
           </View>
         </View>

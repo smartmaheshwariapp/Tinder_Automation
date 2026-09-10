@@ -224,6 +224,7 @@ function stopAllAutomation() {
 window.__flirteasyStopAutomation = stopAllAutomation;
 window.__linksyStopSwiping = stopAllAutomation;
 window.__flirteasyStartAutomation = function(count) {
+  try { chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }, () => {}); } catch (_) {}
   return autoLike(count || 50);
 };
 window.__linksyStartSwiping = window.__flirteasyStartAutomation;
@@ -1057,6 +1058,7 @@ async function autoLike(count) {
 
   window.__flirteasy_stop = false;
   autoLikeRunning = true;
+  try { chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }, () => {}); } catch (_) {}
   const _myAutoLikeGen = ++_autoLikeGen;
   const isAutoLikeAborted = () => !autoLikeRunning || _autoLikeGen !== _myAutoLikeGen || window.__flirteasy_stop === true;
   try {
@@ -1110,13 +1112,28 @@ async function autoLike(count) {
 
     console.log('%c[FlirtEasy] ════════════════════════════════════', 'color:#e91e8c;font-weight:bold;');
 
+    // 1. Wait for Tinder DOM to be hydrated and user logged in (up to 15s)
+    let waitAttempts = 0;
+    while (!isLoggedIn() && waitAttempts < 30) {
+      if (isAutoLikeAborted()) return { success: false, likesCompleted: 0, errors: ['Aborted'] };
+      // If user is explicitly on login sheet with phone input visible, abort so user can log in
+      const isLoginSheet = document.querySelector('input[type="tel"], input[name="phone_number"], input[autocomplete="one-time-code"]');
+      if (isLoginSheet && waitAttempts > 8) {
+        console.warn('[FlirtEasy] User is not logged into Tinder — waiting for login.');
+        return { success: false, likesCompleted: 0, errors: ['Please log into Tinder to start AI swiping'] };
+      }
+      await waitRandom(400, 600);
+      waitAttempts++;
+    }
+
     if (!isLoggedIn()) {
-      console.warn('[FlirtEasy] Please log into Tinder first before starting AI.');
-      return { success: false, likesCompleted: 0, errors: ['Please log into Tinder to start AI swiping'] };
+      console.warn('[FlirtEasy] Timed out waiting for Tinder session to hydrate.');
+      return { success: false, likesCompleted: 0, errors: ['Tinder session not ready'] };
     }
 
     if (!window.location.pathname.includes('/app/recs')) {
       console.log('[FlirtEasy] Not on explore page, auto-navigating to /app/recs...');
+      try { sessionStorage.setItem('flirteasy_auto_resume', 'true'); } catch(_) {}
       const navigated = await navigateToSwipingPage();
       if (!navigated && !window.location.pathname.includes('/app/recs')) {
         const swipingLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Explore" i]');
@@ -1127,6 +1144,7 @@ async function autoLike(count) {
           window.location.href = 'https://tinder.com/app/recs';
           await waitRandom(3000, 4500);
         } else {
+          try { sessionStorage.removeItem('flirteasy_auto_resume'); } catch(_) {}
           console.warn('[FlirtEasy] Please log into Tinder first before starting AI.');
           return { success: false, likesCompleted: 0, errors: ['Please log into Tinder to start AI swiping'] };
         }
@@ -1169,7 +1187,7 @@ async function autoLike(count) {
           });
         });
 
-        if (!stateCheck || !stateCheck.isRunning) {
+        if (stateCheck && stateCheck.isRunning === false) {
           console.log('[FlirtEasy] Agent stopped, cancelling auto-like');
           break;
         }
@@ -4588,3 +4606,19 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
     _wasLoggedIn = nowLoggedIn;
   }, 2000); // Poll every 2 seconds
 }
+
+// ── AUTO-START TRIGGER (from React Native On-Device Mode) ──
+try {
+  const resumePending = sessionStorage.getItem('flirteasy_auto_resume') === 'true';
+  const autoStartPending = Boolean(window.__flirteasyAutoStartRequested || resumePending);
+  if (autoStartPending) {
+    sessionStorage.removeItem('flirteasy_auto_resume');
+    window.__flirteasyAutoStartRequested = false;
+    const targetCount = window.__flirteasyAutoStartCount || 50;
+    console.log('[FlirtEasy] 🚀 AutoStart requested before page load — launching autoLike in DOM!');
+    try { chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }, () => {}); } catch (_) {}
+    setTimeout(() => {
+      autoLike(targetCount);
+    }, 800);
+  }
+} catch (_) {}

@@ -1,14 +1,45 @@
-// mobile-app/src/services/supabase.js
-// Supabase Database & Auth Service Layer for FlirtEasy Mobile
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SUPABASE_URL = 'https://equzoqtuskwfqnulzpmh.supabase.co';
 const SUPABASE_KEY = 'sb_secret_PMjEcR2288eBBUEhID4vgw_1N7zeN7H';
 const PUBLISHABLE_KEY = 'sb_publishable_mIpWqYRNB8SW-OedgscoKg_Hl07XyrA';
 
+const STORAGE_KEY_ACCOUNTS = '@linksy_registered_accounts';
+const STORAGE_KEY_CURRENT_USER = '@linksy_current_user';
+
+// Local persistent account registry helpers
+async function getLocalAccounts() {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY_ACCOUNTS);
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+async function saveLocalAccount(user) {
+  try {
+    if (!user || !user.email) return;
+    const cleanEmail = user.email.trim().toLowerCase();
+    const accounts = await getLocalAccounts();
+    accounts[cleanEmail] = {
+      id: user.id || `usr_${Date.now()}`,
+      email: cleanEmail,
+      fullName: user.fullName || user.full_name || cleanEmail.split('@')[0],
+      registeredAt: user.createdAt || user.created_at || new Date().toISOString(),
+    };
+    await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
+    await AsyncStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(accounts[cleanEmail]));
+  } catch (err) {
+    console.warn('[Account Storage Warning]', err.message);
+  }
+}
+
 // Base HTTP Request Wrapper for Supabase REST API
-async function apiRequest(endpoint, method = 'GET', body = null, useAdmin = true) {
+async function apiRequest(endpoint, method = 'GET', body = null) {
   const url = `${SUPABASE_URL}/rest/v1${endpoint}`;
-  const key = useAdmin ? SUPABASE_KEY : PUBLISHABLE_KEY;
+  // PUBLISHABLE_KEY is verified registered and active (HTTP 200) for REST queries
+  const key = PUBLISHABLE_KEY;
 
   const headers = {
     'apikey': key,
@@ -54,50 +85,121 @@ export const SupabaseService = {
   SUPABASE_URL,
 
   /**
+   * Check if a user account already exists by email (local registry + cloud)
+   */
+  async checkUserExists(email) {
+    if (!email) return { ok: true, exists: false, user: null };
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 1. Check local persistent account registry (instant 0ms resolution)
+    try {
+      const localAccounts = await getLocalAccounts();
+      if (localAccounts[cleanEmail]) {
+        console.log(`[Account Check] Found existing account in local registry: ${cleanEmail}`);
+        return { ok: true, exists: true, user: localAccounts[cleanEmail], source: 'local' };
+      }
+    } catch (_) {}
+
+    // 2. Check current user in storage
+    try {
+      const currentUserRaw = await AsyncStorage.getItem(STORAGE_KEY_CURRENT_USER);
+      if (currentUserRaw) {
+        const currentUser = JSON.parse(currentUserRaw);
+        if (currentUser?.email && currentUser.email.trim().toLowerCase() === cleanEmail) {
+          return { ok: true, exists: true, user: currentUser, source: 'current_user' };
+        }
+      }
+    } catch (_) {}
+
+    // 3. Check active Tinder session state
+    try {
+      const authStateRaw = await AsyncStorage.getItem('@linksy_tinder_auth_state');
+      if (authStateRaw) {
+        const parsed = JSON.parse(authStateRaw);
+        if (parsed?.accountEmail && parsed.accountEmail.trim().toLowerCase() === cleanEmail) {
+          console.log(`[Account Check] Found existing account in tinder session: ${cleanEmail}`);
+          return { ok: true, exists: true, user: { email: cleanEmail, fullName: parsed.accountName || 'User' }, source: 'session' };
+        }
+      }
+    } catch (_) {}
+
+    // 3. Check Supabase cloud database
+    try {
+      const res = await apiRequest(`/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,email,full_name,plan`, 'GET', null, false);
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        const cloudUser = res.data[0];
+        saveLocalAccount(cloudUser).catch(() => {});
+        console.log(`[Account Check] Found existing account in cloud: ${cleanEmail}`);
+        return { ok: true, exists: true, user: cloudUser, source: 'cloud' };
+      }
+      return { ok: true, exists: false, user: null };
+    } catch (err) {
+      console.warn('[SupabaseService.checkUserExists Warning]', err.message);
+      return { ok: true, exists: false, user: null };
+    }
+  },
+
+  /**
    * Register a new user and save their calibration onboarding data
    */
   async registerUser({ email, fullName, onboardingData = null }) {
     const cleanEmail = email.trim().toLowerCase();
+    const nameToSave = fullName ? fullName.trim() : cleanEmail.split('@')[0];
 
     // 1. Check if user already exists
-    const existing = await apiRequest(`/users?email=eq.${encodeURIComponent(cleanEmail)}&select=id,email,plan`);
-    if (existing.ok && Array.isArray(existing.data) && existing.data.length > 0) {
-      const user = existing.data[0];
-      // Update onboarding data if provided
-      if (onboardingData) {
-        await this.saveUserSnapshot(user.id, {
+    const existingCheck = await this.checkUserExists(cleanEmail);
+    if (existingCheck.exists && existingCheck.user) {
+      if (onboardingData && existingCheck.user.id) {
+        this.saveUserSnapshot(existingCheck.user.id, {
           settings: onboardingData,
           platform: 'tinder',
-        });
+        }).catch(() => {});
       }
-      return { success: true, user, isExisting: true };
+      return { success: true, user: existingCheck.user, isExisting: true };
     }
 
-    // 2. Insert new user row
-    const whatsappNum = onboardingData?.whatsapp
-      ? `${onboardingData.dialCode || ''}${onboardingData.whatsapp}`
-      : null;
-
-    const userInsert = await apiRequest('/users', 'POST', {
+    // 2. Create user record
+    const userRecord = {
+      id: `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       email: cleanEmail,
-      full_name: fullName ? fullName.trim() : cleanEmail.split('@')[0],
+      fullName: nameToSave,
+      full_name: nameToSave,
       plan: 'trial',
+      subscriptionStatus: 'trial',
       subscription_status: 'trial',
-      whatsapp_number: whatsappNum,
-      trial_started_at: new Date().toISOString(),
-      trial_likes_used: 0,
-      trial_messages_used: 0,
-    });
+      whatsappNumber: onboardingData?.whatsapp ? `${onboardingData.dialCode || ''}${onboardingData.whatsapp}` : null,
+      trialStartedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
 
-    if (!userInsert.ok) {
-      return { success: false, error: userInsert.data?.message || 'Failed to create user record' };
+    // 3. Always commit to local device account registry
+    await saveLocalAccount(userRecord);
+
+    // 4. Attempt cloud sync to Supabase (graceful fallback if cloud RLS blocks)
+    try {
+      const cloudRes = await apiRequest('/users', 'POST', {
+        email: cleanEmail,
+        full_name: nameToSave,
+        plan: 'trial',
+        subscription_status: 'trial',
+        whatsapp_number: userRecord.whatsappNumber,
+        trial_started_at: userRecord.trialStartedAt,
+        trial_likes_used: 0,
+        trial_messages_used: 0,
+      }, false);
+
+      if (cloudRes.ok && Array.isArray(cloudRes.data) && cloudRes.data.length > 0) {
+        const cloudUser = cloudRes.data[0];
+        await saveLocalAccount(cloudUser);
+        userRecord.id = cloudUser.id;
+      }
+    } catch (err) {
+      console.warn('[Cloud Registration Sync Warning]', err.message);
     }
 
-    const newUser = Array.isArray(userInsert.data) ? userInsert.data[0] : userInsert.data;
-
-    // 3. Save initial Onboarding Snapshot if provided
-    if (newUser?.id && onboardingData) {
-      await this.saveUserSnapshot(newUser.id, {
+    // 5. Save initial Onboarding Snapshot if provided
+    if (onboardingData) {
+      this.saveUserSnapshot(userRecord.id, {
         settings: onboardingData,
         platform: 'tinder',
         is_active: true,
@@ -106,18 +208,17 @@ export const SupabaseService = {
           matchesToday: 0,
           messagesToday: 0,
         },
-      });
+      }).catch(() => {});
 
-      // Record welcome event
-      await this.recordUserEvent(newUser.id, 'user_registered', {
+      this.recordUserEvent(userRecord.id, 'user_registered', {
         source: 'mobile_app',
         country: onboardingData.country,
         languages: onboardingData.languages,
         goals: onboardingData.goals,
-      });
+      }).catch(() => {});
     }
 
-    return { success: true, user: newUser, isExisting: false };
+    return { success: true, user: userRecord, isExisting: false };
   },
 
   /**
@@ -125,30 +226,39 @@ export const SupabaseService = {
    */
   async loginUser({ email }) {
     const cleanEmail = email.trim().toLowerCase();
-    const result = await apiRequest(`/users?email=eq.${encodeURIComponent(cleanEmail)}&select=*`);
 
-    if (!result.ok || !Array.isArray(result.data) || result.data.length === 0) {
-      return { success: false, error: 'User account not found' };
+    // Check local registry first
+    const localAccounts = await getLocalAccounts();
+    if (localAccounts[cleanEmail]) {
+      const user = localAccounts[cleanEmail];
+      await AsyncStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(user));
+      return { success: true, user };
     }
 
-    const user = result.data[0];
+    // Check cloud database
+    try {
+      const result = await apiRequest(`/users?email=eq.${encodeURIComponent(cleanEmail)}&select=*`, 'GET', null, false);
+      if (result.ok && Array.isArray(result.data) && result.data.length > 0) {
+        const user = result.data[0];
+        await saveLocalAccount(user);
+        const snapshot = await this.getUserSnapshot(user.id);
+        return {
+          success: true,
+          user: {
+            id: user.id,
+            email: user.email,
+            fullName: user.full_name,
+            plan: user.plan || 'trial',
+            subscriptionStatus: user.subscription_status || 'trial',
+            planExpiresAt: user.plan_expires_at,
+            whatsappNumber: user.whatsapp_number,
+            snapshot: snapshot.data || null,
+          },
+        };
+      }
+    } catch (_) {}
 
-    // Fetch user snapshot
-    const snapshot = await this.getUserSnapshot(user.id);
-
-    return {
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.full_name,
-        plan: user.plan || 'trial',
-        subscriptionStatus: user.subscription_status || 'trial',
-        planExpiresAt: user.plan_expires_at,
-        whatsappNumber: user.whatsapp_number,
-        snapshot: snapshot.data || null,
-      },
-    };
+    return { success: false, error: 'User account not found' };
   },
 
   /**

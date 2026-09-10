@@ -905,6 +905,15 @@ export const saveOnDeviceSessionState = async (patch) => {
     lastSavedAt: Date.now(),
   };
   syncOnDeviceSessionToShared();
+  if (_onDeviceWorker && patch.isRunning !== undefined) {
+    _onDeviceWorker.agentState.isRunning = Boolean(patch.isRunning);
+    _onDeviceWorker.agentState.isPaused = !patch.isRunning;
+    if (patch.isRunning) {
+      _onDeviceWorker.agentState.currentPhase = 'swiping';
+    } else if (_onDeviceWorker.agentState.currentPhase === 'swiping') {
+      _onDeviceWorker.agentState.currentPhase = 'idle';
+    }
+  }
   try {
     await AsyncStorage.setItem(
       STORAGE_KEY_ON_DEVICE_SESSION,
@@ -977,6 +986,11 @@ export const getOnDeviceWorker = (initialSettings = {}, onStateChange = null, on
     if (initialSettings && Object.keys(initialSettings).length > 0) {
       _onDeviceWorker.settings = { ..._onDeviceWorker.settings, ...initialSettings };
     }
+  }
+  if (onDeviceSessionState && onDeviceSessionState.isRunning) {
+    _onDeviceWorker.agentState.isRunning = true;
+    _onDeviceWorker.agentState.isPaused = false;
+    _onDeviceWorker.agentState.currentPhase = 'swiping';
   }
   return _onDeviceWorker;
 };

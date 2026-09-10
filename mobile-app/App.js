@@ -80,9 +80,9 @@ export default function App() {
   if (!isReady) {
     return (
       <View style={styles.splashContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#0F0F13" />
-        <SafeActivityIndicator size="large" color="#FE3C72" />
-        <Text style={styles.splashTitle}>Linksy</Text>
+        <StatusBar barStyle="light-content" backgroundColor="#18101d" />
+        <SafeActivityIndicator size="large" color="#ff4f73" />
+        <Text style={styles.splashTitle}>Flint</Text>
         <Text style={styles.splashStatus}>{updateStatus}</Text>
       </View>
     );
@@ -115,7 +115,7 @@ export default function App() {
 const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
-    backgroundColor: '#0F0F13',
+    backgroundColor: '#18101d',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -123,13 +123,13 @@ const styles = StyleSheet.create({
   splashTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: '#edddf1',
     marginTop: 16,
     letterSpacing: 0.5,
   },
   splashStatus: {
     fontSize: 14,
-    color: '#8E8E9F',
+    color: '#ac888b',
     marginTop: 8,
     textAlign: 'center',
   },

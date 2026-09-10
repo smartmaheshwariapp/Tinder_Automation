@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Linksy",
-    "slug": "linksy",
+    "name": "Flint",
+    "slug": "flint",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,8 +10,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.flirteasy.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Linksy uses your location to discover local dating matches and automatically synchronize your recommendation deck.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Linksy uses your location to optimize your dating matches.",
+        "NSLocationWhenInUseUsageDescription": "Flint uses your location to discover local dating matches and automatically synchronize your recommendation deck.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Flint uses your location to optimize your dating matches.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
