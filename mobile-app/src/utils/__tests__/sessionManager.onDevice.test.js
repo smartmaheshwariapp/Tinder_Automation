@@ -32,6 +32,7 @@ describe('getOnDeviceSessionState', () => {
       swipes: 0,
       matches: 0,
       messages: 0,
+      likesExhaustedAt: 0,
       isRunning: false,
       lastSavedAt: 0,
     });

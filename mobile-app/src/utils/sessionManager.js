@@ -5,6 +5,7 @@
 import SupabaseService from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NotificationService from '../services/notifications';
+import trackingService from '../services/trackingService';
 
 const HYPERBEAM_KEY = 'sk_test_fsuC8naqJLF2lGcL8Vak2ogGyhYFldLzqCEbX2zQYf0';
 
@@ -428,6 +429,9 @@ export const clearTinderAuthState = async () => {
   // happens at runtime, so the forward reference is safe in a module scope.
   try { await clearOnDeviceSessionState(); } catch (_) {}
   try { await clearProgressFeed(); } catch (_) {}
+  try { await AsyncStorage.removeItem(STORAGE_KEY_STOPPED_CHATS); } catch (_) {}
+  try { await AsyncStorage.removeItem(STORAGE_KEY_MOVE_OFF_APP); } catch (_) {}
+  try { await AsyncStorage.removeItem(STORAGE_KEY_MATCHES_CACHE); } catch (_) {}
   // Destroy the worker singleton so the new session starts with clean chat Maps.
   try { destroyOnDeviceWorker(); } catch (_) {}
   authListeners.forEach((fn) => {
@@ -480,6 +484,12 @@ export const probeTinderSession = async (tokenToTest) => {
       return { ok: true, name, email, user };
     } else if (res.status === 401) {
       console.log('[SessionManager] Probe detected expired Tinder token (401)');
+      try {
+        trackingService.trackEvent('tinder_session_expired');
+      } catch (_) {}
+      try {
+        pushProgressFeedEvent('session_expired', 'Tinder session expired. Please open browser to reconnect.', null, 15);
+      } catch (_) {}
       setTinderAuthState({ isLoggedIn: false, token: null, accountName: null });
       return { ok: false, expired: true };
     }
@@ -824,6 +834,7 @@ const ON_DEVICE_SESSION_DEFAULTS = {
   swipes: 0,
   matches: 0,
   messages: 0,
+  likesExhaustedAt: 0,
   // isRunning is intentionally NOT restored to true on launch. Restarting
   // automation automatically after a kill/restart would be surprising and
   // could violate Tinder's rate limits without the user expecting it.
@@ -932,6 +943,89 @@ export const clearOnDeviceSessionState = async () => {
   syncOnDeviceSessionToShared();
   try {
     await AsyncStorage.removeItem(STORAGE_KEY_ON_DEVICE_SESSION);
+  } catch (_) {}
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── On-Device Mode Persistence Helpers (Survives app kills & reboots) ──
+// ─────────────────────────────────────────────────────────────────────────────
+export const STORAGE_KEY_STOPPED_CHATS = '@linksy_stopped_chats';
+export const STORAGE_KEY_MOVE_OFF_APP = '@linksy_move_off_app_states';
+export const STORAGE_KEY_MATCHES_CACHE = '@linksy_matches_cache';
+
+export const getPersistedStoppedChats = async () => {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY_STOPPED_CHATS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    }
+  } catch (_) {}
+  return null;
+};
+
+export const savePersistedStoppedChats = async (mapOrObj) => {
+  try {
+    let dataToSave = mapOrObj;
+    if (mapOrObj instanceof Map) {
+      dataToSave = Object.fromEntries(mapOrObj.entries());
+    }
+    if (dataToSave && typeof dataToSave === 'object') {
+      await AsyncStorage.setItem(STORAGE_KEY_STOPPED_CHATS, JSON.stringify(dataToSave));
+    }
+  } catch (_) {}
+};
+
+export const getPersistedMoveOffAppStates = async () => {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY_MOVE_OFF_APP);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    }
+  } catch (_) {}
+  return null;
+};
+
+export const savePersistedMoveOffAppStates = async (mapOrObj) => {
+  try {
+    let dataToSave = mapOrObj;
+    if (mapOrObj instanceof Map) {
+      dataToSave = Object.fromEntries(mapOrObj.entries());
+    }
+    if (dataToSave && typeof dataToSave === 'object') {
+      await AsyncStorage.setItem(STORAGE_KEY_MOVE_OFF_APP, JSON.stringify(dataToSave));
+    }
+  } catch (_) {}
+};
+
+export const getPersistedMatchesCache = async () => {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY_MATCHES_CACHE);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (_) {}
+  return [];
+};
+
+export const savePersistedMatchesCache = async (matchesArrayOrMap) => {
+  try {
+    let list = matchesArrayOrMap;
+    if (matchesArrayOrMap instanceof Map) {
+      list = Array.from(matchesArrayOrMap.values());
+    }
+    if (Array.isArray(list)) {
+      const trimmed = list.slice(0, 50);
+      await AsyncStorage.setItem(STORAGE_KEY_MATCHES_CACHE, JSON.stringify(trimmed));
+    }
   } catch (_) {}
 };
 

@@ -1229,6 +1229,14 @@ async function autoLike(count) {
         if (hasSubscriptionPopup()) {
           console.log('[FlirtEasy] Subscription popup / Out of likes detected, stopping cycle');
           errors.push('Out of likes / Subscription popup');
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_OUT_OF_LIKES',
+                timestamp: Date.now()
+              }));
+            }
+          } catch (_) {}
           break;
         }
 
@@ -1397,6 +1405,20 @@ async function autoLike(count) {
         }
 
         await getSwipeDelay();
+
+        if (hasSubscriptionPopup()) {
+          console.log('[FlirtEasy] Subscription popup / Out of likes appeared after like click, stopping cycle');
+          errors.push('Out of likes / Subscription popup');
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_OUT_OF_LIKES',
+                timestamp: Date.now()
+              }));
+            }
+          } catch (_) {}
+          break;
+        }
 
       } catch (error) {
         console.error(`[FlirtEasy] Error at check ${profilesChecked}:`, error);

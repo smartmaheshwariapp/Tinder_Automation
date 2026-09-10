@@ -49,6 +49,7 @@ import {
 import useExtensionStats from '../hooks/useExtensionStats';
 import { DashboardPanel } from '../components/dashboard';
 import SupabaseService from '../services/supabase';
+import trackingService from '../services/trackingService';
 import NotificationService from '../services/notifications';
 import NotificationCenterModal from '../components/NotificationCenterModal';
 import PermissionPrePromptModal from '../components/common/PermissionPrePromptModal';
@@ -173,6 +174,14 @@ export default function PlatformSelectScreen({ navigation, route }) {
     };
   }, []);
 
+  // ── Initialize Telemetry with Resolved User ID ──
+  useEffect(() => {
+    const resolvedId = route?.params?.userId || route?.params?.user?.id;
+    if (resolvedId) {
+      trackingService.init(resolvedId, 'tinder');
+    }
+  }, [route?.params?.userId, route?.params?.user?.id]);
+
   // ── Sync Onboarding Configuration into Engine Settings ──
   useEffect(() => {
     if (route?.params?.onboardingData) {
@@ -225,7 +234,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
     const merged = { ...localSettings, ...updatedSettings };
     setLocalSettings(merged);
     setSharedExtensionSettings(merged);
-    const userId = route?.params?.userId;
+    const userId = route?.params?.userId || route?.params?.user?.id;
     if (userId) {
       SupabaseService.saveUserSnapshot(userId, {
         platform: 'tinder',
@@ -233,7 +242,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
       }).catch(() => {});
     }
     return true;
-  }, [localSettings, route?.params?.userId]);
+  }, [localSettings, route?.params?.userId, route?.params?.user?.id]);
 
   const handleSyncProfileFromHome = useCallback(async () => {
     const auth = getTinderAuthState();
@@ -615,7 +624,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
     const backendUrl = orchestratorUrl || (environment === 'vps' ? 'https://api.smartmaheshwari.com' : resolveLocalUrl('http://localhost:3001'));
     if (backendUrl) {
       const acknowledged = await postJsonWithTimeout(`${backendUrl}/logout`, {
-        userId: route?.params?.userId || 'dev_user_1',
+        userId: route?.params?.userId || route?.params?.user?.id || 'dev_user_1',
         platform: 'tinder',
       });
       if (!acknowledged) {
@@ -630,7 +639,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
     loggingOutRef.current = false;
     setLoggingOut(false);
     setShowLogoutConfirm(false);
-  }, [orchestratorUrl, environment, refreshStats, route?.params?.userId]);
+  }, [orchestratorUrl, environment, refreshStats, route?.params?.userId, route?.params?.user?.id]);
 
   const confirmLogout = useCallback(() => {
     setShowLogoutConfirm(true);

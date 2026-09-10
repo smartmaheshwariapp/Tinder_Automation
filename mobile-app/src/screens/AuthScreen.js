@@ -32,6 +32,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SupabaseService from '../services/supabase';
 import { API_CONFIG } from '../config/api';
+import trackingService from '../services/trackingService';
 
 // Optional safe haptics
 let Haptics;
@@ -115,6 +116,25 @@ export default function AuthScreen({ navigation, route }) {
   const [resendActive, setResendActive] = useState(false);
   const [emblemFailed, setEmblemFailed] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+
+  useEffect(() => {
+    trackingService.trackEvent('landing_page_viewed', { initial_mode: route?.params?.initialMode || 'welcome' });
+  }, []);
+
+  // Sync route params when pushed from Onboarding screen
+  useEffect(() => {
+    if (route?.params?.initialMode) {
+      const mode = route.params.initialMode;
+      setAuthMode(mode);
+      setPhase('form');
+      phaseIndexAnim.setValue(1);
+      cardMorphProgress.setValue(mode === 'signup' ? 1 : 0);
+      setErrorMessage('');
+      setSuccessNotice('');
+      setAgreementError(false);
+      setAccountConflict(null);
+    }
+  }, [route?.params?.initialMode, route?.params?.onboardingData]);
 
   // ── Legal & Support In-App Sheet States (App Store & HIG Compliance) ──
   const [legalModalVisible, setLegalModalVisible] = useState(false);
@@ -555,8 +575,8 @@ export default function AuthScreen({ navigation, route }) {
     setAccountConflict(null);
     setName('');
     setEmail('');
-    if (initialMode && phase === 'form') {
-      navigation.replace('Onboarding');
+    if (navigation.canGoBack()) {
+      navigation.goBack();
     } else {
       navigateToPhase('welcome');
     }
@@ -608,6 +628,11 @@ export default function AuthScreen({ navigation, route }) {
   const sendEmailOtp = async (targetEmail, targetName) => {
     const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
     setSentOtp(generatedCode);
+
+    trackingService.trackEvent('otp_sent', {
+      email_domain: targetEmail.split('@')[1] || '',
+      mode: authMode,
+    });
 
     const emailHtml = `
 <!DOCTYPE html>
@@ -814,6 +839,10 @@ export default function AuthScreen({ navigation, route }) {
       setIsLoading(false);
       setErrorMessage('Invalid verification code. Please check your email inbox.');
       triggerShake();
+      trackingService.trackEvent('otp_verification_failed', {
+        email_domain: email.trim().split('@')[1] || '',
+        mode: authMode,
+      });
       return;
     }
 
@@ -828,25 +857,30 @@ export default function AuthScreen({ navigation, route }) {
       } else {
         result = await SupabaseService.loginUser({
           email: email.trim().toLowerCase(),
+          onboardingData,
         });
       }
+
+      const resolvedUserId = result?.user?.id;
+      if (resolvedUserId) {
+        trackingService.init(resolvedUserId, 'tinder');
+      }
+      trackingService.trackEvent('otp_verified', { mode: authMode });
 
       setIsLoading(false);
       navigation.replace('PlatformSelect', {
         user: result?.user,
+        userId: resolvedUserId,
         onboardingData,
       });
     } catch (err) {
       console.error('[Auth Error]', err);
       setIsLoading(false);
-      if (authMode === 'signup') {
-        navigation.replace('Onboarding', {
-          userName: name.trim(),
-          email: email.trim(),
-        });
-      } else {
-        navigation.replace('PlatformSelect', { onboardingData });
-      }
+      navigation.replace('PlatformSelect', {
+        user: { id: 'offline_user', email, fullName: name },
+        userId: 'offline_user',
+        onboardingData,
+      });
     }
   };
 
@@ -904,28 +938,33 @@ export default function AuthScreen({ navigation, route }) {
           </LinearGradient>
         </Animated.View>
 
-        {/* Brand Name */}
-        <Text style={styles.brandTitle}>Flint</Text>
+        {/* Reflectly-Style Companion Greeting */}
+        <Text style={styles.greetingSalutation}>Hi there,</Text>
+        <Text style={styles.greetingName}>I'm FlintAI</Text>
 
-        {/* Hook Dialogue */}
-        <Text style={styles.heroDialogue}>
-          Strike the spark. Ignite real chemistry.
+        {/* Short, Warm Companion Subtitle */}
+        <Text style={styles.greetingSub}>
+          Your personal dating companion,{'\n'}always in your corner.
         </Text>
       </View>
 
       {/* Bottom Authentication & Action Zone */}
       <View style={styles.actionZone}>
-        {/* Primary Action: Create Account with Tactile Spring Physics & Shimmer */}
+        {/* Primary Action: HI, FlintAI! with Tactile Spring Physics & Shimmer */}
         <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
           <TouchableOpacity
             style={styles.btnCreateAccount}
             onPressIn={handleBtnPressIn}
             onPressOut={handleBtnPressOut}
-            onPress={() => goToForm('signup')}
+            onPress={() => {
+              safeHaptic('medium');
+              trackingService.trackEvent('landing_action_clicked', { action: 'start_onboarding' });
+              navigation.navigate('Onboarding');
+            }}
             activeOpacity={0.88}
             accessibilityRole="button"
-            accessibilityLabel="Create Account"
-            accessibilityHint="Start creating your Flint dating profile"
+            accessibilityLabel="Hi, FlintAI!"
+            accessibilityHint="Start your onboarding journey with FlintAI"
           >
             <LinearGradient
               colors={['#FF3366', '#FF5E7E', '#FFAA80']}
@@ -958,7 +997,7 @@ export default function AuthScreen({ navigation, route }) {
                 />
               </Animated.View>
 
-              <Text style={styles.btnCreateAccountText}>Create Account</Text>
+              <Text style={styles.btnCreateAccountText}>HI, FlintAI!</Text>
               <Animated.View style={{ transform: [{ translateX: arrowFloat }] }}>
                 <Ionicons name="arrow-forward" size={19} color="#FFFFFF" style={styles.btnArrowIcon} />
               </Animated.View>
@@ -969,7 +1008,10 @@ export default function AuthScreen({ navigation, route }) {
         {/* Sign In Link */}
         <TouchableOpacity
           style={styles.signInLinkBtn}
-          onPress={() => goToForm('login')}
+          onPress={() => {
+            trackingService.trackEvent('landing_action_clicked', { action: 'sign_in' });
+            goToForm('login');
+          }}
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="Already have an account? Sign In"
@@ -1032,65 +1074,68 @@ export default function AuthScreen({ navigation, route }) {
         bounces={false}
       >
         <View style={styles.formContainer}>
-          {/* Clean Back Navigation */}
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={goBackToWelcome}
-            activeOpacity={0.7}
-            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="chevron-back" size={23} color="#edddf1" style={{ marginRight: 2 }} />
-          </TouchableOpacity>
-
-          {/* Header with Smooth Crossfade Morphing */}
-          <View style={styles.formHeader}>
-            <View style={styles.headerTitleWrap}>
-              <Animated.View
-                style={[
-                  styles.headerTitleLayer,
-                  {
-                    opacity: cardMorphProgress,
-                    transform: [
-                      {
-                        translateY: cardMorphProgress.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [10, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-                pointerEvents={authMode === 'signup' ? 'auto' : 'none'}
+          {/* Unified Hero Header Row matching Onboarding */}
+          <View style={styles.heroWrap}>
+            <View style={styles.heroHeaderRow}>
+              <TouchableOpacity
+                style={styles.backArrowBtn}
+                onPress={goBackToWelcome}
+                hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
               >
-                <Text style={styles.formTitle}>Create your account</Text>
-                <Text style={styles.formSubtitle}>Enter your details to begin matching.</Text>
-              </Animated.View>
+                <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
+              </TouchableOpacity>
 
-              <Animated.View
-                style={[
-                  styles.headerTitleLayer,
-                  {
-                    opacity: cardMorphProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 0],
-                    }),
-                    transform: [
+              <View style={styles.heroTextWrap}>
+                <View style={styles.headerTitleWrap}>
+                  <Animated.View
+                    style={[
+                      styles.headerTitleLayer,
                       {
-                        translateY: cardMorphProgress.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, -10],
-                        }),
+                        opacity: cardMorphProgress,
+                        transform: [
+                          {
+                            translateY: cardMorphProgress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [10, 0],
+                            }),
+                          },
+                        ],
                       },
-                    ],
-                  },
-                ]}
-                pointerEvents={authMode === 'login' ? 'auto' : 'none'}
-              >
-                <Text style={styles.formTitle}>Welcome back</Text>
-                <Text style={styles.formSubtitle}>Sign in to resume finding your perfect match.</Text>
-              </Animated.View>
+                    ]}
+                    pointerEvents={authMode === 'signup' ? 'auto' : 'none'}
+                  >
+                    <Text style={styles.formTitle}>Create your account</Text>
+                    <Text style={styles.formSubtitle}>Enter your details to begin matching.</Text>
+                  </Animated.View>
+
+                  <Animated.View
+                    style={[
+                      styles.headerTitleLayer,
+                      {
+                        opacity: cardMorphProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 0],
+                        }),
+                        transform: [
+                          {
+                            translateY: cardMorphProgress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0, -10],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                    pointerEvents={authMode === 'login' ? 'auto' : 'none'}
+                  >
+                    <Text style={styles.formTitle}>Welcome back</Text>
+                    <Text style={styles.formSubtitle}>Sign in to resume finding your perfect match.</Text>
+                  </Animated.View>
+                </View>
+              </View>
             </View>
           </View>
 
@@ -1687,23 +1732,28 @@ export default function AuthScreen({ navigation, route }) {
       bounces={false}
     >
       <View style={styles.formContainer}>
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={goBackToForm}
-          activeOpacity={0.7}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Ionicons name="chevron-back" size={23} color="#edddf1" style={{ marginRight: 2 }} />
-        </TouchableOpacity>
+        {/* Unified Hero Header Row matching Onboarding */}
+        <View style={styles.heroWrap}>
+          <View style={styles.heroHeaderRow}>
+            <TouchableOpacity
+              style={styles.backArrowBtn}
+              onPress={goBackToForm}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
 
-        {/* Header */}
-        <View style={styles.formHeader}>
-          <Text style={styles.formTitle}>Verify your email</Text>
-          <Text style={styles.formSubtitle}>
-            Enter the 6-digit code sent to{'\n'}
-            <Text style={{ color: '#FFAA80', fontWeight: '700' }}>{email}</Text>
-          </Text>
+            <View style={styles.heroTextWrap}>
+              <Text style={styles.formTitle}>Verify your email</Text>
+              <Text style={styles.formSubtitle}>
+                Enter the 6-digit code sent to{'\n'}
+                <Text style={{ color: '#FFAA80', fontWeight: '700' }}>{email}</Text>
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Success Notice */}
@@ -1961,31 +2011,43 @@ export default function AuthScreen({ navigation, route }) {
           ))}
         </View>
 
-        {/* Living Ambient Aurora Breathing Orbs */}
-        <Animated.View
-          style={[
-            styles.auroraOrb1,
-            {
-              transform: [
-                { translateY: auroraFloat1 },
-                { scale: auroraScale1 },
-              ],
-              opacity: auroraOpacity1,
-            },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.auroraOrb2,
-            {
-              transform: [
-                { translateY: auroraFloat2 },
-                { scale: auroraScale2 },
-              ],
-              opacity: auroraOpacity2,
-            },
-          ]}
-        />
+        {/* Living Ambient Aurora Breathing Orbs (Strictly Clipped Within Screen Boundary) */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: SCREEN_WIDTH,
+            height: SCREEN_HEIGHT,
+            overflow: 'hidden',
+          }}
+          pointerEvents="none"
+        >
+          <Animated.View
+            style={[
+              styles.auroraOrb1,
+              {
+                transform: [
+                  { translateY: auroraFloat1 },
+                  { scale: auroraScale1 },
+                ],
+                opacity: auroraOpacity1,
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.auroraOrb2,
+              {
+                transform: [
+                  { translateY: auroraFloat2 },
+                  { scale: auroraScale2 },
+                ],
+                opacity: auroraOpacity2,
+              },
+            ]}
+          />
+        </View>
 
         {/* Ambient Luxury Dark Scrim Gradient Overlays (Guaranteed on top of slides) */}
         {/* Top-to-Bottom Scrim */}
@@ -2311,6 +2373,7 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#0a050d',
+    overflow: 'hidden',
   },
   safeArea: {
     flex: 1,
@@ -2347,6 +2410,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(254, 60, 114, 0.25)',
     top: SCREEN_HEIGHT * 0.1,
     left: -60,
+    overflow: 'hidden',
   },
   auroraOrb2: {
     position: 'absolute',
@@ -2356,6 +2420,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 170, 128, 0.20)',
     top: SCREEN_HEIGHT * 0.42,
     right: -50,
+    overflow: 'hidden',
   },
 
   btnShimmerSweep: {
@@ -2365,7 +2430,7 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 0.55,
   },
   headerTitleWrap: {
-    height: 64,
+    minHeight: 56,
     justifyContent: 'center',
     position: 'relative',
   },
@@ -2389,7 +2454,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 22,
     paddingBottom: 24,
   },
 
@@ -2454,18 +2519,32 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
 
-  // ── Brand & Typography ──
-  brandTitle: {
+  // ── Companion Greeting Typography ──
+  greetingSalutation: {
     color: '#FFFFFF',
-    fontSize: 46,
+    fontSize: 30,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    textAlign: 'center',
+    lineHeight: 36,
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  greetingName: {
+    color: '#FFFFFF',
+    fontSize: 38,
     fontWeight: '900',
-    letterSpacing: -0.8,
-    marginBottom: 4,
+    letterSpacing: -0.6,
+    textAlign: 'center',
+    lineHeight: 44,
+    marginTop: 2,
+    marginBottom: 8,
     textShadowColor: 'rgba(255, 51, 102, 0.45)',
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 14,
   },
-  heroDialogue: {
+  greetingSub: {
     color: 'rgba(255, 240, 245, 0.92)',
     fontSize: 16,
     fontWeight: '600',
@@ -2633,17 +2712,35 @@ const styles = StyleSheet.create({
   formHeader: {
     marginBottom: 22,
   },
+  heroWrap: {
+    marginBottom: 20,
+  },
+  heroHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  backArrowBtn: {
+    marginRight: 14,
+    marginTop: Platform.OS === 'ios' ? 4 : 5,
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroTextWrap: {
+    flex: 1,
+  },
   formTitle: {
     color: '#FFFFFF',
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: '800',
-    letterSpacing: -0.6,
+    letterSpacing: -0.5,
     marginBottom: 6,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   formSubtitle: {
-    color: 'rgba(245, 230, 240, 0.78)',
-    fontSize: 14.5,
-    lineHeight: 21,
+    color: 'rgba(255, 255, 255, 0.62)',
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '400',
   },
 

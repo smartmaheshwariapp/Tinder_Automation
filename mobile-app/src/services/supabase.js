@@ -7,6 +7,15 @@ const PUBLISHABLE_KEY = 'sb_publishable_mIpWqYRNB8SW-OedgscoKg_Hl07XyrA';
 const STORAGE_KEY_ACCOUNTS = '@linksy_registered_accounts';
 const STORAGE_KEY_CURRENT_USER = '@linksy_current_user';
 
+// Standard RFC4122 v4 UUID generator for Postgres UUID compliance
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // Local persistent account registry helpers
 async function getLocalAccounts() {
   try {
@@ -23,7 +32,7 @@ async function saveLocalAccount(user) {
     const cleanEmail = user.email.trim().toLowerCase();
     const accounts = await getLocalAccounts();
     accounts[cleanEmail] = {
-      id: user.id || `usr_${Date.now()}`,
+      id: user.id || generateUUID(),
       email: cleanEmail,
       fullName: user.fullName || user.full_name || cleanEmail.split('@')[0],
       registeredAt: user.createdAt || user.created_at || new Date().toISOString(),
@@ -158,9 +167,9 @@ export const SupabaseService = {
       return { success: true, user: existingCheck.user, isExisting: true };
     }
 
-    // 2. Create user record
+    // 2. Create user record with valid UUID
     const userRecord = {
-      id: `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      id: generateUUID(),
       email: cleanEmail,
       fullName: nameToSave,
       full_name: nameToSave,
@@ -197,7 +206,7 @@ export const SupabaseService = {
       console.warn('[Cloud Registration Sync Warning]', err.message);
     }
 
-    // 5. Save initial Onboarding Snapshot if provided
+    // 5. Save initial Onboarding Snapshot & complete telemetry payload
     if (onboardingData) {
       this.saveUserSnapshot(userRecord.id, {
         settings: onboardingData,
@@ -215,16 +224,35 @@ export const SupabaseService = {
         country: onboardingData.country,
         languages: onboardingData.languages,
         goals: onboardingData.goals,
+        personality: onboardingData.personality,
+        frequency: onboardingData.frequency,
+        safeMode: onboardingData.safeMode,
+        timezone: onboardingData.timezone,
+        device_os: onboardingData.device_os,
+        device_os_version: onboardingData.device_os_version,
+        app_version: onboardingData.app_version,
       }).catch(() => {});
+    }
+
+    // 6. Queue automated welcome onboarding email sequence
+    if (userRecord.email) {
+      apiRequest('/email_queue', 'POST', {
+        user_id: userRecord.id,
+        user_email: userRecord.email,
+        user_name: nameToSave,
+        email_index: 0,
+        scheduled_at: new Date().toISOString(),
+        status: 'pending',
+      }).catch((err) => console.warn('[Email Queue Warning]', err.message));
     }
 
     return { success: true, user: userRecord, isExisting: false };
   },
 
   /**
-   * Log in user or fetch their profile
+   * Log in user or fetch their profile, syncing any new calibration settings
    */
-  async loginUser({ email }) {
+  async loginUser({ email, onboardingData = null }) {
     const cleanEmail = email.trim().toLowerCase();
 
     // Check local registry first
@@ -232,6 +260,25 @@ export const SupabaseService = {
     if (localAccounts[cleanEmail]) {
       const user = localAccounts[cleanEmail];
       await AsyncStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(user));
+
+      // Sync updated calibration if returning user went through onboarding
+      if (onboardingData && user.id) {
+        this.saveUserSnapshot(user.id, {
+          settings: onboardingData,
+          platform: 'tinder',
+          is_active: true,
+        }).catch(() => {});
+
+        this.recordUserEvent(user.id, 'user_recalibrated', {
+          source: 'mobile_app',
+          goals: onboardingData.goals,
+          personality: onboardingData.personality,
+          frequency: onboardingData.frequency,
+          safeMode: onboardingData.safeMode,
+          timezone: onboardingData.timezone,
+        }).catch(() => {});
+      }
+
       return { success: true, user };
     }
 
@@ -241,6 +288,25 @@ export const SupabaseService = {
       if (result.ok && Array.isArray(result.data) && result.data.length > 0) {
         const user = result.data[0];
         await saveLocalAccount(user);
+
+        // Sync updated calibration if returning user went through onboarding
+        if (onboardingData && user.id) {
+          await this.saveUserSnapshot(user.id, {
+            settings: onboardingData,
+            platform: 'tinder',
+            is_active: true,
+          }).catch(() => {});
+
+          this.recordUserEvent(user.id, 'user_recalibrated', {
+            source: 'mobile_app',
+            goals: onboardingData.goals,
+            personality: onboardingData.personality,
+            frequency: onboardingData.frequency,
+            safeMode: onboardingData.safeMode,
+            timezone: onboardingData.timezone,
+          }).catch(() => {});
+        }
+
         const snapshot = await this.getUserSnapshot(user.id);
         return {
           success: true,

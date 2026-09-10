@@ -28,9 +28,12 @@ import {
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StackActions } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import trackingService from '../services/trackingService';
 import {
   generateDynamicAiConversation,
   fetchLiveAiChatReply,
@@ -64,7 +67,7 @@ const PREVIEW_PROFILES = [
     name: 'Sarah, 26',
     sub: 'Loves travel, photography & coffee',
     matchScore: '98% Match',
-    image: require('../../assets/profiles/sarah.jpg'),
+    image: require('../../assets/profiles/sarah_card.jpg'),
     opener: "Noticed your trip to Kyoto—did you find that hidden matcha spot by the canal?",
     tags: [
       { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
@@ -77,7 +80,7 @@ const PREVIEW_PROFILES = [
     name: 'Maya, 25',
     sub: 'Architect & espresso lover',
     matchScore: '96% Match',
-    image: require('../../assets/profiles/maya.jpg'),
+    image: require('../../assets/profiles/maya_card.jpg'),
     opener: "That outdoor cafe looks cozy! What's your go-to coffee order on a Sunday morning?",
     tags: [
       { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
@@ -90,7 +93,7 @@ const PREVIEW_PROFILES = [
     name: 'Elena, 27',
     sub: 'Rooftop sunsets & live jazz',
     matchScore: '95% Match',
-    image: require('../../assets/profiles/elena.jpg'),
+    image: require('../../assets/profiles/elena_card.jpg'),
     opener: "Golden hour rooftop views can't be beat. Have you caught live jazz around there?",
     tags: [
       { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
@@ -104,6 +107,173 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - 64, 305);
 const CARD_GAP = 14;
 const TRACK_WIDTH = PREVIEW_PROFILES.length * (CARD_WIDTH + CARD_GAP);
 const DISPLAY_CARDS = [...PREVIEW_PROFILES, ...PREVIEW_PROFILES];
+
+// ── Authentic Profile-Specific AI Dating Openers (Context-Aware & Tailored to Each Match) ──
+const PROFILE_OPENERS_MATRIX = {
+  sarah: {
+    flirty: [
+      "Noticed those travel shots—a smile that charming usually spells trouble 😉 Did you find that hidden matcha cafe in Kyoto?",
+      "You look like someone who knows all the best coffee spots in the world. Care to test that theory over drinks?",
+      "That Kyoto photo has main character energy. Tell me: are you always this photogenic or was the golden hour showing off? ✨",
+    ],
+    witty: [
+      "Rate Kyoto's matcha on a scale of 1 to 'I'm moving there tomorrow.' What was your favorite street?",
+      "I'm convinced your camera roll is 90% aesthetic coffee shops and 10% accidental blurry travel pics 😂",
+      "Travel, photography, and coffee—you've officially built the holy trinity of great weekend plans.",
+    ],
+    confident: [
+      "Your travel photos show great taste. Skip the tourist spots—what's the one place in Kyoto you'd take me first?",
+      "I love someone who actually appreciates good photography. Let's grab espresso this week and swap travel stories.",
+      "You clearly know how to pick great destinations. What's the next country on your radar?",
+    ],
+    charming: [
+      "Noticed your Kyoto photos—did you ever stumble across that tiny hidden tea house by the canal?",
+      "Such warm, adventurous energy in your pictures. What was the single best meal from your travels?",
+      "Traveling with a good camera is the best way to see the world. What's your favorite photo you've taken?",
+    ],
+    bold: [
+      "Let's skip the small talk: pick a city, I'll book the coffee, and you can show me how to take proper travel photos 😉",
+      "You have an effortless glow in these photos. Tell me your craziest travel story over drinks this Thursday.",
+      "I rarely swipe right this fast, but that Kyoto smile is hard to ignore. What's your go-to weekend adventure?",
+    ],
+    playful: [
+      "If your travel photos were a magazine cover, I'd subscribe. Did you get lost in Kyoto or did you actually have a map? 😏",
+      "Serious question: does coffee taste 10x better when you're traveling, or is it just the vacation talking?",
+      "That smile is dangerously charming. Are you as fun to travel with as your profile suggests?",
+    ],
+    romantic: [
+      "There's a quiet magic in those travel photos. What was the one moment on your trip where time just stood still?",
+      "Finding quiet corners in foreign cities is pure romance. What place has stolen your heart the most?",
+      "Your photos feel like poetry. What song reminds you most of that Kyoto sunset?",
+    ],
+    gentle: [
+      "Hey Sarah! Loved your photography vibe—you seem to have such a calm, genuine appreciation for beautiful places.",
+      "Such peaceful energy in your Kyoto pictures. Hope you've had a wonderful week exploring cozy cafes!",
+      "Hi Sarah! What's your absolute favorite cozy coffee spot you've discovered so far?",
+    ],
+    serious: [
+      "Travel always reshapes how we see the world. What was the most meaningful lesson your travels taught you?",
+      "Photography is all about perspective. What draws you to capture the moments you do?",
+      "It's rare to see someone with such a genuine eye for beauty. What kind of adventures fulfill you most?",
+    ],
+    freestyle: [
+      "Noticed your trip to Kyoto—did you find that hidden matcha spot by the canal, or get lost in the bamboo grove?",
+      "That coffee aesthetic is unbeatable! What's the most memorable cafe you've ever stumbled upon?",
+      "Incredible eye for photography. Are you currently planning your next big getaway?",
+    ],
+  },
+  maya: {
+    flirty: [
+      "An architect with serious espresso standards? That's an unfair combination 😉 Do you design buildings or just steal hearts?",
+      "That outdoor terrace looks gorgeous, but honestly your smile steals all the architectural spotlight ✨",
+      "I have a sudden urge to learn all about Italian design. Want to quiz me over an espresso this Thursday? 😉",
+    ],
+    witty: [
+      "As an architect, be honest: do you judge cafes purely by their interior lighting, or does the espresso actually matter? 😂",
+      "I promise not to make any cheesy 'let's build a future together' puns if you tell me where that terrace cafe is.",
+      "Tell me you don't secretly critique the ceiling height of every restaurant you walk into 😏",
+    ],
+    confident: [
+      "Great design, sharp smile, and high espresso standards. I know a hidden espresso bar downtown you'll appreciate—let's go.",
+      "You clearly know what great aesthetics look like. Let's grab an espresso and talk favorite cities.",
+      "I admire people who create things. What's the dream project you want to build one day?",
+    ],
+    charming: [
+      "That outdoor cafe looks cozy! What's an architect's official go-to coffee order on a crisp Sunday morning?",
+      "Your aesthetic in these photos is lovely. What sparked your passion for architecture?",
+      "Always fascinated by great architecture. What's the most inspiring city you've ever explored?",
+    ],
+    bold: [
+      "You have incredible style. Let's see if your conversation is as well-designed as your projects 😉 Drinks this week?",
+      "I'm skipping the small talk—recommend me your favorite coffee spot and I'll buy round one.",
+      "You have that rare combination of brains, creativity, and charisma. Let's grab coffee and see if sparks fly.",
+    ],
+    playful: [
+      "Architect alert! Tell me the truth: how often do you walk into a room and mentally remodel the entire floor plan? 😏",
+      "On a scale from 1 to 'double espresso directly into my veins', how busy has your week been?",
+      "That cafe looks like a European daydream! Are you secretly an undercover travel blogger? 😏",
+    ],
+    romantic: [
+      "There's so much soul in well-designed spaces. What building or place has moved you the most emotionally?",
+      "A slow morning, warm espresso, and great conversation—sounds like the ideal start to any love story.",
+      "Your creative passion shines through your smile. What inspires your favorite designs?",
+    ],
+    gentle: [
+      "Hey Maya! Love the warm, creative energy in your profile. What’s your favorite hidden spot around town?",
+      "Such a peaceful cafe vibe! Hope you're enjoying some quiet time away from blueprints this week.",
+      "Hi Maya! What’s your favorite way to unwind after a long design session?",
+    ],
+    serious: [
+      "Architecture shapes how people live and connect with each other. What philosophy drives your work?",
+      "It takes dedication to master design. What's an architectural movement you feel deeply connected to?",
+      "Looking for someone passionate about what they do. What project has made you the most proud?",
+    ],
+    freestyle: [
+      "That outdoor cafe terrace has great proportions! What's an architect's honest verdict on their espresso?",
+      "Design and great coffee are the best two things in life. What's your favorite neighbourhood to wander?",
+      "Love the creative vibe on your profile! Have you worked on any exciting local builds recently?",
+    ],
+  },
+  elena: {
+    flirty: [
+      "Golden hour was definitely made for you 😉 But more importantly: smooth jazz or upbeat rooftop vibes?",
+      "That rooftop view is stunning, but honestly you outshined the entire skyline ✨ Wine this weekend?",
+      "Live jazz, sunsets, and a smile like that? Be careful, you're raising my standards way too high 😉",
+    ],
+    witty: [
+      "Rooftop sunsets and live jazz? If your playlist is as good as this photo, we might just be best friends already 😂",
+      "Please tell me you don't clap on the 1 and 3 during a jazz solo—that's my only dealbreaker! 🎷",
+      "Golden hour glow + live jazz = you're basically living in a La La Land scene. Who's your favorite jazz artist?",
+    ],
+    confident: [
+      "You have top-tier taste in evenings. I know a speakeasy with live jazz that rivals this rooftop—care to join?",
+      "A woman who appreciates live jazz and rooftop views doesn't settle for boring dates. Let's grab a glass this Friday.",
+      "You look like someone who knows the best-kept secrets in the city. What's your favorite jazz bar?",
+    ],
+    charming: [
+      "There's nothing quite like golden hour with good music. Have you caught any unforgettable live jazz sets lately?",
+      "Such an effortless, vibrant energy in your pictures. What's your favorite rooftop spot around here?",
+      "Live jazz is unmatched for evening vibes. Do you play any instruments or just have great musical taste?",
+    ],
+    bold: [
+      "That rooftop glow caught my attention immediately. Let's grab a glass of wine this week and debate the best jazz spots 😉",
+      "I'll keep it simple: you, me, and a cozy jazz club this Thursday. You pick the venue, I'll get the drinks.",
+      "You have that magnetic evening energy. What's one song that never fails to put you in an amazing mood?",
+    ],
+    playful: [
+      "Live jazz and rooftop sunsets—are you starring in a movie or is this just your average Tuesday night? 😏",
+      "If you had to choose one forever: rooftop sunsets with no music, or underground jazz with no windows?",
+      "That golden hour lighting is doing you justice! Did you have to fight for that rooftop seat? 😏",
+    ],
+    romantic: [
+      "Sunsets and live jazz speak right to the soul. What song instantly takes you back to a perfect summer night?",
+      "There's something deeply romantic about watching the city lights come on while a saxophone plays in the background.",
+      "Your photos radiate such warm, soulful energy. What makes an evening truly unforgettable for you?",
+    ],
+    gentle: [
+      "Hey Elena! Such lovely, warm energy in your photos. What's your favorite spot for an evening unwinding with live music?",
+      "Golden hour rooftop views are the best way to end the day. Hope you've been catching some gorgeous sunsets!",
+      "Hi Elena! Love your musical taste—there's nothing quite like live acoustic sets on a calm evening.",
+    ],
+    serious: [
+      "Jazz is all about spontaneity and deep listening. Do you find that music influences how you experience the city?",
+      "There's a rare depth to people who love live jazz. What kind of sounds or art move you most?",
+      "Looking for authentic connection. What does your ideal, meaningful evening look like?",
+    ],
+    freestyle: [
+      "Golden hour rooftop views can't be beat! Have you found any underground jazz spots with that same vibe?",
+      "That sunset lighting is pure magic. What's the best live performance you've seen this year?",
+      "Live jazz and evening views—you clearly know how to enjoy the city. What's your favorite speakeasy?",
+    ],
+  },
+};
+
+function getPersonalizedOpener(profileId, personalityId, variation = 0) {
+  const profileOpeners = PROFILE_OPENERS_MATRIX[profileId] || PROFILE_OPENERS_MATRIX.sarah;
+  const list = profileOpeners[personalityId] || profileOpeners.freestyle || profileOpeners.witty;
+  return list[Math.abs(variation) % list.length];
+}
+
 
 // ── Master Country & Dial Code Registry (Exact 100% Parity with Desktop Plugin) ──
 const LANGUAGES = [
@@ -802,6 +972,10 @@ const PRIMARY_PERSONALITY_IDS = ['freestyle', 'flirty', 'confident', 'witty', 'c
 
 export default function OnboardingScreen({ navigation }) {
   const [currentStep, setCurrentStep] = useState(1);
+
+  useEffect(() => {
+    trackingService.trackEvent('onboarding_started', { step: 1 });
+  }, []);
   const totalSteps = 5;
 
   // ── Step Selections State ──
@@ -816,6 +990,7 @@ export default function OnboardingScreen({ navigation }) {
   const goalFeedbackTimer = useRef(null);
   const strategyFadeAnim = useRef(new Animated.Value(1)).current;
   const [strategyText, setStrategyText] = useState(() => getStrategySummary(['date', 'phone']));
+  const [cardOpenerIndex, setCardOpenerIndex] = useState(0);
   const counterPulse = useRef(new Animated.Value(1)).current;
   const prevGoalsRef = useRef(selectedGoals);
 
@@ -853,14 +1028,14 @@ export default function OnboardingScreen({ navigation }) {
   const goalsSummary = useMemo(() => {
     if (!selectedGoals || selectedGoals.length === 0) {
       return {
-        title: 'Casual Chat & Banter',
-        detail: 'Fun, playful chats with zero pressure to meet',
+        title: 'Fun & Natural Banter',
+        detail: 'Relaxed, witty conversations with zero pressure or awkwardness',
       };
     }
     if (selectedGoals.includes('never_stop')) {
       return {
-        title: 'Casual Chat & Banter',
-        detail: 'Fun, playful chats with zero pressure to meet',
+        title: 'Fun & Natural Banter',
+        detail: 'Relaxed, witty conversations with zero pressure or awkwardness',
       };
     }
     const matched = GOALS.filter((g) => selectedGoals.includes(g.id));
@@ -871,20 +1046,20 @@ export default function OnboardingScreen({ navigation }) {
     if (matched.length === 1) {
       if (hasDate) {
         return {
-          title: 'Set up a Date',
-          detail: 'Focused on turning great chats into real-world dates',
+          title: 'Setting Up Real Dates',
+          detail: 'Flint effortlessly turns mutual attraction into memorable real-life dates',
         };
       }
       if (hasPhone) {
         return {
-          title: 'Get Her Number',
-          detail: 'Finds the right moment to get her number so you can text',
+          title: 'Getting Her Number',
+          detail: 'Smoothly transitions great chats to texting at the peak of conversation',
         };
       }
       if (hasSocial) {
         return {
-          title: 'Exchange Socials',
-          detail: 'Naturally trades Instagram or Snapchat handles',
+          title: 'Exchanging Socials',
+          detail: 'Effortlessly swaps Instagram handles when the vibe is right',
         };
       }
       return {
@@ -896,31 +1071,31 @@ export default function OnboardingScreen({ navigation }) {
     if (hasDate && hasPhone && hasSocial) {
       return {
         title: 'Dates, Numbers & Socials',
-        detail: 'Builds chemistry, swaps handles, and lines up dates',
+        detail: 'Turns fun conversations into real-world dates and social connections',
       };
     }
     if (hasDate && hasPhone) {
       return {
-        title: 'Set up a Date & Get Her Number',
-        detail: 'Builds chemistry, gets her number, and plans a date',
+        title: 'Real Dates & Phone Numbers',
+        detail: 'Sparks genuine chemistry, gets her number, and plans real-life dates',
       };
     }
     if (hasDate && hasSocial) {
       return {
-        title: 'Set up a Date & Exchange Socials',
-        detail: 'Trades Instagram handles and suggests meeting up',
+        title: 'Real Dates & Socials',
+        detail: 'Trades Instagram handles and turns chats into real-world meetups',
       };
     }
     if (hasPhone && hasSocial) {
       return {
-        title: 'Get Her Number & Exchange Socials',
-        detail: 'Moves the chat smoothly over to WhatsApp or Instagram',
+        title: 'Phone Numbers & Socials',
+        detail: 'Moves the chat smoothly over to WhatsApp or Instagram without the lag',
       };
     }
 
     return {
       title: matched.map((g) => g.title).join(' & '),
-      detail: 'Tailored to spark chemistry and lead to real dates',
+      detail: 'Tailored to spark chemistry and lead to real-world dates',
     };
   }, [selectedGoals]);
 
@@ -1268,6 +1443,8 @@ export default function OnboardingScreen({ navigation }) {
   // ── Step Navigation & Tactile Physics ──
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const stepIndexAnim = useRef(new Animated.Value(1)).current;
+  const mainScrollRef = useRef(null);
   const ctaScale = useRef(new Animated.Value(1)).current;
   const badgePulse = useRef(new Animated.Value(1)).current;
   // ── Step 5: Smooth Constellation Path & Executive Emblem Physics ──
@@ -1282,11 +1459,324 @@ export default function OnboardingScreen({ navigation }) {
   const line3Anim = useRef(new Animated.Value(0)).current;
   const node4Anim = useRef(new Animated.Value(0)).current;
 
-  // ── Step 5: Interactive Swipe Deck & Setup Readiness Physics ──
-  const [activeProfileIdx, setActiveProfileIdx] = useState(1); // Maya by default
-  const [isCardSwiping, setIsCardSwiping] = useState(false);
-  const cardPan = useRef(new Animated.ValueXY()).current;
+  // ── Step 5: High-End Native-Driven Profile Card Stack (Apple / Revolut Physics, Pure 3-Card Infinite Loop) ──
+  const [activeProfileIdx, setActiveProfileIdx] = useState(0); // 0: Sarah, 1: Maya, 2: Elena
+  const [profileZIndices, setProfileZIndices] = useState([3, 2, 1]); // Card 0: 3 (front), Card 1: 2 (mid), Card 2: 1 (back)
+  const profileSlotsRef = useRef([0, 1, 2]); // [frontProfileIdx, midProfileIdx, backProfileIdx]
+  const isSwipingProfileRef = useRef(false);
   const laserBeamAnim = useRef(new Animated.Value(0)).current;
+
+  // Dedicated persistent animated values for each of the 3 preview profiles (NO value resetting, NO snapback):
+  const profileCardAnims = useRef([
+    {
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      scale: new Animated.Value(1.0),
+      rotate: new Animated.Value(0),
+      opacity: new Animated.Value(1.0),
+      dimmer: new Animated.Value(0.0), // 0.0 = completely bright
+    },
+    {
+      x: new Animated.Value(0),
+      y: new Animated.Value(-22),
+      scale: new Animated.Value(0.94),
+      rotate: new Animated.Value(0),
+      opacity: new Animated.Value(1.0),
+      dimmer: new Animated.Value(0.35), // dimmed behind front card, peeks out above
+    },
+    {
+      x: new Animated.Value(0),
+      y: new Animated.Value(-42),
+      scale: new Animated.Value(0.88),
+      rotate: new Animated.Value(0),
+      opacity: new Animated.Value(1.0),
+      dimmer: new Animated.Value(0.65), // dimmed behind mid card, peeks out above
+    },
+  ]).current;
+
+  const likeStampOpacity = useRef(new Animated.Value(0)).current;
+  const nopeStampOpacity = useRef(new Animated.Value(0)).current;
+
+  // ── Step 5: High-End Native-Driven Playing Card Stack (Apple / Revolut Physics, ZERO Snapback) ──
+  const [activeBlueprintIdx, setActiveBlueprintIdx] = useState(0);
+  const [bpZIndices, setBpZIndices] = useState([3, 2, 1]); // Card 0: 3 (front), Card 1: 2 (mid), Card 2: 1 (back)
+  const bpSlotsRef = useRef([0, 1, 2]); // [frontCardIdx, midCardIdx, backCardIdx]
+  const isCyclingBlueprint = useRef(false);
+
+  // Dedicated persistent animated values for each of the 3 blueprint cards (NO resetting, NO snapback):
+  const bpCardAnims = useRef([
+    {
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      scale: new Animated.Value(1.0),
+      rotate: new Animated.Value(0),
+      opacity: new Animated.Value(1.0),
+    },
+    {
+      x: new Animated.Value(0),
+      y: new Animated.Value(8),
+      scale: new Animated.Value(0.94),
+      rotate: new Animated.Value(2.5),
+      opacity: new Animated.Value(0.85),
+    },
+    {
+      x: new Animated.Value(0),
+      y: new Animated.Value(16),
+      scale: new Animated.Value(0.88),
+      rotate: new Animated.Value(-2.5),
+      opacity: new Animated.Value(0.60),
+    },
+  ]).current;
+
+  const cycleBlueprintCard = useCallback(() => {
+    if (isCyclingBlueprint.current) return;
+    isCyclingBlueprint.current = true;
+    safeHaptic('light');
+
+    const [frontIdx, midIdx, backIdx] = bpSlotsRef.current;
+    const frontCard = bpCardAnims[frontIdx];
+    const midCard = bpCardAnims[midIdx];
+    const backCard = bpCardAnims[backIdx];
+
+    // Phase 1: Top card slides smoothly out to the right (like a dealer sliding card off deck)
+    Animated.parallel([
+      Animated.timing(frontCard.x, {
+        toValue: 90,
+        duration: 180,
+        easing: Easing.bezier(0.25, 1, 0.5, 1),
+        useNativeDriver: true,
+      }),
+      Animated.timing(frontCard.rotate, {
+        toValue: 6,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(frontCard.scale, {
+        toValue: 0.98,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Phase 2: Switch z-indices while front card is completely out to the right
+      setBpZIndices((prev) => {
+        const next = [...prev];
+        next[frontIdx] = 1;
+        next[midIdx] = 3;
+        next[backIdx] = 2;
+        return next;
+      });
+
+      // Phase 3: Front card slides back IN underneath into back slot (Slot 2)
+      // Simultaneously, Mid card rises smoothly to Front (Slot 0), Back card rises to Mid (Slot 1)
+      Animated.parallel([
+        // Front card slides into back slot (Slot 2):
+        Animated.timing(frontCard.x, {
+          toValue: 0,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(frontCard.y, {
+          toValue: 16,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(frontCard.scale, {
+          toValue: 0.88,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(frontCard.rotate, {
+          toValue: -2.5,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(frontCard.opacity, {
+          toValue: 0.60,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+
+        // Mid card rises to front slot (Slot 0):
+        Animated.timing(midCard.y, {
+          toValue: 0,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(midCard.scale, {
+          toValue: 1.0,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(midCard.rotate, {
+          toValue: 0,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(midCard.opacity, {
+          toValue: 1.0,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+
+        // Back card rises to mid slot (Slot 1):
+        Animated.timing(backCard.y, {
+          toValue: 8,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backCard.scale, {
+          toValue: 0.94,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backCard.rotate, {
+          toValue: 2.5,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backCard.opacity, {
+          toValue: 0.85,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        bpSlotsRef.current = [midIdx, backIdx, frontIdx];
+        setActiveBlueprintIdx(midIdx);
+        isCyclingBlueprint.current = false;
+      });
+    });
+  }, [bpCardAnims]);
+
+  useEffect(() => {
+    if (currentStep !== 5) return;
+    const interval = setInterval(() => {
+      cycleBlueprintCard();
+    }, 3800);
+    return () => clearInterval(interval);
+  }, [currentStep, cycleBlueprintCard]);
+
+  // ── Step 5: Pure Physical 3-Card Stack Loop Swipe Function (Zero Snapback, Infinite Loop) ──
+  const swipeProfile = useCallback(
+    (isLike) => {
+      if (isSwipingProfileRef.current) return;
+      isSwipingProfileRef.current = true;
+      safeHaptic(isLike ? 'medium' : 'light');
+
+      const [frontIdx, midIdx, backIdx] = profileSlotsRef.current;
+      const frontAnim = profileCardAnims[frontIdx];
+      const midAnim = profileCardAnims[midIdx];
+      const backAnim = profileCardAnims[backIdx];
+
+      const flingDir = isLike ? 1 : -1;
+      const flingX = flingDir * (SCREEN_WIDTH + 140);
+      const flingRot = flingDir * 12;
+
+      Animated.parallel([
+        // 1. Top card flings off screen (fast, fluid):
+        Animated.timing(frontAnim.x, {
+          toValue: flingX,
+          duration: 220,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        }),
+        Animated.timing(frontAnim.rotate, {
+          toValue: flingRot,
+          duration: 220,
+          useNativeDriver: false,
+        }),
+        Animated.timing(frontAnim.opacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(likeStampOpacity, { toValue: 0, duration: 150, useNativeDriver: false }),
+        Animated.timing(nopeStampOpacity, { toValue: 0, duration: 150, useNativeDriver: false }),
+
+        // 2. 2nd card (mid) ZOOMS IN from 0.94 to 1.0, glides down from -22 to 0, and un-dims from 0.35 to 0.0 (dimmed -> bright!):
+        Animated.timing(midAnim.scale, {
+          toValue: 1.0,
+          duration: 220,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        }),
+        Animated.timing(midAnim.y, {
+          toValue: 0,
+          duration: 220,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        }),
+        Animated.timing(midAnim.dimmer, {
+          toValue: 0.0,
+          duration: 220,
+          useNativeDriver: false,
+        }),
+
+        // 3. 3rd card (back) ZOOMS IN from 0.88 to 0.94, glides down from -42 to -22, and un-dims from 0.65 to 0.35:
+        Animated.timing(backAnim.scale, {
+          toValue: 0.94,
+          duration: 220,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        }),
+        Animated.timing(backAnim.y, {
+          toValue: -22,
+          duration: 220,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        }),
+        Animated.timing(backAnim.dimmer, {
+          toValue: 0.35,
+          duration: 220,
+          useNativeDriver: false,
+        }),
+      ]).start(() => {
+        // Phase 2: Rotate slots: Mid is now Front (Slot 0), Back is now Mid (Slot 1), Front is now Back (Slot 2)
+        profileSlotsRef.current = [midIdx, backIdx, frontIdx];
+
+        // Update z-indices so new front is on top (3), mid is (2), back is (1)
+        setProfileZIndices((prev) => {
+          const next = [...prev];
+          next[midIdx] = 3;
+          next[backIdx] = 2;
+          next[frontIdx] = 1;
+          return next;
+        });
+
+        // Update active profile index to update subtitle and simulated chat
+        setActiveProfileIdx(midIdx);
+
+        // Position the swiped card behind the deck in Slot 2 (scale 0.88, y -42, dimmer 0.65)
+        frontAnim.x.setValue(0);
+        frontAnim.y.setValue(-42);
+        frontAnim.scale.setValue(0.88);
+        frontAnim.rotate.setValue(0);
+        frontAnim.dimmer.setValue(0.65);
+
+        // Seamlessly reveal it in the back slot behind the other two cards
+        Animated.timing(frontAnim.opacity, {
+          toValue: 1.0,
+          duration: 180,
+          useNativeDriver: false,
+        }).start(() => {
+          isSwipingProfileRef.current = false;
+        });
+      });
+    },
+    [profileCardAnims, likeStampOpacity, nopeStampOpacity]
+  );
 
   const panResponder = useMemo(
     () =>
@@ -1294,91 +1784,114 @@ export default function OnboardingScreen({ navigation }) {
         onStartShouldSetPanResponder: () => false,
         onStartShouldSetPanResponderCapture: () => false,
         onMoveShouldSetPanResponder: (_, gestureState) =>
-          Math.abs(gestureState.dx) > 6 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+          !isSwipingProfileRef.current &&
+          Math.abs(gestureState.dx) > 6 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
         onMoveShouldSetPanResponderCapture: (_, gestureState) =>
-          Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+          !isSwipingProfileRef.current &&
+          Math.abs(gestureState.dx) > 8 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
         onPanResponderGrant: () => {
-          setIsCardSwiping(true);
-          cardPan.stopAnimation();
+          const [frontIdx] = profileSlotsRef.current;
+          profileCardAnims[frontIdx].x.stopAnimation();
+          profileCardAnims[frontIdx].y.stopAnimation();
+          profileCardAnims[frontIdx].rotate.stopAnimation();
         },
         onPanResponderMove: (_, gestureState) => {
-          cardPan.setValue({ x: gestureState.dx, y: gestureState.dy * 0.3 });
+          if (isSwipingProfileRef.current) return;
+          const [frontIdx, midIdx, backIdx] = profileSlotsRef.current;
+          const frontAnim = profileCardAnims[frontIdx];
+          const midAnim = profileCardAnims[midIdx];
+          const backAnim = profileCardAnims[backIdx];
+
+          const dx = gestureState.dx;
+          const dy = gestureState.dy;
+
+          // 1. Move Front Card:
+          frontAnim.x.setValue(dx);
+          frontAnim.y.setValue(dy * 0.22);
+          frontAnim.rotate.setValue(dx * 0.05);
+
+          // 2. Stamps:
+          if (dx > 18) {
+            likeStampOpacity.setValue(Math.min((dx - 18) / 50, 1));
+            nopeStampOpacity.setValue(0);
+          } else if (dx < -18) {
+            nopeStampOpacity.setValue(Math.min((-dx - 18) / 50, 1));
+            likeStampOpacity.setValue(0);
+          } else {
+            likeStampOpacity.setValue(0);
+            nopeStampOpacity.setValue(0);
+          }
+
+          // 3. Zoom-in and un-dim the 2nd (dimmed) card to bright as 1st card is swiped!
+          const progress = Math.min(Math.abs(dx) / 120, 1);
+
+          // Mid card (Slot 1) zooms in from 0.94 to 1.0, y glides from -22 to 0, dimmer un-dims from 0.35 to 0.0:
+          midAnim.scale.setValue(0.94 + progress * (1.0 - 0.94));
+          midAnim.y.setValue(-22 + progress * 22);
+          midAnim.dimmer.setValue(0.35 - progress * 0.35);
+
+          // Back card (Slot 2) zooms in from 0.88 to 0.94, y glides from -42 to -22, dimmer un-dims from 0.65 to 0.35:
+          backAnim.scale.setValue(0.88 + progress * (0.94 - 0.88));
+          backAnim.y.setValue(-42 + progress * 20);
+          backAnim.dimmer.setValue(0.65 - progress * (0.65 - 0.35));
         },
         onPanResponderTerminationRequest: () => false,
         onShouldBlockAppResponder: () => true,
         onPanResponderTerminate: () => {
-          setIsCardSwiping(false);
-          Animated.spring(cardPan, {
-            toValue: { x: 0, y: 0 },
-            friction: 7,
-            tension: 90,
-            useNativeDriver: false,
-          }).start();
+          const [frontIdx, midIdx, backIdx] = profileSlotsRef.current;
+          const frontAnim = profileCardAnims[frontIdx];
+          const midAnim = profileCardAnims[midIdx];
+          const backAnim = profileCardAnims[backIdx];
+
+          Animated.parallel([
+            Animated.spring(frontAnim.x, { toValue: 0, friction: 7, tension: 40, useNativeDriver: false }),
+            Animated.spring(frontAnim.y, { toValue: 0, friction: 7, tension: 40, useNativeDriver: false }),
+            Animated.spring(frontAnim.rotate, { toValue: 0, friction: 7, tension: 40, useNativeDriver: false }),
+            Animated.timing(likeStampOpacity, { toValue: 0, duration: 150, useNativeDriver: false }),
+            Animated.timing(nopeStampOpacity, { toValue: 0, duration: 150, useNativeDriver: false }),
+
+            Animated.spring(midAnim.scale, { toValue: 0.94, friction: 7, tension: 40, useNativeDriver: false }),
+            Animated.spring(midAnim.y, { toValue: -22, friction: 7, tension: 40, useNativeDriver: false }),
+            Animated.timing(midAnim.dimmer, { toValue: 0.35, duration: 180, useNativeDriver: false }),
+
+            Animated.spring(backAnim.scale, { toValue: 0.88, friction: 7, tension: 40, useNativeDriver: false }),
+            Animated.spring(backAnim.y, { toValue: -42, friction: 7, tension: 40, useNativeDriver: false }),
+            Animated.timing(backAnim.dimmer, { toValue: 0.65, duration: 180, useNativeDriver: false }),
+          ]).start();
         },
         onPanResponderRelease: (_, gestureState) => {
-          setIsCardSwiping(false);
-          const swipeThreshold = 75;
-          if (gestureState.dx > swipeThreshold) {
-            // Swipe Right -> Like
-            safeHaptic('medium');
-            Animated.timing(cardPan, {
-              toValue: { x: SCREEN_WIDTH + 140, y: gestureState.dy * 0.4 },
-              duration: 200,
-              easing: Easing.out(Easing.quad),
-              useNativeDriver: false,
-            }).start(() => {
-              setActiveProfileIdx((prev) => (prev + 1) % PREVIEW_PROFILES.length);
-              cardPan.setValue({ x: 0, y: 0 });
-            });
-          } else if (gestureState.dx < -swipeThreshold) {
-            // Swipe Left -> Pass
-            safeHaptic('light');
-            Animated.timing(cardPan, {
-              toValue: { x: -SCREEN_WIDTH - 140, y: gestureState.dy * 0.4 },
-              duration: 200,
-              easing: Easing.out(Easing.quad),
-              useNativeDriver: false,
-            }).start(() => {
-              setActiveProfileIdx((prev) => (prev + 1) % PREVIEW_PROFILES.length);
-              cardPan.setValue({ x: 0, y: 0 });
-            });
+          const swipeThreshold = 50;
+          if (gestureState.dx > swipeThreshold || gestureState.dx < -swipeThreshold) {
+            const isLike = gestureState.dx > 0;
+            swipeProfile(isLike);
           } else {
-            // Reset to center
-            Animated.spring(cardPan, {
-              toValue: { x: 0, y: 0 },
-              friction: 7,
-              tension: 90,
-              useNativeDriver: false,
-            }).start();
+            const [frontIdx, midIdx, backIdx] = profileSlotsRef.current;
+            const frontAnim = profileCardAnims[frontIdx];
+            const midAnim = profileCardAnims[midIdx];
+            const backAnim = profileCardAnims[backIdx];
+
+            Animated.parallel([
+              Animated.spring(frontAnim.x, { toValue: 0, friction: 7, tension: 40, useNativeDriver: false }),
+              Animated.spring(frontAnim.y, { toValue: 0, friction: 7, tension: 40, useNativeDriver: false }),
+              Animated.spring(frontAnim.rotate, { toValue: 0, friction: 7, tension: 40, useNativeDriver: false }),
+              Animated.timing(likeStampOpacity, { toValue: 0, duration: 150, useNativeDriver: false }),
+              Animated.timing(nopeStampOpacity, { toValue: 0, duration: 150, useNativeDriver: false }),
+
+              Animated.spring(midAnim.scale, { toValue: 0.94, friction: 7, tension: 40, useNativeDriver: false }),
+              Animated.spring(midAnim.y, { toValue: 8, friction: 7, tension: 40, useNativeDriver: false }),
+              Animated.timing(midAnim.dimmer, { toValue: 0.35, duration: 180, useNativeDriver: false }),
+
+              Animated.spring(backAnim.scale, { toValue: 0.88, friction: 7, tension: 40, useNativeDriver: false }),
+              Animated.spring(backAnim.y, { toValue: 16, friction: 7, tension: 40, useNativeDriver: false }),
+              Animated.timing(backAnim.dimmer, { toValue: 0.65, duration: 180, useNativeDriver: false }),
+            ]).start();
           }
         },
       }),
-    [cardPan]
+    [profileCardAnims, swipeProfile, likeStampOpacity, nopeStampOpacity]
   );
-
-  const cardRotate = cardPan.x.interpolate({
-    inputRange: [-SCREEN_WIDTH * 0.5, 0, SCREEN_WIDTH * 0.5],
-    outputRange: ['-14deg', '0deg', '14deg'],
-    extrapolate: 'clamp',
-  });
-
-  const likeStampOpacity = cardPan.x.interpolate({
-    inputRange: [20, 80],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-
-  const nopeStampOpacity = cardPan.x.interpolate({
-    inputRange: [-80, -20],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  const nextCardScale = cardPan.x.interpolate({
-    inputRange: [-SCREEN_WIDTH * 0.5, 0, SCREEN_WIDTH * 0.5],
-    outputRange: [1.0, 0.94, 1.0],
-    extrapolate: 'clamp',
-  });
 
   useEffect(() => {
     if (currentStep === 5) {
@@ -1554,8 +2067,37 @@ export default function OnboardingScreen({ navigation }) {
     if (currentStep === 5) {
       safeHaptic('medium');
       engineCardAnim.setValue(0);
-      cardPan.setValue({ x: 0, y: 0 });
       laserBeamAnim.setValue(0);
+
+      // Reset profile deck slots & resting physics
+      profileSlotsRef.current = [0, 1, 2];
+      setActiveProfileIdx(0);
+      setProfileZIndices([3, 2, 1]);
+      isSwipingProfileRef.current = false;
+
+      profileCardAnims[0].x.setValue(0);
+      profileCardAnims[0].y.setValue(0);
+      profileCardAnims[0].scale.setValue(1.0);
+      profileCardAnims[0].rotate.setValue(0);
+      profileCardAnims[0].opacity.setValue(1.0);
+      profileCardAnims[0].dimmer.setValue(0.0);
+
+      profileCardAnims[1].x.setValue(0);
+      profileCardAnims[1].y.setValue(-22);
+      profileCardAnims[1].scale.setValue(0.94);
+      profileCardAnims[1].rotate.setValue(0);
+      profileCardAnims[1].opacity.setValue(1.0);
+      profileCardAnims[1].dimmer.setValue(0.35);
+
+      profileCardAnims[2].x.setValue(0);
+      profileCardAnims[2].y.setValue(-42);
+      profileCardAnims[2].scale.setValue(0.88);
+      profileCardAnims[2].rotate.setValue(0);
+      profileCardAnims[2].opacity.setValue(1.0);
+      profileCardAnims[2].dimmer.setValue(0.65);
+
+      likeStampOpacity.setValue(0);
+      nopeStampOpacity.setValue(0);
 
       sequenceAnim = Animated.spring(engineCardAnim, {
         toValue: 1,
@@ -1615,32 +2157,78 @@ export default function OnboardingScreen({ navigation }) {
     setWhatsapp(cleanPhoneInput(text, maxPhoneLength));
   };
 
-  // ── Direction-Aware Smooth Step Transitions ──
+  // ── Native-Equivalent Multi-Stage Viewport Interpolations (Full Screen Width Slides) ──
+  const step1TranslateX = stepIndexAnim.interpolate({
+    inputRange: [1, 2, 3, 4, 5],
+    outputRange: [0, -SCREEN_WIDTH * 0.35, -SCREEN_WIDTH * 0.7, -SCREEN_WIDTH, -SCREEN_WIDTH * 1.3],
+    extrapolate: 'clamp',
+  });
+  const step1Opacity = stepIndexAnim.interpolate({
+    inputRange: [1, 1.7, 2],
+    outputRange: [1, 0.2, 0],
+    extrapolate: 'clamp',
+  });
+
+  const step2TranslateX = stepIndexAnim.interpolate({
+    inputRange: [1, 2, 3, 4, 5],
+    outputRange: [SCREEN_WIDTH, 0, -SCREEN_WIDTH * 0.35, -SCREEN_WIDTH * 0.7, -SCREEN_WIDTH],
+    extrapolate: 'clamp',
+  });
+  const step2Opacity = stepIndexAnim.interpolate({
+    inputRange: [1, 1.3, 2, 2.7, 3],
+    outputRange: [0, 0.2, 1, 0.2, 0],
+    extrapolate: 'clamp',
+  });
+
+  const step3TranslateX = stepIndexAnim.interpolate({
+    inputRange: [1, 2, 3, 4, 5],
+    outputRange: [SCREEN_WIDTH * 2, SCREEN_WIDTH, 0, -SCREEN_WIDTH * 0.35, -SCREEN_WIDTH * 0.7],
+    extrapolate: 'clamp',
+  });
+  const step3Opacity = stepIndexAnim.interpolate({
+    inputRange: [2, 2.3, 3, 3.7, 4],
+    outputRange: [0, 0.2, 1, 0.2, 0],
+    extrapolate: 'clamp',
+  });
+
+  const step4TranslateX = stepIndexAnim.interpolate({
+    inputRange: [1, 2, 3, 4, 5],
+    outputRange: [SCREEN_WIDTH * 3, SCREEN_WIDTH * 2, SCREEN_WIDTH, 0, -SCREEN_WIDTH * 0.35],
+    extrapolate: 'clamp',
+  });
+  const step4Opacity = stepIndexAnim.interpolate({
+    inputRange: [3, 3.3, 4, 4.7, 5],
+    outputRange: [0, 0.2, 1, 0.2, 0],
+    extrapolate: 'clamp',
+  });
+
+  const step5TranslateX = stepIndexAnim.interpolate({
+    inputRange: [1, 2, 3, 4, 5],
+    outputRange: [SCREEN_WIDTH * 4, SCREEN_WIDTH * 3, SCREEN_WIDTH * 2, SCREEN_WIDTH, 0],
+    extrapolate: 'clamp',
+  });
+  const step5Opacity = stepIndexAnim.interpolate({
+    inputRange: [4, 4.4, 5],
+    outputRange: [0, 0.2, 1],
+    extrapolate: 'clamp',
+  });
+
+  // ── Native 60/120 FPS Step Transitions matching Landing Slide ──
   const transitionToStep = (newStep) => {
-    const isForward = newStep > currentStep;
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 130,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start(() => {
-      setCurrentStep(newStep);
-      slideAnim.setValue(isForward ? 28 : -28);
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 220,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 80,
-          friction: 9,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    safeHaptic('light');
+    Keyboard.dismiss();
+    trackingService.trackEvent('onboarding_step_completed', {
+      from_step: currentStep,
+      to_step: newStep,
     });
+    setCurrentStep(newStep);
+
+    Animated.timing(stepIndexAnim, {
+      toValue: newStep,
+      duration: 320,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+      useNativeDriver: true,
+    }).start();
   };
 
   const handleNext = () => {
@@ -1658,19 +2246,44 @@ export default function OnboardingScreen({ navigation }) {
       transitionToStep(currentStep + 1);
     } else {
       safeHaptic('success');
-      navigation.replace('PlatformSelect', {
-        onboardingData: {
-          platform: selectedPlatform,
-          country,
-          languages: selectedLanguages,
-          dialCode,
-          whatsapp,
-          goals: selectedGoals,
-          frequency,
-          personality,
-          safeMode,
-        },
+      const tz = typeof Intl !== 'undefined' && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
+      const onboardingData = {
+        platform: selectedPlatform,
+        country,
+        languages: selectedLanguages,
+        dialCode,
+        whatsapp,
+        goals: selectedGoals,
+        frequency,
+        personality,
+        safeMode,
+        device_os: Platform.OS,
+        device_os_version: String(Platform.Version),
+        timezone: tz || 'UTC',
+        app_version: '1.0.0',
+      };
+
+      trackingService.trackEvent('onboarding_completed', {
+        country,
+        languages_count: selectedLanguages.length,
+        goals: selectedGoals,
+        personality,
+        frequency,
+        safeMode,
+        timezone: tz || 'UTC',
       });
+
+      try {
+        AsyncStorage.setItem('@flint_onboarding_data', JSON.stringify(onboardingData)).catch(() => {});
+        AsyncStorage.setItem('@flint_has_completed_onboarding', 'true').catch(() => {});
+      } catch (_) {}
+
+      navigation.dispatch(
+        StackActions.push('Auth', {
+          initialMode: 'signup',
+          onboardingData,
+        })
+      );
     }
   };
 
@@ -1679,7 +2292,11 @@ export default function OnboardingScreen({ navigation }) {
     if (currentStep > 1) {
       transitionToStep(currentStep - 1);
     } else {
-      navigation.navigate('Auth');
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('Auth');
+      }
     }
   };
 
@@ -1829,6 +2446,55 @@ export default function OnboardingScreen({ navigation }) {
     outputRange: [0.55, 0.25, 0],
   });
 
+  const BLUEPRINT_DECK = useMemo(
+    () => [
+      {
+        id: 'intentions',
+        stepNumber: '01 / 03',
+        category: 'YOUR DATING GOAL',
+        icon: 'heart',
+        iconColor: '#FF6584',
+        title: goalsSummary.title,
+        detail: goalsSummary.detail,
+        suit: '♥',
+        badgeBg: 'rgba(255, 101, 132, 0.18)',
+        gradient: ['rgba(44, 16, 32, 0.96)', 'rgba(22, 8, 18, 0.98)'],
+        borderColor: 'rgba(255, 101, 132, 0.45)',
+        accentGlow: '#FF3366',
+      },
+      {
+        id: 'vibe',
+        stepNumber: '02 / 03',
+        category: 'YOUR FLIRT STYLE',
+        icon: 'sparkles',
+        iconColor: currentPersonalityObj.accentColor,
+        title: `${currentPersonalityObj.label} & Charming`,
+        detail: 'Tailored opening lines and banter drafted in your authentic voice.',
+        suit: '★',
+        badgeBg: `${currentPersonalityObj.accentColor}25`,
+        gradient: ['rgba(38, 18, 52, 0.96)', 'rgba(18, 8, 28, 0.98)'],
+        borderColor: `${currentPersonalityObj.accentColor}50`,
+        accentGlow: currentPersonalityObj.accentColor,
+      },
+      {
+        id: 'scene',
+        stepNumber: '03 / 03',
+        category: 'LOCAL DATING',
+        icon: 'location-sharp',
+        iconColor: '#00E676',
+        title: `Made for ${country} ${getCountryFlag(country)}`,
+        detail: 'Paced naturally to match how people actually connect in your city.',
+        suit: '✦',
+        badgeBg: 'rgba(0, 230, 118, 0.18)',
+        gradient: ['rgba(14, 38, 28, 0.96)', 'rgba(8, 22, 16, 0.98)'],
+        borderColor: 'rgba(0, 230, 118, 0.45)',
+        accentGlow: '#00E676',
+      },
+    ],
+    [goalsSummary, currentPersonalityObj, country]
+  );
+
+
   const currentMatch = PREVIEW_PROFILES[activeProfileIdx] || PREVIEW_PROFILES[1];
   const nextMatch = PREVIEW_PROFILES[(activeProfileIdx + 1) % PREVIEW_PROFILES.length];
   const thirdMatch = PREVIEW_PROFILES[(activeProfileIdx + 2) % PREVIEW_PROFILES.length];
@@ -1844,48 +2510,60 @@ export default function OnboardingScreen({ navigation }) {
         style={StyleSheet.absoluteFill}
       />
 
-      {/* ── 2. Living Ambient Aurora Orbs ── */}
-      <Animated.View
-        style={[
-          styles.auroraOrb1,
-          {
-            opacity: auroraOpacity1,
-            transform: [
-              { translateY: auroraFloat1 },
-              { scale: auroraScale1 },
-            ],
-          },
-        ]}
+      {/* ── 2. Living Ambient Aurora Orbs (Strictly Clipped Within Screen Boundary) ── */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: SCREEN_WIDTH,
+          height: SCREEN_HEIGHT,
+          overflow: 'hidden',
+        }}
         pointerEvents="none"
       >
-        <LinearGradient
-          colors={['#FF3366', '#FF5E7E', '#FFAA80', 'transparent']}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0.2, y: 0.1 }}
-          end={{ x: 0.8, y: 0.9 }}
-        />
-      </Animated.View>
+        <Animated.View
+          style={[
+            styles.auroraOrb1,
+            {
+              opacity: auroraOpacity1,
+              transform: [
+                { translateY: auroraFloat1 },
+                { scale: auroraScale1 },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['rgba(255, 51, 102, 0.40)', 'rgba(255, 94, 126, 0.28)', 'rgba(255, 170, 128, 0.14)', 'transparent']}
+            locations={[0, 0.35, 0.7, 1]}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0.2, y: 0.1 }}
+            end={{ x: 0.8, y: 0.9 }}
+          />
+        </Animated.View>
 
-      <Animated.View
-        style={[
-          styles.auroraOrb2,
-          {
-            opacity: auroraOpacity2,
-            transform: [
-              { translateY: auroraFloat2 },
-              { scale: auroraScale2 },
-            ],
-          },
-        ]}
-        pointerEvents="none"
-      >
-        <LinearGradient
-          colors={['#7928CA', '#9333EA', '#FF0080', 'transparent']}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0.1, y: 0.2 }}
-          end={{ x: 0.9, y: 0.8 }}
-        />
-      </Animated.View>
+        <Animated.View
+          style={[
+            styles.auroraOrb2,
+            {
+              opacity: auroraOpacity2,
+              transform: [
+                { translateY: auroraFloat2 },
+                { scale: auroraScale2 },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['rgba(121, 40, 202, 0.42)', 'rgba(147, 51, 234, 0.30)', 'rgba(255, 0, 128, 0.16)', 'transparent']}
+            locations={[0, 0.35, 0.7, 1]}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0.1, y: 0.2 }}
+            end={{ x: 0.9, y: 0.8 }}
+          />
+        </Animated.View>
+      </View>
 
       {/* ── 3. Subtle Vignette Scrim ── */}
       <LinearGradient
@@ -1896,125 +2574,50 @@ export default function OnboardingScreen({ navigation }) {
       />
 
       <SafeAreaView style={styles.safeArea}>
-        {/* ── Header: Brand / Back, Sign In Pill ── */}
-        <View style={styles.header}>
-          {currentStep > 1 ? (
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={handleBack}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-            >
-              <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.headerLogoWrap}
-              onPress={handleBack}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Return to Welcome"
-            >
-              <LinearGradient
-                colors={['#FF3366', '#FFAA80']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.headerLogoGradient}
-              >
-                <Ionicons name="flame" size={17} color="#FFFFFF" />
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-          <View style={styles.headerTitleWrap}>
-            <Ionicons name="flame" size={19} color="#FF3366" style={styles.headerBrandFlame} />
-            <Text style={styles.headerBrandTitle}>Flint</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.headerSignInBtn}
-            onPress={() => {
-              safeHaptic('light');
-              navigation.navigate('Auth');
-            }}
-            activeOpacity={0.75}
-            accessibilityRole="button"
-            accessibilityLabel="Sign In"
-          >
-            <Text style={styles.headerSignInText}>Sign In</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── Segmented Progress Bar & Step Phase (All Steps 1-5) ── */}
-        <View style={[styles.progressContainer, (currentStep === 3 || currentStep === 4) && styles.progressContainerStep3]}>
-          <View style={styles.segmentTrackRow}>
-            {[1, 2, 3, 4, 5].map((stepNum) => {
-              const isFilled = stepNum <= currentStep;
-              const isCurrent = stepNum === currentStep;
-              return (
-                <View key={stepNum} style={styles.segmentTrack}>
-                  {isFilled && (
-                    <LinearGradient
-                      colors={
-                        isCurrent
-                          ? ['#FF3366', '#FFAA80']
-                          : ['#FF3366', '#FF5E7E']
-                      }
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={StyleSheet.absoluteFill}
-                    />
-                  )}
-                </View>
-              );
-            })}
-          </View>
-          <View style={styles.stepCounterRow}>
-            <Text style={styles.stepCounterText}>
-              Step <Text style={styles.stepCounterBold}>{currentStep}</Text> of {totalSteps}
-            </Text>
-
-          </View>
-        </View>
-
         {/* ── Animated Step Viewport ── */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
         >
-          <ScrollView
-            contentContainerStyle={[
-              styles.scrollContent,
-              (currentStep === 3 || currentStep === 4) && styles.scrollContentStep3,
-              currentStep === 5 && styles.scrollContentStep5,
-            ]}
-            scrollEnabled={currentStep === 5 ? !isCardSwiping : true}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            showsVerticalScrollIndicator={false}
-          >
+          <View style={styles.stageViewport}>
+            {/* ── Step 1 Stage Layer ── */}
             <Animated.View
               style={[
-                styles.stepContainer,
+                StyleSheet.absoluteFill,
                 {
-                  opacity: fadeAnim,
-                  transform: [{ translateX: slideAnim }],
+                  transform: [{ translateX: step1TranslateX }],
+                  opacity: step1Opacity,
                 },
               ]}
+              pointerEvents={currentStep === 1 ? 'auto' : 'none'}
             >
-              {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 1: LIVING LIVE COCKPIT PREVIEW                  */}
-              {/* ═════════════════════════════════════════════════════ */}
-              {currentStep === 1 && (
+              <ScrollView
+                style={styles.scrollFlex}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
                 <View>
                   {/* Hero Header */}
                   <View style={styles.heroWrap}>
-                    <Text style={styles.stepTitle}>Better Dates, Less Effort</Text>
-                    <Text style={styles.stepSubtitle}>
-                      Flint finds people you'll actually like, sparks natural conversations, and helps you meet up in real life.
-                    </Text>
+                    <View style={styles.heroHeaderRow}>
+                      <TouchableOpacity
+                        style={styles.backArrowBtn}
+                        onPress={handleBack}
+                        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="Return to Welcome"
+                      >
+                        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <View style={styles.heroTextWrap}>
+                        <Text style={styles.stepTitle}>Better Dates, Less Effort</Text>
+                        <Text style={styles.stepSubtitle}>
+                          Flint finds people you'll actually like, sparks natural conversations, and helps you meet up in real life.
+                        </Text>
+                      </View>
+                    </View>
                   </View>
 
                   {/* Non-Stop Smooth Sliding Cards Showcase */}
@@ -2152,18 +2755,48 @@ export default function OnboardingScreen({ navigation }) {
                     </View>
                   </View>
                 </View>
-              )}
+              </ScrollView>
+            </Animated.View>
 
-              {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 2: ABOUT YOU                                   */}
-              {/* ═════════════════════════════════════════════════════ */}
-              {currentStep === 2 && (
+            {/* ── Step 2 Stage Layer ── */}
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.stageShadowLayer,
+                {
+                  transform: [{ translateX: step2TranslateX }],
+                  opacity: step2Opacity,
+                },
+              ]}
+              pointerEvents={currentStep === 2 ? 'auto' : 'none'}
+            >
+              <ScrollView
+                style={styles.scrollFlex}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+              >
                 <View>
                   <View style={styles.heroWrap}>
-                    <Text style={styles.stepTitle}>About you</Text>
-                    <Text style={styles.stepSubtitle}>
-                      Flint adapts your conversation tone and references so chats feel completely natural in your area.
-                    </Text>
+                    <View style={styles.heroHeaderRow}>
+                      <TouchableOpacity
+                        style={styles.backArrowBtn}
+                        onPress={handleBack}
+                        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="Go back"
+                      >
+                        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <View style={styles.heroTextWrap}>
+                        <Text style={styles.stepTitle}>About you</Text>
+                        <Text style={styles.stepSubtitle}>
+                          Flint adapts your conversation tone and references so chats feel completely natural in your area.
+                        </Text>
+                      </View>
+                    </View>
                   </View>
 
                   {/* Regional Dating Context Card */}
@@ -2459,45 +3092,74 @@ export default function OnboardingScreen({ navigation }) {
                     </LinearGradient>
                   </View>
                 </View>
-              )}
+              </ScrollView>
+            </Animated.View>
 
-              {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 3: WHAT'S YOUR GOAL?                            */}
-              {/* ═════════════════════════════════════════════════════ */}
-              {currentStep === 3 && (
+            {/* ── Step 3 Stage Layer ── */}
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.stageShadowLayer,
+                {
+                  transform: [{ translateX: step3TranslateX }],
+                  opacity: step3Opacity,
+                },
+              ]}
+              pointerEvents={currentStep === 3 ? 'auto' : 'none'}
+            >
+              <ScrollView
+                style={styles.scrollFlex}
+                contentContainerStyle={[styles.scrollContent, styles.scrollContentStep3]}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
                 <View>
                   <View style={styles.step3HeroWrap}>
-                    <Text style={styles.step3Title}>What's Your Goal?</Text>
-                    <View style={styles.goalSubtitleRow}>
-                      <Text style={styles.step3Subtitle}>
-                        {selectedGoals.includes('never_stop')
-                          ? 'Relaxed chat mode is active.'
-                          : "Pick up to 3 things you'd like from your matches."}
-                      </Text>
-                      <Animated.View
-                        style={[
-                          styles.goalCountPill,
-                          selectedGoals.includes('never_stop') && styles.goalCountPillContinuous,
-                          { transform: [{ scale: counterPulse }] },
-                        ]}
+                    <View style={styles.heroHeaderRow}>
+                      <TouchableOpacity
+                        style={styles.backArrowBtn}
+                        onPress={handleBack}
+                        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="Go back"
                       >
-                        <Ionicons
-                          name={selectedGoals.includes('never_stop') ? 'infinite' : 'checkmark-circle'}
-                          size={13}
-                          color={selectedGoals.includes('never_stop') ? '#00E5FF' : '#FF3366'}
-                          style={{ marginRight: 4 }}
-                        />
-                        <Text
-                          style={[
-                            styles.goalCountText,
-                            selectedGoals.includes('never_stop') && styles.goalCountTextContinuous,
-                          ]}
-                        >
-                          {selectedGoals.includes('never_stop')
-                            ? 'Casual Chat'
-                            : `${selectedGoals.length} of 3 chosen`}
-                        </Text>
-                      </Animated.View>
+                        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <View style={styles.heroTextWrap}>
+                        <Text style={styles.stepTitle}>What's Your Goal?</Text>
+                        <View style={styles.goalSubtitleRow}>
+                          <Text style={[styles.stepSubtitle, { flex: 1 }]}>
+                            {selectedGoals.includes('never_stop')
+                              ? 'Relaxed chat mode is active.'
+                              : "Pick up to 3 things you'd like from your matches."}
+                          </Text>
+                          <Animated.View
+                            style={[
+                              styles.goalCountPill,
+                              selectedGoals.includes('never_stop') && styles.goalCountPillContinuous,
+                              { transform: [{ scale: counterPulse }] },
+                            ]}
+                          >
+                            <Ionicons
+                              name={selectedGoals.includes('never_stop') ? 'infinite' : 'checkmark-circle'}
+                              size={13}
+                              color={selectedGoals.includes('never_stop') ? '#00E5FF' : '#FF3366'}
+                              style={{ marginRight: 4 }}
+                            />
+                            <Text
+                              style={[
+                                styles.goalCountText,
+                                selectedGoals.includes('never_stop') && styles.goalCountTextContinuous,
+                              ]}
+                            >
+                              {selectedGoals.includes('never_stop')
+                                ? 'Casual Chat'
+                                : `${selectedGoals.length} of 3 chosen`}
+                            </Text>
+                          </Animated.View>
+                        </View>
+                      </View>
                     </View>
                   </View>
 
@@ -2542,18 +3204,47 @@ export default function OnboardingScreen({ navigation }) {
                     </LinearGradient>
                   </View>
                 </View>
-              )}
+              </ScrollView>
+            </Animated.View>
 
-              {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 4: BEHAVIOR & STYLE                             */}
-              {/* ═════════════════════════════════════════════════════ */}
-              {currentStep === 4 && (
+            {/* ── Step 4 Stage Layer ── */}
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.stageShadowLayer,
+                {
+                  transform: [{ translateX: step4TranslateX }],
+                  opacity: step4Opacity,
+                },
+              ]}
+              pointerEvents={currentStep === 4 ? 'auto' : 'none'}
+            >
+              <ScrollView
+                style={styles.scrollFlex}
+                contentContainerStyle={[styles.scrollContent, styles.scrollContentStep3]}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
                 <View>
                   <View style={styles.step3HeroWrap}>
-                    <Text style={styles.step3Title}>Behavior & Style</Text>
-                    <Text style={styles.step3Subtitle}>
-                      Fine-tune how Flint talks and how actively he replies for you.
-                    </Text>
+                    <View style={styles.heroHeaderRow}>
+                      <TouchableOpacity
+                        style={styles.backArrowBtn}
+                        onPress={handleBack}
+                        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="Go back"
+                      >
+                        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <View style={styles.heroTextWrap}>
+                        <Text style={styles.stepTitle}>Behavior & Style</Text>
+                        <Text style={styles.stepSubtitle}>
+                          Fine-tune how Flint talks and how actively he replies for you.
+                        </Text>
+                      </View>
+                    </View>
                   </View>
 
                   {/* Unified Luxury Glass Settings Card */}
@@ -2849,272 +3540,284 @@ export default function OnboardingScreen({ navigation }) {
                     </LinearGradient>
                   </View>
                 </View>
-              )}
+              </ScrollView>
+            </Animated.View>
 
-              {/* ═════════════════════════════════════════════════════ */}
-              {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 5: YOU'RE ALL SET! (FLUID CALIBRATION PATH)     */}
-              {/* ═════════════════════════════════════════════════════ */}
-              {/* ═════════════════════════════════════════════════════ */}
-              {/* ═════════════════════════════════════════════════════ */}
-              {/* STEP 5: GRAND MATCH HERO & SWIPE DECK ENTRANCE        */}
-              {/* ═════════════════════════════════════════════════════ */}
-              {currentStep === 5 && (
+            {/* ── Step 5 Stage Layer ── */}
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.stageShadowLayer,
+                {
+                  transform: [{ translateX: step5TranslateX }],
+                  opacity: step5Opacity,
+                },
+              ]}
+              pointerEvents={currentStep === 5 ? 'auto' : 'none'}
+            >
+              <ScrollView
+                style={styles.scrollFlex}
+                contentContainerStyle={[styles.scrollContent, styles.scrollContentStep5]}
+                scrollEnabled={false}
+                bounces={false}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.step5Container}>
-                  {/* Executive Entrance Header */}
-                  <View style={styles.heroEntranceHeader}>
-                    <Text style={styles.heroEntranceTitle}>Ready to Match</Text>
-                    <Text style={styles.heroEntranceSubtitle}>
-                      Maya is waiting in your deck · Flint is live & drafting
-                    </Text>
+                  {/* Hero Header matching Steps 1-4 */}
+                  <View style={styles.heroWrap}>
+                    <View style={styles.heroHeaderRow}>
+                      <TouchableOpacity
+                        style={styles.backArrowBtn}
+                        onPress={handleBack}
+                        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="Go back"
+                      >
+                        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <View style={styles.heroTextWrap}>
+                        <Text style={styles.stepTitle}>Ready to Match</Text>
+                        <Text style={styles.stepSubtitle}>
+                          {currentMatch.name.split(',')[0]} is waiting in your deck · Flint is live & drafting
+                        </Text>
+                      </View>
+                    </View>
                   </View>
 
-                  {/* ── 3D Fanned Dating Deck Container ── */}
+                  {/* ── 3D Dating Deck: Pure Physical 3-Card Stack Loop (Zoom-In & Dim-to-Bright) ── */}
                   <View style={styles.deckStackWrap}>
-                    {/* Background Stacked Card (Elena, tilted -4.2 deg) */}
-                    <View style={styles.deckBackCard2}>
-                      <Image
-                        source={thirdMatch.image}
-                        style={styles.deckBackImage}
-                        resizeMode="cover"
-                      />
-                      <View style={styles.deckBackOverlay} />
-                    </View>
+                    {PREVIEW_PROFILES.map((profile, profileIdx) => {
+                      const anim = profileCardAnims[profileIdx];
+                      const isFront = profileSlotsRef.current[0] === profileIdx;
+                      const zIdx = profileZIndices[profileIdx];
 
-                    {/* Background Stacked Card (Sarah, tilted 3.4 deg, scales smoothly as front card is swiped) */}
-                    <Animated.View
-                      style={[
-                        styles.deckBackCard1,
-                        {
-                          transform: [
-                            { rotate: '3.4deg' },
-                            { translateY: -2 },
-                            { scale: nextCardScale },
-                          ],
-                        },
-                      ]}
-                    >
-                      <Image
-                        source={nextMatch.image}
-                        style={styles.deckBackImage}
-                        resizeMode="cover"
-                      />
-                      <View style={styles.deckBackOverlay} />
-                    </Animated.View>
+                      const rotateDeg = anim.rotate.interpolate({
+                        inputRange: [-360, 360],
+                        outputRange: ['-360deg', '360deg'],
+                      });
 
-                    {/* Foreground Hero Match Card (Interactive Swipeable with PanResponder) */}
-                    <Animated.View
-                      {...panResponder.panHandlers}
-                      style={[
-                        styles.heroMatchCard,
-                        {
-                          opacity: engineCardAnim,
-                          transform: [
-                            { translateX: cardPan.x },
-                            { translateY: cardPan.y },
-                            { rotate: cardRotate },
-                          ],
-                        },
-                      ]}
-                    >
-                      {/* Full-Bleed Profile Photo with Face Centering */}
-                      <Image
-                        source={currentMatch.image}
-                        style={styles.heroProfileImage}
-                        resizeMode="cover"
-                      />
+                      return (
+                        <Animated.View
+                          key={profile.id}
+                          {...(isFront ? panResponder.panHandlers : {})}
+                          pointerEvents={isFront ? 'auto' : 'none'}
+                          style={[
+                            styles.heroMatchCard,
+                            {
+                              position: 'absolute',
+                              zIndex: zIdx,
+                              elevation: zIdx * 4,
+                              opacity: anim.opacity,
+                              transform: [
+                                { translateX: anim.x },
+                                { translateY: anim.y },
+                                { rotate: rotateDeg },
+                                { scale: anim.scale },
+                              ],
+                            },
+                          ]}
+                        >
+                          {/* Full-Bleed Profile Photo with Natural Face Framing */}
+                          <Image
+                            source={profile.image}
+                            style={styles.heroProfileImage}
+                            resizeMode="cover"
+                          />
 
-                      {/* Top Vignette Gradient for Badges */}
-                      <LinearGradient
-                        colors={['rgba(12, 6, 18, 0.65)', 'transparent']}
-                        style={styles.heroTopScrim}
-                      />
+                          {/* Top Vignette Gradient for Badges */}
+                          <LinearGradient
+                            colors={['rgba(10, 4, 15, 0.65)', 'transparent']}
+                            style={styles.heroTopScrim}
+                          />
 
-                      {/* Top Floating Glass Badges Row: Only 98% Match (WINGMAN ACTIVE REMOVED per user request) */}
-                      <View style={styles.heroTopBadgesRow}>
-                        <View style={styles.heroCompatibilityBadge}>
-                          <Ionicons name="flame" size={12} color="#FF5E7E" />
-                          <Text style={styles.heroCompatibilityText}>{currentMatch.matchScore || '98% Match'}</Text>
-                        </View>
-                      </View>
-
-                      {/* Glowing LIKE Stamp (reveals on drag right) */}
-                      <Animated.View style={[styles.stampLikeWrap, { opacity: likeStampOpacity }]} pointerEvents="none">
-                        <View style={styles.stampLikeBorder}>
-                          <Text style={styles.stampLikeText}>LIKE</Text>
-                        </View>
-                      </Animated.View>
-
-                      {/* Glowing NOPE Stamp (reveals on drag left) */}
-                      <Animated.View style={[styles.stampNopeWrap, { opacity: nopeStampOpacity }]} pointerEvents="none">
-                        <View style={styles.stampNopeBorder}>
-                          <Text style={styles.stampNopeText}>NOPE</Text>
-                        </View>
-                      </Animated.View>
-
-                      {/* ── Frosted Glass Live Chat Dock (Anchored at Card Base) ── */}
-                      <View style={styles.heroFrostedDock}>
-                        {/* Match Profile Identity */}
-                        <View style={styles.heroDockHeader}>
-                          <View style={styles.heroNameRow}>
-                            <Text style={styles.heroNameText}>{currentMatch.name}</Text>
-                            <Ionicons name="checkmark-circle" size={14} color="#00E676" style={{ marginLeft: 4 }} />
-                          </View>
-                          <View style={styles.heroLocationRow}>
-                            <Ionicons name="location-sharp" size={10.5} color="#FF5E7E" />
-                            <Text style={styles.heroLocationText} numberOfLines={1}>
-                              {currentMatch.sub.split('&')[0].trim()} · {country} {getCountryFlag(country)}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {/* Match's Incoming Message */}
-                        <View style={styles.heroIncomingBubble}>
-                          <Text style={styles.heroIncomingText} numberOfLines={2}>
-                            {activeSimChat.incomingMessage}
-                          </Text>
-                        </View>
-
-                        {/* Flint Wingman Outgoing Message */}
-                        {simPhase === 'typing' ? (
-                          <View style={styles.heroTypingDock}>
-                            <Ionicons name="sparkles" size={10} color="#FFAA80" />
-                            <Text style={styles.heroTypingText}>
-                              Flint drafting in your {currentPersonalityObj.label} vibe...
-                            </Text>
-                            <View style={styles.vipTypingDotsWrap}>
-                              <Animated.View style={[styles.vipTypingDot, { transform: [{ translateY: typingDot1 }] }]} />
-                              <Animated.View style={[styles.vipTypingDot, { transform: [{ translateY: typingDot2 }] }]} />
-                              <Animated.View style={[styles.vipTypingDot, { transform: [{ translateY: typingDot3 }] }]} />
+                          {/* Top Floating Badges Row */}
+                          <View style={styles.heroTopBadgesRow}>
+                            <View style={styles.heroCompatibilityBadge}>
+                              <Ionicons name="flame" size={13} color="#FF5E7E" />
+                              <Text style={styles.heroCompatibilityText}>{profile.matchScore || '98% Match'}</Text>
                             </View>
+                            {isFront && (
+                              <View style={styles.heroSwipeHintBadge}>
+                                <Ionicons name="swap-horizontal" size={12} color="rgba(255, 255, 255, 0.7)" />
+                                <Text style={styles.heroSwipeHintText}>Swipe card</Text>
+                              </View>
+                            )}
                           </View>
-                        ) : (
+
+                          {/* Glowing LIKE Stamp (reveals on drag right, front card only) */}
+                          {isFront && (
+                            <Animated.View style={[styles.stampLikeWrap, { opacity: likeStampOpacity }]} pointerEvents="none">
+                              <View style={styles.stampLikeBorder}>
+                                <Text style={styles.stampLikeText}>LIKE</Text>
+                              </View>
+                            </Animated.View>
+                          )}
+
+                          {/* Glowing NOPE Stamp (reveals on drag left, front card only) */}
+                          {isFront && (
+                            <Animated.View style={[styles.stampNopeWrap, { opacity: nopeStampOpacity }]} pointerEvents="none">
+                              <View style={styles.stampNopeBorder}>
+                                <Text style={styles.stampNopeText}>NOPE</Text>
+                              </View>
+                            </Animated.View>
+                          )}
+
+                          {/* ── Sleek Frosted Gradient Bottom Dock ── */}
+                          <LinearGradient
+                            colors={['transparent', 'rgba(10, 4, 15, 0.72)', 'rgba(8, 3, 12, 0.96)']}
+                            locations={[0, 0.32, 1]}
+                            style={styles.heroFrostedDock}
+                          >
+                            <View style={styles.heroDockHeader}>
+                              <View style={styles.heroIdentityCol}>
+                                <View style={styles.heroNameRow}>
+                                  <Text style={styles.heroNameText}>{profile.name}</Text>
+                                  <Ionicons name="checkmark-circle" size={15} color="#00E676" style={{ marginLeft: 5 }} />
+                                </View>
+                                <Text style={styles.heroLocationText} numberOfLines={1}>
+                                  {profile.sub.split('&')[0].trim()} · 2 miles away
+                                </Text>
+                              </View>
+
+                              {isFront && (
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    safeHaptic('light');
+                                    setCardOpenerIndex((prev) => prev + 1);
+                                  }}
+                                  activeOpacity={0.7}
+                                  style={styles.shuffleCircleBtn}
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Shuffle opener"
+                                >
+                                  <Ionicons name="refresh" size={13} color="#FFAA80" />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+
+                            {/* AI Wingman Icebreaker Pill */}
+                            <View style={styles.icebreakerPill}>
+                              <View style={styles.icebreakerHeaderRow}>
+                                <Ionicons name="sparkles" size={11} color={currentPersonalityObj.accentColor} />
+                                <Text style={[styles.icebreakerTag, { color: currentPersonalityObj.accentColor }]}>
+                                  Flint Icebreaker · {currentPersonalityObj.label}
+                                </Text>
+                              </View>
+                              <Text style={styles.icebreakerQuoteText} numberOfLines={2}>
+                                "{getPersonalizedOpener(profile.id, personality, cardOpenerIndex)}"
+                              </Text>
+                            </View>
+                          </LinearGradient>
+
+                          {/* ── Dimmer Overlay: Makes 2nd & 3rd cards dimmed, smoothly un-dimming to 0 (bright!) on zoom-in ── */}
                           <Animated.View
                             style={[
-                              styles.heroAiBubble,
+                              StyleSheet.absoluteFillObject,
+                              { backgroundColor: '#07030B', opacity: anim.dimmer },
+                            ]}
+                            pointerEvents="none"
+                          />
+                        </Animated.View>
+                      );
+                    })}
+                  </View>
+
+                  {/* ── Soulful Match Blueprint Playing Cards Stack Carousel ── */}
+                  <View style={styles.blueprintDeckSection}>
+                    {/* Header Row: Title + Card Deck Pips + Tap to Flip Hint */}
+                    <View style={styles.blueprintDeckHeader}>
+                      <View style={styles.blueprintHeaderLeft}>
+                        <Ionicons name="sparkles" size={13} color="#FF6584" />
+                        <Text style={styles.blueprintDeckTitle}>Your Dating Game Plan</Text>
+                      </View>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={cycleBlueprintCard}
+                        style={styles.blueprintCycleHintBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel="Cycle blueprint card"
+                      >
+                        <Text style={styles.blueprintCycleHintText}>Tap to cycle</Text>
+                        <Ionicons name="refresh" size={11} color="rgba(255, 170, 128, 0.85)" />
+                        <View style={styles.blueprintPipsRow}>
+                          {[0, 1, 2].map((idx) => (
+                            <View
+                              key={idx}
+                              style={[
+                                styles.blueprintPip,
+                                activeBlueprintIdx === idx && styles.blueprintPipActive,
+                              ]}
+                            />
+                          ))}
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Interactive 3D Stack of Playing Cards (Native-Driven Apple/Revolut Slot Physics) */}
+                    <TouchableOpacity
+                      activeOpacity={0.92}
+                      onPress={cycleBlueprintCard}
+                      style={styles.blueprintCardsWrap}
+                      accessibilityRole="button"
+                      accessibilityLabel="Blueprint card stack. Tap to cycle next card."
+                    >
+                      {BLUEPRINT_DECK.map((card, idx) => {
+                        const anim = bpCardAnims[idx];
+                        const isFront = bpSlotsRef.current[0] === idx;
+                        const rotateDeg = anim.rotate.interpolate({
+                          inputRange: [-10, 10],
+                          outputRange: ['-10deg', '10deg'],
+                        });
+
+                        return (
+                          <Animated.View
+                            key={card.id}
+                            style={[
+                              styles.blueprintCardSingle,
                               {
-                                opacity: simBubbleOpacity,
-                                transform: [{ scale: simBubbleScale }],
-                                borderColor: `${currentPersonalityObj.accentColor}55`,
+                                zIndex: bpZIndices[idx],
+                                opacity: anim.opacity,
+                                transform: [
+                                  { translateX: anim.x },
+                                  { translateY: anim.y },
+                                  { scale: anim.scale },
+                                  { rotate: rotateDeg },
+                                ],
                               },
                             ]}
                           >
                             <LinearGradient
-                              colors={[`${currentPersonalityObj.accentColor}35`, 'rgba(22, 10, 30, 0.96)']}
+                              colors={card.gradient}
                               start={{ x: 0, y: 0 }}
                               end={{ x: 1, y: 1 }}
-                              style={styles.heroAiBubbleGradient}
+                              style={[styles.blueprintCardGradient, { borderColor: card.borderColor }]}
                             >
-                              <View style={styles.heroAiAuthorRow}>
-                                <Ionicons name="sparkles" size={9.5} color={currentPersonalityObj.accentColor} />
-                                <Text style={[styles.heroAiAuthorText, { color: currentPersonalityObj.accentColor }]}>
-                                  Flint · {currentPersonalityObj.label} Mode
-                                </Text>
-                                <Text style={styles.heroAiStrategyText}>
-                                  {activeSimChat.strategyLabel ? `· ${activeSimChat.strategyLabel}` : '· Auto-drafted'}
-                                </Text>
+                              <View style={styles.blueprintCardTopRow}>
+                                <View style={[styles.blueprintCardBadge, { backgroundColor: card.badgeBg }]}>
+                                  <Ionicons name={card.icon} size={11} color={card.iconColor} />
+                                  <Text style={[styles.blueprintCardBadgeText, { color: card.iconColor }]}>
+                                    {card.category}
+                                  </Text>
+                                </View>
+                                <View style={styles.blueprintCardRightTag}>
+                                  <Text style={styles.blueprintSuitPill}>{card.suit} {card.stepNumber}</Text>
+                                  
+                                </View>
                               </View>
-                              <Text style={styles.heroAiBubbleText} numberOfLines={3}>
-                                {activeSimChat.aiReply}
-                              </Text>
+                              <Text style={styles.blueprintCardTitle} numberOfLines={1}>{card.title}</Text>
+                              <Text style={styles.blueprintCardDetail} numberOfLines={1}>{card.detail}</Text>
                             </LinearGradient>
                           </Animated.View>
-                        )}
-
-                        {/* Replay / Shuffle AI Response Button */}
-                        <TouchableOpacity
-                          onPress={() => {
-                            safeHaptic('light');
-                            const nextV = simVariation + 1;
-                            setSimVariation(nextV);
-                            triggerSimChat(nextV);
-                          }}
-                          activeOpacity={0.7}
-                          style={styles.heroShuffleRow}
-                          accessibilityRole="button"
-                          accessibilityLabel="Shuffle AI wingman response"
-                        >
-                          <Ionicons name="refresh" size={10.5} color="rgba(245, 230, 240, 0.55)" />
-                          <Text style={styles.heroShuffleText}>Tap to shuffle AI response · or swipe card</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </Animated.View>
+                        );
+                      })}
+                    </TouchableOpacity>
                   </View>
-
-                  {/* ── Setup Summary & Preferences Readiness Hub ── */}
-                  <TouchableOpacity
-                    activeOpacity={0.88}
-                    onPress={() => {
-                      safeHaptic('light');
-                      laserBeamAnim.setValue(0);
-                      Animated.timing(laserBeamAnim, {
-                        toValue: 1,
-                        duration: 1200,
-                        easing: Easing.out(Easing.cubic),
-                        useNativeDriver: false,
-                      }).start();
-                    }}
-                    style={styles.readinessCard}
-                    accessibilityRole="button"
-                    accessibilityLabel="Preferences Setup Summary"
-                  >
-                    {/* Header Row: Clean Status */}
-                    <View style={styles.readinessHeaderRow}>
-                      <View style={styles.readinessHeaderLeft}>
-                        <View style={styles.readinessDotPulse}>
-                          <View style={styles.readinessDotCore} />
-                        </View>
-                        <Text style={styles.readinessHeaderTitle}>Preferences Saved</Text>
-                        <Text style={styles.readinessHeaderSub}>· Ready to match</Text>
-                      </View>
-                      <View style={styles.readinessBadge}>
-                        <Ionicons name="checkmark-circle" size={12.5} color="#00E676" />
-                        <Text style={styles.readinessBadgeText}>All Set</Text>
-                      </View>
-                    </View>
-
-                    {/* Glowing Laser Divider */}
-                    <View style={styles.readinessLaserTrack}>
-                      <View style={styles.readinessLaserBack} />
-                      <Animated.View
-                        style={[
-                          styles.readinessLaserBeam,
-                          {
-                            width: laserBeamAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: ['15%', '100%'],
-                            }),
-                          },
-                        ]}
-                      />
-                    </View>
-
-                    {/* 4 Preferences Info Chips */}
-                    <View style={styles.readinessGrid}>
-                      <View style={styles.readinessGridItem}>
-                        <Ionicons name="flame" size={12} color="#FE3C72" />
-                        <Text style={styles.readinessGridText} numberOfLines={1}>Tinder</Text>
-                      </View>
-                      <View style={styles.readinessGridItem}>
-                        <Ionicons name="location-sharp" size={11} color="#00E676" />
-                        <Text style={styles.readinessGridText} numberOfLines={1}>{country} {getCountryFlag(country)}</Text>
-                      </View>
-                      <View style={styles.readinessGridItem}>
-                        <Ionicons name="heart" size={11} color="#FF6584" />
-                        <Text style={styles.readinessGridText} numberOfLines={1}>{goalsSummary.title}</Text>
-                      </View>
-                      <View style={styles.readinessGridItem}>
-                        <Ionicons name="sparkles" size={11} color={currentPersonalityObj.accentColor} />
-                        <Text style={[styles.readinessGridText, { color: currentPersonalityObj.accentColor }]} numberOfLines={1}>
-                          {currentPersonalityObj.label} Vibe
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
                 </View>
-              )}
+              </ScrollView>
             </Animated.View>
-          </ScrollView>
+          </View>
         </KeyboardAvoidingView>
 
         {/* ── Sticky Bottom Footer with Tactile CTA Dock ── */}
@@ -3166,17 +3869,35 @@ export default function OnboardingScreen({ navigation }) {
 
             {currentStep === totalSteps && (
               <TouchableOpacity
-                style={styles.guestFooterBtn}
+                style={styles.signInFooterBtn}
                 onPress={() => {
                   safeHaptic('light');
-                  navigation.replace('PlatformSelect');
+                  navigation.dispatch(
+                    StackActions.push('Auth', {
+                      initialMode: 'login',
+                      onboardingData: {
+                        platform: selectedPlatform,
+                        country,
+                        languages: selectedLanguages,
+                        dialCode,
+                        whatsapp,
+                        goals: selectedGoals,
+                        frequency,
+                        personality,
+                        safeMode,
+                      },
+                    })
+                  );
                 }}
                 activeOpacity={0.75}
-                hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+                hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
                 accessibilityRole="button"
-                accessibilityLabel="Continue as Guest"
+                accessibilityLabel="Already have an account? Sign In"
               >
-                <Text style={styles.guestFooterText}>Continue as Guest →</Text>
+                <Text style={styles.signInFooterText}>
+                  Already have an account?{' '}
+                  <Text style={styles.signInFooterHighlight}>Sign In</Text>
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -3515,6 +4236,7 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#08050B',
+    overflow: 'hidden',
   },
   safeArea: {
     flex: 1,
@@ -3532,156 +4254,77 @@ const styles = StyleSheet.create({
   },
   auroraOrb2: {
     position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.12,
-    left: -SCREEN_WIDTH * 0.35,
-    width: SCREEN_WIDTH * 0.92,
-    height: SCREEN_WIDTH * 0.92,
-    borderRadius: (SCREEN_WIDTH * 0.92) / 2,
+    bottom: SCREEN_HEIGHT * 0.10,
+    left: -SCREEN_WIDTH * 0.12,
+    width: SCREEN_WIDTH * 0.85,
+    height: SCREEN_WIDTH * 0.85,
+    borderRadius: (SCREEN_WIDTH * 0.85) / 2,
     overflow: 'hidden',
   },
 
-  // ── Header ──
-  header: {
+  // ── Hero Header Row with Back Arrow Beside Title ──
+  heroHeaderRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  backArrowBtn: {
+    marginRight: 14,
+    marginTop: Platform.OS === 'ios' ? 4 : 5,
+    paddingRight: 2,
+    paddingVertical: 2,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 8,
   },
-  headerLogoWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  headerLogoGradient: {
+  heroTextWrap: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerBrandFlame: {
-    marginRight: 5,
-    shadowColor: '#FF3366',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-  },
-  headerBrandTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(255, 51, 102, 0.55)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 8,
-  },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerSignInBtn: {
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 51, 102, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.32)',
-  },
-  headerSignInText: {
-    color: '#FF5E7E',
-    fontSize: 12.5,
-    fontWeight: '800',
-  },
-
-  // ── Segmented Progress Bar ──
-  progressContainer: {
-    paddingHorizontal: 22,
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  progressContainerStep3: {
-    marginBottom: 12,
-  },
-  segmentTrackRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  segmentTrack: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    overflow: 'hidden',
-  },
-  stepCounterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  stepCounterText: {
-    color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  stepCounterBold: {
-    color: '#FFAA80',
-    fontWeight: '800',
-  },
-  stepPhaseName: {
-    color: '#FF5E7E',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.2,
   },
 
   // ── Content Scroll ──
+  stageViewport: {
+    flex: 1,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  scrollFlex: {
+    flex: 1,
+  },
+  stageShadowLayer: {
+    shadowColor: '#000',
+    shadowOffset: { width: -12, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 22,
+    elevation: 14,
+  },
   scrollContent: {
     paddingHorizontal: 22,
     paddingBottom: 28,
   },
   scrollContentStep3: {
-    paddingBottom: 14,
-    paddingTop: 4,
+    paddingBottom: 20,
+    paddingTop: 6,
   },
   scrollContentStep5: {
-    paddingBottom: 6,
-    paddingTop: 12,
+    paddingBottom: 12,
+    paddingTop: 6,
   },
   stepContainer: {
     width: '100%',
   },
   heroWrap: {
-    marginTop: 6,
-    marginBottom: 16,
+    marginTop: 8,
+    marginBottom: 18,
   },
   stepTitle: {
     color: '#FFFFFF',
-    fontSize: 27,
+    fontSize: 28,
     fontWeight: '900',
     letterSpacing: -0.6,
     marginBottom: 8,
   },
   stepSubtitle: {
     color: '#ac888b',
-    fontSize: 14,
-    lineHeight: 20.5,
+    fontSize: 14.5,
+    lineHeight: 21,
     fontWeight: '500',
   },
 
@@ -4184,12 +4827,12 @@ const styles = StyleSheet.create({
 
   // ── Step 3: Goals ──
   step3HeroWrap: {
-    marginTop: 4,
-    marginBottom: 14,
+    marginTop: 8,
+    marginBottom: 16,
   },
   step3Title: {
     color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: 27,
     fontWeight: '900',
     letterSpacing: -0.5,
     marginBottom: 6,
@@ -4828,324 +5471,179 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // ── Step 5: Hybrid Laser Thread & Live Match Simulator (Zero Jargon, Zero Scroll) ──
+  // ── Step 5: Grand Match Hero & Swipe Deck ──
   step5Container: {
-    alignItems: 'center',
     width: '100%',
-    paddingTop: 4,
+    paddingTop: 0,
     paddingBottom: 0,
     overflow: 'visible',
   },
-  heroBadgeWrapper: {
-    position: 'relative',
-    width: 52,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    overflow: 'visible',
-  },
-  // ── Step 5: Grand Match Hero & Fanned Deck Entrance ──
-  heroEntranceHeader: {
-    alignItems: 'center',
-    marginBottom: 10,
-    marginTop: 0,
-  },
-  heroEntranceTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: -0.4,
-    textAlign: 'center',
-    marginBottom: 3,
-  },
-  heroEntranceSubtitle: {
-    color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 12.5,
-    lineHeight: 17,
-    fontWeight: '500',
-    textAlign: 'center',
-    maxWidth: 320,
-  },
+  // ── Step 5: 3D Dating Deck Physics with Harmonious Margins & Centered Faces ──
   deckStackWrap: {
     position: 'relative',
     width: '100%',
-    height: 350,
+    height: 410,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 18,
+    marginBottom: 4,
   },
   deckBackCard2: {
     position: 'absolute',
-    width: '90%',
-    height: 334,
-    borderRadius: 22,
+    width: 315,
+    height: 385,
+    borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.20)',
-    transform: [{ rotate: '-4.2deg' }, { translateY: -4 }],
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: '#160B20',
     zIndex: 1,
-    shadowColor: '#FF3366',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    elevation: 3,
   },
   deckBackCard1: {
     position: 'absolute',
-    width: '93%',
-    height: 340,
-    borderRadius: 22,
+    width: 315,
+    height: 385,
+    borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 80, 120, 0.28)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 102, 136, 0.32)',
+    backgroundColor: '#160B20',
     zIndex: 2,
-    shadowColor: '#FF3366',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.26,
-    shadowRadius: 12,
-    elevation: 5,
   },
   deckBackImage: {
     ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   deckBackOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(14, 7, 20, 0.78)',
+    backgroundColor: 'rgba(12, 6, 18, 0.15)',
+  },
+  deckBackOverlay1: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(12, 6, 18, 0.20)',
+    zIndex: 1,
+  },
+  deckBackOverlay2: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(12, 6, 18, 0.35)',
+    zIndex: 1,
+  },
+  deckBackBadgeRowLeft: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+  },
+  deckBackBadgeRowRight: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+  },
+  deckBackBadge: {
+    backgroundColor: 'rgba(14, 7, 20, 0.82)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  deckBackBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   heroMatchCard: {
     position: 'relative',
-    width: '98%',
-    height: 345,
+    width: 315,
+    height: 385,
     borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 60, 110, 0.42)',
-    backgroundColor: '#120818',
+    borderColor: 'rgba(255, 80, 130, 0.45)',
+    backgroundColor: '#160B20',
     shadowColor: '#FF3366',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.38,
-    shadowRadius: 22,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 10,
     zIndex: 3,
     justifyContent: 'space-between',
   },
   heroProfileImage: {
-    position: 'absolute',
-    top: -85,
-    left: 0,
-    right: 0,
-    height: 480,
-    transform: [{ scale: 1.18 }],
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   heroTopScrim: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 50,
+    height: 58,
     zIndex: 1,
   },
   heroTopBadgesRow: {
-    position: 'relative',
-    zIndex: 2,
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
     flexDirection: 'row',
-    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingTop: 10,
+    justifyContent: 'space-between',
+    zIndex: 2,
   },
   heroCompatibilityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 8, 22, 0.88)',
+    gap: 5,
+    backgroundColor: 'rgba(14, 7, 20, 0.82)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 12,
-    paddingHorizontal: 9,
+    borderColor: 'rgba(255, 94, 126, 0.45)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
     paddingVertical: 4.5,
-    gap: 4,
   },
   heroCompatibilityText: {
     color: '#FFFFFF',
-    fontSize: 10.5,
+    fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0.2,
   },
-  stampLikeWrap: {
-    position: 'absolute',
-    top: 24,
-    right: 18,
-    zIndex: 10,
-    transform: [{ rotate: '15deg' }],
-  },
-  stampLikeBorder: {
-    borderWidth: 2.5,
-    borderColor: '#00E676',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    backgroundColor: 'rgba(0, 230, 118, 0.18)',
-  },
-  stampLikeText: {
-    color: '#00E676',
-    fontSize: 17,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-  },
-  stampNopeWrap: {
-    position: 'absolute',
-    top: 24,
-    left: 18,
-    zIndex: 10,
-    transform: [{ rotate: '-15deg' }],
-  },
-  stampNopeBorder: {
-    borderWidth: 2.5,
-    borderColor: '#FF3366',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    backgroundColor: 'rgba(255, 51, 102, 0.18)',
-  },
-  stampNopeText: {
-    color: '#FF3366',
-    fontSize: 17,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-  },
-  readinessCard: {
-    width: '98%',
-    backgroundColor: 'rgba(18, 9, 26, 0.82)',
-    borderRadius: 18,
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 60, 110, 0.26)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginTop: 10,
-    marginBottom: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  readinessHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  readinessHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  readinessDotPulse: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0, 230, 118, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  readinessDotCore: {
-    width: 4.5,
-    height: 4.5,
-    borderRadius: 2.25,
-    backgroundColor: '#00E676',
-  },
-  readinessHeaderTitle: {
-    color: '#FFFFFF',
-    fontSize: 12.5,
-    fontWeight: '800',
-    letterSpacing: -0.1,
-  },
-  readinessHeaderSub: {
-    color: 'rgba(245, 230, 240, 0.55)',
-    fontSize: 11.5,
-    fontWeight: '500',
-  },
-  readinessBadge: {
+  heroSwipeHintBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0, 230, 118, 0.14)',
+    backgroundColor: 'rgba(14, 7, 20, 0.65)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(0, 230, 118, 0.32)',
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
-  readinessBadgeText: {
-    color: '#00E676',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
-  readinessLaserTrack: {
-    position: 'relative',
-    height: 2,
-    marginBottom: 9,
-  },
-  readinessLaserBack: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 1,
-  },
-  readinessLaserBeam: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#FF3366',
-    borderRadius: 1,
-    shadowColor: '#FF3366',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 5,
-  },
-  readinessGrid: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 6,
-  },
-  readinessGridItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  readinessGridText: {
-    color: '#FFFFFF',
+  heroSwipeHintText: {
+    color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 10.5,
-    fontWeight: '700',
-    letterSpacing: -0.1,
+    fontWeight: '600',
   },
   heroFrostedDock: {
-    position: 'relative',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     zIndex: 2,
-    backgroundColor: 'rgba(14, 7, 20, 0.88)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.14)',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
   heroDockHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 7,
+    marginBottom: 5,
+  },
+  heroIdentityCol: {
+    flex: 1,
   },
   heroNameRow: {
     flexDirection: 'row',
@@ -5153,114 +5651,214 @@ const styles = StyleSheet.create({
   },
   heroNameText: {
     color: '#FFFFFF',
-    fontSize: 15.5,
-    fontWeight: '900',
-    letterSpacing: -0.3,
-  },
-  heroLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: -0.4,
   },
   heroLocationText: {
-    color: 'rgba(245, 230, 240, 0.85)',
+    color: 'rgba(245, 230, 240, 0.75)',
     fontSize: 11,
-    fontWeight: '600',
-  },
-  heroIncomingBubble: {
-    alignSelf: 'flex-start',
-    maxWidth: '86%',
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 12,
-    borderTopLeftRadius: 3,
-    paddingHorizontal: 10,
-    paddingVertical: 5.5,
-    marginBottom: 5,
-  },
-  heroIncomingText: {
-    color: '#FFFFFF',
-    fontSize: 11.5,
-    lineHeight: 15.5,
     fontWeight: '500',
+    marginTop: 1,
   },
-  heroTypingDock: {
-    alignSelf: 'flex-end',
+  shuffleCircleBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  icebreakerPill: {
+    backgroundColor: 'rgba(20, 10, 28, 0.78)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 2,
+  },
+  icebreakerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  icebreakerTag: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+  icebreakerQuoteText: {
+    color: '#FFF8F4',
+    fontSize: 11,
+    lineHeight: 14,
+    fontStyle: 'italic',
+    fontWeight: '400',
+  },
+  stampLikeWrap: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 10,
+    transform: [{ rotate: '-15deg' }],
+  },
+  stampLikeBorder: {
+    borderWidth: 3,
+    borderColor: '#00E676',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(0, 230, 118, 0.15)',
+  },
+  stampLikeText: {
+    color: '#00E676',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  stampNopeWrap: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    transform: [{ rotate: '15deg' }],
+  },
+  stampNopeBorder: {
+    borderWidth: 3,
+    borderColor: '#FF3366',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255, 51, 102, 0.15)',
+  },
+  stampNopeText: {
+    color: '#FF3366',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+
+  // ── Step 5: Soulful Playing Card Deck Stack Styles ──
+  blueprintDeckSection: {
+    width: '92%',
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  blueprintDeckHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  blueprintHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  blueprintDeckTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  blueprintCycleHintBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(255, 51, 102, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.32)',
-    borderRadius: 12,
-    borderTopRightRadius: 3,
-    paddingHorizontal: 9,
-    paddingVertical: 5.5,
   },
-  heroTypingText: {
-    color: '#FFAA80',
+  blueprintCycleHintText: {
+    color: 'rgba(245, 230, 240, 0.65)',
     fontSize: 10.5,
     fontWeight: '600',
   },
-  vipTypingDotsWrap: {
+  blueprintPipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    marginLeft: 2,
+    marginLeft: 3,
   },
-  vipTypingDot: {
-    width: 3.5,
-    height: 3.5,
-    borderRadius: 2,
-    backgroundColor: '#FF5E7E',
+  blueprintPip: {
+    width: 4.5,
+    height: 4.5,
+    borderRadius: 2.25,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
   },
-  heroAiBubble: {
-    alignSelf: 'flex-end',
-    maxWidth: '88%',
-    borderRadius: 12,
-    borderTopRightRadius: 3,
-    borderWidth: 1,
+  blueprintPipActive: {
+    width: 12,
+    backgroundColor: '#FF6584',
+  },
+  blueprintCardsWrap: {
+    position: 'relative',
+    width: '100%',
+    height: 110,
+    alignItems: 'center',
+  },
+  blueprintCardSingle: {
+    position: 'absolute',
+    width: '100%',
+    height: 92,
+    borderRadius: 18,
     overflow: 'hidden',
+    shadowColor: '#FF3366',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 5,
   },
-  heroAiBubbleGradient: {
-    paddingHorizontal: 10,
-    paddingVertical: 5.5,
+  blueprintCardGradient: {
+    flex: 1,
+    borderWidth: 1.2,
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    justifyContent: 'space-between',
   },
-  heroAiAuthorRow: {
+  blueprintCardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 2,
+    justifyContent: 'space-between',
   },
-  heroAiAuthorText: {
+  blueprintCardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  blueprintCardBadgeText: {
     fontSize: 9.5,
     fontWeight: '800',
-    letterSpacing: 0.2,
+    letterSpacing: 0.5,
   },
-  heroAiStrategyText: {
-    color: 'rgba(245, 230, 240, 0.50)',
-    fontSize: 8.5,
-    fontWeight: '500',
-  },
-  heroAiBubbleText: {
-    color: '#FFFFFF',
-    fontSize: 11.5,
-    lineHeight: 15.5,
-    fontWeight: '500',
-  },
-  heroShuffleRow: {
+  blueprintCardRightTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingTop: 5,
+    gap: 5,
   },
-  heroShuffleText: {
-    color: 'rgba(245, 230, 240, 0.58)',
-    fontSize: 9.5,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+  blueprintSuitPill: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  blueprintCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    marginTop: 1,
+  },
+  blueprintCardDetail: {
+    color: 'rgba(245, 230, 240, 0.65)',
+    fontSize: 10.5,
+    fontWeight: '400',
+    marginBottom: 1,
   },
 
   // ── Sticky Bottom Footer (Visually Matches Create Account / Sign In) ──
@@ -5314,15 +5912,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.2,
   },
-  guestFooterBtn: {
+  signInFooterBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
-  guestFooterText: {
-    color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 13,
-    fontWeight: '600',
+  signInFooterText: {
+    color: 'rgba(245, 230, 240, 0.75)',
+    fontSize: 13.5,
+    fontWeight: '500',
+  },
+  signInFooterHighlight: {
+    color: '#FFAA80',
+    fontWeight: '700',
   },
 
   // ── Modals (iOS Industry Standard Luxury Sheet) ──

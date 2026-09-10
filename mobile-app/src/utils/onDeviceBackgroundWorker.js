@@ -5,10 +5,17 @@
 
 import { API_CONFIG } from '../config/api';
 import trackingService from '../services/trackingService';
+import SupabaseService from '../services/supabase';
 import {
   saveOnDeviceSessionState,
   getOnDeviceSessionState,
   pushProgressFeedEvent,
+  getPersistedStoppedChats,
+  savePersistedStoppedChats,
+  getPersistedMoveOffAppStates,
+  savePersistedMoveOffAppStates,
+  getPersistedMatchesCache,
+  savePersistedMatchesCache,
 } from './sessionManager';
 
 /**
@@ -118,6 +125,46 @@ export class OnDeviceBackgroundWorker {
     this.moveOffAppStates = new Map(); // matchId -> { state, offeredPlatforms, persuasionCount, lastOfferedPlatform }
     this.handleSentStats = { telegram: 0, instagram: 0, tango: 0 };
     this.lastProfileData = null;
+
+    // Eagerly restore persisted chat blocks and states from storage
+    this._restorePersistedState();
+  }
+
+  async _restorePersistedState() {
+    try {
+      const [persistedStopped, persistedMoveOff, persistedMatches] = await Promise.all([
+        getPersistedStoppedChats(),
+        getPersistedMoveOffAppStates(),
+        getPersistedMatchesCache(),
+      ]);
+
+      if (persistedStopped && typeof persistedStopped === 'object') {
+        Object.entries(persistedStopped).forEach(([k, v]) => {
+          if (!this.stoppedChats.has(k)) {
+            this.stoppedChats.set(k, v);
+          }
+        });
+        this.log(`Restored ${this.stoppedChats.size} stopped chats from storage.`);
+      }
+
+      if (persistedMoveOff && typeof persistedMoveOff === 'object') {
+        Object.entries(persistedMoveOff).forEach(([k, v]) => {
+          if (!this.moveOffAppStates.has(k)) {
+            this.moveOffAppStates.set(k, v);
+          }
+        });
+      }
+
+      if (Array.isArray(persistedMatches) && persistedMatches.length > 0) {
+        persistedMatches.forEach((m) => {
+          if (m && m.matchId && !this.matchData.has(m.matchId)) {
+            this.matchData.set(m.matchId, m);
+          }
+        });
+      }
+    } catch (e) {
+      this.log('Error restoring persisted state:', e?.message);
+    }
   }
 
   log(msg, data = null) {
@@ -286,6 +333,21 @@ export class OnDeviceBackgroundWorker {
           stoppedAt: Date.now()
         });
         this.log(`Chat stopped for match ${matchId}: ${reason}`);
+        savePersistedStoppedChats(this.stoppedChats);
+
+        // Sync to cloud user snapshot when authenticated
+        try {
+          const userId = trackingService.getUserId ? trackingService.getUserId() : trackingService.userId;
+          if (userId && userId !== 'anonymous_user' && userId !== 'guest') {
+            SupabaseService.saveUserSnapshot(userId, {
+              platform: 'tinder',
+              settings: {
+                stopped_chats: Object.fromEntries(this.stoppedChats.entries())
+              }
+            }).catch(() => {});
+          }
+        } catch (_) {}
+
         trackingService.trackEvent('stop_condition_triggered', {
           match_id: matchId,
           reason: reason || 'Stopped by user',
@@ -298,11 +360,13 @@ export class OnDeviceBackgroundWorker {
         const matchId = payload.matchId;
         this.stoppedChats.delete(matchId);
         this.log(`Chat unblocked for match ${matchId}`);
+        savePersistedStoppedChats(this.stoppedChats);
         return { success: true };
       }
 
       case 'clearStoppedChats':
         this.stoppedChats.clear();
+        savePersistedStoppedChats(this.stoppedChats);
         return { success: true };
 
       // ── Language Detection & Storage ──
@@ -330,7 +394,9 @@ export class OnDeviceBackgroundWorker {
       case 'saveMatchData': {
         const { matchId, data } = payload;
         if (matchId) {
-          this.matchData.set(matchId, data || {});
+          const merged = { ...(this.matchData.get(matchId) || {}), ...data, matchId, lastUpdated: Date.now() };
+          this.matchData.set(matchId, merged);
+          savePersistedMatchesCache(this.matchData);
         }
         return { success: true };
       }
@@ -356,6 +422,7 @@ export class OnDeviceBackgroundWorker {
         const { matchId, stateData } = payload;
         if (matchId && stateData) {
           this.moveOffAppStates.set(matchId, stateData);
+          savePersistedMoveOffAppStates(this.moveOffAppStates);
         }
         return { success: true };
       }
@@ -364,6 +431,7 @@ export class OnDeviceBackgroundWorker {
         const matchId = payload.matchId;
         if (matchId) {
           this.moveOffAppStates.delete(matchId);
+          savePersistedMoveOffAppStates(this.moveOffAppStates);
         }
         return { success: true };
       }
@@ -523,6 +591,15 @@ export class OnDeviceBackgroundWorker {
     } catch (err) {
       this.log(`AI generation failed: ${err.message}. Using intelligent fallback.`);
       const fallback = this.getFallbackMessage(effectiveSettings, matchData, isFollowUp);
+
+      trackingService.trackMessage({
+        count: 1,
+        style: effectiveSettings.chattingStyle,
+        language: effectiveSettings.conversationLanguage,
+        isOpener: !isFollowUp,
+        matchName: matchData.name,
+        isFallback: true,
+      });
 
       this.agentState.stats.messages = (this.agentState.stats.messages || 0) + 1;
       this.agentState.stats.messagesSent = this.agentState.stats.messages;

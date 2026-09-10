@@ -16,8 +16,8 @@ export default function AppNavigator() {
       initialRouteName="Auth"
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#18101d' },
-        animation: 'fade',
+        contentStyle: { backgroundColor: '#08050B', overflow: 'hidden' },
+        animation: 'slide_from_right',
       }}
     >
       <Stack.Screen name="Auth" component={AuthScreen} />

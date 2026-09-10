@@ -2548,6 +2548,32 @@ export default function BrowserScreen({ route, navigation }) {
                     addLog(`🎉 New Match detected (${matchName})!`, 'success');
                     trackingService.trackMatch({ matchName });
                     pushProgressFeedEvent('match_detected', 'New Match Connected!', matchName, 25);
+
+                    const matchId = msg.matchId || `match_${Date.now()}`;
+                    const worker = backgroundWorkerRef.current;
+                    if (worker && worker.handleMessage) {
+                      worker.handleMessage({
+                        action: 'saveMatchData',
+                        matchId,
+                        data: {
+                          matchId,
+                          name: matchName,
+                          photoUrl: msg.photoUrl || null,
+                          matchedAt: Date.now()
+                        }
+                      }).catch(() => {});
+                    }
+                  }
+                  if (msg.type === 'FE_OUT_OF_LIKES') {
+                    const now = msg.timestamp || Date.now();
+                    saveOnDeviceSessionState({ likesExhaustedAt: now, isRunning: false });
+                    onDeviceSwipingRef.current = false;
+                    setOnDeviceSwiping(false);
+                    addLog('Daily like quota exhausted (12h reset countdown active). Paused.', 'warn');
+                    trackingService.trackEvent('like_quota_exhausted', {
+                      exhausted_at: new Date(now).toISOString()
+                    });
+                    pushProgressFeedEvent('rate_limit', 'Daily like limit reached. Refills in 12h.', null, 10);
                   }
                   if (msg.type === 'FE_CYCLE_DONE') {
                     onDeviceSwipingRef.current = false;
