@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/common/MultiRangeSlider.js
 // Two-thumb dual range slider on a single track with smooth touch response matching Desktop V2 UI
 import React, { useRef, useState, useEffect } from 'react';
@@ -17,8 +18,11 @@ export default function MultiRangeSlider({
   onValuesChange,
   disabled = false,
 }) {
+  const propsRef = useRef({ disabled, onValuesChange });
+  propsRef.current = { disabled, onValuesChange };
+  const draggingRef = useRef(null);
   const [trackWidth, setTrackWidth] = useState(0);
-  const [draggingThumb, setDraggingThumb] = useState(null); // 'min' | 'max' | null
+  const [draggingThumb, setDraggingState] = useState(null); // 'min' | 'max' | null
 
   // Keep local copy of values for fluid dragging
   const [localMin, setLocalMin] = useState(minValue);
@@ -36,6 +40,8 @@ export default function MultiRangeSlider({
     localMinRef.current = minValue;
     localMaxRef.current = maxValue;
   }, [minValue, maxValue]);
+
+  const setDraggingThumb = (value) => { draggingRef.current = value; setDraggingState(value); };
 
   const clamp = (val, minVal, maxVal) => Math.min(Math.max(val, minVal), maxVal);
 
@@ -59,27 +65,27 @@ export default function MultiRangeSlider({
   // ── Min Thumb PanResponder (Left Handle) ──
   const minPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabled,
-      onStartShouldSetPanResponderCapture: () => !disabled,
-      onMoveShouldSetPanResponder: () => !disabled,
-      onMoveShouldSetPanResponderCapture: () => !disabled,
+      onStartShouldSetPanResponder: () => !propsRef.current.disabled,
+      onStartShouldSetPanResponderCapture: () => !propsRef.current.disabled,
+      onMoveShouldSetPanResponder: () => !propsRef.current.disabled,
+      onMoveShouldSetPanResponderCapture: () => !propsRef.current.disabled,
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
 
       onPanResponderGrant: () => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         setDraggingThumb('min');
         measureTrack();
       },
       onPanResponderMove: (evt) => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         const pageX = evt.nativeEvent.pageX;
         const relativeX = pageX - trackLeftRef.current;
         const val = xToValue(relativeX);
         const newMin = clamp(val, min, localMaxRef.current - 1);
         localMinRef.current = newMin;
         setLocalMin(newMin);
-        if (onValuesChange) onValuesChange(newMin, localMaxRef.current);
+        if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(newMin, localMaxRef.current);
       },
       onPanResponderRelease: () => {
         setDraggingThumb(null);
@@ -93,27 +99,27 @@ export default function MultiRangeSlider({
   // ── Max Thumb PanResponder (Right Handle) ──
   const maxPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabled,
-      onStartShouldSetPanResponderCapture: () => !disabled,
-      onMoveShouldSetPanResponder: () => !disabled,
-      onMoveShouldSetPanResponderCapture: () => !disabled,
+      onStartShouldSetPanResponder: () => !propsRef.current.disabled,
+      onStartShouldSetPanResponderCapture: () => !propsRef.current.disabled,
+      onMoveShouldSetPanResponder: () => !propsRef.current.disabled,
+      onMoveShouldSetPanResponderCapture: () => !propsRef.current.disabled,
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
 
       onPanResponderGrant: () => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         setDraggingThumb('max');
         measureTrack();
       },
       onPanResponderMove: (evt) => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         const pageX = evt.nativeEvent.pageX;
         const relativeX = pageX - trackLeftRef.current;
         const val = xToValue(relativeX);
         const newMax = clamp(val, localMinRef.current + 1, max);
         localMaxRef.current = newMax;
         setLocalMax(newMax);
-        if (onValuesChange) onValuesChange(localMinRef.current, newMax);
+        if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(localMinRef.current, newMax);
       },
       onPanResponderRelease: () => {
         setDraggingThumb(null);
@@ -127,15 +133,15 @@ export default function MultiRangeSlider({
   // ── Track Tap PanResponder (Moves closest thumb on click) ──
   const trackPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabled,
+      onStartShouldSetPanResponder: () => !propsRef.current.disabled,
       onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: () => !disabled,
+      onMoveShouldSetPanResponder: () => !propsRef.current.disabled,
       onMoveShouldSetPanResponderCapture: () => false,
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
 
       onPanResponderGrant: (evt) => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         measureTrack();
         const pageX = evt.nativeEvent.pageX;
         const relativeX = pageX - trackLeftRef.current;
@@ -149,31 +155,31 @@ export default function MultiRangeSlider({
           const newMin = clamp(touchedVal, min, localMaxRef.current - 1);
           localMinRef.current = newMin;
           setLocalMin(newMin);
-          if (onValuesChange) onValuesChange(newMin, localMaxRef.current);
+          if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(newMin, localMaxRef.current);
         } else {
           setDraggingThumb('max');
           const newMax = clamp(touchedVal, localMinRef.current + 1, max);
           localMaxRef.current = newMax;
           setLocalMax(newMax);
-          if (onValuesChange) onValuesChange(localMinRef.current, newMax);
+          if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(localMinRef.current, newMax);
         }
       },
       onPanResponderMove: (evt) => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         const pageX = evt.nativeEvent.pageX;
         const relativeX = pageX - trackLeftRef.current;
         const touchedVal = xToValue(relativeX);
 
-        if (draggingThumb === 'min') {
+        if (draggingRef.current === 'min') {
           const newMin = clamp(touchedVal, min, localMaxRef.current - 1);
           localMinRef.current = newMin;
           setLocalMin(newMin);
-          if (onValuesChange) onValuesChange(newMin, localMaxRef.current);
-        } else if (draggingThumb === 'max') {
+          if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(newMin, localMaxRef.current);
+        } else if (draggingRef.current === 'max') {
           const newMax = clamp(touchedVal, localMinRef.current + 1, max);
           localMaxRef.current = newMax;
           setLocalMax(newMax);
-          if (onValuesChange) onValuesChange(localMinRef.current, newMax);
+          if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(localMinRef.current, newMax);
         }
       },
       onPanResponderRelease: () => {
@@ -245,6 +251,19 @@ export default function MultiRangeSlider({
               { left: minPos - 20 },
               draggingThumb === 'min' && { zIndex: 10 },
             ]}
+            accessible
+            accessibilityRole="adjustable"
+            accessibilityLabel="Minimum matching age"
+            accessibilityState={{ disabled }}
+            accessibilityValue={{ min: min, max: localMax - 1, now: localMin }}
+            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+            onAccessibilityAction={({ nativeEvent }) => {
+              if (disabled) return;
+              const next = clamp(localMin + (nativeEvent.actionName === 'increment' ? 1 : -1), min, localMax - 1);
+              localMinRef.current = next;
+              setLocalMin(next);
+              onValuesChange?.(next, localMax);
+            }}
             {...minPanResponder.panHandlers}
           >
             <View
@@ -264,6 +283,19 @@ export default function MultiRangeSlider({
               { left: maxPos - 20 },
               draggingThumb === 'max' && { zIndex: 10 },
             ]}
+            accessible
+            accessibilityRole="adjustable"
+            accessibilityLabel="Maximum matching age"
+            accessibilityState={{ disabled }}
+            accessibilityValue={{ min: localMin + 1, max: max, now: localMax }}
+            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+            onAccessibilityAction={({ nativeEvent }) => {
+              if (disabled) return;
+              const next = clamp(localMax + (nativeEvent.actionName === 'increment' ? 1 : -1), localMin + 1, max);
+              localMaxRef.current = next;
+              setLocalMax(next);
+              onValuesChange?.(localMin, next);
+            }}
             {...maxPanResponder.panHandlers}
           >
             <View
@@ -300,20 +332,20 @@ const styles = StyleSheet.create({
     width: 84,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     paddingVertical: 3.5,
     borderRadius: 6,
     zIndex: 20,
-    shadowColor: '#FE3C72',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
     shadowRadius: 5,
     elevation: 5,
   },
-  bubbleText: {
+  bubbleText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     textAlign: 'center',
   },
   bubbleArrow: {
@@ -326,7 +358,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 4,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#FE3C72',
+    borderTopColor: uiTheme.colors.primary,
   },
   trackContainer: {
     height: 40,
@@ -335,7 +367,7 @@ const styles = StyleSheet.create({
   },
   trackBase: {
     height: 7,
-    backgroundColor: '#26223B',
+    backgroundColor: uiTheme.colors.elevated,
     borderRadius: 999,
     overflow: 'hidden',
     position: 'relative',
@@ -344,7 +376,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     borderRadius: 999,
   },
   thumbTouchArea: {
@@ -362,7 +394,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: '#FFFFFF',
     borderWidth: 4,
-    borderColor: '#FE3C72',
+    borderColor: uiTheme.colors.primary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
@@ -379,9 +411,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     marginTop: -2,
   },
-  limitText: {
-    color: '#716E89',
-    fontSize: 11,
-    fontWeight: '500',
+  limitText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 });

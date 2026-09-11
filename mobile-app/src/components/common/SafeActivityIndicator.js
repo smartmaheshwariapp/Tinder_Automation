@@ -1,21 +1,24 @@
+import { theme as uiTheme } from '../../theme';
 // mobile-app/src/components/common/SafeActivityIndicator.js
 // Universal, 100% crash-proof circular spinner for all React Native & Expo platforms
 // Replaces legacy RCTActivityIndicatorView with a high-FPS, hardware-accelerated Animated spinner
 
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Easing, StyleSheet } from 'react-native';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
 export default function SafeActivityIndicator({
   size = 'small',
-  color = '#FE3C72',
+  color = uiTheme.colors.primary,
   style,
   animating = true,
   ...restProps
 }) {
   const spinAnim = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
-    if (!animating) return;
+    if (!animating || reducedMotion) return;
     const loop = Animated.loop(
       Animated.timing(spinAnim, {
         toValue: 1,
@@ -26,7 +29,7 @@ export default function SafeActivityIndicator({
     );
     loop.start();
     return () => loop.stop();
-  }, [animating, spinAnim]);
+  }, [animating, reducedMotion, spinAnim]);
 
   if (!animating) return null;
 
@@ -49,6 +52,8 @@ export default function SafeActivityIndicator({
         style,
       ]}
       accessibilityRole="progressbar"
+      accessibilityLabel="Loading"
+      accessibilityState={{ busy: animating }}
       {...restProps}
     >
       <Animated.View

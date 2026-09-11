@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../theme';
 // src/screens/OnboardingScreen.js — 6-Step Onboarding matching Desktop Plugin
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -69,7 +70,7 @@ const PREVIEW_PROFILES = [
     tags: [
       { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
       { icon: 'shield-checkmark-outline', label: 'Verified profile', color: '#00E676' },
-      { icon: 'time-outline', label: 'Natural timing', color: '#FFAA80' },
+      { icon: 'time-outline', label: 'Natural timing', color: uiTheme.colors.secondary },
     ],
   },
   {
@@ -82,7 +83,7 @@ const PREVIEW_PROFILES = [
     tags: [
       { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
       { icon: 'shield-checkmark-outline', label: 'Verified profile', color: '#00E676' },
-      { icon: 'sparkles-outline', label: 'Active now', color: '#FFAA80' },
+      { icon: 'sparkles-outline', label: 'Active now', color: uiTheme.colors.secondary },
     ],
   },
   {
@@ -95,7 +96,7 @@ const PREVIEW_PROFILES = [
     tags: [
       { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
       { icon: 'shield-checkmark-outline', label: 'Verified profile', color: '#00E676' },
-      { icon: 'time-outline', label: 'Natural timing', color: '#FFAA80' },
+      { icon: 'time-outline', label: 'Natural timing', color: uiTheme.colors.secondary },
     ],
   },
 ];
@@ -350,8 +351,8 @@ const GOALS = [
     title: 'Set up a Date',
     desc: 'Suggests drinks, coffee, or dinner once there is a good vibe.',
     icon: 'calendar',
-    gradient: ['#FF3366', '#FFAA80'],
-    accentColor: '#FF3366',
+    gradient: [uiTheme.colors.primary, uiTheme.colors.secondary],
+    accentColor: uiTheme.colors.primary,
     bgActive: 'rgba(255, 51, 102, 0.12)',
   },
   {
@@ -711,7 +712,7 @@ const PERSONALITIES = [
     label: 'Freestyle',
     tagline: 'Context-Smart',
     icon: 'sparkles',
-    accentColor: '#FF3366',
+    accentColor: uiTheme.colors.primary,
     previewOpener: "Hey! Love the energy in your profile. How's your week treating you so far?",
     vibeDesc: 'Adapts to photos and bio cues for natural chemistry.',
   },
@@ -720,7 +721,7 @@ const PERSONALITIES = [
     label: 'Flirty',
     tagline: 'Teasing & Warm',
     icon: 'flame',
-    accentColor: '#FF5E7E',
+    accentColor: uiTheme.colors.accent,
     previewOpener: "Had to swipe right — that smile definitely caught my eye. What's your secret?",
     vibeDesc: 'Playful compliments and charm to spark chemistry fast.',
   },
@@ -747,7 +748,7 @@ const PERSONALITIES = [
     label: 'Charming',
     tagline: 'Smooth & Polite',
     icon: 'heart',
-    accentColor: '#FFAA80',
+    accentColor: uiTheme.colors.secondary,
     previewOpener: "Honestly couldn't just scroll past without saying hi. What's something fun you've been up to?",
     vibeDesc: 'Smooth curiosity with classic gentlemanly warmth.',
   },
@@ -1859,7 +1860,7 @@ export default function OnboardingScreen({ navigation }) {
         pointerEvents="none"
       >
         <LinearGradient
-          colors={['#FF3366', '#FF5E7E', '#FFAA80', 'transparent']}
+          colors={[uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary, 'transparent']}
           style={StyleSheet.absoluteFill}
           start={{ x: 0.2, y: 0.1 }}
           end={{ x: 0.8, y: 0.9 }}
@@ -1918,7 +1919,7 @@ export default function OnboardingScreen({ navigation }) {
               accessibilityLabel="Return to Welcome"
             >
               <LinearGradient
-                colors={['#FF3366', '#FFAA80']}
+                colors={[uiTheme.colors.primary, uiTheme.colors.secondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.headerLogoGradient}
@@ -1929,7 +1930,7 @@ export default function OnboardingScreen({ navigation }) {
           )}
 
           <View style={styles.headerTitleWrap}>
-            <Ionicons name="flame" size={19} color="#FF3366" style={styles.headerBrandFlame} />
+            <Ionicons name="flame" size={19} color={uiTheme.colors.primary} style={styles.headerBrandFlame} />
             <Text style={styles.headerBrandTitle}>Flint</Text>
           </View>
 
@@ -1959,8 +1960,8 @@ export default function OnboardingScreen({ navigation }) {
                     <LinearGradient
                       colors={
                         isCurrent
-                          ? ['#FF3366', '#FFAA80']
-                          : ['#FF3366', '#FF5E7E']
+                          ? [uiTheme.colors.primary, uiTheme.colors.secondary]
+                          : [uiTheme.colors.primary, uiTheme.colors.accent]
                       }
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
@@ -2104,7 +2105,7 @@ export default function OnboardingScreen({ navigation }) {
                           colors={['rgba(255, 51, 102, 0.28)', 'rgba(255, 51, 102, 0.08)']}
                           style={styles.featureIconWrap}
                         >
-                          <Ionicons name="compass-outline" size={20} color="#FF3366" />
+                          <Ionicons name="compass-outline" size={20} color={uiTheme.colors.primary} />
                         </LinearGradient>
                       </View>
                       <View style={styles.featureInfo}>
@@ -2140,7 +2141,7 @@ export default function OnboardingScreen({ navigation }) {
                           colors={['rgba(255, 170, 128, 0.28)', 'rgba(255, 170, 128, 0.08)']}
                           style={styles.featureIconWrap}
                         >
-                          <Ionicons name="calendar-outline" size={20} color="#FFAA80" />
+                          <Ionicons name="calendar-outline" size={20} color={uiTheme.colors.secondary} />
                         </LinearGradient>
                       </View>
                       <View style={styles.featureInfo}>
@@ -2177,7 +2178,7 @@ export default function OnboardingScreen({ navigation }) {
                       {/* Sub-section 1: Where you date */}
                       <View style={styles.step2SectionHeader}>
                         <View style={styles.step2IconDiskCoral}>
-                          <Ionicons name="location-sharp" size={16} color="#FF3366" />
+                          <Ionicons name="location-sharp" size={16} color={uiTheme.colors.primary} />
                         </View>
                         <View style={styles.step2HeaderTextWrap}>
                           <View style={styles.step2TitleWithPillRow}>
@@ -2258,7 +2259,7 @@ export default function OnboardingScreen({ navigation }) {
                                 {lang}
                               </Text>
                               {isSelected && (
-                                <Ionicons name="checkmark-circle" size={13} color="#FF3366" />
+                                <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.primary} />
                               )}
                             </TouchableOpacity>
                           );
@@ -2290,7 +2291,7 @@ export default function OnboardingScreen({ navigation }) {
                               <Ionicons
                                 name="chevron-down"
                                 size={13}
-                                color="#FFAA80"
+                                color={uiTheme.colors.secondary}
                               />
                             </Animated.View>
                           </TouchableOpacity>
@@ -2345,7 +2346,7 @@ export default function OnboardingScreen({ navigation }) {
                                   {lang}
                                 </Text>
                                 {isSelected && (
-                                  <Ionicons name="checkmark-circle" size={13} color="#FF3366" />
+                                  <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.primary} />
                                 )}
                               </TouchableOpacity>
                             );
@@ -2436,7 +2437,7 @@ export default function OnboardingScreen({ navigation }) {
 
                       {isPhoneTooShort ? (
                         <View style={styles.phoneFeedbackRow}>
-                          <Ionicons name="alert-circle" size={13} color="#FF5E7E" style={{ marginRight: 6 }} />
+                          <Ionicons name="alert-circle" size={13} color={uiTheme.colors.accent} style={{ marginRight: 6 }} />
                           <Text style={styles.hintTextError}>
                             Number looks too short for {dialCode} (min {minPhoneLength} digits)
                           </Text>
@@ -2484,7 +2485,7 @@ export default function OnboardingScreen({ navigation }) {
                         <Ionicons
                           name={selectedGoals.includes('never_stop') ? 'infinite' : 'checkmark-circle'}
                           size={13}
-                          color={selectedGoals.includes('never_stop') ? '#00E5FF' : '#FF3366'}
+                          color={selectedGoals.includes('never_stop') ? '#00E5FF' : uiTheme.colors.primary}
                           style={{ marginRight: 4 }}
                         />
                         <Text
@@ -2503,7 +2504,7 @@ export default function OnboardingScreen({ navigation }) {
 
                   {Boolean(goalFeedback) && (
                     <View style={styles.goalFeedbackBanner}>
-                      <Ionicons name="information-circle" size={14} color="#FFAA80" style={{ marginRight: 5 }} />
+                      <Ionicons name="information-circle" size={14} color={uiTheme.colors.secondary} style={{ marginRight: 5 }} />
                       <Text style={styles.goalFeedbackText}>{goalFeedback}</Text>
                     </View>
                   )}
@@ -2529,7 +2530,7 @@ export default function OnboardingScreen({ navigation }) {
                     >
                       <View style={styles.strategyHeaderRow}>
                         <View style={styles.strategyIconDisk}>
-                          <Ionicons name="sparkles" size={12} color="#FFAA80" />
+                          <Ionicons name="sparkles" size={12} color={uiTheme.colors.secondary} />
                         </View>
                         <Text style={styles.strategyHeaderTitle}>How Flint will help you</Text>
                         <View style={styles.strategyGamePlanBadge}>
@@ -2608,7 +2609,7 @@ export default function OnboardingScreen({ navigation }) {
                               <Text
                                 style={[
                                   styles.personalityPillText,
-                                  isSelected && { color: '#FFFFFF', fontWeight: '800' },
+                                  isSelected && { fontFamily: 'Inter_800ExtraBold', color: '#FFFFFF', fontWeight: 'normal' },
                                 ]}
                               >
                                 {p.label}
@@ -2676,7 +2677,7 @@ export default function OnboardingScreen({ navigation }) {
                               <Text style={styles.voiceOpenerText}>
                                 "{typedOpener}
                                 {isTypingOpener && (
-                                  <Animated.Text style={{ opacity: voiceCursorOpacity, color: currentPersonalityObj.accentColor, fontWeight: '900' }}>
+                                  <Animated.Text style={{ fontFamily: 'Inter_800ExtraBold', opacity: voiceCursorOpacity, color: currentPersonalityObj.accentColor, fontWeight: 'normal' }}>
                                     |
                                   </Animated.Text>
                                 )}
@@ -2704,7 +2705,7 @@ export default function OnboardingScreen({ navigation }) {
                       {/* Sub-section 2: Reply Speed (Intelligent Cadence Bar) */}
                       <View style={styles.step4SectionHeader}>
                         <View style={styles.step4IconDiskCoral}>
-                          <Ionicons name="timer" size={15} color="#FF3366" />
+                          <Ionicons name="timer" size={15} color={uiTheme.colors.primary} />
                         </View>
                         <View style={styles.step4HeaderTextWrap}>
                           <Text numberOfLines={1} style={styles.step4SectionTitle}>Reply Speed</Text>
@@ -2750,7 +2751,7 @@ export default function OnboardingScreen({ navigation }) {
                               <Ionicons
                                 name={freq.icon}
                                 size={12}
-                                color={isSelected ? '#FF3366' : 'rgba(245, 230, 240, 0.55)'}
+                                color={isSelected ? uiTheme.colors.primary : 'rgba(245, 230, 240, 0.55)'}
                                 style={{ marginRight: 4 }}
                               />
                               <Text style={[styles.cadenceSegmentLabel, isSelected && styles.cadenceSegmentLabelActive]}>
@@ -2933,7 +2934,7 @@ export default function OnboardingScreen({ navigation }) {
                       {/* Top Floating Glass Badges Row: Only 98% Match (WINGMAN ACTIVE REMOVED per user request) */}
                       <View style={styles.heroTopBadgesRow}>
                         <View style={styles.heroCompatibilityBadge}>
-                          <Ionicons name="flame" size={12} color="#FF5E7E" />
+                          <Ionicons name="flame" size={12} color={uiTheme.colors.accent} />
                           <Text style={styles.heroCompatibilityText}>{currentMatch.matchScore || '98% Match'}</Text>
                         </View>
                       </View>
@@ -2961,7 +2962,7 @@ export default function OnboardingScreen({ navigation }) {
                             <Ionicons name="checkmark-circle" size={14} color="#00E676" style={{ marginLeft: 4 }} />
                           </View>
                           <View style={styles.heroLocationRow}>
-                            <Ionicons name="location-sharp" size={10.5} color="#FF5E7E" />
+                            <Ionicons name="location-sharp" size={10.5} color={uiTheme.colors.accent} />
                             <Text style={styles.heroLocationText} numberOfLines={1}>
                               {currentMatch.sub.split('&')[0].trim()} · {country} {getCountryFlag(country)}
                             </Text>
@@ -2978,7 +2979,7 @@ export default function OnboardingScreen({ navigation }) {
                         {/* Flint Wingman Outgoing Message */}
                         {simPhase === 'typing' ? (
                           <View style={styles.heroTypingDock}>
-                            <Ionicons name="sparkles" size={10} color="#FFAA80" />
+                            <Ionicons name="sparkles" size={10} color={uiTheme.colors.secondary} />
                             <Text style={styles.heroTypingText}>
                               Flint drafting in your {currentPersonalityObj.label} vibe...
                             </Text>
@@ -3092,7 +3093,7 @@ export default function OnboardingScreen({ navigation }) {
                     {/* 4 Preferences Info Chips */}
                     <View style={styles.readinessGrid}>
                       <View style={styles.readinessGridItem}>
-                        <Ionicons name="flame" size={12} color="#FE3C72" />
+                        <Ionicons name="flame" size={12} color={uiTheme.colors.primary} />
                         <Text style={styles.readinessGridText} numberOfLines={1}>Tinder</Text>
                       </View>
                       <View style={styles.readinessGridItem}>
@@ -3130,7 +3131,7 @@ export default function OnboardingScreen({ navigation }) {
               accessibilityLabel={currentStep === 1 ? 'Get Started' : currentStep === totalSteps ? 'Start Meeting Matches' : 'Continue'}
             >
               <LinearGradient
-                colors={['#FF3366', '#FF5E7E', '#FFAA80']}
+                colors={[uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.continueGradient}
@@ -3198,7 +3199,7 @@ export default function OnboardingScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalBackdrop}
         >
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.modalDismissArea}
             activeOpacity={1}
             onPress={() => {
@@ -3220,7 +3221,7 @@ export default function OnboardingScreen({ navigation }) {
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
                 <View style={styles.modalHeaderIconDiskCoral}>
-                  <Ionicons name="location-sharp" size={17} color="#FF3366" />
+                  <Ionicons name="location-sharp" size={17} color={uiTheme.colors.primary} />
                 </View>
                 <View style={styles.modalHeaderTitleGroup}>
                   <Text style={styles.modalTitle}>Select Country</Text>
@@ -3253,7 +3254,7 @@ export default function OnboardingScreen({ navigation }) {
               <Ionicons
                 name="search"
                 size={17}
-                color={isCountrySearchFocused ? '#FF3366' : 'rgba(255, 255, 255, 0.55)'}
+                color={isCountrySearchFocused ? uiTheme.colors.primary : 'rgba(255, 255, 255, 0.55)'}
               />
               <TextInput
                 style={styles.modalSearchInput}
@@ -3267,7 +3268,7 @@ export default function OnboardingScreen({ navigation }) {
                 returnKeyType="search"
               />
               {Boolean(countrySearch) && (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   onPress={() => {
                     safeHaptic('light');
                     setCountrySearch('');
@@ -3305,7 +3306,7 @@ export default function OnboardingScreen({ navigation }) {
                 const isSelected = country === item;
                 const matchDial = DIAL_CODES.find((d) => d.name === item)?.dial;
                 return (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[
                       styles.modalListItem,
                       isSelected && styles.modalListItemSelected,
@@ -3335,7 +3336,7 @@ export default function OnboardingScreen({ navigation }) {
                         </Text>
                       )}
                       {isSelected && (
-                        <Ionicons name="checkmark-circle" size={20} color="#FF3366" style={{ marginLeft: 8 }} />
+                        <Ionicons name="checkmark-circle" size={20} color={uiTheme.colors.primary} style={{ marginLeft: 8 }} />
                       )}
                     </View>
                   </TouchableOpacity>
@@ -3361,7 +3362,7 @@ export default function OnboardingScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalBackdrop}
         >
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.modalDismissArea}
             activeOpacity={1}
             onPress={() => {
@@ -3430,7 +3431,7 @@ export default function OnboardingScreen({ navigation }) {
                 returnKeyType="search"
               />
               {Boolean(dialSearch) && (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   onPress={() => {
                     safeHaptic('light');
                     setDialSearch('');
@@ -3467,7 +3468,7 @@ export default function OnboardingScreen({ navigation }) {
               renderItem={({ item }) => {
                 const isSelected = dialCode === item.dial && (country === item.name || !DIAL_CODES.some(d => d.dial === item.dial && d.name === country));
                 return (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[
                       styles.modalListItem,
                       isSelected && styles.modalListItemSelectedEmerald,
@@ -3545,14 +3546,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingHorizontal: uiTheme.spacing.xl,
+    paddingTop: uiTheme.spacing.sm,
+    paddingBottom: uiTheme.spacing.sm,
   },
   headerLogoWrap: {
     width: 38,
     height: 38,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
@@ -3570,7 +3571,7 @@ const styles = StyleSheet.create({
   },
   headerBrandFlame: {
     marginRight: 5,
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 6,
@@ -3578,15 +3579,15 @@ const styles = StyleSheet.create({
   headerBrandTitle: {
     color: '#FFFFFF',
     fontSize: 20,
-    fontWeight: '900',
+    fontFamily: 'Manrope_800ExtraBold',
     letterSpacing: 0.5,
     textShadowColor: 'rgba(255, 51, 102, 0.55)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
   },
   backBtn: {
-    width: 38,
-    height: 38,
+    width: 44,
+    height: 44,
     borderRadius: 19,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
@@ -3602,26 +3603,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.32)',
   },
-  headerSignInText: {
-    color: '#FF5E7E',
+  headerSignInText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.accent,
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
 
   // ── Segmented Progress Bar ──
   progressContainer: {
     paddingHorizontal: 22,
-    marginTop: 4,
-    marginBottom: 16,
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.lg,
   },
   progressContainerStep3: {
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   segmentTrackRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
   segmentTrack: {
     flex: 1,
@@ -3635,61 +3636,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  stepCounterText: {
+  stepCounterText: { fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  stepCounterBold: {
-    color: '#FFAA80',
-    fontWeight: '800',
+  stepCounterBold: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.secondary,
+    fontWeight: 'normal',
   },
-  stepPhaseName: {
-    color: '#FF5E7E',
-    fontSize: 12,
-    fontWeight: '700',
+  stepPhaseName: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.accent,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
 
   // ── Content Scroll ──
-  scrollContent: {
+  scrollContent: { width: '100%', maxWidth: 600, alignSelf: 'center',
     paddingHorizontal: 22,
     paddingBottom: 28,
   },
   scrollContentStep3: {
     paddingBottom: 14,
-    paddingTop: 4,
+    paddingTop: uiTheme.spacing.xs,
   },
   scrollContentStep5: {
     paddingBottom: 6,
-    paddingTop: 12,
+    paddingTop: uiTheme.spacing.md,
   },
   stepContainer: {
     width: '100%',
   },
   heroWrap: {
     marginTop: 6,
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   stepTitle: {
     color: '#FFFFFF',
     fontSize: 27,
-    fontWeight: '900',
+    fontFamily: 'Manrope_800ExtraBold',
     letterSpacing: -0.6,
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
   stepSubtitle: {
-    color: '#ac888b',
-    fontSize: 14,
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.label.fontSize,
     lineHeight: 20.5,
-    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
   },
 
   // ── Living Cockpit Sliding Showcase ──
   marqueeSectionWrap: {
     marginHorizontal: -22,
-    marginTop: 4,
-    marginBottom: 20,
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.xl,
   },
   marqueeWindow: {
     width: '100%',
@@ -3709,14 +3710,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     borderColor: 'rgba(255, 102, 136, 0.24)',
     overflow: 'hidden',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 18,
     elevation: 8,
   },
   cockpitCardGradient: {
-    padding: 16,
+    padding: uiTheme.spacing.lg,
   },
   cockpitHeaderRow: {
     flexDirection: 'row',
@@ -3724,7 +3725,7 @@ const styles = StyleSheet.create({
   },
   cockpitAvatarWrap: {
     position: 'relative',
-    marginRight: 12,
+    marginRight: uiTheme.spacing.md,
   },
   cockpitAvatarImage: {
     width: 48,
@@ -3751,16 +3752,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 2,
   },
-  cockpitProfileName: {
+  cockpitProfileName: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
-  cockpitProfileSub: {
-    color: '#ac888b',
-    fontSize: 11.5,
-    fontWeight: '400',
+  cockpitProfileSub: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   cockpitScoreWrap: {
     flexDirection: 'row',
@@ -3768,47 +3769,47 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     paddingHorizontal: 2,
   },
-  cockpitScoreText: {
+  cockpitScoreText: { fontFamily: 'Inter_700Bold',
     color: '#00E676',
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   cockpitHairline: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    marginVertical: 12,
+    marginVertical: uiTheme.spacing.md,
   },
   cockpitOpenerBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.035)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
+    padding: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.md,
   },
   cockpitOpenerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
   },
-  cockpitOpenerLabel: {
+  cockpitOpenerLabel: { fontFamily: 'Inter_600SemiBold',
     color: '#C49BFF',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
-  cockpitOpenerText: {
+  cockpitOpenerText: { fontFamily: 'Inter_500Medium',
     color: '#FFFFFF',
     fontSize: 12.8,
     lineHeight: 18,
-    fontWeight: '500',
+    fontWeight: 'normal',
     fontStyle: 'italic',
   },
-  cockpitCursor: {
-    color: '#FF3366',
-    fontWeight: '900',
-    fontSize: 14,
+  cockpitCursor: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.primary,
+    fontWeight: 'normal',
+    fontSize: uiTheme.type.label.fontSize,
   },
   cockpitFooterStrip: {
     flexDirection: 'row',
@@ -3819,12 +3820,12 @@ const styles = StyleSheet.create({
   cockpitFooterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
   },
-  cockpitFooterItemText: {
-    color: '#ac888b',
-    fontSize: 11,
-    fontWeight: '600',
+  cockpitFooterItemText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   cockpitFooterDot: {
     width: 3,
@@ -3835,8 +3836,8 @@ const styles = StyleSheet.create({
 
   // ── Step 1: Feature List (Apple HIG Borderless with Specular Disks) ──
   featureList: {
-    gap: 16,
-    marginTop: 4,
+    gap: uiTheme.spacing.lg,
+    marginTop: uiTheme.spacing.xs,
   },
   featureRow: {
     flexDirection: 'row',
@@ -3862,18 +3863,18 @@ const styles = StyleSheet.create({
   featureInfo: {
     flex: 1,
   },
-  featureTitle: {
+  featureTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.2,
     marginBottom: 3,
   },
-  featureDesc: {
-    color: '#ac888b',
+  featureDesc: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
     lineHeight: 17.5,
-    fontWeight: '400',
+    fontWeight: 'normal',
   },
 
   // ── Step 2: About You (Regional Context & VIP Alerts) ──
@@ -3882,8 +3883,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     borderColor: 'rgba(255, 102, 136, 0.22)',
     overflow: 'hidden',
-    marginBottom: 16,
-    shadowColor: '#FF3366',
+    marginBottom: uiTheme.spacing.lg,
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.16,
     shadowRadius: 16,
@@ -3894,7 +3895,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     borderColor: 'rgba(0, 230, 118, 0.22)',
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
     shadowColor: '#00E676',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.14,
@@ -3902,12 +3903,12 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   step2CardGradient: {
-    padding: 16,
+    padding: uiTheme.spacing.lg,
   },
   step2SectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   step2IconDiskCoral: {
     width: 36,
@@ -3918,7 +3919,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 51, 102, 0.28)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: uiTheme.spacing.md,
   },
   step2IconDiskAmethyst: {
     width: 36,
@@ -3929,7 +3930,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(179, 136, 255, 0.28)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: uiTheme.spacing.md,
   },
   step2IconDiskEmerald: {
     width: 36,
@@ -3940,7 +3941,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 230, 118, 0.28)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: uiTheme.spacing.md,
   },
   step2HeaderTextWrap: {
     flex: 1,
@@ -3951,10 +3952,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingRight: 2,
   },
-  step2SectionTitle: {
+  step2SectionTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
   step2CoralBadgePill: {
@@ -3963,12 +3964,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 51, 102, 0.28)',
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
   },
-  step2CoralBadgeText: {
-    color: '#FFAA80',
-    fontSize: 11,
-    fontWeight: '800',
+  step2CoralBadgeText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   step2LangCountPill: {
     backgroundColor: 'rgba(179, 136, 255, 0.12)',
@@ -3976,12 +3977,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(179, 136, 255, 0.28)',
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
   },
-  step2LangCountText: {
+  step2LangCountText: { fontFamily: 'Inter_700Bold',
     color: '#B388FF',
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   step2OptionalPill: {
     backgroundColor: 'rgba(0, 230, 118, 0.12)',
@@ -3989,17 +3990,17 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 230, 118, 0.28)',
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
   },
-  step2OptionalText: {
+  step2OptionalText: { fontFamily: 'Inter_700Bold',
     color: '#00E676',
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  step2SectionSub: {
-    color: '#ac888b',
-    fontSize: 12,
-    fontWeight: '400',
+  step2SectionSub: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 2,
   },
   step2SelectTrigger: {
@@ -4029,14 +4030,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  step2FlagEmoji: {
-    fontSize: 18,
+  step2FlagEmoji: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.section.fontSize,
     lineHeight: 22,
   },
-  step2SelectTriggerText: {
+  step2SelectTriggerText: { fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     flexShrink: 1,
   },
   step2ChevronWrap: {
@@ -4048,12 +4049,12 @@ const styles = StyleSheet.create({
   step2Divider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    marginVertical: 16,
+    marginVertical: uiTheme.spacing.lg,
   },
   langChipsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   langChip: {
     flexDirection: 'row',
@@ -4067,21 +4068,21 @@ const styles = StyleSheet.create({
     paddingVertical: 7.5,
   },
   langChipSelected: {
-    borderColor: '#FF3366',
+    borderColor: uiTheme.colors.primary,
     backgroundColor: 'rgba(255, 51, 102, 0.16)',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
   },
-  langChipText: {
+  langChipText: { fontFamily: 'Inter_600SemiBold',
     color: '#D8D0DD',
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
-  langChipTextSelected: {
+  langChipTextSelected: { fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   moreLangChip: {
     flexDirection: 'row',
@@ -4091,13 +4092,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 170, 128, 0.25)',
     borderRadius: 18,
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 7.5,
   },
-  moreLangChipText: {
-    color: '#FFAA80',
-    fontSize: 12,
-    fontWeight: '700',
+  moreLangChipText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   secondaryLangWrap: {
     overflow: 'hidden',
@@ -4105,8 +4106,8 @@ const styles = StyleSheet.create({
   langChipsContainerSecondary: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    paddingTop: 8,
+    gap: uiTheme.spacing.sm,
+    paddingTop: uiTheme.spacing.sm,
   },
   phoneInputWrap: {
     flexDirection: 'row',
@@ -4116,7 +4117,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.09)',
     borderRadius: 15,
     height: 52,
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
   },
   phoneInputWrapFocused: {
     borderColor: 'rgba(0, 230, 118, 0.55)',
@@ -4133,29 +4134,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.xs,
   },
-  dialFlagText: {
-    fontSize: 15,
-    marginRight: 4,
+  dialFlagText: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.body.fontSize,
+    marginRight: uiTheme.spacing.xs,
   },
-  dialCodeText: {
+  dialCodeText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
   dialDivider: {
     width: 1,
     height: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    marginHorizontal: 8,
+    marginHorizontal: uiTheme.spacing.sm,
   },
-  phoneInput: {
+  phoneInput: { fontFamily: 'Inter_600SemiBold',
     flex: 1,
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   phoneFeedbackRow: {
     flexDirection: 'row',
@@ -4163,34 +4164,34 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 2,
   },
-  privacyReassuranceText: {
+  privacyReassuranceText: { fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.6)',
-    fontSize: 11.5,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     lineHeight: 16,
   },
-  privacyReassuranceActiveText: {
+  privacyReassuranceActiveText: { fontFamily: 'Inter_600SemiBold',
     color: '#00E676',
-    fontSize: 11.5,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     lineHeight: 16,
   },
-  hintTextError: {
-    color: '#FF5E7E',
-    fontSize: 11.5,
-    fontWeight: '600',
+  hintTextError: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.accent,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     lineHeight: 16,
   },
 
   // ── Step 3: Goals ──
   step3HeroWrap: {
-    marginTop: 4,
+    marginTop: uiTheme.spacing.xs,
     marginBottom: 14,
   },
   step3Title: {
     color: '#FFFFFF',
     fontSize: 26,
-    fontWeight: '900',
+    fontFamily: 'Manrope_800ExtraBold',
     letterSpacing: -0.5,
     marginBottom: 6,
   },
@@ -4198,13 +4199,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   step3Subtitle: {
-    color: '#ac888b',
+    color: uiTheme.colors.muted,
     fontSize: 13.5,
     lineHeight: 18,
-    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
     flex: 1,
   },
   goalCountPill: {
@@ -4212,8 +4213,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
+    paddingVertical: uiTheme.spacing.xs,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.25)',
   },
@@ -4221,10 +4222,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 229, 255, 0.12)',
     borderColor: 'rgba(0, 229, 255, 0.28)',
   },
-  goalCountText: {
-    color: '#FF3366',
-    fontSize: 11.5,
-    fontWeight: '700',
+  goalCountText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   goalCountTextContinuous: {
@@ -4236,15 +4237,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 170, 128, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 170, 128, 0.28)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderRadius: uiTheme.radius.input,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 7,
     marginBottom: 10,
   },
-  goalFeedbackText: {
-    color: '#FFAA80',
-    fontSize: 12,
-    fontWeight: '600',
+  goalFeedbackText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   goalsList: {
     gap: 10,
@@ -4254,7 +4255,7 @@ const styles = StyleSheet.create({
   },
   goalGlow: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
+    borderRadius: uiTheme.radius.card,
   },
   goalShadow: {
     ...StyleSheet.absoluteFillObject,
@@ -4268,7 +4269,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.4,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 18,
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     paddingHorizontal: 14,
     overflow: 'hidden',
   },
@@ -4287,23 +4288,23 @@ const styles = StyleSheet.create({
   },
   goalInfo: {
     flex: 1,
-    paddingRight: 8,
+    paddingRight: uiTheme.spacing.sm,
   },
-  goalTitle: {
+  goalTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: 'rgba(255, 255, 255, 0.95)',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     marginBottom: 3,
     letterSpacing: 0.1,
   },
   goalTitleSelected: {
     color: '#FFFFFF',
   },
-  goalDesc: {
+  goalDesc: { fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.80)',
     fontSize: 12.5,
     lineHeight: 17,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
   goalDescSelected: {
     color: 'rgba(255, 255, 255, 0.95)',
@@ -4338,7 +4339,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   strategyCard: {
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     paddingHorizontal: 14,
   },
   strategyHeaderRow: {
@@ -4353,33 +4354,33 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 170, 128, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: uiTheme.spacing.sm,
   },
-  strategyHeaderTitle: {
+  strategyHeaderTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: 0.15,
     flex: 1,
   },
   strategyGamePlanBadge: {
     backgroundColor: 'rgba(255, 170, 128, 0.12)',
-    paddingHorizontal: 8,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(255, 170, 128, 0.25)',
   },
-  strategyGamePlanBadgeText: {
-    color: '#FFAA80',
-    fontSize: 10.5,
-    fontWeight: '700',
+  strategyGamePlanBadgeText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  strategySummaryText: {
+  strategySummaryText: { fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.92)',
     fontSize: 12.5,
     lineHeight: 18,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
 
   // ── Step 4: Behavior & Style (Luxury Obsidian Glass Card) ──
@@ -4447,18 +4448,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
-  step4SectionTitle: {
+  step4SectionTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
-  step4SectionSub: {
-    color: '#ac888b',
-    fontSize: 11.5,
-    fontWeight: '500',
+  step4SectionSub: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 1,
   },
   step4AmethystBadgePill: {
@@ -4468,15 +4469,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(179, 136, 255, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(179, 136, 255, 0.32)',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 7.5,
     paddingVertical: 2,
     height: 22,
   },
-  step4AmethystBadgeText: {
+  step4AmethystBadgeText: { fontFamily: 'Inter_700Bold',
     color: '#B388FF',
-    fontSize: 10.5,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     includeFontPadding: false,
   },
   step4CoralBadgePill: {
@@ -4486,15 +4487,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 51, 102, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.32)',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 7.5,
     paddingVertical: 2,
     height: 22,
   },
-  step4CoralBadgeText: {
-    color: '#FF3366',
-    fontSize: 10.5,
-    fontWeight: '700',
+  step4CoralBadgeText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     includeFontPadding: false,
   },
   step4Divider: {
@@ -4515,14 +4516,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(12, 7, 18, 0.72)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
-  personalityPillText: {
+  personalityPillText: { fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 240, 0.75)',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   voicePreviewWrapper: {
     borderRadius: 14,
@@ -4552,17 +4553,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  voiceHeaderTitle: {
+  voiceHeaderTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   voiceLiveBeaconRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginLeft: 4,
+    gap: uiTheme.spacing.xs,
+    marginLeft: uiTheme.spacing.xs,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -4573,9 +4574,9 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 2.5,
   },
-  voiceLiveText: {
-    fontSize: 9.5,
-    fontWeight: '700',
+  voiceLiveText: { fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
     includeFontPadding: false,
   },
@@ -4589,9 +4590,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 20,
   },
-  voiceTagBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '700',
+  voiceTagBadgeText: { fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     includeFontPadding: false,
   },
   voiceBubble: {
@@ -4600,7 +4601,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
     paddingHorizontal: 11,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
     minHeight: 48,
     justifyContent: 'center',
     marginBottom: 6,
@@ -4608,7 +4609,7 @@ const styles = StyleSheet.create({
   voiceDraftingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     paddingVertical: 2,
   },
   typingDotsRow: {
@@ -4622,16 +4623,16 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 2.5,
   },
-  voiceDraftingText: {
+  voiceDraftingText: { fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 11.5,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     fontStyle: 'italic',
   },
-  voiceOpenerText: {
+  voiceOpenerText: { fontFamily: 'Inter_600SemiBold',
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     fontStyle: 'italic',
     lineHeight: 17,
   },
@@ -4654,10 +4655,10 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 1.25,
   },
-  voiceVibeDesc: {
+  voiceVibeDesc: { fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.72)',
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     lineHeight: 15,
     flex: 1,
   },
@@ -4681,7 +4682,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.65)',
     overflow: 'hidden',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.40,
     shadowRadius: 5,
@@ -4697,15 +4698,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     zIndex: 1,
   },
-  cadenceSegmentLabel: {
+  cadenceSegmentLabel: { fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 240, 0.70)',
-    fontSize: 11.5,
-    fontWeight: '600',
-    marginRight: 4,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
+    marginRight: uiTheme.spacing.xs,
   },
-  cadenceSegmentLabelActive: {
+  cadenceSegmentLabelActive: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   cadenceTimePill: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
@@ -4716,15 +4717,15 @@ const styles = StyleSheet.create({
   cadenceTimePillActive: {
     backgroundColor: 'rgba(255, 51, 102, 0.35)',
   },
-  cadenceTimeText: {
+  cadenceTimeText: { fontFamily: 'Inter_700Bold',
     color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 9.5,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     includeFontPadding: false,
   },
-  cadenceTimeTextActive: {
-    color: '#FFAA80',
-    fontWeight: '800',
+  cadenceTimeTextActive: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.secondary,
+    fontWeight: 'normal',
   },
   cadenceInsightRow: {
     flexDirection: 'row',
@@ -4737,13 +4738,13 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#FF3366',
+    backgroundColor: uiTheme.colors.primary,
     flexShrink: 0,
   },
-  cadenceInsightText: {
+  cadenceInsightText: { fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.75)',
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     lineHeight: 15,
     flex: 1,
   },
@@ -4763,7 +4764,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    gap: 4,
+    gap: uiTheme.spacing.xs,
   },
   shieldBeaconPillDimmed: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -4778,10 +4779,10 @@ const styles = StyleSheet.create({
   shieldBeaconDotDimmed: {
     backgroundColor: '#8E8E93',
   },
-  shieldBeaconText: {
+  shieldBeaconText: { fontFamily: 'Inter_700Bold',
     color: '#00E676',
-    fontSize: 9.5,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
     includeFontPadding: false,
   },
@@ -4792,7 +4793,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
   },
   shieldPillarCard: {
     flex: 1,
@@ -4813,26 +4814,26 @@ const styles = StyleSheet.create({
     gap: 3.5,
     marginBottom: 2,
   },
-  shieldPillarTitle: {
+  shieldPillarTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     includeFontPadding: false,
   },
   shieldPillarTitleDimmed: {
     color: '#8E8E93',
   },
-  shieldPillarSub: {
+  shieldPillarSub: { fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.60)',
-    fontSize: 8.5,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Step 5: Hybrid Laser Thread & Live Match Simulator (Zero Jargon, Zero Scroll) ──
   step5Container: {
     alignItems: 'center',
     width: '100%',
-    paddingTop: 4,
+    paddingTop: uiTheme.spacing.xs,
     paddingBottom: 0,
     overflow: 'visible',
   },
@@ -4842,7 +4843,7 @@ const styles = StyleSheet.create({
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
     overflow: 'visible',
   },
   // ── Step 5: Grand Match Hero & Fanned Deck Entrance ──
@@ -4853,8 +4854,8 @@ const styles = StyleSheet.create({
   },
   heroEntranceTitle: {
     color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '900',
+    fontSize: uiTheme.type.title.fontSize,
+    fontFamily: 'Manrope_800ExtraBold',
     letterSpacing: -0.4,
     textAlign: 'center',
     marginBottom: 3,
@@ -4863,7 +4864,7 @@ const styles = StyleSheet.create({
     color: 'rgba(245, 230, 240, 0.65)',
     fontSize: 12.5,
     lineHeight: 17,
-    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
     textAlign: 'center',
     maxWidth: 320,
   },
@@ -4884,7 +4885,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 51, 102, 0.20)',
     transform: [{ rotate: '-4.2deg' }, { translateY: -4 }],
     zIndex: 1,
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.22,
     shadowRadius: 10,
@@ -4899,7 +4900,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 80, 120, 0.28)',
     zIndex: 2,
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.26,
     shadowRadius: 12,
@@ -4916,12 +4917,12 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '98%',
     height: 345,
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 60, 110, 0.42)',
     backgroundColor: '#120818',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.38,
     shadowRadius: 22,
@@ -4951,7 +4952,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingTop: 10,
   },
   heroCompatibilityBadge: {
@@ -4960,15 +4961,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 8, 22, 0.88)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     paddingHorizontal: 9,
     paddingVertical: 4.5,
-    gap: 4,
+    gap: uiTheme.spacing.xs,
   },
-  heroCompatibilityText: {
+  heroCompatibilityText: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '800',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   stampLikeWrap: {
@@ -4981,15 +4982,15 @@ const styles = StyleSheet.create({
   stampLikeBorder: {
     borderWidth: 2.5,
     borderColor: '#00E676',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 10,
     paddingVertical: 3,
     backgroundColor: 'rgba(0, 230, 118, 0.18)',
   },
-  stampLikeText: {
+  stampLikeText: { fontFamily: 'Inter_800ExtraBold',
     color: '#00E676',
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: 'normal',
     letterSpacing: 1.5,
   },
   stampNopeWrap: {
@@ -5001,16 +5002,16 @@ const styles = StyleSheet.create({
   },
   stampNopeBorder: {
     borderWidth: 2.5,
-    borderColor: '#FF3366',
-    borderRadius: 8,
+    borderColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 10,
     paddingVertical: 3,
     backgroundColor: 'rgba(255, 51, 102, 0.18)',
   },
-  stampNopeText: {
-    color: '#FF3366',
+  stampNopeText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.primary,
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: 'normal',
     letterSpacing: 1.5,
   },
   readinessCard: {
@@ -5022,7 +5023,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginTop: 10,
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
@@ -5033,7 +5034,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
   readinessHeaderLeft: {
     flexDirection: 'row',
@@ -5054,21 +5055,21 @@ const styles = StyleSheet.create({
     borderRadius: 2.25,
     backgroundColor: '#00E676',
   },
-  readinessHeaderTitle: {
+  readinessHeaderTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.1,
   },
-  readinessHeaderSub: {
+  readinessHeaderSub: { fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.55)',
-    fontSize: 11.5,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   readinessBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     backgroundColor: 'rgba(0, 230, 118, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(0, 230, 118, 0.32)',
@@ -5076,10 +5077,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2.5,
   },
-  readinessBadgeText: {
+  readinessBadgeText: { fontFamily: 'Inter_800ExtraBold',
     color: '#00E676',
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   readinessLaserTrack: {
@@ -5097,9 +5098,9 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: '#FF3366',
+    backgroundColor: uiTheme.colors.primary,
     borderRadius: 1,
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 5,
@@ -5121,12 +5122,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 10,
     paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingHorizontal: uiTheme.spacing.xs,
   },
-  readinessGridText: {
+  readinessGridText: { fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.1,
   },
   heroFrostedDock: {
@@ -5137,9 +5138,9 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.14)',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingTop: 10,
-    paddingBottom: 8,
+    paddingBottom: uiTheme.spacing.sm,
   },
   heroDockHeader: {
     flexDirection: 'row',
@@ -5151,10 +5152,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  heroNameText: {
+  heroNameText: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 15.5,
-    fontWeight: '900',
+    fontWeight: 'normal',
     letterSpacing: -0.3,
   },
   heroLocationRow: {
@@ -5162,10 +5163,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
   },
-  heroLocationText: {
+  heroLocationText: { fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 240, 0.85)',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   heroIncomingBubble: {
     alignSelf: 'flex-start',
@@ -5173,17 +5174,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderTopLeftRadius: 3,
     paddingHorizontal: 10,
     paddingVertical: 5.5,
     marginBottom: 5,
   },
-  heroIncomingText: {
+  heroIncomingText: { fontFamily: 'Inter_500Medium',
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 15.5,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
   heroTypingDock: {
     alignSelf: 'flex-end',
@@ -5193,15 +5194,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 51, 102, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.32)',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderTopRightRadius: 3,
     paddingHorizontal: 9,
     paddingVertical: 5.5,
   },
-  heroTypingText: {
-    color: '#FFAA80',
-    fontSize: 10.5,
-    fontWeight: '600',
+  heroTypingText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   vipTypingDotsWrap: {
     flexDirection: 'row',
@@ -5213,12 +5214,12 @@ const styles = StyleSheet.create({
     width: 3.5,
     height: 3.5,
     borderRadius: 2,
-    backgroundColor: '#FF5E7E',
+    backgroundColor: uiTheme.colors.accent,
   },
   heroAiBubble: {
     alignSelf: 'flex-end',
     maxWidth: '88%',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderTopRightRadius: 3,
     borderWidth: 1,
     overflow: 'hidden',
@@ -5230,43 +5231,43 @@ const styles = StyleSheet.create({
   heroAiAuthorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     marginBottom: 2,
   },
-  heroAiAuthorText: {
-    fontSize: 9.5,
-    fontWeight: '800',
+  heroAiAuthorText: { fontFamily: 'Manrope_800ExtraBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
-  heroAiStrategyText: {
+  heroAiStrategyText: { fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.50)',
-    fontSize: 8.5,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  heroAiBubbleText: {
+  heroAiBubbleText: { fontFamily: 'Inter_500Medium',
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 15.5,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
   heroShuffleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     paddingTop: 5,
   },
-  heroShuffleText: {
+  heroShuffleText: { fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 240, 0.58)',
-    fontSize: 9.5,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
 
   // ── Sticky Bottom Footer (Visually Matches Create Account / Sign In) ──
   footer: {
     paddingHorizontal: 22,
-    paddingTop: 12,
+    paddingTop: uiTheme.spacing.md,
     paddingBottom: 10,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.06)',
@@ -5275,7 +5276,7 @@ const styles = StyleSheet.create({
   continueBtn: {
     borderRadius: 26,
     overflow: 'hidden',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.38,
     shadowRadius: 16,
@@ -5287,14 +5288,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.35)',
   },
   continueBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
     letterSpacing: 0.2,
   },
   footerSubSlot: {
@@ -5308,10 +5309,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaReassuranceText: {
+  ctaReassuranceText: { fontFamily: 'Inter_500Medium',
     color: 'rgba(255, 255, 255, 0.45)',
-    fontSize: 11.5,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   guestFooterBtn: {
@@ -5319,10 +5320,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 6,
   },
-  guestFooterText: {
+  guestFooterText: { fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 240, 0.65)',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
 
   // ── Modals (iOS Industry Standard Luxury Sheet) ──
@@ -5344,8 +5345,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     borderColor: 'rgba(255, 255, 255, 0.14)',
     height: '82%',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: uiTheme.spacing.lg,
+    paddingTop: uiTheme.spacing.sm,
     paddingBottom: Platform.OS === 'ios' ? 36 : 20,
     overflow: 'hidden',
     shadowColor: '#000000',
@@ -5360,8 +5361,8 @@ const styles = StyleSheet.create({
     borderRadius: 2.25,
     backgroundColor: 'rgba(255, 255, 255, 0.32)',
     alignSelf: 'center',
-    marginTop: 4,
-    marginBottom: 16,
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalHandle: {
     width: 38,
@@ -5369,8 +5370,8 @@ const styles = StyleSheet.create({
     borderRadius: 2.25,
     backgroundColor: 'rgba(255, 255, 255, 0.32)',
     alignSelf: 'center',
-    marginTop: 4,
-    marginBottom: 16,
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalList: {
     flex: 1,
@@ -5384,13 +5385,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginBottom: 16,
+    paddingHorizontal: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: uiTheme.spacing.md,
     flex: 1,
   },
   modalHeaderIconDiskCoral: {
@@ -5416,21 +5417,21 @@ const styles = StyleSheet.create({
   modalHeaderTitleGroup: {
     flex: 1,
   },
-  modalTitle: {
+  modalTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 19,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.3,
   },
-  modalSub: {
+  modalSub: { fontFamily: 'Inter_500Medium',
     color: 'rgba(255, 255, 255, 0.65)',
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: 'normal',
     marginTop: 2,
   },
   modalCloseBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
     borderWidth: 1,
@@ -5448,21 +5449,21 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: 14,
     height: 48,
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   modalSearchWrapFocusedCoral: {
-    borderColor: '#FF3366',
+    borderColor: uiTheme.colors.primary,
     backgroundColor: 'rgba(255, 51, 102, 0.08)',
   },
   modalSearchWrapFocusedEmerald: {
     borderColor: '#00E676',
     backgroundColor: 'rgba(0, 230, 118, 0.08)',
   },
-  modalSearchInput: {
+  modalSearchInput: { fontFamily: 'Inter_500Medium',
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
   },
   modalMatchCountPill: {
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
@@ -5472,18 +5473,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
-  modalMatchCountText: {
+  modalMatchCountText: { fontFamily: 'Inter_700Bold',
     color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   modalListItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 13,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingHorizontal: uiTheme.spacing.md,
+    borderRadius: uiTheme.radius.input,
   },
   modalListItemSelected: {
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
@@ -5494,47 +5495,47 @@ const styles = StyleSheet.create({
   modalListItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: uiTheme.spacing.md,
     flex: 1,
   },
-  modalItemFlag: {
-    fontSize: 24,
+  modalItemFlag: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.title.fontSize,
     width: 32,
     textAlign: 'center',
   },
-  modalListText: {
+  modalListText: { fontFamily: 'Inter_600SemiBold',
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'normal',
     flex: 1,
     letterSpacing: -0.2,
   },
-  modalListTextSelected: {
-    color: '#FF5E7E',
-    fontWeight: '800',
+  modalListTextSelected: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.accent,
+    fontWeight: 'normal',
   },
-  modalListTextSelectedEmerald: {
+  modalListTextSelectedEmerald: { fontFamily: 'Inter_800ExtraBold',
     color: '#00E676',
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   modalListItemRight: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  modalItemDialText: {
+  modalItemDialText: { fontFamily: 'Inter_500Medium',
     color: 'rgba(255, 255, 255, 0.42)',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
-  modalItemDialTextSelected: {
-    color: '#FFAA80',
-    fontWeight: '700',
+  modalItemDialTextSelected: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontWeight: 'normal',
   },
   modalDialBadge: {
     backgroundColor: 'rgba(0, 230, 118, 0.10)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: uiTheme.spacing.xs,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
     borderColor: 'rgba(0, 230, 118, 0.25)',
   },
@@ -5542,29 +5543,29 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 230, 118, 0.22)',
     borderColor: 'rgba(0, 230, 118, 0.55)',
   },
-  modalDialText: {
+  modalDialText: { fontFamily: 'Inter_800ExtraBold',
     color: '#00E676',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
-  modalDialTextSelected: {
+  modalDialTextSelected: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: 'normal',
   },
   modalEmptyWrap: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 56,
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
-  modalEmptyTitle: {
+  modalEmptyTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
-  modalEmptySub: {
+  modalEmptySub: { fontFamily: 'Inter_500Medium',
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
 });

@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/QuickTelemetryCapsule.js — Apple Health-Style Metric Telemetry Bar
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -25,12 +26,12 @@ export default function QuickTelemetryCapsule({ lifetimeStats }) {
       {/* ── 1. Swipes Telemetry Column ── */}
       <View style={styles.col}>
         <View style={styles.colHeader}>
-          <Ionicons name="heart" size={13} color="#FE3C72" />
+          <Ionicons name="heart" size={13} color={uiTheme.colors.primary} />
           <Text style={styles.colLabel}>Swipes</Text>
         </View>
         <Text style={styles.colValue}>{formatNumber(totalSwipes)}</Text>
         <View style={[styles.badge, { backgroundColor: 'rgba(254, 60, 114, 0.12)' }]}>
-          <Text style={[styles.badgeText, { color: '#FE3C72' }]}>
+          <Text style={[styles.badgeText, { color: uiTheme.colors.primary }]}>
             {todaySwipes > 0 ? `+${todaySwipes} today` : 'Ready'}
           </Text>
         </View>
@@ -57,12 +58,12 @@ export default function QuickTelemetryCapsule({ lifetimeStats }) {
       {/* ── 3. Matches & Leads Telemetry Column ── */}
       <View style={styles.col}>
         <View style={styles.colHeader}>
-          <Ionicons name="sparkles" size={13} color="#818CF8" />
+          <Ionicons name="sparkles" size={13} color={uiTheme.colors.info} />
           <Text style={styles.colLabel}>Matches</Text>
         </View>
         <Text style={styles.colValue}>{formatNumber(totalMatches)}</Text>
         <View style={[styles.badge, { backgroundColor: 'rgba(129, 140, 248, 0.12)' }]}>
-          <Text style={[styles.badgeText, { color: '#818CF8' }]}>
+          <Text style={[styles.badgeText, { color: uiTheme.colors.info }]}>
             {totalMatches > 0 ? `${totalMatches} matches` : 'Standby'}
           </Text>
         </View>
@@ -75,13 +76,13 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#14121F',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     paddingVertical: 14,
-    paddingHorizontal: 8,
-    marginBottom: 12,
+    paddingHorizontal: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.md,
   },
   col: {
     flex: 1,
@@ -91,17 +92,17 @@ const styles = StyleSheet.create({
   colHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
+    gap: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.xs,
   },
-  colLabel: {
-    fontSize: 11,
-    color: '#8E8DA3',
-    fontWeight: '600',
+  colLabel: { fontFamily: 'Inter_600SemiBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
+    fontWeight: 'normal',
   },
-  colValue: {
+  colValue: { fontFamily: 'Inter_800ExtraBold',
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: 'normal',
     color: '#FFF',
     letterSpacing: -0.5,
     marginVertical: 2,
@@ -112,9 +113,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginTop: 2,
   },
-  badgeText: {
-    fontSize: 9.5,
-    fontWeight: '700',
+  badgeText: { fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   divider: {

@@ -1,3 +1,5 @@
+import DialogContent from './DialogContent';
+import { theme as uiTheme } from '../../theme';
 // mobile-app/src/components/common/LocationNoticeModal.js
 // Universal, high-converting location access, permission & feedback modal across all screens
 // Uses React Native native <Modal> portal to ensure viewport-centered, unclipped presentation over all ScrollViews
@@ -172,6 +174,7 @@ export default function LocationNoticeModal({
             },
           ]}
         >
+          <DialogContent style={{ alignItems: 'center' }}>
           {/* Top Status Icon Pill */}
           <View
             style={[
@@ -183,7 +186,7 @@ export default function LocationNoticeModal({
             ]}
           >
             {rechecking ? (
-              <ActivityIndicator size="small" color="#FE3C72" />
+              <ActivityIndicator size="small" color={uiTheme.colors.primary} />
             ) : (
               <Ionicons
                 name={
@@ -198,11 +201,11 @@ export default function LocationNoticeModal({
                 size={26}
                 color={
                   isConnected
-                    ? '#10B981'
+                    ? uiTheme.colors.success
                     : isBlocked
-                    ? '#FE3C72'
+                    ? uiTheme.colors.primary
                     : isServicesDisabled
-                    ? '#F59E0B'
+                    ? uiTheme.colors.warning
                     : '#6366F1'
                 }
               />
@@ -216,7 +219,7 @@ export default function LocationNoticeModal({
           {isConnected && Boolean(modalCity) && (
             <View style={styles.cityBadge}>
               <View style={styles.cityDot} />
-              <Ionicons name="location-sharp" size={13} color="#10B981" />
+              <Ionicons name="location-sharp" size={13} color={uiTheme.colors.success} />
               <Text style={styles.cityText} numberOfLines={1}>
                 {modalCity}
               </Text>
@@ -230,7 +233,7 @@ export default function LocationNoticeModal({
           <View style={styles.buttonGroup}>
             {isBlocked && (
               <>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.primaryBtn}
                   onPress={handlePressSettings}
                   activeOpacity={0.88}
@@ -239,19 +242,19 @@ export default function LocationNoticeModal({
                   <Text style={styles.primaryBtnText}>Open Device Settings</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.checkAgainBtn}
                   onPress={handleAutoCheck}
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="refresh" size={14} color="#10B981" />
+                  <Ionicons name="refresh" size={14} color={uiTheme.colors.success} />
                   <Text style={styles.checkAgainText}>
                     {rechecking ? 'Checking Location…' : "I've Enabled It • Check Again"}
                   </Text>
                 </TouchableOpacity>
 
                 {onChooseCityManually && (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={styles.secondaryBtn}
                     onPress={() => {
                       if (onClose) onClose();
@@ -267,7 +270,7 @@ export default function LocationNoticeModal({
 
             {isServicesDisabled && (
               <>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.primaryBtn}
                   onPress={handlePressEnableGps}
                   activeOpacity={0.88}
@@ -276,19 +279,19 @@ export default function LocationNoticeModal({
                   <Text style={styles.primaryBtnText}>Turn On Location</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.checkAgainBtn}
                   onPress={handleAutoCheck}
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="refresh" size={14} color="#10B981" />
+                  <Ionicons name="refresh" size={14} color={uiTheme.colors.success} />
                   <Text style={styles.checkAgainText}>
                     {rechecking ? 'Checking…' : 'Check Again'}
                   </Text>
                 </TouchableOpacity>
 
                 {onChooseCityManually && (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={styles.secondaryBtn}
                     onPress={() => {
                       if (onClose) onClose();
@@ -303,7 +306,7 @@ export default function LocationNoticeModal({
             )}
 
             {(isConnected || isNotice) && (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[
                   styles.primaryBtn,
                   isConnected && styles.primaryBtnConnected,
@@ -322,6 +325,7 @@ export default function LocationNoticeModal({
               </TouchableOpacity>
             )}
           </View>
+          </DialogContent>
         </Animated.View>
       </View>
     </Modal>
@@ -334,16 +338,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 4, 10, 0.84)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: uiTheme.spacing.xxl,
   },
   card: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#26223B',
-    padding: 24,
+    borderColor: uiTheme.colors.elevated,
+    padding: uiTheme.spacing.xxl,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
@@ -357,10 +361,10 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: '#1F1B2E',
     borderWidth: 1,
-    borderColor: '#363252',
+    borderColor: uiTheme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   iconCircleConnected: {
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
@@ -378,10 +382,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(99, 102, 241, 0.12)',
     borderColor: 'rgba(99, 102, 241, 0.3)',
   },
-  title: {
+  title: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: uiTheme.type.section.fontSize,
+    fontWeight: 'normal',
     textAlign: 'center',
     letterSpacing: -0.3,
   },
@@ -392,8 +396,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.28)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderRadius: uiTheme.radius.input,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 5,
     marginTop: 10,
     marginBottom: 2,
@@ -402,15 +406,15 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
   },
-  cityText: {
-    color: '#10B981',
+  cityText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
-  message: {
-    color: '#8E8DA3',
+  message: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
@@ -425,46 +429,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#FE3C72',
+    gap: uiTheme.spacing.sm,
+    backgroundColor: uiTheme.colors.primary,
     borderRadius: 14,
     paddingVertical: 13,
-    paddingHorizontal: 16,
-    shadowColor: '#FE3C72',
+    paddingHorizontal: uiTheme.spacing.lg,
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 6,
   },
   primaryBtnConnected: {
-    backgroundColor: '#10B981',
-    shadowColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
+    shadowColor: uiTheme.colors.success,
   },
-  primaryBtnText: {
+  primaryBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
   checkAgainBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
   },
-  checkAgainText: {
-    color: '#10B981',
+  checkAgainText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   secondaryBtn: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
   },
-  secondaryBtnText: {
-    color: '#8E8DA3',
+  secondaryBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
 });

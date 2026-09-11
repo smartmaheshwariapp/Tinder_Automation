@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/common/RangeSlider.js
 // High-performance Native Slider matching Desktop V2 UI
 import React, { useState, useEffect } from 'react';
@@ -42,8 +43,11 @@ export default function RangeSlider({
         step={step}
         value={clampedVal}
         disabled={disabled}
-        minimumTrackTintColor="#FE3C72"
-        maximumTrackTintColor="#26223B"
+        accessibilityLabel="Maximum matching distance"
+        accessibilityValue={{ min, max, now: clampedVal, text: `${clampedVal} ${unit}` }}
+        accessibilityState={{ disabled }}
+        minimumTrackTintColor={uiTheme.colors.primary}
+        maximumTrackTintColor={uiTheme.colors.elevated}
         thumbTintColor="#FFFFFF"
         onValueChange={(val) => {
           setLocalVal(val);
@@ -73,23 +77,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  badgeLabel: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '600',
+  badgeLabel: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   valueBadge: {
-    backgroundColor: '#1C192E',
-    paddingHorizontal: 8,
+    backgroundColor: uiTheme.colors.elevated,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(254, 60, 114, 0.4)',
   },
-  valueBadgeText: {
-    color: '#FE3C72',
-    fontSize: 11.5,
-    fontWeight: '800',
+  valueBadgeText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   slider: {
     width: '100%',
@@ -101,9 +105,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     marginTop: -4,
   },
-  limitText: {
-    color: '#716E89',
-    fontSize: 11,
-    fontWeight: '500',
+  limitText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 });

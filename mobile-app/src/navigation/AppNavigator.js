@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../theme';
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AuthScreen from '../screens/AuthScreen';
@@ -16,7 +17,7 @@ export default function AppNavigator() {
       initialRouteName="Auth"
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#18101d' },
+        contentStyle: { backgroundColor: uiTheme.colors.background },
         animation: 'fade',
       }}
     >

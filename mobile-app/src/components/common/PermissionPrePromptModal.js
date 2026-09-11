@@ -1,3 +1,5 @@
+import DialogContent from './DialogContent';
+import { theme as uiTheme } from '../../theme';
 // mobile-app/src/components/common/PermissionPrePromptModal.js
 // Consumer-grade, high-converting permission pre-prompt modal with live feedback & GPS sync
 
@@ -119,14 +121,14 @@ export default function PermissionPrePromptModal({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <DialogContent style={styles.sheet}>
           {/* ══════════ STEP 1: INTRO VALUE PROPOSITION ══════════ */}
           {step === 'intro' && (
             <>
               {/* Header Icon */}
               <View style={styles.iconWrap}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="sparkles" size={26} color="#FE3C72" />
+                  <Ionicons name="sparkles" size={26} color={uiTheme.colors.primary} />
                 </View>
               </View>
 
@@ -159,7 +161,7 @@ export default function PermissionPrePromptModal({
                 {/* Notifications Feature */}
                 <View style={styles.featureItem}>
                   <View style={[styles.featureIconWrap, { backgroundColor: 'rgba(254, 60, 114, 0.12)' }]}>
-                    <Ionicons name="chatbubbles" size={20} color="#FE3C72" />
+                    <Ionicons name="chatbubbles" size={20} color={uiTheme.colors.primary} />
                   </View>
                   <View style={styles.featureTextWrap}>
                     <View style={styles.featureTitleRow}>
@@ -176,7 +178,7 @@ export default function PermissionPrePromptModal({
               </View>
 
               {/* Action Buttons */}
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.primaryBtn}
                 onPress={handleEnableAll}
                 activeOpacity={0.88}
@@ -185,7 +187,7 @@ export default function PermissionPrePromptModal({
                 <Ionicons name="arrow-forward" size={16} color="#FFF" />
               </TouchableOpacity>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.secondaryBtn}
                 onPress={handleFinishManual}
                 activeOpacity={0.8}
@@ -199,7 +201,7 @@ export default function PermissionPrePromptModal({
           {step === 'requesting' && (
             <View style={styles.loadingContainer}>
               <View style={styles.loadingPulseCircle}>
-                <ActivityIndicator size="large" color="#FE3C72" />
+                <ActivityIndicator size="large" color={uiTheme.colors.primary} />
               </View>
               <Text style={styles.loadingTitle}>Finding Your Location…</Text>
               <Text style={styles.loadingSubtitle}>
@@ -212,18 +214,18 @@ export default function PermissionPrePromptModal({
           {step === 'success' && (
             <View style={styles.successContainer}>
               <View style={styles.successIconCircle}>
-                <Ionicons name="checkmark-circle" size={44} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={44} color={uiTheme.colors.success} />
               </View>
               <Text style={styles.successTitle}>Location Found!</Text>
               <View style={styles.cityPill}>
-                <Ionicons name="location-sharp" size={14} color="#10B981" />
+                <Ionicons name="location-sharp" size={14} color={uiTheme.colors.success} />
                 <Text style={styles.cityNameText}>{resolvedCity}</Text>
               </View>
               <Text style={styles.successSubtitle}>
                 We'll prioritize showing you great singles near {resolvedCity}.
               </Text>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.primaryBtn}
                 onPress={handleFinishSuccess}
                 activeOpacity={0.88}
@@ -238,14 +240,14 @@ export default function PermissionPrePromptModal({
           {step === 'blocked' && (
             <View style={styles.manualContainer}>
               <View style={[styles.iconCircle, { backgroundColor: 'rgba(254, 60, 114, 0.12)', borderColor: 'rgba(254, 60, 114, 0.3)' }]}>
-                <Ionicons name="location-outline" size={30} color="#FE3C72" />
+                <Ionicons name="location-outline" size={30} color={uiTheme.colors.primary} />
               </View>
               <Text style={styles.title}>Location Access Needed</Text>
               <Text style={styles.subtitle}>
                 To show people in your city, please allow Location in your phone's settings.
               </Text>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.primaryBtn}
                 onPress={handleOpenSettings}
                 activeOpacity={0.88}
@@ -254,16 +256,16 @@ export default function PermissionPrePromptModal({
                 <Text style={styles.primaryBtnText}>Open Device Settings</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.secondaryActionBtn, { marginTop: 10 }]}
                 onPress={handleEnableAll}
                 activeOpacity={0.85}
               >
-                <Ionicons name="refresh" size={15} color="#10B981" />
+                <Ionicons name="refresh" size={15} color={uiTheme.colors.success} />
                 <Text style={styles.secondaryActionText}>I've Enabled It • Check Again</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.secondaryBtn}
                 onPress={() => setStep('manual')}
                 activeOpacity={0.8}
@@ -277,14 +279,14 @@ export default function PermissionPrePromptModal({
           {step === 'services_disabled' && (
             <View style={styles.manualContainer}>
               <View style={[styles.iconCircle, { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: 'rgba(245, 158, 11, 0.3)' }]}>
-                <Ionicons name="navigate-outline" size={30} color="#F59E0B" />
+                <Ionicons name="navigate-outline" size={30} color={uiTheme.colors.warning} />
               </View>
               <Text style={styles.title}>Turn On Location</Text>
               <Text style={styles.subtitle}>
                 Your phone's location is turned off. Please turn on Location in quick settings to see nearby people.
               </Text>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.primaryBtn}
                 onPress={handleEnableGps}
                 activeOpacity={0.88}
@@ -293,16 +295,16 @@ export default function PermissionPrePromptModal({
                 <Text style={styles.primaryBtnText}>Turn On Location</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.secondaryActionBtn, { marginTop: 10 }]}
                 onPress={handleEnableAll}
                 activeOpacity={0.85}
               >
-                <Ionicons name="refresh" size={15} color="#10B981" />
+                <Ionicons name="refresh" size={15} color={uiTheme.colors.success} />
                 <Text style={styles.secondaryActionText}>Check Again</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.secondaryBtn}
                 onPress={() => setStep('manual')}
                 activeOpacity={0.8}
@@ -316,14 +318,14 @@ export default function PermissionPrePromptModal({
           {step === 'manual' && (
             <View style={styles.manualContainer}>
               <View style={[styles.iconCircle, { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: 'rgba(245, 158, 11, 0.3)' }]}>
-                <Ionicons name="globe-outline" size={30} color="#F59E0B" />
+                <Ionicons name="globe-outline" size={30} color={uiTheme.colors.warning} />
               </View>
               <Text style={styles.title}>Pick Any City</Text>
               <Text style={styles.subtitle}>
                 You can pick from 60+ cities around the world anytime in settings to meet people worldwide.
               </Text>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.primaryBtn}
                 onPress={handleFinishManual}
                 activeOpacity={0.88}
@@ -333,7 +335,7 @@ export default function PermissionPrePromptModal({
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </DialogContent>
       </View>
     </Modal>
   );
@@ -345,17 +347,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.82)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: uiTheme.spacing.xl,
   },
   sheet: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#131122',
-    borderRadius: 24,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.sheet,
     borderWidth: 1,
-    borderColor: '#26223B',
-    padding: 24,
-    shadowColor: '#FE3C72',
+    borderColor: uiTheme.colors.elevated,
+    padding: uiTheme.spacing.xxl,
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.18,
     shadowRadius: 28,
@@ -363,7 +365,7 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   iconCircle: {
     width: 60,
@@ -375,41 +377,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  title: {
+  title: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: 'normal',
     textAlign: 'center',
     letterSpacing: -0.4,
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
-  subtitle: {
+  subtitle: { fontFamily: 'Inter_400Regular',
     color: '#A09EB5',
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: uiTheme.spacing.xl,
   },
   featureList: {
-    gap: 12,
-    marginBottom: 24,
+    gap: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.xxl,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#18162A',
     borderRadius: 14,
-    padding: 12,
+    padding: uiTheme.spacing.md,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
   featureIconWrap: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: uiTheme.spacing.md,
   },
   featureTextWrap: {
     flex: 1,
@@ -420,14 +422,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 3,
   },
-  featureTitle: {
+  featureTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFFFFF',
     fontSize: 13.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
-  featureDesc: {
-    color: '#8E8DA3',
-    fontSize: 11,
+  featureDesc: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 15,
   },
   statusPending: {
@@ -436,46 +438,46 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  statusPendingText: {
-    color: '#FE3C72',
-    fontSize: 8.5,
-    fontWeight: '800',
+  statusPendingText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.5,
   },
   primaryBtn: {
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     borderRadius: 14,
     height: 50,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    shadowColor: '#FE3C72',
+    gap: uiTheme.spacing.sm,
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 4,
   },
-  primaryBtnText: {
+  primaryBtnText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   secondaryBtn: {
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     alignItems: 'center',
     marginTop: 6,
   },
-  secondaryBtnText: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '600',
+  secondaryBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   // Loading State
   loadingContainer: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: uiTheme.spacing.xxl,
   },
   loadingPulseCircle: {
     width: 80,
@@ -486,14 +488,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 18,
   },
-  loadingTitle: {
+  loadingTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 8,
+    fontSize: uiTheme.type.section.fontSize,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.sm,
   },
-  loadingSubtitle: {
-    color: '#8E8DA3',
+  loadingSubtitle: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
     textAlign: 'center',
     lineHeight: 18,
@@ -501,15 +503,15 @@ const styles = StyleSheet.create({
   // Success State
   successContainer: {
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
   },
   successIconCircle: {
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
-  successTitle: {
+  successTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: 'normal',
     marginBottom: 10,
     textAlign: 'center',
   },
@@ -518,19 +520,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
     marginBottom: 14,
   },
-  cityNameText: {
-    color: '#10B981',
+  cityNameText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
-  successSubtitle: {
+  successSubtitle: { fontFamily: 'Inter_400Regular',
     color: '#A09EB5',
     fontSize: 12.5,
     lineHeight: 18,
@@ -540,24 +542,24 @@ const styles = StyleSheet.create({
   // Manual / Error State
   manualContainer: {
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
   },
   secondaryActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: uiTheme.spacing.md,
+    paddingHorizontal: uiTheme.spacing.lg,
     borderRadius: 14,
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
     width: '100%',
   },
-  secondaryActionText: {
-    color: '#10B981',
+  secondaryActionText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 });

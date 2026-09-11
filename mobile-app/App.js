@@ -1,13 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, StatusBar } from 'react-native';
 import SafeActivityIndicator from './src/components/common/SafeActivityIndicator';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { theme } from './src/theme';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
 import AppNavigator from './src/navigation/AppNavigator';
 import InAppNotificationBanner from './src/components/InAppNotificationBanner';
 import ExternalRedirectModal from './src/components/ExternalRedirectModal';
 import NotificationService from './src/services/notifications';
+import { useFonts } from 'expo-font';
+import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
+import { Manrope_800ExtraBold } from '@expo-google-fonts/manrope/800ExtraBold';
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
+import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
+
+const navigationTheme = {
+  ...DarkTheme,
+  fonts: { regular: { fontFamily: theme.fonts.body, fontWeight: "normal" }, medium: { fontFamily: theme.fonts.label, fontWeight: "normal" }, bold: { fontFamily: theme.fonts.heading, fontWeight: "normal" }, heavy: { fontFamily: theme.fonts.display, fontWeight: "normal" } },
+  colors: { ...DarkTheme.colors, primary: theme.colors.primary, background: theme.colors.background, card: theme.colors.surface, text: theme.colors.text, border: theme.colors.border, notification: theme.colors.primary },
+};
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
@@ -15,22 +30,21 @@ export default function App() {
   const [redirectNotif, setRedirectNotif] = useState(null);
   const navigationRef = useRef(null);
 
+  const [fontsLoaded, fontError] = useFonts({
+    Manrope_700Bold, Manrope_800ExtraBold,
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold,
+  });
+
   useEffect(() => {
-    // 1. Initialize Notification Center persistent storage & channels
     NotificationService.initialize();
 
-    // 2. Subscribe to smart redirect modals (WhatsApp / Instagram / Tinder)
     const unsubRedirect = NotificationService.subscribeRedirectPrompt((notif) => {
       setRedirectNotif(notif);
     });
 
-    // 3. Setup Native Push & OS Tray Tap Listeners
     const cleanupListeners = NotificationService.setupListeners(
-      (notif) => {
-        // Foreground push received
-      },
+      (notif) => {},
       (response, notifItem) => {
-        // User tapped push notification in the OS tray
         const data = notifItem?.data || {};
         if (data.phone || data.instagram) {
           NotificationService.handleNotificationRedirect(notifItem);
@@ -48,11 +62,9 @@ export default function App() {
     };
   }, []);
 
-
   useEffect(() => {
     const boot = async () => {
       try {
-        // Check for updates (Production only, skip in Expo Go)
         if (!__DEV__) {
           try {
             setUpdateStatus("Checking for updates...");
@@ -77,7 +89,7 @@ export default function App() {
     boot();
   }, []);
 
-  if (!isReady) {
+  if (!isReady || (!fontsLoaded && !fontError)) {
     return (
       <View style={styles.splashContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#18101d" />
@@ -90,7 +102,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <AppNavigator />
         <InAppNotificationBanner
           onNavigateToStream={(notif) => {

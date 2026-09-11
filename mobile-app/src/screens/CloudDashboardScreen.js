@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../theme';
 import React from 'react';
 import {
   StyleSheet,
@@ -40,20 +41,20 @@ export default function CloudDashboardScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0B14" />
+      <StatusBar barStyle="light-content" backgroundColor={uiTheme.colors.background} />
 
       {/* Header Bar */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={20} color="#D8D6E8" />
+          <TouchableOpacity accessibilityRole="button" style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={20} color={uiTheme.colors.text} />
           </TouchableOpacity>
           <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" />
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={styles.headerTitle}>Flint Assistant</Text>
               <View style={styles.proTag}>
-                <Text style={styles.proTagText}>24/7</Text>
+                <Text style={styles.proTagText}>LIVE</Text>
               </View>
             </View>
             <Text style={styles.headerSub}>Dating Assistant & Live Dashboard</Text>
@@ -61,12 +62,12 @@ export default function CloudDashboardScreen({ route, navigation }) {
         </View>
 
         {vpsUrl ? (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.streamBtn}
             onPress={() => navigation.navigate('Browser', { vpsUrl, platform, proxyIp: '' })}
             activeOpacity={0.8}
           >
-            <Ionicons name="videocam-outline" size={14} color="#FE3C72" />
+            <Ionicons name="videocam-outline" size={14} color={uiTheme.colors.primary} />
             <Text style={styles.streamBtnText}>Live Screen</Text>
           </TouchableOpacity>
         ) : (
@@ -90,14 +91,14 @@ export default function CloudDashboardScreen({ route, navigation }) {
         controlsContent={
           <View style={styles.infoBox}>
             <View style={styles.infoTitleRow}>
-              <Ionicons name="sparkles" size={18} color="#FE3C72" />
+              <Ionicons name="sparkles" size={18} color={uiTheme.colors.primary} />
               <Text style={styles.infoTitle}>Tinder Assistant Active</Text>
             </View>
             <Text style={styles.infoText}>
               Flint is actively finding compatible matches and chatting in your unique personal style.
             </Text>
             {vpsUrl && (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.openStreamBtn}
                 onPress={() => navigation.navigate('Browser', { vpsUrl, platform, proxyIp: '' })}
                 activeOpacity={0.85}
@@ -116,17 +117,22 @@ export default function CloudDashboardScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
   },
   header: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+    flexWrap: 'wrap',
+    gap: uiTheme.spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderColor: '#26223B',
-    backgroundColor: '#161424',
+    borderColor: uiTheme.colors.elevated,
+    backgroundColor: uiTheme.colors.surface,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -134,39 +140,39 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   backBtn: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 9,
-    backgroundColor: '#26223B',
+    backgroundColor: uiTheme.colors.elevated,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerLogo: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
   },
-  headerTitle: {
+  headerTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
     fontSize: 15.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
   proTag: {
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     paddingHorizontal: 5,
     paddingVertical: 1.5,
     borderRadius: 4,
   },
-  proTagText: {
+  proTagText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
-    fontSize: 9,
-    fontWeight: '800',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  headerSub: {
-    color: '#8E8DA3',
-    fontSize: 10.5,
-    fontWeight: '600',
+  headerSub: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 1,
   },
   streamBtn: {
@@ -175,22 +181,22 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     backgroundColor: 'rgba(254, 60, 114, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(254, 60, 114, 0.3)',
   },
-  streamBtnText: {
-    color: '#FE3C72',
-    fontSize: 12,
-    fontWeight: '700',
+  streamBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: uiTheme.spacing.sm,
+    paddingVertical: uiTheme.spacing.xs,
     borderRadius: 6,
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
@@ -198,50 +204,50 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
   },
-  liveText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontWeight: '700',
+  liveText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   infoBox: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: '#26223B',
-    padding: 16,
+    borderColor: uiTheme.colors.elevated,
+    padding: uiTheme.spacing.lg,
     margin: 14,
   },
   infoTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    gap: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.sm,
   },
-  infoTitle: {
+  infoTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
   },
-  infoText: {
-    color: '#9E9DB5',
+  infoText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.textSecondary,
     fontSize: 12.5,
     lineHeight: 18,
   },
   openStreamBtn: {
-    marginTop: 16,
-    backgroundColor: '#FE3C72',
+    marginTop: uiTheme.spacing.lg,
+    backgroundColor: uiTheme.colors.primary,
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
-  openStreamBtnText: {
+  openStreamBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
     fontSize: 13.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 });

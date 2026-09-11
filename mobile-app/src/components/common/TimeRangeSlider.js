@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/common/TimeRangeSlider.js
 // Two-thumb dual 24-hour time range slider (15-min increments) matching Desktop V2 AI Active Time track
 import React, { useRef, useState, useEffect } from 'react';
@@ -46,11 +47,14 @@ export default function TimeRangeSlider({
   const maxMins = 1440;
   const step = 15;
 
-  const initialStart = timeToMins(startVal) || 540; // 9:00 AM
-  const initialEnd = timeToMins(endVal) || 1320;   // 10:00 PM
+  const initialStart = timeToMins(startVal); // 9:00 AM
+  const initialEnd = timeToMins(endVal);   // 10:00 PM
 
+  const propsRef = useRef({ disabled, onValuesChange });
+  propsRef.current = { disabled, onValuesChange };
+  const draggingRef = useRef(null);
   const [trackWidth, setTrackWidth] = useState(0);
-  const [draggingThumb, setDraggingThumb] = useState(null); // 'start' | 'end' | null
+  const [draggingThumb, setDraggingState] = useState(null); // 'start' | 'end' | null
 
   const [localStart, setLocalStart] = useState(initialStart);
   const [localEnd, setLocalEnd] = useState(initialEnd);
@@ -69,6 +73,8 @@ export default function TimeRangeSlider({
     localStartRef.current = s;
     localEndRef.current = e;
   }, [startVal, endVal]);
+
+  const setDraggingThumb = (value) => { draggingRef.current = value; setDraggingState(value); };
 
   const clamp = (val, minVal, maxVal) => Math.min(Math.max(val, minVal), maxVal);
 
@@ -98,27 +104,27 @@ export default function TimeRangeSlider({
   // ── Start Thumb PanResponder (Left Handle) ──
   const startPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabled,
-      onStartShouldSetPanResponderCapture: () => !disabled,
-      onMoveShouldSetPanResponder: () => !disabled,
-      onMoveShouldSetPanResponderCapture: () => !disabled,
+      onStartShouldSetPanResponder: () => !propsRef.current.disabled,
+      onStartShouldSetPanResponderCapture: () => !propsRef.current.disabled,
+      onMoveShouldSetPanResponder: () => !propsRef.current.disabled,
+      onMoveShouldSetPanResponderCapture: () => !propsRef.current.disabled,
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
 
       onPanResponderGrant: () => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         setDraggingThumb('start');
         measureTrack();
       },
       onPanResponderMove: (evt) => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         const pageX = evt.nativeEvent.pageX;
         const relativeX = pageX - trackLeftRef.current;
         const val = xToMins(relativeX);
         const newStart = clamp(val, minMins, localEndRef.current - step);
         localStartRef.current = newStart;
         setLocalStart(newStart);
-        if (onValuesChange) onValuesChange(minsTo24(newStart), minsTo24(localEndRef.current));
+        if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(minsTo24(newStart), minsTo24(localEndRef.current));
       },
       onPanResponderRelease: () => {
         setDraggingThumb(null);
@@ -132,27 +138,27 @@ export default function TimeRangeSlider({
   // ── End Thumb PanResponder (Right Handle) ──
   const endPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabled,
-      onStartShouldSetPanResponderCapture: () => !disabled,
-      onMoveShouldSetPanResponder: () => !disabled,
-      onMoveShouldSetPanResponderCapture: () => !disabled,
+      onStartShouldSetPanResponder: () => !propsRef.current.disabled,
+      onStartShouldSetPanResponderCapture: () => !propsRef.current.disabled,
+      onMoveShouldSetPanResponder: () => !propsRef.current.disabled,
+      onMoveShouldSetPanResponderCapture: () => !propsRef.current.disabled,
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
 
       onPanResponderGrant: () => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         setDraggingThumb('end');
         measureTrack();
       },
       onPanResponderMove: (evt) => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         const pageX = evt.nativeEvent.pageX;
         const relativeX = pageX - trackLeftRef.current;
         const val = xToMins(relativeX);
         const newEnd = clamp(val, localStartRef.current + step, maxMins);
         localEndRef.current = newEnd;
         setLocalEnd(newEnd);
-        if (onValuesChange) onValuesChange(minsTo24(localStartRef.current), minsTo24(newEnd));
+        if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(minsTo24(localStartRef.current), minsTo24(newEnd));
       },
       onPanResponderRelease: () => {
         setDraggingThumb(null);
@@ -166,15 +172,15 @@ export default function TimeRangeSlider({
   // ── Track Tap PanResponder (Moves closest thumb on click) ──
   const trackPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabled,
+      onStartShouldSetPanResponder: () => !propsRef.current.disabled,
       onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: () => !disabled,
+      onMoveShouldSetPanResponder: () => !propsRef.current.disabled,
       onMoveShouldSetPanResponderCapture: () => false,
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
 
       onPanResponderGrant: (evt) => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         measureTrack();
         const pageX = evt.nativeEvent.pageX;
         const relativeX = pageX - trackLeftRef.current;
@@ -188,31 +194,31 @@ export default function TimeRangeSlider({
           const newStart = clamp(touchedVal, minMins, localEndRef.current - step);
           localStartRef.current = newStart;
           setLocalStart(newStart);
-          if (onValuesChange) onValuesChange(minsTo24(newStart), minsTo24(localEndRef.current));
+          if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(minsTo24(newStart), minsTo24(localEndRef.current));
         } else {
           setDraggingThumb('end');
           const newEnd = clamp(touchedVal, localStartRef.current + step, maxMins);
           localEndRef.current = newEnd;
           setLocalEnd(newEnd);
-          if (onValuesChange) onValuesChange(minsTo24(localStartRef.current), minsTo24(newEnd));
+          if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(minsTo24(localStartRef.current), minsTo24(newEnd));
         }
       },
       onPanResponderMove: (evt) => {
-        if (disabled) return;
+        if (propsRef.current.disabled) return;
         const pageX = evt.nativeEvent.pageX;
         const relativeX = pageX - trackLeftRef.current;
         const touchedVal = xToMins(relativeX);
 
-        if (draggingThumb === 'start') {
+        if (draggingRef.current === 'start') {
           const newStart = clamp(touchedVal, minMins, localEndRef.current - step);
           localStartRef.current = newStart;
           setLocalStart(newStart);
-          if (onValuesChange) onValuesChange(minsTo24(newStart), minsTo24(localEndRef.current));
-        } else if (draggingThumb === 'end') {
+          if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(minsTo24(newStart), minsTo24(localEndRef.current));
+        } else if (draggingRef.current === 'end') {
           const newEnd = clamp(touchedVal, localStartRef.current + step, maxMins);
           localEndRef.current = newEnd;
           setLocalEnd(newEnd);
-          if (onValuesChange) onValuesChange(minsTo24(localStartRef.current), minsTo24(newEnd));
+          if (propsRef.current.onValuesChange) propsRef.current.onValuesChange(minsTo24(localStartRef.current), minsTo24(newEnd));
         }
       },
       onPanResponderRelease: () => {
@@ -269,6 +275,19 @@ export default function TimeRangeSlider({
                 { left: startPos - 18 },
                 draggingThumb === 'start' && { zIndex: 10 },
               ]}
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel="Start time"
+              accessibilityState={{ disabled }}
+              accessibilityValue={{ text: minsToDisplay(localStart) }}
+              accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+              onAccessibilityAction={({ nativeEvent }) => {
+                if (disabled) return;
+                const next = clamp(localStart + (nativeEvent.actionName === 'increment' ? step : -step), minMins, localEnd - step);
+                localStartRef.current = next;
+                setLocalStart(next);
+                onValuesChange?.(minsTo24(next), minsTo24(localEnd));
+              }}
               {...startPanResponder.panHandlers}
             >
               <View
@@ -288,6 +307,19 @@ export default function TimeRangeSlider({
                 { left: endPos - 18 },
                 draggingThumb === 'end' && { zIndex: 10 },
               ]}
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel="End time"
+              accessibilityState={{ disabled }}
+              accessibilityValue={{ text: minsToDisplay(localEnd) }}
+              accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+              onAccessibilityAction={({ nativeEvent }) => {
+                if (disabled) return;
+                const next = clamp(localEnd + (nativeEvent.actionName === 'increment' ? step : -step), localStart + step, maxMins);
+                localEndRef.current = next;
+                setLocalEnd(next);
+                onValuesChange?.(minsTo24(localStart), minsTo24(next));
+              }}
               {...endPanResponder.panHandlers}
             >
               <View
@@ -316,12 +348,12 @@ const styles = StyleSheet.create({
   trackRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
-  edgeLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#8E8DA3',
+  edgeLabel: { fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
+    color: uiTheme.colors.muted,
     minWidth: 56,
     textAlign: 'left',
   },
@@ -336,7 +368,7 @@ const styles = StyleSheet.create({
   },
   trackBase: {
     height: 5,
-    backgroundColor: '#26223B',
+    backgroundColor: uiTheme.colors.elevated,
     borderRadius: 999,
     overflow: 'hidden',
     position: 'relative',
@@ -345,7 +377,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
     borderRadius: 999,
   },
   thumbTouchArea: {
@@ -363,7 +395,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#FFFFFF',
     borderWidth: 3.5,
-    borderColor: '#10B981',
+    borderColor: uiTheme.colors.success,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,

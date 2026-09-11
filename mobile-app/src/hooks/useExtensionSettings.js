@@ -10,16 +10,17 @@ export default function useExtensionSettings(orchestratorUrl) {
 
   // Fetch settings from orchestrator
   const fetchSettings = useCallback(async () => {
-    if (!orchestratorUrl) return;
+    if (!orchestratorUrl) { setLoading(false); return; }
     try {
       setError(null);
       const res = await fetch(`${orchestratorUrl}/extension-settings`);
+      if (!res.ok) throw new Error('Could not load settings. Check your connection and try again.');
       const data = await res.json();
       if (data && data.success && data.settings) {
         setSettings(data.settings);
       }
     } catch (e) {
-      setError(e.message || 'Failed to load settings');
+      setError('Could not load settings. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -48,11 +49,11 @@ export default function useExtensionSettings(orchestratorUrl) {
         setTimeout(() => setSaveSuccess(false), 3000);
         return true;
       } else {
-        setError(data?.error || 'Failed to update settings');
+        setError('Your settings could not be saved. Please try again.');
         return false;
       }
     } catch (e) {
-      setError(e.message || 'Save failed');
+      setError('Your settings could not be saved. Check your connection and try again.');
       return false;
     } finally {
       setSaving(false);

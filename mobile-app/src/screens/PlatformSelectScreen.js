@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../theme';
 // PlatformSelectScreen.js — FlirtEasy AI Cockpit (Root Home Screen)
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -667,7 +668,13 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#080809" />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['#201020', uiTheme.colors.surface, uiTheme.colors.background]}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <StatusBar barStyle="light-content" backgroundColor={uiTheme.colors.background} />
 
       {/* Confirms the sign-out that just closed the browser session, so the
           screen change does not read as a crash. Deliberately local rather than
@@ -675,14 +682,14 @@ export default function PlatformSelectScreen({ navigation, route }) {
           action and would contradict the message. */}
       {signedOutToast && (
         <View style={styles.signedOutToast} accessibilityRole="alert" accessibilityLiveRegion="polite">
-          <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+          <Ionicons name="checkmark-circle" size={16} color={uiTheme.colors.success} />
           <Text style={styles.signedOutToastText}>Signed out of Tinder</Text>
         </View>
       )}
 
       <View style={homeStyles.header}>
         <View style={homeStyles.brand}>
-          <LinearGradient colors={['#FF275B', '#FE4169']} style={homeStyles.brandIcon}>
+          <LinearGradient colors={[uiTheme.colors.primary, uiTheme.colors.secondary, '#FFD166']} style={homeStyles.brandIcon}>
             <Ionicons name="flame" size={25} color="#FFFFFF" />
           </LinearGradient>
           <View>
@@ -692,11 +699,11 @@ export default function PlatformSelectScreen({ navigation, route }) {
         </View>
         <View style={homeStyles.headerActions}>
           <TouchableOpacity style={homeStyles.headerButton} onPress={() => setShowNotifModal(true)} accessibilityRole="button" accessibilityLabel={`Notifications, ${unreadNotifCount} unread`}>
-            <Ionicons name="notifications-outline" size={20} color="#CBCBCF" />
+            <Ionicons name="notifications-outline" size={20} color={uiTheme.colors.text} />
             {unreadNotifCount > 0 && <View style={homeStyles.notificationDot} />}
           </TouchableOpacity>
           <TouchableOpacity style={homeStyles.headerButton} onPress={() => setHomeTab('settings')} accessibilityRole="button" accessibilityLabel="Account and settings">
-            <Ionicons name="person-outline" size={20} color="#CBCBCF" />
+            <Ionicons name="person-outline" size={20} color={uiTheme.colors.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -743,11 +750,11 @@ export default function PlatformSelectScreen({ navigation, route }) {
             controlsContent={
               <View style={homeStyles.extraActions}>
                 <TouchableOpacity style={homeStyles.secondaryAction} onPress={() => handleLaunch('Tinder')} accessibilityRole="button">
-                  <Ionicons name="options-outline" size={17} color="#FF5277" />
+                  <Ionicons name="options-outline" size={17} color={uiTheme.colors.accent} />
                   <Text style={homeStyles.secondaryLabel}>Session preferences</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={homeStyles.secondaryAction} onPress={() => navigation.replace('Auth')} accessibilityRole="button">
-                  <Ionicons name="log-out-outline" size={17} color="#FF5277" />
+                  <Ionicons name="log-out-outline" size={17} color={uiTheme.colors.accent} />
                   <Text style={homeStyles.secondaryLabel}>Back to Flint login</Text>
                 </TouchableOpacity>
               </View>
@@ -776,8 +783,8 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>App Preferences</Text>
-                  <TouchableOpacity onPress={closeModal} activeOpacity={0.8}>
-                    <Ionicons name="close-circle" size={22} color="#716E89" />
+                  <TouchableOpacity accessibilityRole="button" onPress={closeModal} activeOpacity={0.8}>
+                    <Ionicons name="close-circle" size={22} color={uiTheme.colors.muted} />
                   </TouchableOpacity>
                 </View>
 
@@ -786,7 +793,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                   <View style={styles.consumerSectionCard}>
                     <View style={styles.consumerSectionHeader}>
                       <View style={styles.consumerIconWrap}>
-                        <Ionicons name="location" size={18} color="#FE3C72" />
+                        <Ionicons name="location" size={18} color={uiTheme.colors.primary} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.consumerCardTitle}>Your Location</Text>
@@ -803,17 +810,17 @@ export default function PlatformSelectScreen({ navigation, route }) {
                       </Text>
                     </View>
 
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.consumerRefreshGpsBtn}
                       onPress={handleRefreshDeviceLocation}
                       disabled={updatingGpsLocation}
                       activeOpacity={0.85}
                     >
                       {updatingGpsLocation ? (
-                        <ActivityIndicator size="small" color="#10B981" />
+                        <ActivityIndicator size="small" color={uiTheme.colors.success} />
                       ) : (
                         <>
-                          <Ionicons name="locate" size={14} color="#10B981" />
+                          <Ionicons name="locate" size={14} color={uiTheme.colors.success} />
                           <Text style={styles.consumerRefreshGpsText}>Update to Current Location</Text>
                         </>
                       )}
@@ -824,7 +831,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                   <View style={styles.consumerSectionCard}>
                     <View style={styles.consumerSectionHeader}>
                       <View style={[styles.consumerIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-                        <Ionicons name="sparkles" size={18} color="#10B981" />
+                        <Ionicons name="sparkles" size={18} color={uiTheme.colors.success} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.consumerCardTitle}>Dating Assistant</Text>
@@ -838,7 +845,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                   </View>
 
                   {/* ─── 3. Developer / Advanced Network (Tucked Away Behind Toggle) ─── */}
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={styles.advancedToggleRow}
                     onPress={() => setShowAdvanced(!showAdvanced)}
                     activeOpacity={0.8}
@@ -849,7 +856,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                     <Ionicons
                       name={showAdvanced ? 'chevron-up' : 'chevron-down'}
                       size={15}
-                      color="#8E8DA3"
+                      color={uiTheme.colors.muted}
                     />
                   </TouchableOpacity>
 
@@ -857,7 +864,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                     <View style={styles.advancedDrawer}>
                       <Text style={styles.modalSectionLabel}>Server Environment</Text>
                       <View style={styles.envSelector}>
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={[styles.envOption, environment === 'on_device' && styles.envOptionActive]}
                           onPress={() => setEnvironment('on_device')}
                           activeOpacity={0.8}
@@ -865,14 +872,14 @@ export default function PlatformSelectScreen({ navigation, route }) {
                           <Ionicons
                             name="phone-portrait-outline"
                             size={15}
-                            color={environment === 'on_device' ? '#10B981' : '#716E89'}
+                            color={environment === 'on_device' ? uiTheme.colors.success : uiTheme.colors.muted}
                           />
                           <Text style={[styles.envOptionText, environment === 'on_device' && styles.envOptionTextActive]}>
                             On-Device
                           </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={[styles.envOption, environment === 'hyperbeam' && styles.envOptionActive]}
                           onPress={() => setEnvironment('hyperbeam')}
                           activeOpacity={0.8}
@@ -880,14 +887,14 @@ export default function PlatformSelectScreen({ navigation, route }) {
                           <Ionicons
                             name="flash-outline"
                             size={15}
-                            color={environment === 'hyperbeam' ? '#FE3C72' : '#716E89'}
+                            color={environment === 'hyperbeam' ? uiTheme.colors.primary : uiTheme.colors.muted}
                           />
                           <Text style={[styles.envOptionText, environment === 'hyperbeam' && styles.envOptionTextActive]}>
                             Cloud
                           </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={[styles.envOption, environment === 'vps' && styles.envOptionActive]}
                           onPress={() => setEnvironment('vps')}
                           activeOpacity={0.8}
@@ -895,14 +902,14 @@ export default function PlatformSelectScreen({ navigation, route }) {
                           <Ionicons
                             name="cloud-done-outline"
                             size={15}
-                            color={environment === 'vps' ? '#FFF' : '#716E89'}
+                            color={environment === 'vps' ? '#FFF' : uiTheme.colors.muted}
                           />
                           <Text style={[styles.envOptionText, environment === 'vps' && styles.envOptionTextActive]}>
                             VPS
                           </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={[styles.envOption, environment === 'local' && styles.envOptionActive]}
                           onPress={() => setEnvironment('local')}
                           activeOpacity={0.8}
@@ -910,7 +917,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                           <Ionicons
                             name="laptop-outline"
                             size={15}
-                            color={environment === 'local' ? '#FFF' : '#716E89'}
+                            color={environment === 'local' ? '#FFF' : uiTheme.colors.muted}
                           />
                           <Text style={[styles.envOptionText, environment === 'local' && styles.envOptionTextActive]}>
                             Local
@@ -924,7 +931,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                   {isLoggedIn && (
                     <View style={{ marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' }}>
                       <Text style={styles.modalSectionLabel}>Active Tinder Account</Text>
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={styles.modalLogoutBtn}
                         onPress={() => {
                           closeModal();
@@ -932,7 +939,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                         }}
                         activeOpacity={0.85}
                       >
-                        <Ionicons name="log-out-outline" size={16} color="#EF4444" />
+                        <Ionicons name="log-out-outline" size={16} color={uiTheme.colors.error} />
                         <Text style={styles.modalLogoutBtnText}>Log Out & End Session</Text>
                       </TouchableOpacity>
                     </View>
@@ -955,7 +962,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
         <View style={styles.logoutModalOverlay}>
           <View style={styles.logoutModalCard}>
             <View style={styles.logoutIconBadge}>
-              <Ionicons name="log-out" size={28} color="#EF4444" />
+              <Ionicons name="log-out" size={28} color={uiTheme.colors.error} />
             </View>
 
             <Text style={styles.logoutModalTitle}>Log Out of Tinder?</Text>
@@ -964,7 +971,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
             </Text>
 
             <View style={styles.logoutModalBtnRow}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.logoutModalCancelBtn}
                 onPress={() => setShowLogoutConfirm(false)}
                 disabled={loggingOut}
@@ -973,7 +980,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                 <Text style={styles.logoutModalCancelText}>Cancel</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.logoutModalConfirmBtn}
                 onPress={handleLogout}
                 disabled={loggingOut}
@@ -1027,7 +1034,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#080809',
+    backgroundColor: uiTheme.colors.background,
   },
 
   // ── Header ──
@@ -1035,11 +1042,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
-    backgroundColor: '#12101C',
+    backgroundColor: uiTheme.colors.background,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -1051,28 +1058,28 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 10,
   },
-  headerTitle: {
+  headerTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
     fontSize: 16.5,
-    fontWeight: '900',
+    fontWeight: 'normal',
     letterSpacing: -0.3,
   },
-  headerSub: {
-    color: '#8E8DA3',
-    fontSize: 10.5,
-    fontWeight: '600',
+  headerSub: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 1,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   notifBtn: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 9,
-    backgroundColor: '#1E1B2E',
+    backgroundColor: uiTheme.colors.elevated,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
     justifyContent: 'center',
@@ -1083,51 +1090,51 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: '#FE3C72',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.small,
     minWidth: 16,
     height: 16,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
   },
-  headerBadgeText: {
+  headerBadgeText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '900',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   headerLaunchBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FE3C72',
+    gap: uiTheme.spacing.xs,
+    backgroundColor: uiTheme.colors.primary,
     paddingVertical: 7,
     paddingHorizontal: 10,
     borderRadius: 9,
-    shadowColor: '#FE3C72',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
     shadowRadius: 6,
     elevation: 3,
   },
-  headerLaunchBtnText: {
+  headerLaunchBtnText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   gearBtn: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 9,
-    backgroundColor: '#1E1B2E',
+    backgroundColor: uiTheme.colors.elevated,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerSignOutBtn: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 9,
     backgroundColor: 'rgba(254, 60, 114, 0.10)',
     borderWidth: 1,
@@ -1141,7 +1148,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
     paddingVertical: 10,
     backgroundColor: '#151322',
     borderBottomWidth: 1,
@@ -1149,29 +1156,29 @@ const styles = StyleSheet.create({
   },
   quickLaunchPrimaryBtn: {
     flex: 1,
-    backgroundColor: '#FE3C72',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.input,
     paddingVertical: 11,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#FE3C72',
+    gap: uiTheme.spacing.sm,
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
-  quickLaunchPrimaryText: {
+  quickLaunchPrimaryText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   quickLaunchSecondaryBtn: {
     backgroundColor: 'rgba(254, 60, 114, 0.10)',
     borderWidth: 1,
     borderColor: 'rgba(254, 60, 114, 0.30)',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     paddingVertical: 11,
     paddingHorizontal: 14,
     flexDirection: 'row',
@@ -1179,25 +1186,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  quickLaunchSecondaryText: {
-    color: '#FE3C72',
+  quickLaunchSecondaryText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   // ── Unified Tinder Hero Status & Action Card ──
   heroCardContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: uiTheme.spacing.lg,
+    paddingTop: uiTheme.spacing.md,
     paddingBottom: 6,
   },
   heroCardActive: {
-    backgroundColor: '#14121F',
-    borderRadius: 20,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1.5,
     borderColor: 'rgba(16, 185, 129, 0.28)',
-    padding: 16,
-    shadowColor: '#10B981',
+    padding: uiTheme.spacing.lg,
+    shadowColor: uiTheme.colors.success,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
@@ -1212,7 +1219,7 @@ const styles = StyleSheet.create({
   heroActiveLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: uiTheme.spacing.md,
     flex: 1,
   },
   heroAvatarWrap: {
@@ -1221,7 +1228,7 @@ const styles = StyleSheet.create({
   heroAvatarIcon: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1.5,
     borderColor: 'rgba(254, 60, 114, 0.4)',
   },
@@ -1232,9 +1239,9 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
     borderWidth: 2,
-    borderColor: '#14121F',
+    borderColor: uiTheme.colors.surface,
   },
   heroActiveInfo: {
     flex: 1,
@@ -1244,16 +1251,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
   },
-  heroActiveTitle: {
+  heroActiveTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.3,
   },
   heroOnlinePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     backgroundColor: 'rgba(16, 185, 129, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.35)',
@@ -1265,23 +1272,23 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
   },
-  heroOnlineText: {
-    color: '#10B981',
-    fontSize: 9,
-    fontWeight: '800',
+  heroOnlineText: { fontFamily: 'Manrope_800ExtraBold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.5,
   },
-  heroActiveSub: {
-    color: '#8E8DA3',
-    fontSize: 11,
-    fontWeight: '500',
+  heroActiveSub: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 2,
   },
   heroLogoutBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: 9,
     backgroundColor: 'rgba(239, 68, 68, 0.08)',
     borderWidth: 1,
@@ -1296,50 +1303,50 @@ const styles = StyleSheet.create({
   },
   heroPrimaryBtn: {
     flex: 1,
-    backgroundColor: '#FE3C72',
-    borderRadius: 12,
-    paddingVertical: 12,
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.input,
+    paddingVertical: uiTheme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
-    shadowColor: '#FE3C72',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
-  heroPrimaryBtnText: {
+  heroPrimaryBtnText: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   heroConfigureBtn: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(254, 60, 114, 0.3)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderRadius: uiTheme.radius.input,
+    paddingVertical: uiTheme.spacing.md,
+    paddingHorizontal: uiTheme.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  heroConfigureBtnText: {
-    color: '#FE3C72',
+  heroConfigureBtnText: { fontFamily: 'Manrope_700Bold',
+    color: uiTheme.colors.primary,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   /* Disconnected Hero State */
   heroCardInactive: {
-    backgroundColor: '#14121F',
-    borderRadius: 20,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1.5,
     borderColor: 'rgba(245, 158, 11, 0.32)',
-    padding: 16,
-    shadowColor: '#F59E0B',
+    padding: uiTheme.spacing.lg,
+    shadowColor: uiTheme.colors.warning,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
@@ -1348,7 +1355,7 @@ const styles = StyleSheet.create({
   heroInactiveHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: uiTheme.spacing.md,
     marginBottom: 14,
   },
   heroInactiveIconWrap: {
@@ -1357,7 +1364,7 @@ const styles = StyleSheet.create({
   heroInactiveIcon: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1.5,
     borderColor: 'rgba(245, 158, 11, 0.4)',
   },
@@ -1368,9 +1375,9 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#F59E0B',
+    backgroundColor: uiTheme.colors.warning,
     borderWidth: 2,
-    borderColor: '#14121F',
+    borderColor: uiTheme.colors.surface,
   },
   heroInactiveTextWrap: {
     flex: 1,
@@ -1380,10 +1387,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
   },
-  heroInactiveTitle: {
+  heroInactiveTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.3,
   },
   heroOfflinePill: {
@@ -1394,37 +1401,37 @@ const styles = StyleSheet.create({
     paddingVertical: 1.5,
     borderRadius: 6,
   },
-  heroOfflineText: {
-    color: '#F59E0B',
-    fontSize: 8.5,
-    fontWeight: '800',
+  heroOfflineText: { fontFamily: 'Manrope_800ExtraBold',
+    color: uiTheme.colors.warning,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.5,
   },
-  heroInactiveSub: {
-    color: '#8E8DA3',
-    fontSize: 11,
-    fontWeight: '500',
+  heroInactiveSub: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 2,
     lineHeight: 15,
   },
   heroConnectBtn: {
-    backgroundColor: '#FE3C72',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.input,
     paddingVertical: 13,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#FE3C72',
+    gap: uiTheme.spacing.sm,
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 4,
   },
-  heroConnectBtnText: {
+  heroConnectBtnText: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
 
@@ -1435,28 +1442,28 @@ const styles = StyleSheet.create({
 
   // ── Settings Info Box ──
   infoBox: {
-    backgroundColor: '#14121F',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 16,
-    marginTop: 4,
-    marginBottom: 12,
+    padding: uiTheme.spacing.lg,
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.md,
   },
   infoTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     marginBottom: 6,
   },
-  infoTitle: {
+  infoTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
-  infoText: {
-    color: '#8E8DA3',
-    fontSize: 12,
+  infoText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 17,
   },
 
@@ -1472,7 +1479,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: '#14121F',
+    backgroundColor: uiTheme.colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: SCREEN_HEIGHT * 0.72,
@@ -1492,26 +1499,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: uiTheme.spacing.xl,
+    paddingVertical: uiTheme.spacing.md,
     borderBottomWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
   },
-  modalTitle: {
+  modalTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
     fontSize: 15.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   modalBody: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: uiTheme.spacing.xl,
+    paddingTop: uiTheme.spacing.lg,
     paddingBottom: 36,
   },
   consumerSectionCard: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     padding: 14,
     marginBottom: 14,
   },
@@ -1529,30 +1536,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  consumerCardTitle: {
+  consumerCardTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
-  consumerCardSub: {
-    color: '#8E8DA3',
-    fontSize: 11,
+  consumerCardSub: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 1,
   },
   consumerCityBox: {
-    backgroundColor: '#1E1B2E',
+    backgroundColor: uiTheme.colors.elevated,
     borderRadius: 10,
     padding: 10,
     marginBottom: 10,
   },
-  consumerCityName: {
+  consumerCityName: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
   consumerCityCoords: {
-    color: '#8E8DA3',
-    fontSize: 11,
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 2,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
@@ -1562,50 +1569,50 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
     paddingVertical: 9,
   },
-  consumerRefreshGpsText: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '700',
+  consumerRefreshGpsText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   consumerStatusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
-    paddingTop: 8,
+    marginTop: uiTheme.spacing.xs,
+    paddingTop: uiTheme.spacing.sm,
     borderTopWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.05)',
   },
-  consumerStatusLabel: {
-    color: '#8E8DA3',
-    fontSize: 12,
+  consumerStatusLabel: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
   },
-  consumerStatusVal: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '700',
+  consumerStatusVal: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  modalSectionLabel: {
-    color: '#8E8DA3',
-    fontSize: 10.5,
-    fontWeight: '700',
+  modalSectionLabel: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
   envSelector: {
     flexDirection: 'row',
-    backgroundColor: '#0D0B14',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.input,
     padding: 3,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   envOption: {
     flex: 1,
@@ -1617,28 +1624,28 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   envOptionActive: {
-    backgroundColor: '#26223B',
+    backgroundColor: uiTheme.colors.elevated,
   },
-  envOptionText: {
-    color: '#716E89',
-    fontSize: 12,
-    fontWeight: '600',
+  envOptionText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  envOptionTextActive: {
+  envOptionTextActive: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   regionCardRow: {
-    gap: 8,
-    marginBottom: 16,
+    gap: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.lg,
   },
   regionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#0D0B14',
+    gap: uiTheme.spacing.sm,
+    backgroundColor: uiTheme.colors.background,
     borderRadius: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
@@ -1647,14 +1654,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(254, 60, 114, 0.4)',
     backgroundColor: 'rgba(254, 60, 114, 0.05)',
   },
-  regionPillText: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '500',
+  regionPillText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  regionPillTextActive: {
+  regionPillTextActive: { fontFamily: 'Inter_600SemiBold',
     color: '#FFF',
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   advancedToggleRow: {
     flexDirection: 'row',
@@ -1664,74 +1671,74 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 6,
   },
-  advancedToggleText: {
-    color: '#FE3C72',
-    fontSize: 12,
-    fontWeight: '700',
+  advancedToggleText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   advancedDrawer: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
-    padding: 12,
-    marginBottom: 16,
+    padding: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.lg,
   },
   inputGroup: {
-    gap: 4,
+    gap: uiTheme.spacing.xs,
   },
-  inputLabel: {
-    color: '#8E8DA3',
-    fontSize: 11,
-    fontWeight: '600',
+  inputLabel: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  textInput: {
-    backgroundColor: '#161424',
-    borderRadius: 8,
+  textInput: { fontFamily: 'Inter_400Regular',
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     color: '#FFF',
-    fontSize: 12,
+    fontSize: uiTheme.type.caption.fontSize,
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
   },
   modalLogoutBtn: {
     backgroundColor: 'rgba(239, 68, 68, 0.10)',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.30)',
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: uiTheme.radius.input,
+    paddingVertical: uiTheme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 8,
+    gap: uiTheme.spacing.sm,
+    marginTop: uiTheme.spacing.sm,
   },
-  modalLogoutBtnText: {
-    color: '#EF4444',
+  modalLogoutBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.error,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   // ── Sign-out confirmation toast ──
   signedOutToast: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     alignSelf: 'center',
-    marginTop: 8,
-    marginHorizontal: 20,
+    marginTop: uiTheme.spacing.sm,
+    marginHorizontal: uiTheme.spacing.xl,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.32)',
   },
-  signedOutToastText: {
-    color: '#10B981',
+  signedOutToastText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   // ── Custom Logout Confirmation Modal ──
@@ -1740,18 +1747,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 4, 10, 0.80)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: uiTheme.spacing.xxl,
   },
   logoutModalCard: {
     width: '100%',
     maxWidth: 340,
     backgroundColor: '#141220',
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.28)',
-    padding: 24,
+    padding: uiTheme.spacing.xxl,
     alignItems: 'center',
-    shadowColor: '#EF4444',
+    shadowColor: uiTheme.colors.error,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 24,
@@ -1766,18 +1773,18 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(239, 68, 68, 0.32)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
-  logoutModalTitle: {
+  logoutModalTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: uiTheme.type.section.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.3,
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
     textAlign: 'center',
   },
-  logoutModalSubtitle: {
-    color: '#8E8DA3',
+  logoutModalSubtitle: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
     lineHeight: 18,
     textAlign: 'center',
@@ -1792,54 +1799,54 @@ const styles = StyleSheet.create({
   logoutModalCancelBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoutModalCancelText: {
-    color: '#D8D6E8',
+  logoutModalCancelText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   logoutModalConfirmBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: '#EF4444',
+    borderRadius: uiTheme.radius.input,
+    backgroundColor: uiTheme.colors.error,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
-    shadowColor: '#EF4444',
+    shadowColor: uiTheme.colors.error,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 4,
   },
-  logoutModalConfirmText: {
+  logoutModalConfirmText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
 });
 
 const homeStyles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 12, paddingBottom: 14, gap: 10 },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  header: { width: '100%', maxWidth: 760, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: uiTheme.spacing.md, paddingBottom: 14, gap: 10 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: uiTheme.spacing.md, flex: 1 },
   brandIcon: { width: 42, height: 42, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  brandName: { color: '#F6F6F7', fontSize: 21, fontWeight: '800', letterSpacing: -0.8 },
-  brandCaption: { color: '#747479', fontSize: 8, letterSpacing: 1.1, fontWeight: '600', marginTop: 4 },
-  headerActions: { flexDirection: 'row', gap: 8 },
-  headerButton: { width: 42, height: 42, borderRadius: 22, borderWidth: 1, borderColor: '#232326', backgroundColor: '#101011', alignItems: 'center', justifyContent: 'center' },
-  notificationDot: { position: 'absolute', top: 10, right: 12, width: 5, height: 5, borderRadius: 3, backgroundColor: '#FF365F' },
+  brandName: { fontFamily: 'Manrope_800ExtraBold', color: uiTheme.colors.text, fontSize: 21, fontWeight: 'normal', letterSpacing: -0.8 },
+  brandCaption: { fontFamily: 'Inter_600SemiBold', color: uiTheme.colors.muted, fontSize: uiTheme.type.caption.fontSize, letterSpacing: 1.1, fontWeight: 'normal', marginTop: uiTheme.spacing.xs },
+  headerActions: { flexDirection: 'row', gap: uiTheme.spacing.sm },
+  headerButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: uiTheme.colors.border, backgroundColor: uiTheme.colors.surface, alignItems: 'center', justifyContent: 'center' },
+  notificationDot: { position: 'absolute', top: 10, right: 12, width: 5, height: 5, borderRadius: 3, backgroundColor: uiTheme.colors.primary },
   dashboard: { flex: 1, paddingBottom: 80 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 8, gap: 8 },
-  backButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  sectionTitle: { color: '#F4F4F5', fontSize: 18, fontWeight: '700', flex: 1 },
-  extraActions: { padding: 12, gap: 12 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: uiTheme.spacing.sm, gap: uiTheme.spacing.sm },
+  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontFamily: 'Manrope_700Bold', color: uiTheme.colors.text, fontSize: uiTheme.type.section.fontSize, fontWeight: 'normal', flex: 1 },
+  extraActions: { padding: uiTheme.spacing.md, gap: uiTheme.spacing.md },
   secondaryAction: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 10 },
-  secondaryLabel: { color: '#D5D5D9', fontSize: 13, fontWeight: '600' },
+  secondaryLabel: { fontFamily: 'Inter_600SemiBold', color: uiTheme.colors.textSecondary, fontSize: 13, fontWeight: 'normal' },
 });

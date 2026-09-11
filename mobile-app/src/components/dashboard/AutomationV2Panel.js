@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/AutomationV2Panel.js — Comprehensive FlirtEasy V2 Panel with Style Training & Safety Controls
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
@@ -1471,7 +1472,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
   if (loading || !form) {
     return (
       <View style={styles.centerWrap}>
-        <ActivityIndicator size="small" color="#FE3C72" />
+        <ActivityIndicator size="small" color={uiTheme.colors.primary} />
         <Text style={styles.loadingText}>Syncing Automation V2 configuration...</Text>
       </View>
     );
@@ -1549,19 +1550,19 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
         {/* ════════════════════ CARD 1: YOUR DATING GOAL (V2 DESKTOP PARITY) ════════════════════ */}
         <View style={[styles.v2Card, openCards.goal && styles.v2CardOpen]}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.v2CardHeader}
             onPress={() => toggleCard('goal')}
             activeOpacity={0.85}
           >
             <View style={styles.cardTitleWrap}>
-              <Ionicons name="flag-outline" size={17} color="#FE3C72" />
+              <Ionicons name="flag-outline" size={17} color={uiTheme.colors.primary} />
               <Text style={styles.v2CardTitle}>Your Dating Goal</Text>
             </View>
             <Ionicons
               name={openCards.goal ? "chevron-up" : "chevron-down"}
               size={18}
-              color="#8E8DA3"
+              color={uiTheme.colors.muted}
             />
           </TouchableOpacity>
 
@@ -1569,7 +1570,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           {!openCards.goal && (
             <View style={styles.collapsedRow}>
               <View style={styles.v2Chip}>
-                <Ionicons name="locate" size={11} color="#FE3C72" />
+                <Ionicons name="locate" size={11} color={uiTheme.colors.primary} />
                 <Text style={styles.v2ChipText}>{getGoalSummary()}</Text>
               </View>
               <View style={styles.v2Chip}>
@@ -1613,8 +1614,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     value={form.stopAfterGoal !== false && form.goal !== 'never'}
                     disabled={form.goal === 'never'}
                     onValueChange={v => updateField('stopAfterGoal', v)}
-                    trackColor={{ false: '#26223B', true: '#FE3C72' }}
-                    thumbColor={(form.stopAfterGoal !== false && form.goal !== 'never') ? '#FFF' : '#716E89'}
+                    trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
+                    thumbColor={(form.stopAfterGoal !== false && form.goal !== 'never') ? '#FFF' : uiTheme.colors.muted}
                   />
                 </View>
               </View>
@@ -1644,19 +1645,19 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
               {/* ─── Your Contact Details Accordion Section (Desktop V2 Parity) ─── */}
               <View style={styles.contactSection}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.contactHeader}
                   onPress={toggleContactDetails}
                   activeOpacity={0.8}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name="card-outline" size={16} color="#FE3C72" />
+                    <Ionicons name="card-outline" size={16} color={uiTheme.colors.primary} />
                     <Text style={styles.contactHeaderTitle}>Your Contact Details</Text>
                   </View>
                   <Ionicons
                     name={contactDetailsOpen ? "chevron-up" : "chevron-down"}
                     size={16}
-                    color="#8E8DA3"
+                    color={uiTheme.colors.muted}
                   />
                 </TouchableOpacity>
 
@@ -1677,14 +1678,14 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       <Switch
                         value={form.contactDetails?.instagram?.enabled !== false}
                         onValueChange={v => updateField('contactDetails.instagram.enabled', v)}
-                        trackColor={{ false: '#26223B', true: '#FE3C72' }}
-                        thumbColor={form.contactDetails?.instagram?.enabled !== false ? '#FFF' : '#716E89'}
+                        trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
+                        thumbColor={form.contactDetails?.instagram?.enabled !== false ? '#FFF' : uiTheme.colors.muted}
                       />
                     </View>
                     <View style={styles.handleStatRow}>
-                      <Ionicons name="mail-outline" size={11} color="#716E89" />
+                      <Ionicons name="mail-outline" size={11} color={uiTheme.colors.muted} />
                       <Text style={styles.handleStatText}>
-                        Sent to <Text style={{ color: '#FE3C72', fontWeight: 'bold' }}>{form.handleSentStats?.instagram || 0}</Text> matches
+                        Sent to <Text style={{ fontFamily: 'Inter_700Bold', color: uiTheme.colors.primary, fontWeight: 'normal' }}>{form.handleSentStats?.instagram || 0}</Text> matches
                       </Text>
                     </View>
 
@@ -1759,14 +1760,14 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       <Switch
                         value={form.contactDetails?.whatsapp?.enabled !== false}
                         onValueChange={v => updateField('contactDetails.whatsapp.enabled', v)}
-                        trackColor={{ false: '#26223B', true: '#FE3C72' }}
-                        thumbColor={form.contactDetails?.whatsapp?.enabled !== false ? '#FFF' : '#716E89'}
+                        trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
+                        thumbColor={form.contactDetails?.whatsapp?.enabled !== false ? '#FFF' : uiTheme.colors.muted}
                       />
                     </View>
                     <View style={styles.handleStatRow}>
-                      <Ionicons name="mail-outline" size={11} color="#716E89" />
+                      <Ionicons name="mail-outline" size={11} color={uiTheme.colors.muted} />
                       <Text style={styles.handleStatText}>
-                        Sent to <Text style={{ color: '#25D366', fontWeight: 'bold' }}>{form.handleSentStats?.whatsapp || 0}</Text> matches
+                        Sent to <Text style={{ fontFamily: 'Inter_700Bold', color: '#25D366', fontWeight: 'normal' }}>{form.handleSentStats?.whatsapp || 0}</Text> matches
                       </Text>
                     </View>
 
@@ -1784,7 +1785,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           const currentGender = (form.userGenderOverride || 'auto').toLowerCase();
                           const isSelected = currentGender === g.id;
                           return (
-                            <TouchableOpacity
+                            <TouchableOpacity accessibilityRole="button"
                               key={g.id}
                               style={[styles.genderBtn, isSelected && styles.genderBtnActive]}
                               onPress={() => updateField('userGenderOverride', g.id)}
@@ -1872,19 +1873,19 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
         {/* ════════════════════ CARD 2: SWIPING & SAFETY LIMITS ════════════════════ */}
         <View style={[styles.v2Card, openCards.swiping && styles.v2CardOpen]}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.v2CardHeader}
             onPress={() => toggleCard('swiping')}
             activeOpacity={0.85}
           >
             <View style={styles.cardTitleWrap}>
-              <Ionicons name="heart-outline" size={17} color="#FE3C72" />
+              <Ionicons name="heart-outline" size={17} color={uiTheme.colors.primary} />
               <Text style={styles.v2CardTitle}>Swiping</Text>
             </View>
             <Ionicons
               name={openCards.swiping ? "chevron-up" : "chevron-down"}
               size={18}
-              color="#8E8DA3"
+              color={uiTheme.colors.muted}
             />
           </TouchableOpacity>
 
@@ -1892,11 +1893,11 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           {!openCards.swiping && (
             <View style={styles.collapsedRow}>
               <View style={styles.v2Chip}>
-                <Ionicons name="flash" size={11} color="#FE3C72" />
+                <Ionicons name="flash" size={11} color={uiTheme.colors.primary} />
                 <Text style={styles.v2ChipText}>{getSwipingSummary().likes}</Text>
               </View>
               <View style={styles.v2Chip}>
-                <Ionicons name="time-outline" size={11} color="#818CF8" />
+                <Ionicons name="time-outline" size={11} color={uiTheme.colors.info} />
                 <Text style={styles.v2ChipText}>{getSwipingSummary().pacing}</Text>
               </View>
               <View style={styles.v2Chip}>
@@ -1919,7 +1920,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       <Text style={styles.toggleTitle}>Auto Swipe</Text>
                       {isSafetyOn && (
                         <View style={styles.safetyChipBadge}>
-                          <Ionicons name="shield-checkmark" size={10} color="#10B981" />
+                          <Ionicons name="shield-checkmark" size={10} color={uiTheme.colors.success} />
                           <Text style={styles.safetyChipBadgeText}>Safety Mode</Text>
                         </View>
                       )}
@@ -1940,8 +1941,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         updateField('likesPerCycle', 0);
                       }
                     }}
-                    trackColor={{ false: '#26223B', true: '#FE3C72' }}
-                    thumbColor={(isSafetyOn || (form.likesPerCycle ?? 50) > 0) ? '#FFF' : '#716E89'}
+                    trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
+                    thumbColor={(isSafetyOn || (form.likesPerCycle ?? 50) > 0) ? '#FFF' : uiTheme.colors.muted}
                   />
                 </View>
 
@@ -1962,8 +1963,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
                 {isSafetyOn && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
-                    <Ionicons name="lock-closed" size={11} color="#8E8DA3" style={{ marginRight: 5 }} />
-                    <Text style={{ color: '#8E8DA3', fontSize: 11, fontStyle: 'italic', flex: 1 }}>
+                    <Ionicons name="lock-closed" size={11} color={uiTheme.colors.muted} style={{ marginRight: 5 }} />
+                    <Text style={{ fontFamily: 'Inter_400Regular', color: uiTheme.colors.muted, fontSize: 11, fontStyle: 'italic', flex: 1 }}>
                       Auto Swipe & Speed are locked to safe defaults. Toggle Safety Mode OFF in Settings to customize.
                     </Text>
                   </View>
@@ -1988,8 +1989,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     <Switch
                       value={form.ageFilter?.enabled === true}
                       onValueChange={v => updateField('ageFilter.enabled', v)}
-                      trackColor={{ false: '#26223B', true: '#FE3C72' }}
-                      thumbColor={form.ageFilter?.enabled ? '#FFF' : '#716E89'}
+                      trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
+                      thumbColor={form.ageFilter?.enabled ? '#FFF' : uiTheme.colors.muted}
                     />
                   </View>
                 </View>
@@ -2022,7 +2023,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           (form.ageFilter?.min ?? 20) === b.min &&
                           (form.ageFilter?.max ?? 35) === b.max;
                         return (
-                          <TouchableOpacity
+                          <TouchableOpacity accessibilityRole="button"
                             key={b.label}
                             style={[styles.chip, isActive && styles.chipActive]}
                             onPress={() => {
@@ -2060,8 +2061,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     <Switch
                       value={form.distanceFilter?.enabled === true}
                       onValueChange={v => updateField('distanceFilter.enabled', v)}
-                      trackColor={{ false: '#26223B', true: '#FE3C72' }}
-                      thumbColor={form.distanceFilter?.enabled ? '#FFF' : '#716E89'}
+                      trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
+                      thumbColor={form.distanceFilter?.enabled ? '#FFF' : uiTheme.colors.muted}
                     />
                   </View>
                 </View>
@@ -2089,7 +2090,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       ].map(d => {
                         const isActive = (form.distanceFilter?.maxDistance ?? 50) === d.dist;
                         return (
-                          <TouchableOpacity
+                          <TouchableOpacity accessibilityRole="button"
                             key={d.label}
                             style={[styles.chip, isActive && styles.chipActive]}
                             onPress={() => updateField('distanceFilter.maxDistance', d.dist)}
@@ -2118,11 +2119,11 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       <Ionicons
                         name={form?.useDeviceLocation ? "navigate" : "airplane"}
                         size={10}
-                        color={form?.useDeviceLocation ? "#10B981" : "#FE3C72"}
+                        color={form?.useDeviceLocation ? uiTheme.colors.success : uiTheme.colors.primary}
                       />
                       <Text style={[
                         styles.swipingLocationBadgeText,
-                        form?.useDeviceLocation ? { color: "#10B981" } : { color: "#FE3C72" }
+                        form?.useDeviceLocation ? { color: uiTheme.colors.success } : { color: uiTheme.colors.primary }
                       ]}>
                         {form?.useDeviceLocation ? 'LIVE GPS' : 'PASSPORT'}
                       </Text>
@@ -2142,7 +2143,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   </View>
                 </View>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.swipingLocationActionBtn}
                   onPress={() => {
                     if (onNavigateToSettings) {
@@ -2152,7 +2153,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   activeOpacity={0.8}
                 >
                   <Text style={styles.swipingLocationActionText}>Change</Text>
-                  <Ionicons name="arrow-forward" size={12} color="#FE3C72" />
+                  <Ionicons name="arrow-forward" size={12} color={uiTheme.colors.primary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -2161,7 +2162,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
         {/* ════════════════════ CARD 3: MESSAGING (V2 DESKTOP PARITY) ════════════════════ */}
         <View style={[styles.v2Card, openCards.messaging && styles.v2CardOpen]}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.v2CardHeader}
             onPress={() => toggleCard('messaging')}
             activeOpacity={0.85}
@@ -2173,7 +2174,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             <Ionicons
               name={openCards.messaging ? "chevron-up" : "chevron-down"}
               size={18}
-              color="#8E8DA3"
+              color={uiTheme.colors.muted}
             />
           </TouchableOpacity>
 
@@ -2185,15 +2186,15 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 <Text style={styles.v2ChipText}>{getMessagingSummary().intention}</Text>
               </View>
               <View style={styles.v2Chip}>
-                <Ionicons name="swap-horizontal" size={11} color="#818CF8" />
+                <Ionicons name="swap-horizontal" size={11} color={uiTheme.colors.info} />
                 <Text style={styles.v2ChipText}>{getMessagingSummary().priority}</Text>
               </View>
               <View style={styles.v2Chip}>
-                <Ionicons name="color-wand" size={11} color="#10B981" />
+                <Ionicons name="color-wand" size={11} color={uiTheme.colors.success} />
                 <Text style={styles.v2ChipText}>{getMessagingSummary().tone}</Text>
               </View>
               <View style={styles.v2Chip}>
-                <Ionicons name="globe-outline" size={11} color="#F59E0B" />
+                <Ionicons name="globe-outline" size={11} color={uiTheme.colors.warning} />
                 <Text style={styles.v2ChipText}>{getMessagingSummary().lang}</Text>
               </View>
               <View style={styles.v2Chip}>
@@ -2219,7 +2220,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   <View style={{ flex: 1, paddingRight: 10 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={styles.toggleTitle}>Smart Reactions</Text>
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         onPress={() => setTooltipModal({
                           title: 'Smart Reactions',
                           lines: [
@@ -2230,7 +2231,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         })}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <Ionicons name="information-circle-outline" size={14} color="#8E8DA3" />
+                        <Ionicons name="information-circle-outline" size={14} color={uiTheme.colors.muted} />
                       </TouchableOpacity>
                     </View>
                     <Text style={styles.labelMuted}>AI randomly likes (❤️) received messages to push chat to top</Text>
@@ -2241,8 +2242,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       updateField('randomHearts', v);
                       updateField('smartReactionsEnabled', v);
                     }}
-                    trackColor={{ false: '#26223B', true: '#EC4899' }}
-                    thumbColor={(form.randomHearts ?? form.smartReactionsEnabled) ? '#FFF' : '#716E89'}
+                    trackColor={{ false: uiTheme.colors.elevated, true: '#EC4899' }}
+                    thumbColor={(form.randomHearts ?? form.smartReactionsEnabled) ? '#FFF' : uiTheme.colors.muted}
                   />
                 </View>
 
@@ -2257,8 +2258,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   <Switch
                     value={form.useEmojis !== false}
                     onValueChange={v => updateField('useEmojis', v)}
-                    trackColor={{ false: '#26223B', true: '#EC4899' }}
-                    thumbColor={form.useEmojis !== false ? '#FFF' : '#716E89'}
+                    trackColor={{ false: uiTheme.colors.elevated, true: '#EC4899' }}
+                    thumbColor={form.useEmojis !== false ? '#FFF' : uiTheme.colors.muted}
                   />
                 </View>
 
@@ -2269,7 +2270,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   <View style={{ flex: 1, paddingRight: 10 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={styles.toggleTitle}>Consecutive Messages</Text>
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         onPress={() => setTooltipModal({
                           title: 'Consecutive Messages',
                           lines: [
@@ -2280,7 +2281,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         })}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <Ionicons name="information-circle-outline" size={14} color="#8E8DA3" />
+                        <Ionicons name="information-circle-outline" size={14} color={uiTheme.colors.muted} />
                       </TouchableOpacity>
                     </View>
                     <Text style={styles.labelMuted}>AI mirrors match energy with 2–3 message replies when they text in bursts</Text>
@@ -2288,8 +2289,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   <Switch
                     value={form.consecutiveMessagesEnabled === true}
                     onValueChange={v => updateField('consecutiveMessagesEnabled', v)}
-                    trackColor={{ false: '#26223B', true: '#EC4899' }}
-                    thumbColor={form.consecutiveMessagesEnabled ? '#FFF' : '#716E89'}
+                    trackColor={{ false: uiTheme.colors.elevated, true: '#EC4899' }}
+                    thumbColor={form.consecutiveMessagesEnabled ? '#FFF' : uiTheme.colors.muted}
                   />
                 </View>
               </View>
@@ -2346,9 +2347,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               <View style={styles.subBox}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={styles.subBoxTitle}>
-                    Messaging Priority <Text style={{ color: '#716E89', fontSize: 11, fontWeight: 'normal' }}>(Replies : New Matches)</Text>
+                    Messaging Priority <Text style={{ fontFamily: 'Inter_400Regular', color: uiTheme.colors.muted, fontSize: 11, fontWeight: 'normal' }}>(Replies : New Matches)</Text>
                   </Text>
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     onPress={() => setTooltipModal({
                       title: 'Messaging Priority',
                       lines: [
@@ -2360,7 +2361,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     })}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Ionicons name="information-circle-outline" size={14} color="#8E8DA3" />
+                    <Ionicons name="information-circle-outline" size={14} color={uiTheme.colors.muted} />
                   </TouchableOpacity>
                 </View>
                 <Text style={[styles.labelMuted, { marginBottom: 8 }]}>Splits AI time between ongoing conversation replies & new match outreach:</Text>
@@ -2370,7 +2371,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     const currentVal = form.prioritySlider ?? form.minReplySlots ?? 50;
                     const isSelected = currentVal === preset.value;
                     return (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={preset.value}
                         style={[styles.speedBtn, isSelected && styles.speedBtnActive]}
                         onPress={() => {
@@ -2389,7 +2390,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 </View>
 
                 <View style={{ marginTop: 8 }}>
-                  <Text style={{ color: '#FE3C72', fontSize: 11, fontWeight: '600' }}>
+                  <Text style={{ fontFamily: 'Inter_600SemiBold', color: uiTheme.colors.primary, fontSize: 11, fontWeight: 'normal' }}>
                     {PRIORITY_PRESETS.find(p => p.value === (form.prioritySlider ?? form.minReplySlots ?? 50))?.desc || 'Balanced outreach & replies (Recommended)'}
                   </Text>
                 </View>
@@ -2400,7 +2401,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
         {/* ════════════════════ CARD 4: YOUR CHAT STYLE & AI TRAINING (V2 DESKTOP PARITY) ════════════════════ */}
         <View style={[styles.v2Card, openCards.style && styles.v2CardOpen]}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.v2CardHeader}
             onPress={() => toggleCard('style')}
             activeOpacity={0.85}
@@ -2412,7 +2413,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             <Ionicons
               name={openCards.style ? "chevron-up" : "chevron-down"}
               size={18}
-              color="#8E8DA3"
+              color={uiTheme.colors.muted}
             />
           </TouchableOpacity>
 
@@ -2422,7 +2423,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               {getStyleSummary().map((item, idx) => (
                 <View key={idx} style={[styles.v2Chip, item.full && { borderColor: 'rgba(192, 38, 211, 0.4)' }]}>
                   <Ionicons name="sparkles" size={11} color="#C026D3" />
-                  <Text style={[styles.v2ChipText, item.full && { color: '#E0DFEC' }]}>{item.label}</Text>
+                  <Text style={[styles.v2ChipText, item.full && { color: uiTheme.colors.text }]}>{item.label}</Text>
                 </View>
               ))}
             </View>
@@ -2483,7 +2484,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                             const lObj = LANGUAGE_OPTIONS.find(l => l.code === code) || { label: code, flag: '🌐' };
                             const isActive = code === trainingLang;
                             return (
-                              <TouchableOpacity
+                              <TouchableOpacity accessibilityRole="button"
                                 key={code}
                                 style={[styles.cstTrainedPill, isActive && styles.cstTrainedPillActive]}
                                 onPress={() => {
@@ -2518,7 +2519,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     </View>
 
                     {/* Start / Continue Button */}
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={[styles.cstStartBtn, atCap && { opacity: 0.5, backgroundColor: '#332E4A' }]}
                       onPress={() => !atCap && startTrainingSession(trainingLang, isFull)}
                       disabled={atCap}
@@ -2538,7 +2539,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
                     {/* View Trained Style Button */}
                     {isTrained && (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={styles.cstViewTrainedBtn}
                         onPress={() => {
                           setViewingLang(trainingLang);
@@ -2569,7 +2570,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                         <View style={styles.simAvatarWrapper}>
                           <View style={styles.simAvatar}>
-                            <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 12 }}>
+                            <Text style={{ fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal', fontSize: 12 }}>
                               {persona.name.charAt(0)}
                             </Text>
                           </View>
@@ -2577,29 +2578,29 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         </View>
                         <View>
                           <Text style={styles.simMatchName}>{persona.name}</Text>
-                          <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '600' }}>Online now</Text>
+                          <Text style={{ fontFamily: 'Inter_600SemiBold', color: uiTheme.colors.success, fontSize: 11, fontWeight: 'normal' }}>Online now</Text>
                         </View>
                       </View>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <View style={{ width: 60, height: 4, backgroundColor: '#221E33', borderRadius: 2, overflow: 'hidden' }}>
-                          <View style={{ width: `${progressPct}%`, height: '100%', backgroundColor: '#FE3C72', borderRadius: 2 }} />
+                          <View style={{ width: `${progressPct}%`, height: '100%', backgroundColor: uiTheme.colors.primary, borderRadius: 2 }} />
                         </View>
-                        <Text style={{ color: '#8E8DA3', fontSize: 11, fontWeight: '700' }}>{validCount} / 12</Text>
-                        <TouchableOpacity
+                        <Text style={{ fontFamily: 'Inter_700Bold', color: uiTheme.colors.muted, fontSize: 11, fontWeight: 'normal' }}>{validCount} / 12</Text>
+                        <TouchableOpacity accessibilityRole="button"
                           style={styles.cstRestartBtn}
                           onPress={restartTrainingSession}
                           activeOpacity={0.8}
                           accessibilityLabel="Restart"
                         >
-                          <Ionicons name="refresh" size={13} color="#8E8DA3" />
+                          <Ionicons name="refresh" size={13} color={uiTheme.colors.muted} />
                         </TouchableOpacity>
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={styles.cstCancelBtn}
                           onPress={() => setStyleView('intro')}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="close" size={15} color="#8E8DA3" />
+                          <Ionicons name="close" size={15} color={uiTheme.colors.muted} />
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -2619,7 +2620,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         if (msg.sender === 'system') {
                           return (
                             <View key={msg.id} style={styles.simSystemHint}>
-                              <Ionicons name="information-circle-outline" size={13} color="#F59E0B" />
+                              <Ionicons name="information-circle-outline" size={13} color={uiTheme.colors.warning} />
                               <Text style={styles.simSystemHintText}>{msg.text}</Text>
                             </View>
                           );
@@ -2628,7 +2629,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           return (
                             <View key={msg.id} style={styles.simMatchRow}>
                               <View style={styles.simMatchAvatarTiny}>
-                                <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>
+                                <Text style={{ fontFamily: 'Inter_800ExtraBold', color: '#FFF', fontSize: 10, fontWeight: 'normal' }}>
                                   {persona.name.charAt(0)}
                                 </Text>
                               </View>
@@ -2654,12 +2655,12 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       {calibrating && (
                         <View style={styles.simMatchRow}>
                           <View style={styles.simMatchAvatarTiny}>
-                            <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>
+                            <Text style={{ fontFamily: 'Inter_800ExtraBold', color: '#FFF', fontSize: 10, fontWeight: 'normal' }}>
                               {persona.name.charAt(0)}
                             </Text>
                           </View>
                           <View style={[styles.simBubble, styles.simBubbleMatch]}>
-                            <Text style={{ color: '#8E8DA3', fontSize: 11, fontStyle: 'italic' }}>
+                            <Text style={{ fontFamily: 'Inter_400Regular', color: uiTheme.colors.muted, fontSize: 11, fontStyle: 'italic' }}>
                               {persona.name} is typing…
                             </Text>
                           </View>
@@ -2669,12 +2670,12 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       {/* Desktop V2 Finish Banner */}
                       {sessionCompleted && (
                         <View style={styles.cstFinishBanner}>
-                          <Text style={{ fontSize: 22, textAlign: 'center', marginBottom: 4 }}>🎉</Text>
+                          <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 22, textAlign: 'center', marginBottom: 4 }}>🎉</Text>
                           <Text style={styles.cstFinishTitle}>Training complete!</Text>
                           <Text style={styles.cstFinishSub}>
                             Your style has been captured. Tap below to see what the AI learned.
                           </Text>
-                          <TouchableOpacity
+                          <TouchableOpacity accessibilityRole="button"
                             style={styles.cstFinishBtn}
                             onPress={finishAndSaveSession}
                             activeOpacity={0.85}
@@ -2688,22 +2689,22 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     {/* Footer Action Row with Globe Pill */}
                     <View style={styles.simActionRow}>
                       {validCount > 0 && !sessionCompleted && (
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={[
                             styles.cstSaveInlinePill,
-                            inlineSaved && { borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.12)' }
+                            inlineSaved && { borderColor: uiTheme.colors.success, backgroundColor: 'rgba(16, 185, 129, 0.12)' }
                           ]}
                           onPress={saveStyleInline}
                           activeOpacity={0.8}
                         >
-                          <Text style={[styles.cstSaveInlinePillText, inlineSaved && { color: '#10B981' }]}>
+                          <Text style={[styles.cstSaveInlinePillText, inlineSaved && { color: uiTheme.colors.success }]}>
                             {inlineSaved ? '✓ Saved' : 'Save style'}
                           </Text>
                         </TouchableOpacity>
                       )}
                       <View style={{ flex: 1 }} />
                       {trainedCodes.length > 0 && (
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={styles.cstProfilesBtn}
                           onPress={() => setSimLangModalOpen(true)}
                           activeOpacity={0.8}
@@ -2712,14 +2713,14 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           <Text style={styles.cstProfilesBtnText}>Profiles {trainedCodes.length}</Text>
                         </TouchableOpacity>
                       )}
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={styles.simLangPill}
                         onPress={() => setSimLangModalOpen(true)}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="globe-outline" size={12} color="#FE3C72" />
+                        <Ionicons name="globe-outline" size={12} color={uiTheme.colors.primary} />
                         <Text style={styles.simLangPillText}>{currentLangObj.label}</Text>
-                        <Ionicons name="chevron-down" size={12} color="#FE3C72" />
+                        <Ionicons name="chevron-down" size={12} color={uiTheme.colors.primary} />
                       </TouchableOpacity>
                     </View>
 
@@ -2730,7 +2731,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       animationType="fade"
                       onRequestClose={() => setSimLangModalOpen(false)}
                     >
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={styles.modalOverlay}
                         activeOpacity={1}
                         onPress={() => setSimLangModalOpen(false)}
@@ -2738,11 +2739,11 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         <View style={styles.simLangModalContent} onStartShouldSetResponder={() => true}>
                           <View style={styles.simLangModalHeader}>
                             <Text style={styles.simLangModalTitle}>Training Language</Text>
-                            <TouchableOpacity
+                            <TouchableOpacity accessibilityRole="button"
                               onPress={() => setSimLangModalOpen(false)}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
-                              <Ionicons name="close" size={18} color="#8E8DA3" />
+                              <Ionicons name="close" size={18} color={uiTheme.colors.muted} />
                             </TouchableOpacity>
                           </View>
 
@@ -2754,7 +2755,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                               const count = form?.chatStyleProfiles?.[lang.code]?.messageCount || 0;
 
                               return (
-                                <TouchableOpacity
+                                <TouchableOpacity accessibilityRole="button"
                                   key={lang.code}
                                   style={[
                                     styles.simLangModalOption,
@@ -2764,13 +2765,13 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                                   activeOpacity={0.7}
                                 >
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                    <Text style={{ fontSize: 18 }}>{lang.flag}</Text>
+                                    <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 18 }}>{lang.flag}</Text>
                                     <View>
-                                      <Text style={[styles.simLangModalOptionText, isSelected && { color: '#FE3C72', fontWeight: '800' }]}>
+                                      <Text style={[styles.simLangModalOptionText, isSelected && { fontFamily: 'Inter_800ExtraBold', color: uiTheme.colors.primary, fontWeight: 'normal' }]}>
                                         {lang.label}
                                       </Text>
                                       {isTrained && (
-                                        <Text style={{ color: isPartial ? '#F59E0B' : '#10B981', fontSize: 10, fontWeight: '600' }}>
+                                        <Text style={{ fontFamily: 'Inter_600SemiBold', color: isPartial ? uiTheme.colors.warning : uiTheme.colors.success, fontSize: 10, fontWeight: 'normal' }}>
                                           {isPartial ? `Partial session (${count}/12)` : '✓ Style trained'}
                                         </Text>
                                       )}
@@ -2778,7 +2779,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                                   </View>
 
                                   {isSelected && (
-                                    <Ionicons name="checkmark-circle" size={18} color="#FE3C72" />
+                                    <Ionicons name="checkmark-circle" size={18} color={uiTheme.colors.primary} />
                                   )}
                                 </TouchableOpacity>
                               );
@@ -2808,7 +2809,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           onSubmitEditing={sendPracticeMessage}
                           editable={!sessionCompleted}
                         />
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={[styles.simSendBtn, sessionCompleted && { opacity: 0.4 }]}
                           onPress={sendPracticeMessage}
                           activeOpacity={0.8}
@@ -2842,9 +2843,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         <Ionicons
                           name={isPartial ? "time-outline" : "checkmark-circle"}
                           size={14}
-                          color={isPartial ? "#F59E0B" : "#10B981"}
+                          color={isPartial ? uiTheme.colors.warning : uiTheme.colors.success}
                         />
-                        <Text style={[styles.cstBadgeSuccessText, isPartial && { color: "#F59E0B" }]}>
+                        <Text style={[styles.cstBadgeSuccessText, isPartial && { color: uiTheme.colors.warning }]}>
                           {isPartial ? 'Partial Style Saved' : 'Style Captured'}
                         </Text>
                       </View>
@@ -2892,7 +2893,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     <View style={styles.cstMetricGrid}>
                       <View style={styles.cstMetricCard}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Ionicons name="speedometer-outline" size={14} color="#FE3C72" />
+                          <Ionicons name="speedometer-outline" size={14} color={uiTheme.colors.primary} />
                           <Text style={styles.cstMetricTitle}>Texting Tempo & Length</Text>
                         </View>
                         <Text style={styles.cstMetricValue}>
@@ -2912,7 +2913,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
                       <View style={styles.cstMetricCard}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Ionicons name="text-outline" size={14} color="#818CF8" />
+                          <Ionicons name="text-outline" size={14} color={uiTheme.colors.info} />
                           <Text style={styles.cstMetricTitle}>Punctuation & Flow</Text>
                         </View>
                         <Text style={styles.cstMetricValue}>
@@ -2922,16 +2923,16 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
                       <View style={styles.cstMetricCard}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Ionicons name="flash-outline" size={14} color="#10B981" />
+                          <Ionicons name="flash-outline" size={14} color={uiTheme.colors.success} />
                           <Text style={styles.cstMetricTitle}>AI Mirroring Status</Text>
                         </View>
-                        <Text style={[styles.cstMetricValue, { color: '#10B981', fontWeight: '700' }]}>Active in Live Chats</Text>
+                        <Text style={[styles.cstMetricValue, { fontFamily: 'Inter_700Bold', color: uiTheme.colors.success, fontWeight: 'normal' }]}>Active in Live Chats</Text>
                       </View>
                     </View>
 
                     {/* Action Buttons (100% Desktop V2 Complete Actions) */}
                     <View style={{ marginTop: 14, gap: 8 }}>
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={styles.cstStartBtn}
                         onPress={() => startTrainingSession(viewingLang, !isPartial)}
                         activeOpacity={0.85}
@@ -2942,7 +2943,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         </Text>
                       </TouchableOpacity>
 
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={styles.cstTrainAnotherBtn}
                         onPress={trainAnotherLanguage}
                         activeOpacity={0.8}
@@ -2952,17 +2953,17 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       </TouchableOpacity>
 
                       {hasSavedChat && (
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={styles.cstSecondaryBtn}
                           onPress={() => setStyleView('replay')}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="chatbox-ellipses-outline" size={14} color="#E0DFEC" />
+                          <Ionicons name="chatbox-ellipses-outline" size={14} color={uiTheme.colors.text} />
                           <Text style={styles.cstSecondaryBtnText}>View training chat</Text>
                         </TouchableOpacity>
                       )}
 
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={styles.cstSecondaryBtn}
                         onPress={() => setStyleView('intro')}
                         activeOpacity={0.8}
@@ -2970,12 +2971,12 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         <Text style={styles.cstSecondaryBtnText}>Back to Overview</Text>
                       </TouchableOpacity>
 
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={styles.cstDeleteBtn}
                         onPress={() => deleteProfile(viewingLang)}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="trash-outline" size={13} color="#EF4444" />
+                        <Ionicons name="trash-outline" size={13} color={uiTheme.colors.error} />
                         <Text style={styles.cstDeleteBtnText}>Delete {langObj.label} Profile</Text>
                       </TouchableOpacity>
                     </View>
@@ -2993,13 +2994,13 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 return (
                   <View style={styles.cstSimContainer}>
                     <View style={styles.cstSimTopBar}>
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
                         onPress={() => setStyleView('insights')}
                         activeOpacity={0.8}
                       >
                         <Ionicons name="arrow-back" size={16} color="#C026D3" />
-                        <Text style={{ color: '#C026D3', fontSize: 12, fontWeight: '700' }}>Back</Text>
+                        <Text style={{ fontFamily: 'Inter_700Bold', color: '#C026D3', fontSize: 12, fontWeight: 'normal' }}>Back</Text>
                       </TouchableOpacity>
                       <Text style={styles.simMatchName}>{langObj.flag} Training Transcript</Text>
                       <View style={{ width: 40 }} />
@@ -3032,8 +3033,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   <View style={styles.cstInsightsContainer}>
                     <View style={styles.cstInsightsHeader}>
                       <View style={[styles.cstBadgeSuccess, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
-                        <Ionicons name="warning-outline" size={14} color="#EF4444" />
-                        <Text style={[styles.cstBadgeSuccessText, { color: '#EF4444' }]}>Replies Too Short</Text>
+                        <Ionicons name="warning-outline" size={14} color={uiTheme.colors.error} />
+                        <Text style={[styles.cstBadgeSuccessText, { color: uiTheme.colors.error }]}>Replies Too Short</Text>
                       </View>
                       <Text style={styles.cstInsightsTitle}>Replies too short to learn from</Text>
                       <Text style={styles.cstInsightsSub}>
@@ -3041,7 +3042,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       </Text>
                     </View>
 
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.cstStartBtn}
                       onPress={() => startTrainingSession(trainingLang, true)}
                       activeOpacity={0.85}
@@ -3050,7 +3051,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       <Text style={styles.cstStartBtnText}>Try Again ({langObj.label})</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={[styles.cstSecondaryBtn, { marginTop: 8 }]}
                       onPress={() => setStyleView('intro')}
                       activeOpacity={0.8}
@@ -3067,12 +3068,12 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
         {/* ════════════════════ CARD 5: AI ACTIVE TIME & SAFETY (DESKTOP V2 PARITY) ════════════════════ */}
         <View style={[styles.v2Card, openCards.activeTime && styles.v2CardOpen]}>
           <View style={styles.v2CardHeader}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[styles.cardTitleWrap, { flex: 1 }]}
               onPress={() => toggleCard('activeTime')}
               activeOpacity={0.85}
             >
-              <Ionicons name="time-outline" size={17} color="#10B981" />
+              <Ionicons name="time-outline" size={17} color={uiTheme.colors.success} />
               <Text style={styles.v2CardTitle}>AI Active Time</Text>
             </TouchableOpacity>
 
@@ -3093,18 +3094,18 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     toggleCard('activeTime');
                   }
                 }}
-                trackColor={{ false: '#26223B', true: '#10B981' }}
-                thumbColor={form.activeHours?.enabled !== false ? '#FFF' : '#716E89'}
+                trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.success }}
+                thumbColor={form.activeHours?.enabled !== false ? '#FFF' : uiTheme.colors.muted}
               />
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 onPress={() => toggleCard('activeTime')}
                 activeOpacity={0.85}
               >
                 <Ionicons
                   name={openCards.activeTime ? "chevron-up" : "chevron-down"}
                   size={18}
-                  color="#8E8DA3"
+                  color={uiTheme.colors.muted}
                 />
               </TouchableOpacity>
             </View>
@@ -3114,7 +3115,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           {!openCards.activeTime && (
             <View style={styles.collapsedRow}>
               <View style={styles.v2Chip}>
-                <Ionicons name="calendar" size={11} color="#10B981" />
+                <Ionicons name="calendar" size={11} color={uiTheme.colors.success} />
                 <Text style={styles.v2ChipText}>{getActiveTimeSummary()}</Text>
               </View>
             </View>
@@ -3131,7 +3132,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               <View style={styles.subBox}>
                 <View style={styles.rowBetween}>
                   <Text style={styles.subBoxTitle}>Operating Hours Window</Text>
-                  <Text style={{ color: '#10B981', fontSize: 11.5, fontWeight: '700' }}>
+                  <Text style={{ fontFamily: 'Inter_700Bold', color: uiTheme.colors.success, fontSize: 11.5, fontWeight: 'normal' }}>
                     {form.activeHours?.enabled !== false ? 'Scheduled Active' : '24/7 Always On'}
                   </Text>
                 </View>
@@ -3187,7 +3188,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       (p === 'Evening (6pm-12am)' && form.activeHours?.enabled !== false && form.activeHours?.startTime === '18:00' && form.activeHours?.endTime === '23:59');
 
                     return (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={p}
                         style={[styles.chip, isActive && styles.chipActive]}
                         onPress={() => {
@@ -3234,7 +3235,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
         animationType="fade"
         onRequestClose={() => setTooltipModal(null)}
       >
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.simLangModalOverlay}
           activeOpacity={1}
           onPress={() => setTooltipModal(null)}
@@ -3242,23 +3243,23 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           <View style={[styles.simLangModalContent, { maxWidth: 330, padding: 18 }]}>
             <View style={styles.simLangModalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="information-circle" size={18} color="#FE3C72" />
+                <Ionicons name="information-circle" size={18} color={uiTheme.colors.primary} />
                 <Text style={styles.simLangModalTitle}>{tooltipModal?.title || 'How it works'}</Text>
               </View>
-              <TouchableOpacity onPress={() => setTooltipModal(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name="close" size={18} color="#8E8DA3" />
+              <TouchableOpacity accessibilityRole="button" onPress={() => setTooltipModal(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={18} color={uiTheme.colors.muted} />
               </TouchableOpacity>
             </View>
 
             <View style={{ marginTop: 10, gap: 10 }}>
               {tooltipModal?.lines?.map((line, idx) => (
                 <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                  <Text style={{ color: '#D8D6E8', fontSize: 12.5, lineHeight: 18, flex: 1 }}>{line}</Text>
+                  <Text style={{ fontFamily: 'Inter_400Regular', color: uiTheme.colors.text, fontSize: 12.5, lineHeight: 18, flex: 1 }}>{line}</Text>
                 </View>
               ))}
             </View>
 
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[styles.cstStartBtn, { marginTop: 16, paddingVertical: 10 }]}
               onPress={() => setTooltipModal(null)}
               activeOpacity={0.85}
@@ -3276,17 +3277,17 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
   },
   centerWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#0D0B14',
+    padding: uiTheme.spacing.xl,
+    backgroundColor: uiTheme.colors.background,
   },
-  loadingText: {
-    color: '#8E8DA3',
+  loadingText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     marginTop: 10,
     fontSize: 13,
   },
@@ -3296,15 +3297,15 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 14,
     paddingBottom: 90,
-    gap: 12,
+    gap: uiTheme.spacing.md,
   },
 
   // ─── V2 Accordion Cards ───
   v2Card: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     overflow: 'hidden',
   },
   v2CardOpen: {
@@ -3314,17 +3315,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: uiTheme.spacing.lg,
   },
   cardTitleWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  v2CardTitle: {
+  v2CardTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
 
@@ -3333,57 +3334,57 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
     paddingBottom: 14,
   },
   v2Chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#1C192E',
-    paddingHorizontal: 8,
+    backgroundColor: uiTheme.colors.elevated,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 4.5,
     borderRadius: 7,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
-  v2ChipText: {
-    color: '#9E9DB5',
-    fontSize: 11,
-    fontWeight: '600',
+  v2ChipText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.textSecondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ─── Expanded Card Body ───
   v2CardBody: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
+    paddingBottom: uiTheme.spacing.lg,
     borderTopWidth: 1,
     borderColor: '#221E33',
-    paddingTop: 12,
+    paddingTop: uiTheme.spacing.md,
   },
-  fieldDesc: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    marginBottom: 12,
+  fieldDesc: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    marginBottom: uiTheme.spacing.md,
     lineHeight: 16,
   },
 
   // ─── Radio Group ───
   radioGroup: {
-    gap: 8,
-    marginBottom: 12,
+    gap: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.md,
   },
   goalOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D0B14',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.input,
+    padding: uiTheme.spacing.md,
     borderWidth: 1,
     borderColor: '#221E33',
   },
   goalOptionSelected: {
-    borderColor: '#FE3C72',
+    borderColor: uiTheme.colors.primary,
     backgroundColor: 'rgba(254, 60, 114, 0.06)',
   },
   radioCircle: {
@@ -3391,44 +3392,44 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     borderWidth: 1.5,
-    borderColor: '#716E89',
+    borderColor: uiTheme.colors.muted,
     justifyContent: 'center',
     alignItems: 'center',
   },
   radioCircleActive: {
-    borderColor: '#FE3C72',
+    borderColor: uiTheme.colors.primary,
   },
   radioInnerCircle: {
     width: 9,
     height: 9,
     borderRadius: 4.5,
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
   },
-  goalOptionLabel: {
-    color: '#E0DFEC',
+  goalOptionLabel: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
-  goalOptionSub: {
-    color: '#716E89',
-    fontSize: 11,
+  goalOptionSub: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 1,
   },
 
   // ─── Sub-Boxes & Inputs ───
   subBox: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.input,
+    padding: uiTheme.spacing.md,
     borderWidth: 1,
     borderColor: '#221E33',
     marginTop: 10,
   },
-  subBoxTitle: {
+  subBoxTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFF',
     fontSize: 12.5,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.sm,
   },
   chipRow: {
     flexDirection: 'row',
@@ -3436,50 +3437,50 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   chip: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 7,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
   chipActive: {
-    backgroundColor: '#FE3C72',
-    borderColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
+    borderColor: uiTheme.colors.primary,
   },
-  chipText: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
-    fontWeight: '600',
+  chipText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  chipTextActive: {
+  chipTextActive: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   inputGroup: {
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
   },
-  inputLabel: {
-    color: '#8E8DA3',
-    fontSize: 11,
-    fontWeight: '600',
-    marginBottom: 4,
+  inputLabel: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.xs,
   },
-  textInput: {
-    backgroundColor: '#161424',
-    borderRadius: 8,
+  textInput: { fontFamily: 'Inter_400Regular',
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     color: '#FFF',
     fontSize: 12.5,
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
   },
-  textArea: {
-    backgroundColor: '#161424',
-    borderRadius: 8,
+  textArea: { fontFamily: 'Inter_400Regular',
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     color: '#FFF',
     fontSize: 12.5,
     padding: 10,
@@ -3490,50 +3491,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
   },
-  labelMuted: {
-    color: '#8E8DA3',
-    fontSize: 12,
+  labelMuted: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
   },
-  smallInput: {
-    backgroundColor: '#161424',
+  smallInput: { fontFamily: 'Inter_400Regular',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 7,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     color: '#FFF',
-    fontSize: 12,
+    fontSize: uiTheme.type.caption.fontSize,
     width: 54,
     textAlign: 'center',
-    paddingVertical: 4,
+    paddingVertical: uiTheme.spacing.xs,
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
   },
   v2ValueBadge: {
-    backgroundColor: '#1C192E',
-    paddingHorizontal: 8,
+    backgroundColor: uiTheme.colors.elevated,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 3.5,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
-  v2ValueBadgeText: {
-    color: '#FE3C72',
-    fontSize: 11,
-    fontWeight: '700',
+  v2ValueBadgeText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  toggleTitle: {
+  toggleTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
-  toggleSub: {
-    color: '#716E89',
-    fontSize: 11,
+  toggleSub: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 1,
   },
   safetyChipBadge: {
@@ -3547,10 +3548,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.25)',
   },
-  safetyChipBadgeText: {
-    color: '#10B981',
-    fontSize: 10,
-    fontWeight: '700',
+  safetyChipBadgeText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   subBoxDivider: {
     height: 1,
@@ -3559,31 +3560,31 @@ const styles = StyleSheet.create({
   },
   speedButtonGroup: {
     flexDirection: 'row',
-    backgroundColor: '#161424',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.small,
     padding: 3,
     gap: 3,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
   speedBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 6,
   },
   speedBtnActive: {
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
   },
-  speedBtnText: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
-    fontWeight: '600',
+  speedBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  speedBtnTextActive: {
+  speedBtnTextActive: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
 
   // ─── Chat Style Training (CST) V2 Parity Styles ───
@@ -3602,33 +3603,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(192, 38, 211, 0.25)',
   },
-  cstIntroTitle: {
+  cstIntroTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     textAlign: 'center',
     marginBottom: 6,
   },
-  cstIntroDesc: {
-    color: '#8E8DA3',
-    fontSize: 12,
+  cstIntroDesc: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 17,
     textAlign: 'center',
     marginBottom: 14,
-    paddingHorizontal: 8,
+    paddingHorizontal: uiTheme.spacing.sm,
   },
   cstTrainedBar: {
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
     borderColor: '#221E33',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
-  cstTrainedBarLabel: {
-    color: '#716E89',
-    fontSize: 11,
-    fontWeight: '700',
+  cstTrainedBarLabel: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginBottom: 6,
   },
   cstTrainedChipsRow: {
@@ -3637,64 +3638,64 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cstTrainedPill: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: uiTheme.spacing.sm,
+    paddingVertical: uiTheme.spacing.xs,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
   cstTrainedPillActive: {
     borderColor: '#C026D3',
     backgroundColor: 'rgba(192, 38, 211, 0.15)',
   },
-  cstTrainedPillText: {
-    color: '#8E8DA3',
-    fontSize: 11,
-    fontWeight: '600',
+  cstTrainedPillText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  cstTrainedPillTextActive: {
+  cstTrainedPillTextActive: { fontFamily: 'Inter_700Bold',
     color: '#C026D3',
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   cstStartBtn: {
     backgroundColor: '#C026D3',
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     marginTop: 14,
   },
-  cstStartBtnText: {
+  cstStartBtnText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   cstViewTrainedBtn: {
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
     borderColor: 'rgba(192, 38, 211, 0.3)',
     backgroundColor: 'rgba(192, 38, 211, 0.06)',
   },
-  cstViewTrainedBtnText: {
+  cstViewTrainedBtnText: { fontFamily: 'Inter_700Bold',
     color: '#C026D3',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // CST Simulator
   cstSimContainer: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
     borderColor: '#221E33',
-    padding: 12,
+    padding: uiTheme.spacing.md,
   },
   cstSimTopBar: {
     flexDirection: 'row',
@@ -3705,50 +3706,50 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   cstSaveExitBtn: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: uiTheme.spacing.sm,
+    paddingVertical: uiTheme.spacing.xs,
   },
-  cstSaveExitBtnText: {
-    color: '#E0DFEC',
-    fontSize: 11,
-    fontWeight: '700',
+  cstSaveExitBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   cstCancelBtn: {
-    width: 26,
-    height: 26,
+    width: 44,
+    height: 44,
     borderRadius: 6,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cstProgressWrap: {
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
   },
   cstProgressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
   },
-  cstProgressLabel: {
-    color: '#716E89',
-    fontSize: 10.5,
-    fontWeight: '700',
+  cstProgressLabel: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  cstProgressValue: {
+  cstProgressValue: { fontFamily: 'Inter_800ExtraBold',
     color: '#C026D3',
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   cstProgressBarBg: {
     height: 5,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 2.5,
     overflow: 'hidden',
   },
@@ -3762,8 +3763,8 @@ const styles = StyleSheet.create({
     minHeight: 140,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#1E1B2E',
-    marginVertical: 4,
+    borderColor: uiTheme.colors.elevated,
+    marginVertical: uiTheme.spacing.xs,
   },
   simAvatarWrapper: {
     position: 'relative',
@@ -3772,7 +3773,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -3783,23 +3784,23 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 4.5,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
     borderWidth: 1.5,
-    borderColor: '#0D0B14',
+    borderColor: uiTheme.colors.background,
   },
-  simMatchName: {
+  simMatchName: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   simDateSeparator: {
     alignItems: 'center',
-    marginVertical: 4,
+    marginVertical: uiTheme.spacing.xs,
   },
-  simDateSeparatorText: {
-    color: '#716E89',
-    fontSize: 10,
-    fontWeight: '800',
+  simDateSeparatorText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.8,
   },
   simMatchRow: {
@@ -3813,13 +3814,13 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 2,
   },
   simBubble: {
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 9,
     borderRadius: 14,
     maxWidth: '85%',
@@ -3831,16 +3832,16 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 3,
   },
   simBubbleUser: {
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     alignSelf: 'flex-end',
     borderBottomRightRadius: 3,
   },
-  simBubbleTextMatch: {
+  simBubbleTextMatch: { fontFamily: 'Inter_400Regular',
     color: '#FFF',
     fontSize: 12.5,
     lineHeight: 17,
   },
-  simBubbleTextUser: {
+  simBubbleTextUser: { fontFamily: 'Inter_400Regular',
     color: '#FFF',
     fontSize: 12.5,
     lineHeight: 17,
@@ -3849,158 +3850,158 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: uiTheme.spacing.xs,
   },
   cstSaveInlinePill: {
-    backgroundColor: '#161424',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.input,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: uiTheme.spacing.xs,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
-  cstSaveInlinePillText: {
-    color: '#FE3C72',
-    fontSize: 11,
-    fontWeight: '700',
+  cstSaveInlinePillText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   cstProfilesBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     backgroundColor: 'rgba(192, 38, 211, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderRadius: uiTheme.radius.input,
+    paddingHorizontal: uiTheme.spacing.sm,
+    paddingVertical: uiTheme.spacing.xs,
     borderWidth: 1,
     borderColor: 'rgba(192, 38, 211, 0.25)',
     marginRight: 6,
   },
-  cstProfilesBtnText: {
+  cstProfilesBtnText: { fontFamily: 'Inter_700Bold',
     color: '#C026D3',
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   simLangPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     backgroundColor: 'rgba(254, 60, 114, 0.1)',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: uiTheme.spacing.xs,
     borderWidth: 1,
     borderColor: 'rgba(254, 60, 114, 0.25)',
   },
-  simLangPillText: {
-    color: '#FE3C72',
-    fontSize: 11,
-    fontWeight: '700',
+  simLangPillText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   simInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
-  simTextInput: {
+  simTextInput: { fontFamily: 'Inter_400Regular',
     flex: 1,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     color: '#FFF',
     fontSize: 12.5,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
     height: 42,
   },
   simTextInputShaking: {
-    borderColor: '#F59E0B',
+    borderColor: uiTheme.colors.warning,
     borderWidth: 1.5,
     backgroundColor: 'rgba(245, 158, 11, 0.05)',
   },
-  simInputWarningText: {
-    color: '#F59E0B',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 4,
+  simInputWarningText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.warning,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
+    marginTop: uiTheme.spacing.xs,
     marginLeft: 6,
   },
   simSendBtn: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     borderRadius: 21,
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
   // CST Insights (Completion Screen)
   cstInsightsContainer: {
-    paddingVertical: 4,
+    paddingVertical: uiTheme.spacing.xs,
   },
   cstInsightsHeader: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   cstBadgeSuccess: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 8,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.25)',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
-  cstBadgeSuccessText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontWeight: '800',
+  cstBadgeSuccessText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  cstInsightsTitle: {
+  cstInsightsTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
     fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 4,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.xs,
   },
-  cstInsightsSub: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
+  cstInsightsSub: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     textAlign: 'center',
     lineHeight: 16,
     paddingHorizontal: 10,
   },
   cstMetricGrid: {
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   cstMetricCard: {
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
     borderColor: '#221E33',
   },
-  cstMetricTitle: {
-    color: '#E0DFEC',
-    fontSize: 12,
-    fontWeight: '700',
+  cstMetricTitle: { fontFamily: 'Manrope_700Bold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  cstMetricValue: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
+  cstMetricValue: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 3,
-    marginLeft: 20,
+    marginLeft: uiTheme.spacing.xl,
   },
   cstRestartBtn: {
-    width: 26,
-    height: 26,
+    width: 44,
+    height: 44,
     borderRadius: 6,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -4009,20 +4010,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   cstTraitChip: {
-    backgroundColor: '#161424',
-    paddingHorizontal: 8,
+    backgroundColor: uiTheme.colors.surface,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 3.5,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
-  cstTraitChipText: {
-    color: '#D8D6E8',
-    fontSize: 11,
-    fontWeight: '600',
+  cstTraitChipText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   cstTrainAnotherBtn: {
     backgroundColor: '#9333EA',
@@ -4033,66 +4034,66 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  cstTrainAnotherBtnText: {
+  cstTrainAnotherBtnText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   cstSecondaryBtn: {
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
-    borderColor: '#26223B',
-    backgroundColor: '#161424',
+    borderColor: uiTheme.colors.elevated,
+    backgroundColor: uiTheme.colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  cstSecondaryBtnText: {
-    color: '#E0DFEC',
-    fontSize: 12,
-    fontWeight: '700',
+  cstSecondaryBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   simSystemHint: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    marginVertical: 4,
+    marginVertical: uiTheme.spacing.xs,
     borderWidth: 1,
     borderColor: 'rgba(245, 158, 11, 0.25)',
     alignSelf: 'center',
     maxWidth: '92%',
   },
-  simSystemHintText: {
-    color: '#F59E0B',
-    fontSize: 11,
+  simSystemHintText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.warning,
+    fontSize: uiTheme.type.caption.fontSize,
     fontStyle: 'italic',
     flex: 1,
     lineHeight: 15,
   },
   cstFinishBanner: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderWidth: 1,
     borderColor: '#9333EA',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     padding: 14,
     alignItems: 'center',
-    marginVertical: 8,
+    marginVertical: uiTheme.spacing.sm,
   },
-  cstFinishTitle: {
+  cstFinishTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
-    fontSize: 15,
-    fontWeight: '800',
-    marginBottom: 4,
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.xs,
   },
-  cstFinishSub: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
+  cstFinishSub: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     textAlign: 'center',
     lineHeight: 16,
     marginBottom: 10,
@@ -4101,32 +4102,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#C026D3',
     paddingHorizontal: 18,
     paddingVertical: 9,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
   },
-  cstFinishBtnText: {
+  cstFinishBtnText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   cstAiSummaryWrap: {
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#221E33',
     padding: 10,
     marginBottom: 10,
   },
-  cstAiSummaryLabel: {
-    color: '#FE3C72',
-    fontSize: 11.5,
-    fontWeight: '800',
-    marginBottom: 4,
+  cstAiSummaryLabel: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  cstAiSummaryText: {
-    color: '#D8D6E8',
-    fontSize: 12,
+  cstAiSummaryText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 17,
   },
   cstDeleteBtn: {
@@ -4134,12 +4135,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
   },
-  cstDeleteBtnText: {
-    color: '#EF4444',
-    fontSize: 11.5,
-    fontWeight: '600',
+  cstDeleteBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.error,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ─── Simulator Language Picker Modal ───
@@ -4148,7 +4149,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: uiTheme.spacing.xl,
   },
   simLangModalContent: {
     width: '100%',
@@ -4156,8 +4157,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#120F1D',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#26223B',
-    padding: 16,
+    borderColor: uiTheme.colors.elevated,
+    padding: uiTheme.spacing.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
@@ -4168,22 +4169,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 12,
+    paddingBottom: uiTheme.spacing.md,
     borderBottomWidth: 1,
     borderColor: '#221E33',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
-  simLangModalTitle: {
+  simLangModalTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
   simLangModalOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     borderRadius: 10,
     marginVertical: 2,
   },
@@ -4192,18 +4193,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(254, 60, 114, 0.3)',
   },
-  simLangModalOptionText: {
-    color: '#D8D6E8',
+  simLangModalOptionText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   // ─── Contact Section & Move Off App (Desktop V2 Parity) ───
   contactSection: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
     borderColor: '#221E33',
-    padding: 12,
+    padding: uiTheme.spacing.md,
     marginTop: 10,
   },
   contactHeader: {
@@ -4212,46 +4213,46 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 2,
   },
-  contactHeaderTitle: {
+  contactHeaderTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginVertical: 4,
+    gap: uiTheme.spacing.sm,
+    marginVertical: uiTheme.spacing.xs,
   },
-  contactRowLabel: {
-    color: '#D8D6E8',
-    fontSize: 12,
-    fontWeight: '600',
+  contactRowLabel: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     width: 68,
   },
-  contactInput: {
+  contactInput: { fontFamily: 'Inter_400Regular',
     flex: 1,
-    backgroundColor: '#161424',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     color: '#FFF',
-    fontSize: 12,
-    paddingHorizontal: 8,
+    fontSize: uiTheme.type.caption.fontSize,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 6,
     height: 36,
   },
   handleStatRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     marginLeft: 30,
     marginTop: -2,
     marginBottom: 6,
   },
-  handleStatText: {
-    color: '#716E89',
-    fontSize: 10.5,
+  handleStatText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
   },
   genderSelector: {
     flexDirection: 'row',
@@ -4264,43 +4265,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 7,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
   genderBtnActive: {
-    backgroundColor: '#FE3C72',
-    borderColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
+    borderColor: uiTheme.colors.primary,
   },
-  genderBtnText: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
-    fontWeight: '600',
+  genderBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  genderBtnTextActive: {
+  genderBtnTextActive: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFF',
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
-  helperNote: {
-    color: '#716E89',
-    fontSize: 11,
+  helperNote: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 15,
-    marginTop: 4,
+    marginTop: uiTheme.spacing.xs,
   },
 
   // ─── AI Active Time (Desktop V2 Parity) ───
-  atHeaderRangeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#8E8DA3',
+  atHeaderRangeText: { fontFamily: 'Inter_600SemiBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
+    color: uiTheme.colors.muted,
   },
   timelineWrap: {
     marginTop: 10,
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
   },
   timelineBg: {
     height: 8,
-    backgroundColor: '#1E1B2E',
+    backgroundColor: uiTheme.colors.elevated,
     borderRadius: 4,
     overflow: 'hidden',
     position: 'relative',
@@ -4309,19 +4310,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
     borderRadius: 4,
   },
   timelineMarkers: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: uiTheme.spacing.xs,
     paddingHorizontal: 2,
   },
-  timelineMarkerText: {
+  timelineMarkerText: { fontFamily: 'Inter_600SemiBold',
     color: '#65637D',
-    fontSize: 9.5,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ─── Desktop V2 Toast Banner ───
@@ -4329,21 +4330,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     backgroundColor: '#064E3B',
-    borderColor: '#10B981',
+    borderColor: uiTheme.colors.success,
     borderWidth: 1,
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
     marginHorizontal: 14,
     marginTop: 10,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     zIndex: 99,
   },
-  toastBannerText: {
+  toastBannerText: { fontFamily: 'Inter_700Bold',
     color: '#ECFDF5',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   // ─── Desktop V2 Sticky Save Bar ───
@@ -4352,11 +4353,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderTopWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.35,
@@ -4368,7 +4369,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     height: 3,
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
@@ -4380,7 +4381,7 @@ const styles = StyleSheet.create({
   saveBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     flex: 1,
     marginRight: 10,
   },
@@ -4390,46 +4391,46 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   unsavedDot: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: uiTheme.colors.warning,
   },
   savedDot: {
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
   },
-  saveBarText: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '600',
+  saveBarText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  saveBarTextUnsaved: {
-    color: '#FE3C72',
-    fontWeight: '700',
+  saveBarTextUnsaved: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontWeight: 'normal',
   },
   saveBarActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   discardBtn: {
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
     paddingHorizontal: 13,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
-    borderColor: '#363252',
+    borderColor: uiTheme.colors.border,
     backgroundColor: 'transparent',
   },
-  discardBtnText: {
-    color: '#A19EBD',
+  discardBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.textSecondary,
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   saveChangesBtn: {
-    backgroundColor: '#FE3C72',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.primary,
+    paddingVertical: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.lg,
+    borderRadius: uiTheme.radius.small,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FE3C72',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
@@ -4440,22 +4441,22 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
   saveChangesBtnSuccess: {
-    backgroundColor: '#10B981',
-    shadowColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
+    shadowColor: uiTheme.colors.success,
   },
-  saveChangesBtnText: {
+  saveChangesBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   btnRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
   },
-  errorText: {
-    color: '#EF4444',
-    fontSize: 11,
+  errorText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.error,
+    fontSize: uiTheme.type.caption.fontSize,
     textAlign: 'center',
     marginBottom: 6,
   },
@@ -4466,11 +4467,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#0E0C18',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     marginTop: 10,
   },
   swipingLocationLeft: {
@@ -4480,20 +4481,20 @@ const styles = StyleSheet.create({
   swipingLocationTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
+    gap: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.xs,
   },
-  swipingLocationTitle: {
-    color: '#8E8DA3',
-    fontSize: 11,
-    fontWeight: '700',
+  swipingLocationTitle: { fontFamily: 'Manrope_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   swipingLocationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -4508,38 +4509,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(254, 60, 114, 0.22)',
   },
-  swipingLocationBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
+  swipingLocationBadgeText: { fontFamily: 'Inter_800ExtraBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.5,
   },
   swipingLocationCityRow: {
     marginTop: 2,
   },
-  swipingLocationCityText: {
+  swipingLocationCityText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
-  swipingLocationSub: {
+  swipingLocationSub: { fontFamily: 'Inter_400Regular',
     color: '#65637D',
-    fontSize: 11,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 2,
   },
   swipingLocationActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     backgroundColor: 'rgba(254, 60, 114, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(254, 60, 114, 0.25)',
   },
-  swipingLocationActionText: {
-    color: '#FE3C72',
-    fontSize: 12,
-    fontWeight: '700',
+  swipingLocationActionText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 });

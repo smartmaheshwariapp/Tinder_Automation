@@ -1,3 +1,5 @@
+import DialogContent from './common/DialogContent';
+import { theme as uiTheme } from '../theme';
 // mobile-app/src/components/ExternalRedirectModal.js
 // Production-Grade External App Redirect Confirmation Modal with "Remember Preference"
 
@@ -53,7 +55,7 @@ export default function ExternalRedirectModal({
   // Determine primary destination
   let primaryApp = 'Tinder';
   let primaryIcon = 'heart-outline';
-  let primaryColor = '#FE3C72';
+  let primaryColor = uiTheme.colors.primary;
   let headline = `Open Tinder?`;
   let description = `You are about to leave FlirtEasy and open ${matchName}'s conversation in the Tinder app.`;
 
@@ -119,13 +121,13 @@ export default function ExternalRedirectModal({
       statusBarTranslucent
     >
       <View style={styles.backdrop}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.dismissArea}
           activeOpacity={1}
           onPress={onClose}
         />
 
-        <View style={styles.modalCard}>
+        <DialogContent style={styles.modalCard}>
           {/* Top App Icon Badge */}
           <View
             style={[
@@ -141,7 +143,7 @@ export default function ExternalRedirectModal({
           <Text style={styles.descText}>{description}</Text>
 
           {/* "Remember my choice" Toggle Checkbox */}
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.checkboxRow}
             onPress={() => {
               setRememberChoice(!rememberChoice);
@@ -163,7 +165,7 @@ export default function ExternalRedirectModal({
           </TouchableOpacity>
 
           {/* Primary Action Button */}
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.primaryBtn, { backgroundColor: primaryColor }]}
             onPress={handleLaunchPrimary}
             activeOpacity={0.85}
@@ -174,18 +176,18 @@ export default function ExternalRedirectModal({
 
           {/* Secondary Action Options */}
           {phone && primaryApp !== 'Tinder' && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.secondaryOptionBtn}
               onPress={() => handleLaunchSecondary('Tinder')}
               activeOpacity={0.8}
             >
-              <Ionicons name="flame-outline" size={15} color="#FE3C72" />
+              <Ionicons name="flame-outline" size={15} color={uiTheme.colors.primary} />
               <Text style={styles.secondaryOptionText}>Open in Tinder Instead</Text>
             </TouchableOpacity>
           )}
 
           {phone && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.copyOptionBtn}
               onPress={handleCopy}
               activeOpacity={0.8}
@@ -193,23 +195,23 @@ export default function ExternalRedirectModal({
               <Ionicons
                 name={copied ? 'checkmark-circle-outline' : 'copy-outline'}
                 size={14}
-                color={copied ? '#10B981' : '#A4A2B8'}
+                color={copied ? uiTheme.colors.success : '#A4A2B8'}
               />
-              <Text style={[styles.copyOptionText, copied && { color: '#10B981' }]}>
+              <Text style={[styles.copyOptionText, copied && { color: uiTheme.colors.success }]}>
                 {copied ? 'Copied to Clipboard' : `Copy ${phone}`}
               </Text>
             </TouchableOpacity>
           )}
 
           {/* Cancel Button */}
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.cancelBtn}
             onPress={onClose}
             activeOpacity={0.8}
           >
             <Text style={styles.cancelBtnText}>Stay in App</Text>
           </TouchableOpacity>
-        </View>
+        </DialogContent>
       </View>
     </Modal>
   );
@@ -221,7 +223,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.78)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: uiTheme.spacing.xxl,
   },
   dismissArea: {
     ...StyleSheet.absoluteFillObject,
@@ -230,7 +232,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     backgroundColor: '#12101D',
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     padding: 22,
@@ -244,25 +246,25 @@ const styles = StyleSheet.create({
   iconBadge: {
     width: 60,
     height: 60,
-    borderRadius: 20,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
-  titleText: {
+  titleText: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 19,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.3,
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
     textAlign: 'center',
   },
-  descText: {
-    color: '#8E8DA3',
+  descText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 13,
     lineHeight: 18.5,
-    fontWeight: '400',
+    fontWeight: 'normal',
     textAlign: 'center',
     marginBottom: 18,
   },
@@ -271,12 +273,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'stretch',
     backgroundColor: '#181628',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 10,
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
     gap: 10,
   },
   checkboxBox: {
@@ -288,26 +290,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxLabel: {
-    color: '#D8D6E8',
+  checkboxLabel: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
     flex: 1,
   },
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     alignSelf: 'stretch',
     borderRadius: 14,
     paddingVertical: 13,
     marginBottom: 10,
   },
-  primaryBtnText: {
+  primaryBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   secondaryOptionBtn: {
     flexDirection: 'row',
@@ -316,16 +318,16 @@ const styles = StyleSheet.create({
     gap: 6,
     alignSelf: 'stretch',
     backgroundColor: '#1A182B',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     paddingVertical: 10,
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
-  secondaryOptionText: {
-    color: '#D8D6E8',
+  secondaryOptionText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   copyOptionBtn: {
     flexDirection: 'row',
@@ -335,18 +337,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     marginBottom: 6,
   },
-  copyOptionText: {
+  copyOptionText: { fontFamily: 'Inter_600SemiBold',
     color: '#A4A2B8',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   cancelBtn: {
-    paddingVertical: 8,
-    marginTop: 4,
+    paddingVertical: uiTheme.spacing.sm,
+    marginTop: uiTheme.spacing.xs,
   },
-  cancelBtnText: {
+  cancelBtnText: { fontFamily: 'Inter_600SemiBold',
     color: '#6E6C80',
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
 });

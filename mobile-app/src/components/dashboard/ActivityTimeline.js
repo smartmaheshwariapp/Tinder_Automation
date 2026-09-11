@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/ActivityTimeline.js — Minimalist Apple-Style Live Timeline
 import React, { useRef, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
@@ -5,26 +6,26 @@ import { Ionicons } from '@expo/vector-icons';
 
 const EVENT_CONFIG = {
   opener_sent:      { icon: 'mail-outline',          label: 'Opener Sent',        color: '#EC4899' },
-  message_replied:  { icon: 'chatbubbles-outline',   label: 'Reply Sent',         color: '#818CF8' },
-  profile_liked:    { icon: 'heart',                 label: 'Profile Liked',      color: '#FE3C72' },
-  match_detected:   { icon: 'sparkles',              label: 'New Match',          color: '#F59E0B' },
-  handoff_detected: { icon: 'star',                  label: 'Match Moment',       color: '#10B981' },
-  cycle_complete:   { icon: 'checkmark-done',        label: 'Batch Completed',    color: '#10B981' },
-  persona_update:   { icon: 'options-outline',       label: 'Tone Calibrated',    color: '#818CF8' },
-  swipe_progress:   { icon: 'trending-up-outline',   label: 'Swiping Session',    color: '#FE3C72' },
+  message_replied:  { icon: 'chatbubbles-outline',   label: 'Reply Sent',         color: uiTheme.colors.info },
+  profile_liked:    { icon: 'heart',                 label: 'Profile Liked',      color: uiTheme.colors.primary },
+  match_detected:   { icon: 'sparkles',              label: 'New Match',          color: uiTheme.colors.warning },
+  handoff_detected: { icon: 'star',                  label: 'Match Moment',       color: uiTheme.colors.success },
+  cycle_complete:   { icon: 'checkmark-done',        label: 'Batch Completed',    color: uiTheme.colors.success },
+  persona_update:   { icon: 'options-outline',       label: 'Tone Calibrated',    color: uiTheme.colors.info },
+  swipe_progress:   { icon: 'trending-up-outline',   label: 'Swiping Session',    color: uiTheme.colors.primary },
   msg_progress:     { icon: 'chatbox-ellipses',      label: 'Messaging Queue',    color: '#EC4899' },
-  rate_limit:       { icon: 'shield-outline',        label: 'Safety Pace Active', color: '#EF4444' },
+  rate_limit:       { icon: 'shield-outline',        label: 'Safety Pace Active', color: uiTheme.colors.error },
   follow_up_sent:   { icon: 'paper-plane-outline',   label: 'Follow-Up Sent',     color: '#A78BFA' },
-  trial_limit:      { icon: 'flag-outline',          label: 'Trial Limit Active', color: '#716E89' },
-  trial_ended:      { icon: 'flag-outline',          label: 'Cycle Paused',       color: '#716E89' },
-  error:            { icon: 'alert-circle-outline',  label: 'Attention Needed',   color: '#EF4444' },
+  trial_limit:      { icon: 'flag-outline',          label: 'Trial Limit Active', color: uiTheme.colors.muted },
+  trial_ended:      { icon: 'flag-outline',          label: 'Cycle Paused',       color: uiTheme.colors.muted },
+  error:            { icon: 'alert-circle-outline',  label: 'Attention Needed',   color: uiTheme.colors.error },
   // Aliases from direct logs & webview events
-  like:             { icon: 'heart',                 label: 'Profile Liked',      color: '#FE3C72' },
-  match:            { icon: 'sparkles',              label: 'New Match',          color: '#F59E0B' },
-  message:          { icon: 'chatbubbles-outline',   label: 'Reply Sent',         color: '#818CF8' },
-  info:             { icon: 'options-outline',       label: 'Tone Calibrated',    color: '#818CF8' },
-  action:           { icon: 'trending-up-outline',   label: 'Swiping Session',    color: '#FE3C72' },
-  success:          { icon: 'sparkles',              label: 'Milestone',          color: '#10B981' },
+  like:             { icon: 'heart',                 label: 'Profile Liked',      color: uiTheme.colors.primary },
+  match:            { icon: 'sparkles',              label: 'New Match',          color: uiTheme.colors.warning },
+  message:          { icon: 'chatbubbles-outline',   label: 'Reply Sent',         color: uiTheme.colors.info },
+  info:             { icon: 'options-outline',       label: 'Tone Calibrated',    color: uiTheme.colors.info },
+  action:           { icon: 'trending-up-outline',   label: 'Swiping Session',    color: uiTheme.colors.primary },
+  success:          { icon: 'sparkles',              label: 'Milestone',          color: uiTheme.colors.success },
 };
 
 function formatTimeAgo(timestamp) {
@@ -129,7 +130,7 @@ function TimelineItem({ event, isLast }) {
       <View style={styles.timelineLeft}>
         <View style={[
           styles.nodeDot,
-          { backgroundColor: isMoment ? '#10B981' : config.color },
+          { backgroundColor: isMoment ? uiTheme.colors.success : config.color },
         ]} />
         {!isLast && <View style={styles.nodeLine} />}
       </View>
@@ -141,9 +142,9 @@ function TimelineItem({ event, isLast }) {
             <Ionicons
               name={isMoment ? 'star' : config.icon}
               size={12}
-              color={isMoment ? '#10B981' : config.color}
+              color={isMoment ? uiTheme.colors.success : config.color}
             />
-            <Text style={[styles.cardTitle, isMoment && { color: '#10B981' }]} numberOfLines={1}>
+            <Text style={[styles.cardTitle, isMoment && { color: uiTheme.colors.success }]} numberOfLines={1}>
               {title}
             </Text>
           </View>
@@ -198,7 +199,7 @@ export default function ActivityTimeline({ progressFeed }) {
           <Text style={styles.title}>Live Activity Feed</Text>
           {momentsCount > 0 && (
             <View style={styles.momentPill}>
-              <Ionicons name="star" size={10} color="#10B981" />
+              <Ionicons name="star" size={10} color={uiTheme.colors.success} />
               <Text style={styles.momentPillText}>{momentsCount} Leads</Text>
             </View>
           )}
@@ -211,7 +212,7 @@ export default function ActivityTimeline({ progressFeed }) {
 
       {events.length === 0 ? (
         <View style={styles.emptyWrap}>
-          <Ionicons name="sparkles-outline" size={22} color="#716E89" />
+          <Ionicons name="sparkles-outline" size={22} color={uiTheme.colors.muted} />
           <Text style={styles.emptyTitle}>Live Feed Ready</Text>
           <Text style={styles.emptyDesc}>
             Automated swipes, conversation openers, and match moments stream here in real time.
@@ -240,12 +241,12 @@ export default function ActivityTimeline({ progressFeed }) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#14121F',
-    borderRadius: 20,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 16,
-    marginBottom: 12,
+    padding: uiTheme.spacing.lg,
+    marginBottom: uiTheme.spacing.md,
   },
   header: {
     flexDirection: 'row',
@@ -256,11 +257,11 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
-  title: {
-    fontSize: 14,
-    fontWeight: '800',
+  title: { fontFamily: 'Manrope_800ExtraBold',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
     color: '#FFF',
     letterSpacing: -0.2,
   },
@@ -275,27 +276,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
-  momentPillText: {
-    color: '#10B981',
-    fontSize: 10,
-    fontWeight: '800',
+  momentPillText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  countText: {
-    color: '#716E89',
-    fontSize: 11,
-    fontWeight: '600',
+  countText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   scroll: {
     maxHeight: 280,
   },
   scrollContent: {
-    paddingTop: 4,
+    paddingTop: uiTheme.spacing.xs,
     paddingBottom: 10,
     paddingHorizontal: 2,
   },
   itemRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: uiTheme.spacing.md,
   },
   timelineLeft: {
     alignItems: 'center',
@@ -312,16 +313,16 @@ const styles = StyleSheet.create({
     flex: 1,
     width: 1.5,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginVertical: 4,
+    marginVertical: uiTheme.spacing.xs,
   },
   card: {
     flex: 1,
-    backgroundColor: '#0D0B14',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
     padding: 10,
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
   cardMoment: {
     borderColor: 'rgba(16, 185, 129, 0.35)',
@@ -339,20 +340,20 @@ const styles = StyleSheet.create({
     gap: 6,
     flex: 1,
   },
-  cardTitle: {
-    fontSize: 12,
-    fontWeight: '700',
+  cardTitle: { fontFamily: 'Manrope_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     color: '#FFF',
   },
-  cardTime: {
-    fontSize: 10.5,
-    color: '#716E89',
-    fontWeight: '600',
+  cardTime: { fontFamily: 'Inter_600SemiBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
+    fontWeight: 'normal',
     marginLeft: 6,
   },
-  cardDetail: {
-    fontSize: 11,
-    color: '#8E8DA3',
+  cardDetail: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
     marginTop: 2,
     lineHeight: 15,
   },
@@ -361,17 +362,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  emptyTitle: {
+  emptyTitle: { fontFamily: 'Manrope_700Bold',
     fontSize: 13.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     color: '#FFF',
-    marginTop: 4,
+    marginTop: uiTheme.spacing.xs,
   },
-  emptyDesc: {
-    fontSize: 11.5,
-    color: '#716E89',
+  emptyDesc: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
     textAlign: 'center',
     lineHeight: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: uiTheme.spacing.xl,
   },
 });

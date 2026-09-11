@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../theme';
 // mobile-app/src/components/InAppNotificationBanner.js
 // Modern iOS Dynamic Island / Glassmorphism Floating In-App Push Banner HUD
 import React, { useState, useEffect, useRef } from 'react';
@@ -177,7 +178,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
       ]}
       {...panResponder.panHandlers}
     >
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={styles.touchableCard}
         onPress={handleTap}
         activeOpacity={0.92}
@@ -186,7 +187,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
           colors={
             isGoal
               ? ['#261528', '#1A1020', '#130C18']
-              : ['#1E1A30', '#151322', '#100E1A']
+              : [uiTheme.colors.elevated, '#151322', '#100E1A']
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -199,7 +200,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
           <View style={styles.bannerHeader}>
             <View style={styles.bannerHeaderLeft}>
               <View style={[styles.appBadge, { backgroundColor: 'rgba(255, 255, 255, 0.08)' }]}>
-                <Ionicons name="shield-checkmark" size={10} color="#D8D6E8" />
+                <Ionicons name="shield-checkmark" size={10} color={uiTheme.colors.text} />
                 <Text style={styles.appBadgeText}>FLIRTEASY</Text>
               </View>
               <Text style={styles.timestampText}>Just now</Text>
@@ -211,7 +212,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
           {/* Main Content Row: Icon/Avatar + Text + Action */}
           <View style={styles.mainContentRow}>
             {/* Category Icon Badge */}
-            <View style={[styles.iconBadge, { backgroundColor: isGoal ? 'rgba(254, 60, 114, 0.15)' : 'rgba(255, 255, 255, 0.08)', borderColor: isGoal ? '#FE3C72' : 'rgba(255, 255, 255, 0.15)' }]}>
+            <View style={[styles.iconBadge, { backgroundColor: isGoal ? 'rgba(254, 60, 114, 0.15)' : 'rgba(255, 255, 255, 0.08)', borderColor: isGoal ? uiTheme.colors.primary : 'rgba(255, 255, 255, 0.15)' }]}>
               <Ionicons
                 name={
                   currentNotif.type === 'goal_unlocked'
@@ -225,7 +226,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
                     : 'notifications-outline'
                 }
                 size={18}
-                color={isGoal ? '#FE3C72' : '#FFFFFF'}
+                color={isGoal ? uiTheme.colors.primary : '#FFFFFF'}
               />
             </View>
 
@@ -243,7 +244,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
           {/* Action Chips Bar */}
           <View style={styles.actionsBar}>
             {phone ? (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.actionPill, copied && styles.actionPillSuccess]}
                 onPress={handleCopyPhone}
                 activeOpacity={0.8}
@@ -251,9 +252,9 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
                 <Ionicons
                   name={copied ? 'checkmark-circle-outline' : 'copy-outline'}
                   size={12}
-                  color={copied ? '#10B981' : '#FFFFFF'}
+                  color={copied ? uiTheme.colors.success : '#FFFFFF'}
                 />
-                <Text style={[styles.actionPillText, copied && { color: '#10B981' }]}>
+                <Text style={[styles.actionPillText, copied && { color: uiTheme.colors.success }]}>
                   {copied ? 'Copied to Clipboard' : `Copy ${phone}`}
                 </Text>
               </TouchableOpacity>
@@ -263,7 +264,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
 
             <View style={styles.actionPillSecondary}>
               <Text style={styles.actionPillSecondaryText}>Open Tinder</Text>
-              <Ionicons name="chevron-forward" size={11} color="#8E8DA3" />
+              <Ionicons name="chevron-forward" size={11} color={uiTheme.colors.muted} />
             </View>
           </View>
         </LinearGradient>
@@ -285,20 +286,20 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   touchableCard: {
-    borderRadius: 20,
+    borderRadius: uiTheme.radius.card,
     overflow: 'hidden',
   },
   bannerCard: {
-    borderRadius: 20,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1.2,
     borderColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: 14,
     paddingTop: 10,
-    paddingBottom: 12,
+    paddingBottom: uiTheme.spacing.md,
   },
   bannerCardGoal: {
     borderColor: 'rgba(254, 60, 114, 0.5)',
-    shadowColor: '#FE3C72',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: 20,
@@ -307,30 +308,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
   bannerHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   appBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    borderRadius: 12,
-    paddingHorizontal: 8,
+    gap: uiTheme.spacing.xs,
+    borderRadius: uiTheme.radius.input,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 2,
   },
-  appBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '900',
+  appBadgeText: { fontFamily: 'Inter_800ExtraBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.8,
   },
-  timestampText: {
-    color: '#716E89',
-    fontSize: 9.5,
-    fontWeight: '700',
+  timestampText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.4,
   },
   topHandleBar: {
@@ -342,7 +343,7 @@ const styles = StyleSheet.create({
   mainContentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: uiTheme.spacing.md,
   },
   iconBadge: {
     width: 40,
@@ -359,25 +360,25 @@ const styles = StyleSheet.create({
   textContainer: {
     flex: 1,
   },
-  titleText: {
+  titleText: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.2,
     marginBottom: 2,
   },
-  bodyText: {
-    color: '#D8D6E8',
-    fontSize: 12,
+  bodyText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 16.5,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
   actionsBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 10,
-    paddingTop: 8,
+    paddingTop: uiTheme.spacing.sm,
     borderTopWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
   },
@@ -390,25 +391,25 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(254, 60, 114, 0.3)',
     borderRadius: 14,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: uiTheme.spacing.xs,
   },
   actionPillSuccess: {
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
     borderColor: 'rgba(16, 185, 129, 0.4)',
   },
-  actionPillText: {
-    color: '#FE3C72',
-    fontSize: 11,
-    fontWeight: '700',
+  actionPillText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   actionPillSecondary: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
   },
-  actionPillSecondaryText: {
-    color: '#8E8DA3',
-    fontSize: 10.5,
-    fontWeight: '600',
+  actionPillSecondaryText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 });

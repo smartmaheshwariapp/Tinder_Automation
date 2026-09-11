@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/DashboardPanel.js — Apple iOS-Grade Root Dashboard Panel
 import React, { useState, useCallback } from 'react';
 import {
@@ -19,14 +20,10 @@ import FloatingSaveBar from './FloatingSaveBar';
 import useExtensionSettings from '../../hooks/useExtensionSettings';
 import { resolveLocalUrl } from '../../utils/network';
 import { getProgressFeed } from '../../utils/sessionManager';
+import FeedbackState from '../common/FeedbackState';
 
 function LoadingState() {
-  return (
-    <View style={styles.loadingWrap}>
-      <ActivityIndicator size="small" color="#FE3C72" />
-      <Text style={styles.loadingText}>Syncing assistant data…</Text>
-    </View>
-  );
+  return <FeedbackState kind="loading" title="Connecting your assistant" message="Your latest activity will appear here shortly." />;
 }
 
 export default function DashboardPanel({
@@ -79,9 +76,10 @@ export default function DashboardPanel({
     saveSuccess: v2SaveSuccess,
     error: v2Error,
     saveSettings: handleSaveV2Settings,
-  } = useExtensionSettings(effectiveOrchestratorUrl);
+  } = useExtensionSettings(onSaveSettings ? null : effectiveOrchestratorUrl);
 
   const [localSaving, setLocalSaving] = useState(false);
+  const [localError, setLocalError] = useState(null);
   const [localSaveSuccess, setLocalSaveSuccess] = useState(false);
   const [localSettings, setLocalSettings] = useState(null);
 
@@ -90,6 +88,7 @@ export default function DashboardPanel({
   const handleSave = useCallback(async (updated) => {
     if (onSaveSettings) {
       setLocalSaving(true);
+      setLocalError(null);
       try {
         const success = await onSaveSettings(updated);
         if (success !== false) {
@@ -98,6 +97,10 @@ export default function DashboardPanel({
           setTimeout(() => setLocalSaveSuccess(false), 3000);
           return true;
         }
+        setLocalError('Your settings could not be saved. Please try again.');
+        return false;
+      } catch (_) {
+        setLocalError('Your settings could not be saved. Please try again.');
         return false;
       } finally {
         setLocalSaving(false);
@@ -138,6 +141,8 @@ export default function DashboardPanel({
     <View style={styles.panel}>
       {/* ── Scrollable Dashboard Content ── */}
       <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -164,12 +169,7 @@ export default function DashboardPanel({
           ) : (
             <View>
               {error && !stats && (
-                <View style={styles.errorBanner}>
-                  <Ionicons name="alert-circle-outline" size={15} color="#EF4444" />
-                  <Text style={styles.errorText}>
-                    Connecting to cloud assistant…
-                  </Text>
-                </View>
+                <FeedbackState kind="error" title="Assistant unavailable" message="Check your connection, then reconnect to your Tinder session." actionLabel="Reconnect" onAction={onConnect} />
               )}
 
               <ActivityTimeline progressFeed={progressFeed} />
@@ -183,7 +183,7 @@ export default function DashboardPanel({
             loading={onSaveSettings ? false : v2Loading}
             saving={onSaveSettings ? localSaving : v2Saving}
             saveSuccess={onSaveSettings ? localSaveSuccess : v2SaveSuccess}
-            error={onSaveSettings ? null : v2Error}
+            error={onSaveSettings ? localError : v2Error}
             onSave={handleSave}
             onDirtyChange={handleDirtyChange}
             onNavigateToSettings={handleNavigateToSettings}
@@ -196,7 +196,7 @@ export default function DashboardPanel({
             loading={onSaveSettings ? false : v2Loading}
             saving={onSaveSettings ? localSaving : v2Saving}
             saveSuccess={onSaveSettings ? localSaveSuccess : v2SaveSuccess}
-            error={onSaveSettings ? null : v2Error}
+            error={onSaveSettings ? localError : v2Error}
             onSave={handleSave}
             onDirtyChange={handleDirtyChange}
             onLogout={onLogout}
@@ -217,7 +217,7 @@ export default function DashboardPanel({
         visible={dirtyState.isDirty}
         saving={onSaveSettings ? localSaving : v2Saving}
         saveSuccess={onSaveSettings ? localSaveSuccess : v2SaveSuccess}
-        error={onSaveSettings ? null : v2Error}
+        error={onSaveSettings ? localError : v2Error}
         onSave={handleGlobalSave}
         onDiscard={handleGlobalDiscard}
       />
@@ -228,38 +228,38 @@ export default function DashboardPanel({
 const styles = StyleSheet.create({
   panel: {
     flex: 1,
-    backgroundColor: '#09080E',
+    backgroundColor: uiTheme.colors.background,
     position: 'relative',
   },
-  scrollContent: {
+  scrollContent: { width: '100%', maxWidth: 760, alignSelf: 'center',
     paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingTop: uiTheme.spacing.md,
     paddingBottom: 90, // Extra breathing space so content isn't covered by floating save bar
   },
   loadingWrap: {
     paddingVertical: 36,
     alignItems: 'center',
   },
-  loadingText: {
-    color: '#8E8DA3',
+  loadingText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
     marginTop: 10,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.25)',
-    padding: 12,
-    marginBottom: 12,
+    padding: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.md,
   },
-  errorText: {
-    color: '#EF4444',
-    fontSize: 12,
-    fontWeight: '600',
+  errorText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.error,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 });
