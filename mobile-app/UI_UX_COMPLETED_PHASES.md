@@ -112,3 +112,28 @@ Copy this template only after the full phase satisfies its requirements. Replace
 - Bundled seven static font weights, loading before main UI; font-loading errors no longer block startup indefinitely.
 - Preserved existing layouts, colors, icon fonts and diagnostic monospace text.
 - Android and iOS bundle validation passed; visual checks on a device remain pending.
+
+### App Settings tab (2026-09-11)
+
+- Added an accessible gear tab to HomeBottomNavigation and routed the header account shortcut to the same dedicated page.
+- Built AppSettings with shared theme and typography, grouped account/session, location, notifications/permissions, and app/connection sections; responsive centered content, safe-area bottom clearance, accessible actions and location loading feedback.
+- Connected actions to existing Tinder/session, automation, location refresh, inbox and advanced preferences flows. Device permissions opens native app settings with error handling. Profile and app version use existing data; appearance is informational.
+- Validation: Android/iOS exports passed; 7 regression suites / 83 tests passed; targeted diff whitespace check passed. Device visual and interaction checks remain pending.
+- This completes the requested settings-page implementation; broader master-prompt phases remain at their existing completion status.
+
+### Profile details and settings (2026-09-11)
+
+- Header account icon now opens a dedicated ProfileDetails page, separate from App Settings.
+- Shows synced Tinder details, profile photo with fallback, available account email, connection state, refresh feedback, and an Open/Edit on Tinder action.
+- Added an editable assistant bio source and custom bio modal using the existing settings save handler. Includes validation, loading/error/success feedback, keyboard avoidance and discard confirmation. Public Tinder edits remain in Tinder; this distinction is explained in the page.
+- Android/iOS export and 83 existing regression tests passed. Device visual/keyboard checks remain pending.
+
+### Standard profile layout (2026-09-11)
+- Reorganized profile into centered avatar/name/email, Edit Profile action, personal information and About Me, followed by connected account and assistant preferences.
+- Added editable Flint name, city, profession, education and bio saved as accountProfile through existing settings persistence. Kept email read-only and Tinder data separate. Editor retains validation, cancellation protection and keyboard handling.
+- Android/iOS export and 83 regression tests passed. Device rendering remains unverified.
+
+### Modern profile redesign (2026-09-11)
+- Replaced stacked information cards with a gradient identity header, prominent edit action, editorial About You section, and grouped icon settings rows.
+- Preserved profile editing, email display, connected account actions, assistant bio editing and syncing. Synced details expand on demand; removed city/profession/education remain absent.
+- Added initials fallback, connection status, compact interests, and responsive 600px maximum content width. Android/iOS export passed; device visual verification remains pending.

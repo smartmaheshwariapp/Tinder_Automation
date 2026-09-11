@@ -1120,3 +1120,9 @@ Do not commit or push any changes unless explicitly instructed.
 
 
 - Typography task completed (2026-09-11): Manrope headings and Inter body/control text applied throughout native screens. Device font-scale/visual checks remain pending; broader phase completion unchanged.
+
+- App Settings task completed (2026-09-11): new gear navigation tab and themed settings page wired to existing app actions. Android/iOS export and 83 regression tests passed; device visual/accessibility checks remain pending.
+
+- Profile page task completed (2026-09-11): account icon opens profile details and editable assistant bio settings, separate from App Settings. Device UI verification remains pending.
+- Standard profile refinement completed: personal-details editor and conventional profile hierarchy added; device visual checks remain pending.
+- Modern profile visual refinement completed: compact identity card, grouped settings rows and expandable synced details. Device review remains pending.
