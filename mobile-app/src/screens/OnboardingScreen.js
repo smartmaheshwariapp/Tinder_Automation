@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../theme';
 // src/screens/OnboardingScreen.js — 6-Step Onboarding matching Desktop Plugin
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -54,7 +55,7 @@ const safeHaptic = (type) => {
     else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     else if (type === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-  } catch (_) {}
+  } catch (_) { }
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -72,7 +73,7 @@ const PREVIEW_PROFILES = [
     tags: [
       { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
       { icon: 'shield-checkmark-outline', label: 'Verified profile', color: '#00E676' },
-      { icon: 'time-outline', label: 'Natural timing', color: '#FFAA80' },
+      { icon: 'time-outline', label: 'Natural timing', color: uiTheme.colors.secondary },
     ],
   },
   {
@@ -85,7 +86,7 @@ const PREVIEW_PROFILES = [
     tags: [
       { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
       { icon: 'shield-checkmark-outline', label: 'Verified profile', color: '#00E676' },
-      { icon: 'sparkles-outline', label: 'Active now', color: '#FFAA80' },
+      { icon: 'sparkles-outline', label: 'Active now', color: uiTheme.colors.secondary },
     ],
   },
   {
@@ -98,7 +99,7 @@ const PREVIEW_PROFILES = [
     tags: [
       { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
       { icon: 'shield-checkmark-outline', label: 'Verified profile', color: '#00E676' },
-      { icon: 'time-outline', label: 'Natural timing', color: '#FFAA80' },
+      { icon: 'time-outline', label: 'Natural timing', color: uiTheme.colors.secondary },
     ],
   },
 ];
@@ -345,152 +346,152 @@ const getTrendyLanguagesForCountry = (countryName) => {
 };
 
 const DIAL_CODES = [
-  { code: 'AF', dial: '+93',  name: 'Afghanistan',            len: [9,  9]  },
-  { code: 'AL', dial: '+355', name: 'Albania',                len: [9,  9]  },
-  { code: 'DZ', dial: '+213', name: 'Algeria',                len: [9,  9]  },
-  { code: 'AR', dial: '+54',  name: 'Argentina',              len: [10, 10] },
-  { code: 'AM', dial: '+374', name: 'Armenia',                len: [8,  8]  },
-  { code: 'AU', dial: '+61',  name: 'Australia',              len: [9,  9]  },
-  { code: 'AT', dial: '+43',  name: 'Austria',                len: [10, 11] },
-  { code: 'AZ', dial: '+994', name: 'Azerbaijan',             len: [9,  9]  },
-  { code: 'BD', dial: '+880', name: 'Bangladesh',             len: [10, 10] },
-  { code: 'BY', dial: '+375', name: 'Belarus',                len: [9,  9]  },
-  { code: 'BE', dial: '+32',  name: 'Belgium',                len: [9,  9]  },
-  { code: 'BO', dial: '+591', name: 'Bolivia',                len: [8,  8]  },
-  { code: 'BA', dial: '+387', name: 'Bosnia and Herzegovina', len: [8,  8]  },
-  { code: 'BR', dial: '+55',  name: 'Brazil',                 len: [10, 11] },
-  { code: 'BG', dial: '+359', name: 'Bulgaria',               len: [9,  9]  },
-  { code: 'KH', dial: '+855', name: 'Cambodia',               len: [8,  9]  },
-  { code: 'CA', dial: '+1',   name: 'Canada',                 len: [10, 10] },
-  { code: 'CL', dial: '+56',  name: 'Chile',                  len: [9,  9]  },
-  { code: 'CN', dial: '+86',  name: 'China',                  len: [11, 11] },
-  { code: 'CO', dial: '+57',  name: 'Colombia',               len: [10, 10] },
-  { code: 'HR', dial: '+385', name: 'Croatia',                len: [8,  9]  },
-  { code: 'CZ', dial: '+420', name: 'Czech Republic',         len: [9,  9]  },
-  { code: 'DK', dial: '+45',  name: 'Denmark',                len: [8,  8]  },
-  { code: 'EC', dial: '+593', name: 'Ecuador',                len: [9,  9]  },
-  { code: 'EG', dial: '+20',  name: 'Egypt',                  len: [10, 10] },
-  { code: 'EE', dial: '+372', name: 'Estonia',                len: [7,  8]  },
-  { code: 'ET', dial: '+251', name: 'Ethiopia',               len: [9,  9]  },
-  { code: 'FI', dial: '+358', name: 'Finland',                len: [9,  10] },
-  { code: 'FR', dial: '+33',  name: 'France',                 len: [9,  9]  },
-  { code: 'GE', dial: '+995', name: 'Georgia',                len: [9,  9]  },
-  { code: 'DE', dial: '+49',  name: 'Germany',                len: [10, 11] },
-  { code: 'GH', dial: '+233', name: 'Ghana',                  len: [9,  9]  },
-  { code: 'GR', dial: '+30',  name: 'Greece',                 len: [10, 10] },
-  { code: 'GT', dial: '+502', name: 'Guatemala',              len: [8,  8]  },
-  { code: 'HU', dial: '+36',  name: 'Hungary',                len: [9,  9]  },
-  { code: 'IN', dial: '+91',  name: 'India',                  len: [10, 10] },
-  { code: 'ID', dial: '+62',  name: 'Indonesia',              len: [9,  12] },
-  { code: 'IR', dial: '+98',  name: 'Iran',                   len: [10, 10] },
-  { code: 'IQ', dial: '+964', name: 'Iraq',                   len: [10, 10] },
-  { code: 'IE', dial: '+353', name: 'Ireland',                len: [9,  9]  },
-  { code: 'IL', dial: '+972', name: 'Israel',                 len: [9,  9]  },
-  { code: 'IT', dial: '+39',  name: 'Italy',                  len: [9,  10] },
-  { code: 'JP', dial: '+81',  name: 'Japan',                  len: [10, 10] },
-  { code: 'JO', dial: '+962', name: 'Jordan',                 len: [9,  9]  },
-  { code: 'KZ', dial: '+7',   name: 'Kazakhstan',             len: [10, 10] },
-  { code: 'KE', dial: '+254', name: 'Kenya',                  len: [9,  9]  },
-  { code: 'XK', dial: '+383', name: 'Kosovo',                 len: [8,  8]  },
-  { code: 'KW', dial: '+965', name: 'Kuwait',                 len: [8,  8]  },
-  { code: 'LV', dial: '+371', name: 'Latvia',                 len: [8,  8]  },
-  { code: 'LB', dial: '+961', name: 'Lebanon',                len: [7,  8]  },
-  { code: 'LY', dial: '+218', name: 'Libya',                  len: [9,  9]  },
-  { code: 'LT', dial: '+370', name: 'Lithuania',              len: [8,  8]  },
-  { code: 'MY', dial: '+60',  name: 'Malaysia',               len: [9,  10] },
-  { code: 'MX', dial: '+52',  name: 'Mexico',                 len: [10, 10] },
-  { code: 'MD', dial: '+373', name: 'Moldova',                len: [8,  8]  },
-  { code: 'MN', dial: '+976', name: 'Mongolia',               len: [8,  8]  },
-  { code: 'MA', dial: '+212', name: 'Morocco',                len: [9,  9]  },
-  { code: 'NL', dial: '+31',  name: 'Netherlands',            len: [9,  9]  },
-  { code: 'NZ', dial: '+64',  name: 'New Zealand',            len: [8,  9]  },
-  { code: 'NG', dial: '+234', name: 'Nigeria',                len: [10, 10] },
-  { code: 'MK', dial: '+389', name: 'North Macedonia',        len: [8,  8]  },
-  { code: 'NO', dial: '+47',  name: 'Norway',                 len: [8,  8]  },
-  { code: 'PK', dial: '+92',  name: 'Pakistan',               len: [10, 10] },
-  { code: 'PY', dial: '+595', name: 'Paraguay',               len: [9,  9]  },
-  { code: 'PE', dial: '+51',  name: 'Peru',                   len: [9,  9]  },
-  { code: 'PH', dial: '+63',  name: 'Philippines',            len: [10, 10] },
-  { code: 'PL', dial: '+48',  name: 'Poland',                 len: [9,  9]  },
-  { code: 'PT', dial: '+351', name: 'Portugal',               len: [9,  9]  },
-  { code: 'QA', dial: '+974', name: 'Qatar',                  len: [8,  8]  },
-  { code: 'RO', dial: '+40',  name: 'Romania',                len: [9,  9]  },
-  { code: 'RU', dial: '+7',   name: 'Russia',                 len: [10, 10] },
-  { code: 'SA', dial: '+966', name: 'Saudi Arabia',           len: [9,  9]  },
-  { code: 'RS', dial: '+381', name: 'Serbia',                 len: [8,  9]  },
-  { code: 'SK', dial: '+421', name: 'Slovakia',               len: [9,  9]  },
-  { code: 'SI', dial: '+386', name: 'Slovenia',               len: [8,  8]  },
-  { code: 'ZA', dial: '+27',  name: 'South Africa',           len: [9,  9]  },
-  { code: 'KR', dial: '+82',  name: 'South Korea',            len: [9,  10] },
-  { code: 'ES', dial: '+34',  name: 'Spain',                  len: [9,  9]  },
-  { code: 'LK', dial: '+94',  name: 'Sri Lanka',              len: [9,  9]  },
-  { code: 'SE', dial: '+46',  name: 'Sweden',                 len: [9,  9]  },
-  { code: 'CH', dial: '+41',  name: 'Switzerland',            len: [9,  9]  },
-  { code: 'SY', dial: '+963', name: 'Syria',                  len: [9,  9]  },
-  { code: 'TW', dial: '+886', name: 'Taiwan',                 len: [9,  9]  },
-  { code: 'TH', dial: '+66',  name: 'Thailand',               len: [9,  9]  },
-  { code: 'TN', dial: '+216', name: 'Tunisia',                len: [8,  8]  },
-  { code: 'TR', dial: '+90',  name: 'Turkey',                 len: [10, 10] },
-  { code: 'UA', dial: '+380', name: 'Ukraine',                len: [9,  9]  },
-  { code: 'AE', dial: '+971', name: 'United Arab Emirates',   len: [9,  9]  },
-  { code: 'GB', dial: '+44',  name: 'United Kingdom',         len: [10, 10] },
-  { code: 'US', dial: '+1',   name: 'United States',          len: [10, 10] },
-  { code: 'UY', dial: '+598', name: 'Uruguay',                len: [8,  8]  },
-  { code: 'UZ', dial: '+998', name: 'Uzbekistan',             len: [9,  9]  },
-  { code: 'VE', dial: '+58',  name: 'Venezuela',              len: [10, 10] },
-  { code: 'VN', dial: '+84',  name: 'Vietnam',                len: [9,  10] },
-  { code: 'YE', dial: '+967', name: 'Yemen',                  len: [9,  9]  },
+  { code: 'AF', dial: '+93', name: 'Afghanistan', len: [9, 9] },
+  { code: 'AL', dial: '+355', name: 'Albania', len: [9, 9] },
+  { code: 'DZ', dial: '+213', name: 'Algeria', len: [9, 9] },
+  { code: 'AR', dial: '+54', name: 'Argentina', len: [10, 10] },
+  { code: 'AM', dial: '+374', name: 'Armenia', len: [8, 8] },
+  { code: 'AU', dial: '+61', name: 'Australia', len: [9, 9] },
+  { code: 'AT', dial: '+43', name: 'Austria', len: [10, 11] },
+  { code: 'AZ', dial: '+994', name: 'Azerbaijan', len: [9, 9] },
+  { code: 'BD', dial: '+880', name: 'Bangladesh', len: [10, 10] },
+  { code: 'BY', dial: '+375', name: 'Belarus', len: [9, 9] },
+  { code: 'BE', dial: '+32', name: 'Belgium', len: [9, 9] },
+  { code: 'BO', dial: '+591', name: 'Bolivia', len: [8, 8] },
+  { code: 'BA', dial: '+387', name: 'Bosnia and Herzegovina', len: [8, 8] },
+  { code: 'BR', dial: '+55', name: 'Brazil', len: [10, 11] },
+  { code: 'BG', dial: '+359', name: 'Bulgaria', len: [9, 9] },
+  { code: 'KH', dial: '+855', name: 'Cambodia', len: [8, 9] },
+  { code: 'CA', dial: '+1', name: 'Canada', len: [10, 10] },
+  { code: 'CL', dial: '+56', name: 'Chile', len: [9, 9] },
+  { code: 'CN', dial: '+86', name: 'China', len: [11, 11] },
+  { code: 'CO', dial: '+57', name: 'Colombia', len: [10, 10] },
+  { code: 'HR', dial: '+385', name: 'Croatia', len: [8, 9] },
+  { code: 'CZ', dial: '+420', name: 'Czech Republic', len: [9, 9] },
+  { code: 'DK', dial: '+45', name: 'Denmark', len: [8, 8] },
+  { code: 'EC', dial: '+593', name: 'Ecuador', len: [9, 9] },
+  { code: 'EG', dial: '+20', name: 'Egypt', len: [10, 10] },
+  { code: 'EE', dial: '+372', name: 'Estonia', len: [7, 8] },
+  { code: 'ET', dial: '+251', name: 'Ethiopia', len: [9, 9] },
+  { code: 'FI', dial: '+358', name: 'Finland', len: [9, 10] },
+  { code: 'FR', dial: '+33', name: 'France', len: [9, 9] },
+  { code: 'GE', dial: '+995', name: 'Georgia', len: [9, 9] },
+  { code: 'DE', dial: '+49', name: 'Germany', len: [10, 11] },
+  { code: 'GH', dial: '+233', name: 'Ghana', len: [9, 9] },
+  { code: 'GR', dial: '+30', name: 'Greece', len: [10, 10] },
+  { code: 'GT', dial: '+502', name: 'Guatemala', len: [8, 8] },
+  { code: 'HU', dial: '+36', name: 'Hungary', len: [9, 9] },
+  { code: 'IN', dial: '+91', name: 'India', len: [10, 10] },
+  { code: 'ID', dial: '+62', name: 'Indonesia', len: [9, 12] },
+  { code: 'IR', dial: '+98', name: 'Iran', len: [10, 10] },
+  { code: 'IQ', dial: '+964', name: 'Iraq', len: [10, 10] },
+  { code: 'IE', dial: '+353', name: 'Ireland', len: [9, 9] },
+  { code: 'IL', dial: '+972', name: 'Israel', len: [9, 9] },
+  { code: 'IT', dial: '+39', name: 'Italy', len: [9, 10] },
+  { code: 'JP', dial: '+81', name: 'Japan', len: [10, 10] },
+  { code: 'JO', dial: '+962', name: 'Jordan', len: [9, 9] },
+  { code: 'KZ', dial: '+7', name: 'Kazakhstan', len: [10, 10] },
+  { code: 'KE', dial: '+254', name: 'Kenya', len: [9, 9] },
+  { code: 'XK', dial: '+383', name: 'Kosovo', len: [8, 8] },
+  { code: 'KW', dial: '+965', name: 'Kuwait', len: [8, 8] },
+  { code: 'LV', dial: '+371', name: 'Latvia', len: [8, 8] },
+  { code: 'LB', dial: '+961', name: 'Lebanon', len: [7, 8] },
+  { code: 'LY', dial: '+218', name: 'Libya', len: [9, 9] },
+  { code: 'LT', dial: '+370', name: 'Lithuania', len: [8, 8] },
+  { code: 'MY', dial: '+60', name: 'Malaysia', len: [9, 10] },
+  { code: 'MX', dial: '+52', name: 'Mexico', len: [10, 10] },
+  { code: 'MD', dial: '+373', name: 'Moldova', len: [8, 8] },
+  { code: 'MN', dial: '+976', name: 'Mongolia', len: [8, 8] },
+  { code: 'MA', dial: '+212', name: 'Morocco', len: [9, 9] },
+  { code: 'NL', dial: '+31', name: 'Netherlands', len: [9, 9] },
+  { code: 'NZ', dial: '+64', name: 'New Zealand', len: [8, 9] },
+  { code: 'NG', dial: '+234', name: 'Nigeria', len: [10, 10] },
+  { code: 'MK', dial: '+389', name: 'North Macedonia', len: [8, 8] },
+  { code: 'NO', dial: '+47', name: 'Norway', len: [8, 8] },
+  { code: 'PK', dial: '+92', name: 'Pakistan', len: [10, 10] },
+  { code: 'PY', dial: '+595', name: 'Paraguay', len: [9, 9] },
+  { code: 'PE', dial: '+51', name: 'Peru', len: [9, 9] },
+  { code: 'PH', dial: '+63', name: 'Philippines', len: [10, 10] },
+  { code: 'PL', dial: '+48', name: 'Poland', len: [9, 9] },
+  { code: 'PT', dial: '+351', name: 'Portugal', len: [9, 9] },
+  { code: 'QA', dial: '+974', name: 'Qatar', len: [8, 8] },
+  { code: 'RO', dial: '+40', name: 'Romania', len: [9, 9] },
+  { code: 'RU', dial: '+7', name: 'Russia', len: [10, 10] },
+  { code: 'SA', dial: '+966', name: 'Saudi Arabia', len: [9, 9] },
+  { code: 'RS', dial: '+381', name: 'Serbia', len: [8, 9] },
+  { code: 'SK', dial: '+421', name: 'Slovakia', len: [9, 9] },
+  { code: 'SI', dial: '+386', name: 'Slovenia', len: [8, 8] },
+  { code: 'ZA', dial: '+27', name: 'South Africa', len: [9, 9] },
+  { code: 'KR', dial: '+82', name: 'South Korea', len: [9, 10] },
+  { code: 'ES', dial: '+34', name: 'Spain', len: [9, 9] },
+  { code: 'LK', dial: '+94', name: 'Sri Lanka', len: [9, 9] },
+  { code: 'SE', dial: '+46', name: 'Sweden', len: [9, 9] },
+  { code: 'CH', dial: '+41', name: 'Switzerland', len: [9, 9] },
+  { code: 'SY', dial: '+963', name: 'Syria', len: [9, 9] },
+  { code: 'TW', dial: '+886', name: 'Taiwan', len: [9, 9] },
+  { code: 'TH', dial: '+66', name: 'Thailand', len: [9, 9] },
+  { code: 'TN', dial: '+216', name: 'Tunisia', len: [8, 8] },
+  { code: 'TR', dial: '+90', name: 'Turkey', len: [10, 10] },
+  { code: 'UA', dial: '+380', name: 'Ukraine', len: [9, 9] },
+  { code: 'AE', dial: '+971', name: 'United Arab Emirates', len: [9, 9] },
+  { code: 'GB', dial: '+44', name: 'United Kingdom', len: [10, 10] },
+  { code: 'US', dial: '+1', name: 'United States', len: [10, 10] },
+  { code: 'UY', dial: '+598', name: 'Uruguay', len: [8, 8] },
+  { code: 'UZ', dial: '+998', name: 'Uzbekistan', len: [9, 9] },
+  { code: 'VE', dial: '+58', name: 'Venezuela', len: [10, 10] },
+  { code: 'VN', dial: '+84', name: 'Vietnam', len: [9, 10] },
+  { code: 'YE', dial: '+967', name: 'Yemen', len: [9, 9] },
 ];
 
 const DIAL_EXAMPLES = {
-  '+93': '701234567',   '+355': '661234567',  '+213': '551234567',
-  '+54': '1123456789',  '+374': '77123456',   '+61': '412345678',
-  '+43': '6641234567',  '+994': '501234567',  '+880': '1712345678',
-  '+375': '291234567',  '+32': '470123456',   '+591': '71234567',
-  '+387': '61123456',   '+55': '11912345678', '+359': '881234567',
-  '+855': '12345678',   '+1':  '2015551234',  '+56': '912345678',
-  '+86': '13812345678', '+57': '3001234567',  '+385': '91234567',
-  '+420': '601123456',  '+45': '20123456',    '+593': '991234567',
-  '+20': '1001234567',  '+372': '51234567',   '+251': '911234567',
-  '+358': '412345678',  '+33': '612345678',   '+995': '555123456',
-  '+49': '15123456789', '+233': '201234567',  '+30': '6912345678',
-  '+502': '51234567',   '+36': '201234567',   '+91': '9123456789',
-  '+62': '81234567890', '+98': '9123456789',  '+964': '7901234567',
-  '+353': '851234567',  '+972': '501234567',  '+39': '3123456789',
-  '+81': '9012345678',  '+962': '791234567',  '+7':  '9161234567',
-  '+254': '712345678',  '+383': '43123456',   '+965': '51234567',
-  '+371': '21234567',   '+961': '3123456',    '+218': '912345678',
-  '+370': '61234567',   '+60': '123456789',   '+52': '5512345678',
-  '+373': '69123456',   '+976': '88123456',   '+212': '612345678',
-  '+31': '612345678',   '+64': '21123456',    '+234': '8012345678',
-  '+389': '71234567',   '+47': '41234567',    '+92': '3001234567',
-  '+595': '961234567',  '+51': '912345678',   '+63': '9171234567',
-  '+48': '512345678',   '+351': '912345678',  '+974': '33123456',
-  '+40': '712345678',   '+966': '512345678',  '+381': '641234567',
-  '+421': '901234567',  '+386': '31234567',   '+27': '711234567',
-  '+82': '1012345678',  '+34': '612345678',   '+94': '712345678',
-  '+46': '701234567',   '+41': '791234567',   '+963': '944123456',
-  '+886': '912345678',  '+66': '812345678',   '+216': '20123456',
-  '+90': '5321234567',  '+380': '501234567',  '+971': '501234567',
-  '+44': '7911123456',  '+598': '91234567',   '+998': '901234567',
-  '+58': '4121234567',  '+84': '912345678',   '+967': '712345678',
+  '+93': '701234567', '+355': '661234567', '+213': '551234567',
+  '+54': '1123456789', '+374': '77123456', '+61': '412345678',
+  '+43': '6641234567', '+994': '501234567', '+880': '1712345678',
+  '+375': '291234567', '+32': '470123456', '+591': '71234567',
+  '+387': '61123456', '+55': '11912345678', '+359': '881234567',
+  '+855': '12345678', '+1': '2015551234', '+56': '912345678',
+  '+86': '13812345678', '+57': '3001234567', '+385': '91234567',
+  '+420': '601123456', '+45': '20123456', '+593': '991234567',
+  '+20': '1001234567', '+372': '51234567', '+251': '911234567',
+  '+358': '412345678', '+33': '612345678', '+995': '555123456',
+  '+49': '15123456789', '+233': '201234567', '+30': '6912345678',
+  '+502': '51234567', '+36': '201234567', '+91': '9123456789',
+  '+62': '81234567890', '+98': '9123456789', '+964': '7901234567',
+  '+353': '851234567', '+972': '501234567', '+39': '3123456789',
+  '+81': '9012345678', '+962': '791234567', '+7': '9161234567',
+  '+254': '712345678', '+383': '43123456', '+965': '51234567',
+  '+371': '21234567', '+961': '3123456', '+218': '912345678',
+  '+370': '61234567', '+60': '123456789', '+52': '5512345678',
+  '+373': '69123456', '+976': '88123456', '+212': '612345678',
+  '+31': '612345678', '+64': '21123456', '+234': '8012345678',
+  '+389': '71234567', '+47': '41234567', '+92': '3001234567',
+  '+595': '961234567', '+51': '912345678', '+63': '9171234567',
+  '+48': '512345678', '+351': '912345678', '+974': '33123456',
+  '+40': '712345678', '+966': '512345678', '+381': '641234567',
+  '+421': '901234567', '+386': '31234567', '+27': '711234567',
+  '+82': '1012345678', '+34': '612345678', '+94': '712345678',
+  '+46': '701234567', '+41': '791234567', '+963': '944123456',
+  '+886': '912345678', '+66': '812345678', '+216': '20123456',
+  '+90': '5321234567', '+380': '501234567', '+971': '501234567',
+  '+44': '7911123456', '+598': '91234567', '+998': '901234567',
+  '+58': '4121234567', '+84': '912345678', '+967': '712345678',
 };
 
 const COUNTRIES = [
-  'Afghanistan','Albania','Algeria','Argentina','Armenia','Australia','Austria',
-  'Azerbaijan','Bangladesh','Belarus','Belgium','Bolivia','Bosnia and Herzegovina',
-  'Brazil','Bulgaria','Cambodia','Canada','Chile','China','Colombia','Croatia',
-  'Czech Republic','Denmark','Ecuador','Egypt','Estonia','Ethiopia','Finland',
-  'France','Georgia','Germany','Ghana','Greece','Guatemala','Hungary','India',
-  'Indonesia','Iran','Iraq','Ireland','Israel','Italy','Japan','Jordan',
-  'Kazakhstan','Kenya','Kosovo','Kuwait','Latvia','Lebanon','Libya','Lithuania',
-  'Malaysia','Mexico','Moldova','Mongolia','Morocco','Netherlands','New Zealand',
-  'Nigeria','North Macedonia','Norway','Pakistan','Paraguay','Peru','Philippines',
-  'Poland','Portugal','Qatar','Romania','Russia','Saudi Arabia','Serbia',
-  'Slovakia','Slovenia','South Africa','South Korea','Spain','Sri Lanka',
-  'Sweden','Switzerland','Syria','Taiwan','Thailand','Tunisia','Turkey',
-  'Ukraine','United Arab Emirates','United Kingdom','United States','Uruguay',
-  'Uzbekistan','Venezuela','Vietnam','Yemen',
+  'Afghanistan', 'Albania', 'Algeria', 'Argentina', 'Armenia', 'Australia', 'Austria',
+  'Azerbaijan', 'Bangladesh', 'Belarus', 'Belgium', 'Bolivia', 'Bosnia and Herzegovina',
+  'Brazil', 'Bulgaria', 'Cambodia', 'Canada', 'Chile', 'China', 'Colombia', 'Croatia',
+  'Czech Republic', 'Denmark', 'Ecuador', 'Egypt', 'Estonia', 'Ethiopia', 'Finland',
+  'France', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Guatemala', 'Hungary', 'India',
+  'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Japan', 'Jordan',
+  'Kazakhstan', 'Kenya', 'Kosovo', 'Kuwait', 'Latvia', 'Lebanon', 'Libya', 'Lithuania',
+  'Malaysia', 'Mexico', 'Moldova', 'Mongolia', 'Morocco', 'Netherlands', 'New Zealand',
+  'Nigeria', 'North Macedonia', 'Norway', 'Pakistan', 'Paraguay', 'Peru', 'Philippines',
+  'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Saudi Arabia', 'Serbia',
+  'Slovakia', 'Slovenia', 'South Africa', 'South Korea', 'Spain', 'Sri Lanka',
+  'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Thailand', 'Tunisia', 'Turkey',
+  'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay',
+  'Uzbekistan', 'Venezuela', 'Vietnam', 'Yemen',
 ];
 
 // ── Master Country Flag & ISO Conversion Registry ──
@@ -520,8 +521,8 @@ const GOALS = [
     title: 'Set up a Date',
     desc: 'Suggests drinks, coffee, or dinner once there is a good vibe.',
     icon: 'calendar',
-    gradient: ['#FF3366', '#FFAA80'],
-    accentColor: '#FF3366',
+    gradient: [uiTheme.colors.primary, uiTheme.colors.secondary],
+    accentColor: uiTheme.colors.primary,
     bgActive: 'rgba(255, 51, 102, 0.12)',
   },
   {
@@ -881,7 +882,7 @@ const PERSONALITIES = [
     label: 'Freestyle',
     tagline: 'Context-Smart',
     icon: 'sparkles',
-    accentColor: '#FF3366',
+    accentColor: uiTheme.colors.primary,
     previewOpener: "Hey! Love the energy in your profile. How's your week treating you so far?",
     vibeDesc: 'Adapts to photos and bio cues for natural chemistry.',
   },
@@ -890,7 +891,7 @@ const PERSONALITIES = [
     label: 'Flirty',
     tagline: 'Teasing & Warm',
     icon: 'flame',
-    accentColor: '#FF5E7E',
+    accentColor: uiTheme.colors.accent,
     previewOpener: "Had to swipe right — that smile definitely caught my eye. What's your secret?",
     vibeDesc: 'Playful compliments and charm to spark chemistry fast.',
   },
@@ -917,7 +918,7 @@ const PERSONALITIES = [
     label: 'Charming',
     tagline: 'Smooth & Polite',
     icon: 'heart',
-    accentColor: '#FFAA80',
+    accentColor: uiTheme.colors.secondary,
     previewOpener: "Honestly couldn't just scroll past without saying hi. What's something fun you've been up to?",
     vibeDesc: 'Smooth curiosity with classic gentlemanly warmth.',
   },
@@ -1274,7 +1275,7 @@ export default function OnboardingScreen({ navigation }) {
           isLiveModel: true,
         }));
       }
-    }).catch(() => {});
+    }).catch(() => { });
 
     simTimerRef.current = setTimeout(() => {
       setSimPhase('replying');
@@ -2274,9 +2275,9 @@ export default function OnboardingScreen({ navigation }) {
       });
 
       try {
-        AsyncStorage.setItem('@flint_onboarding_data', JSON.stringify(onboardingData)).catch(() => {});
-        AsyncStorage.setItem('@flint_has_completed_onboarding', 'true').catch(() => {});
-      } catch (_) {}
+        AsyncStorage.setItem('@flint_onboarding_data', JSON.stringify(onboardingData)).catch(() => { });
+        AsyncStorage.setItem('@flint_has_completed_onboarding', 'true').catch(() => { });
+      } catch (_) { }
 
       navigation.dispatch(
         StackActions.push('Auth', {
@@ -2624,79 +2625,79 @@ export default function OnboardingScreen({ navigation }) {
                   <View style={styles.marqueeSectionWrap}>
                     <View style={styles.marqueeWindow}>
                       <Animated.View
-                          style={[
-                            styles.marqueeTrack,
-                            { transform: [{ translateX: marqueeAnim }] },
-                          ]}
-                        >
-                          {DISPLAY_CARDS.map((card, idx) => (
-                            <View key={`${card.id}-${idx}`} style={styles.cockpitCardContainer}>
-                              <LinearGradient
-                                colors={['rgba(255, 51, 102, 0.16)', 'rgba(179, 136, 255, 0.08)', 'rgba(22, 14, 32, 0.94)']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.cockpitCardGradient}
-                              >
-                                {/* Top Row: Real Generated Portrait & Match Score */}
-                                <View style={styles.cockpitHeaderRow}>
-                                  <View style={styles.cockpitAvatarWrap}>
-                                    <Image
-                                      source={card.image}
-                                      style={styles.cockpitAvatarImage}
-                                      resizeMode="cover"
-                                    />
-                                    <View style={styles.cockpitAvatarLiveBeacon} />
-                                  </View>
-
-                                  <View style={styles.cockpitProfileMeta}>
-                                    <View style={styles.cockpitNameRow}>
-                                      <Text style={styles.cockpitProfileName}>{card.name}</Text>
-                                      <Ionicons name="checkmark-circle" size={13} color="#00E676" style={{ marginLeft: 5 }} />
-                                    </View>
-                                    <Text style={styles.cockpitProfileSub} numberOfLines={1}>
-                                      {card.sub}
-                                    </Text>
-                                  </View>
-
-                                  <View style={styles.cockpitScoreWrap}>
-                                    <Ionicons name="sparkles" size={13} color="#00E676" style={{ marginRight: 4 }} />
-                                    <Text style={styles.cockpitScoreText}>{card.matchScore}</Text>
-                                  </View>
+                        style={[
+                          styles.marqueeTrack,
+                          { transform: [{ translateX: marqueeAnim }] },
+                        ]}
+                      >
+                        {DISPLAY_CARDS.map((card, idx) => (
+                          <View key={`${card.id}-${idx}`} style={styles.cockpitCardContainer}>
+                            <LinearGradient
+                              colors={['rgba(255, 51, 102, 0.16)', 'rgba(179, 136, 255, 0.08)', 'rgba(22, 14, 32, 0.94)']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={styles.cockpitCardGradient}
+                            >
+                              {/* Top Row: Real Generated Portrait & Match Score */}
+                              <View style={styles.cockpitHeaderRow}>
+                                <View style={styles.cockpitAvatarWrap}>
+                                  <Image
+                                    source={card.image}
+                                    style={styles.cockpitAvatarImage}
+                                    resizeMode="cover"
+                                  />
+                                  <View style={styles.cockpitAvatarLiveBeacon} />
                                 </View>
 
-                                {/* Hairline Divider */}
-                                <View style={styles.cockpitHairline} />
-
-                                {/* Simulated Real-Time Opener Box */}
-                                <View style={styles.cockpitOpenerBox}>
-                                  <View style={styles.cockpitOpenerHeader}>
-                                    <Ionicons name="chatbubble-outline" size={12} color="#B388FF" style={{ marginRight: 5 }} />
-                                    <Text style={styles.cockpitOpenerLabel}>Suggested message</Text>
+                                <View style={styles.cockpitProfileMeta}>
+                                  <View style={styles.cockpitNameRow}>
+                                    <Text style={styles.cockpitProfileName}>{card.name}</Text>
+                                    <Ionicons name="checkmark-circle" size={13} color="#00E676" style={{ marginLeft: 5 }} />
                                   </View>
-                                  <Text style={styles.cockpitOpenerText}>
-                                    "{card.opener}"
-                                    <Animated.Text style={[styles.cockpitCursor, { opacity: cursorOpacity }]}>|</Animated.Text>
+                                  <Text style={styles.cockpitProfileSub} numberOfLines={1}>
+                                    {card.sub}
                                   </Text>
                                 </View>
 
-                                {/* Live Match Reassurance Strip */}
-                                <View style={styles.cockpitFooterStrip}>
-                                  {card.tags.map((tag, tIdx) => (
-                                    <React.Fragment key={tIdx}>
-                                      {tIdx > 0 && <View style={styles.cockpitFooterDot} />}
-                                      <View style={styles.cockpitFooterItem}>
-                                        <Ionicons name={tag.icon} size={12} color={tag.color} />
-                                        <Text style={styles.cockpitFooterItemText}>{tag.label}</Text>
-                                      </View>
-                                    </React.Fragment>
-                                  ))}
+                                <View style={styles.cockpitScoreWrap}>
+                                  <Ionicons name="sparkles" size={13} color="#00E676" style={{ marginRight: 4 }} />
+                                  <Text style={styles.cockpitScoreText}>{card.matchScore}</Text>
                                 </View>
-                              </LinearGradient>
-                            </View>
-                          ))}
-                        </Animated.View>
-                      </View>
+                              </View>
+
+                              {/* Hairline Divider */}
+                              <View style={styles.cockpitHairline} />
+
+                              {/* Simulated Real-Time Opener Box */}
+                              <View style={styles.cockpitOpenerBox}>
+                                <View style={styles.cockpitOpenerHeader}>
+                                  <Ionicons name="chatbubble-outline" size={12} color="#B388FF" style={{ marginRight: 5 }} />
+                                  <Text style={styles.cockpitOpenerLabel}>Suggested message</Text>
+                                </View>
+                                <Text style={styles.cockpitOpenerText}>
+                                  "{card.opener}"
+                                  <Animated.Text style={[styles.cockpitCursor, { opacity: cursorOpacity }]}>|</Animated.Text>
+                                </Text>
+                              </View>
+
+                              {/* Live Match Reassurance Strip */}
+                              <View style={styles.cockpitFooterStrip}>
+                                {card.tags.map((tag, tIdx) => (
+                                  <React.Fragment key={tIdx}>
+                                    {tIdx > 0 && <View style={styles.cockpitFooterDot} />}
+                                    <View style={styles.cockpitFooterItem}>
+                                      <Ionicons name={tag.icon} size={12} color={tag.color} />
+                                      <Text style={styles.cockpitFooterItemText}>{tag.label}</Text>
+                                    </View>
+                                  </React.Fragment>
+                                ))}
+                              </View>
+                            </LinearGradient>
+                          </View>
+                        ))}
+                      </Animated.View>
                     </View>
+                  </View>
 
                   {/* 3 Core Value Pillars */}
                   <View style={styles.featureList}>
@@ -2707,7 +2708,7 @@ export default function OnboardingScreen({ navigation }) {
                           colors={['rgba(255, 51, 102, 0.28)', 'rgba(255, 51, 102, 0.08)']}
                           style={styles.featureIconWrap}
                         >
-                          <Ionicons name="compass-outline" size={20} color="#FF3366" />
+                          <Ionicons name="compass-outline" size={20} color={uiTheme.colors.primary} />
                         </LinearGradient>
                       </View>
                       <View style={styles.featureInfo}>
@@ -2743,7 +2744,7 @@ export default function OnboardingScreen({ navigation }) {
                           colors={['rgba(255, 170, 128, 0.28)', 'rgba(255, 170, 128, 0.08)']}
                           style={styles.featureIconWrap}
                         >
-                          <Ionicons name="calendar-outline" size={20} color="#FFAA80" />
+                          <Ionicons name="calendar-outline" size={20} color={uiTheme.colors.secondary} />
                         </LinearGradient>
                       </View>
                       <View style={styles.featureInfo}>
@@ -2810,7 +2811,7 @@ export default function OnboardingScreen({ navigation }) {
                       {/* Sub-section 1: Where you date */}
                       <View style={styles.step2SectionHeader}>
                         <View style={styles.step2IconDiskCoral}>
-                          <Ionicons name="location-sharp" size={16} color="#FF3366" />
+                          <Ionicons name="location-sharp" size={16} color={uiTheme.colors.primary} />
                         </View>
                         <View style={styles.step2HeaderTextWrap}>
                           <View style={styles.step2TitleWithPillRow}>
@@ -2891,7 +2892,7 @@ export default function OnboardingScreen({ navigation }) {
                                 {lang}
                               </Text>
                               {isSelected && (
-                                <Ionicons name="checkmark-circle" size={13} color="#FF3366" />
+                                <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.primary} />
                               )}
                             </TouchableOpacity>
                           );
@@ -2923,7 +2924,7 @@ export default function OnboardingScreen({ navigation }) {
                               <Ionicons
                                 name="chevron-down"
                                 size={13}
-                                color="#FFAA80"
+                                color={uiTheme.colors.secondary}
                               />
                             </Animated.View>
                           </TouchableOpacity>
@@ -2978,7 +2979,7 @@ export default function OnboardingScreen({ navigation }) {
                                   {lang}
                                 </Text>
                                 {isSelected && (
-                                  <Ionicons name="checkmark-circle" size={13} color="#FF3366" />
+                                  <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.primary} />
                                 )}
                               </TouchableOpacity>
                             );
@@ -3069,7 +3070,7 @@ export default function OnboardingScreen({ navigation }) {
 
                       {isPhoneTooShort ? (
                         <View style={styles.phoneFeedbackRow}>
-                          <Ionicons name="alert-circle" size={13} color="#FF5E7E" style={{ marginRight: 6 }} />
+                          <Ionicons name="alert-circle" size={13} color={uiTheme.colors.accent} style={{ marginRight: 6 }} />
                           <Text style={styles.hintTextError}>
                             Number looks too short for {dialCode} (min {minPhoneLength} digits)
                           </Text>
@@ -3165,7 +3166,7 @@ export default function OnboardingScreen({ navigation }) {
 
                   {Boolean(goalFeedback) && (
                     <View style={styles.goalFeedbackBanner}>
-                      <Ionicons name="information-circle" size={14} color="#FFAA80" style={{ marginRight: 5 }} />
+                      <Ionicons name="information-circle" size={14} color={uiTheme.colors.secondary} style={{ marginRight: 5 }} />
                       <Text style={styles.goalFeedbackText}>{goalFeedback}</Text>
                     </View>
                   )}
@@ -3191,7 +3192,7 @@ export default function OnboardingScreen({ navigation }) {
                     >
                       <View style={styles.strategyHeaderRow}>
                         <View style={styles.strategyIconDisk}>
-                          <Ionicons name="sparkles" size={12} color="#FFAA80" />
+                          <Ionicons name="sparkles" size={12} color={uiTheme.colors.secondary} />
                         </View>
                         <Text style={styles.strategyHeaderTitle}>How Flint will help you</Text>
                         <View style={styles.strategyGamePlanBadge}>
@@ -3299,7 +3300,7 @@ export default function OnboardingScreen({ navigation }) {
                               <Text
                                 style={[
                                   styles.personalityPillText,
-                                  isSelected && { color: '#FFFFFF', fontWeight: '800' },
+                                  isSelected && { fontFamily: 'Inter_800ExtraBold', color: '#FFFFFF', fontWeight: 'normal' },
                                 ]}
                               >
                                 {p.label}
@@ -3367,7 +3368,7 @@ export default function OnboardingScreen({ navigation }) {
                               <Text style={styles.voiceOpenerText}>
                                 "{typedOpener}
                                 {isTypingOpener && (
-                                  <Animated.Text style={{ opacity: voiceCursorOpacity, color: currentPersonalityObj.accentColor, fontWeight: '900' }}>
+                                  <Animated.Text style={{ fontFamily: 'Inter_800ExtraBold', opacity: voiceCursorOpacity, color: currentPersonalityObj.accentColor, fontWeight: 'normal' }}>
                                     |
                                   </Animated.Text>
                                 )}
@@ -3395,7 +3396,7 @@ export default function OnboardingScreen({ navigation }) {
                       {/* Sub-section 2: Reply Speed (Intelligent Cadence Bar) */}
                       <View style={styles.step4SectionHeader}>
                         <View style={styles.step4IconDiskCoral}>
-                          <Ionicons name="timer" size={15} color="#FF3366" />
+                          <Ionicons name="timer" size={15} color={uiTheme.colors.primary} />
                         </View>
                         <View style={styles.step4HeaderTextWrap}>
                           <Text numberOfLines={1} style={styles.step4SectionTitle}>Reply Speed</Text>
@@ -3441,7 +3442,7 @@ export default function OnboardingScreen({ navigation }) {
                               <Ionicons
                                 name={freq.icon}
                                 size={12}
-                                color={isSelected ? '#FF3366' : 'rgba(245, 230, 240, 0.55)'}
+                                color={isSelected ? uiTheme.colors.primary : 'rgba(245, 230, 240, 0.55)'}
                                 style={{ marginRight: 4 }}
                               />
                               <Text style={[styles.cadenceSegmentLabel, isSelected && styles.cadenceSegmentLabelActive]}>
@@ -3803,7 +3804,7 @@ export default function OnboardingScreen({ navigation }) {
                                 </View>
                                 <View style={styles.blueprintCardRightTag}>
                                   <Text style={styles.blueprintSuitPill}>{card.suit} {card.stepNumber}</Text>
-                                  
+
                                 </View>
                               </View>
                               <Text style={styles.blueprintCardTitle} numberOfLines={1}>{card.title}</Text>
@@ -3833,7 +3834,7 @@ export default function OnboardingScreen({ navigation }) {
               accessibilityLabel={currentStep === 1 ? 'Get Started' : currentStep === totalSteps ? 'Start Meeting Matches' : 'Continue'}
             >
               <LinearGradient
-                colors={['#FF3366', '#FF5E7E', '#FFAA80']}
+                colors={[uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.continueGradient}
@@ -3919,7 +3920,7 @@ export default function OnboardingScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalBackdrop}
         >
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.modalDismissArea}
             activeOpacity={1}
             onPress={() => {
@@ -3941,7 +3942,7 @@ export default function OnboardingScreen({ navigation }) {
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
                 <View style={styles.modalHeaderIconDiskCoral}>
-                  <Ionicons name="location-sharp" size={17} color="#FF3366" />
+                  <Ionicons name="location-sharp" size={17} color={uiTheme.colors.primary} />
                 </View>
                 <View style={styles.modalHeaderTitleGroup}>
                   <Text style={styles.modalTitle}>Select Country</Text>
@@ -3974,7 +3975,7 @@ export default function OnboardingScreen({ navigation }) {
               <Ionicons
                 name="search"
                 size={17}
-                color={isCountrySearchFocused ? '#FF3366' : 'rgba(255, 255, 255, 0.55)'}
+                color={isCountrySearchFocused ? uiTheme.colors.primary : 'rgba(255, 255, 255, 0.55)'}
               />
               <TextInput
                 style={styles.modalSearchInput}
@@ -3988,7 +3989,7 @@ export default function OnboardingScreen({ navigation }) {
                 returnKeyType="search"
               />
               {Boolean(countrySearch) && (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   onPress={() => {
                     safeHaptic('light');
                     setCountrySearch('');
@@ -4026,7 +4027,7 @@ export default function OnboardingScreen({ navigation }) {
                 const isSelected = country === item;
                 const matchDial = DIAL_CODES.find((d) => d.name === item)?.dial;
                 return (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[
                       styles.modalListItem,
                       isSelected && styles.modalListItemSelected,
@@ -4056,7 +4057,7 @@ export default function OnboardingScreen({ navigation }) {
                         </Text>
                       )}
                       {isSelected && (
-                        <Ionicons name="checkmark-circle" size={20} color="#FF3366" style={{ marginLeft: 8 }} />
+                        <Ionicons name="checkmark-circle" size={20} color={uiTheme.colors.primary} style={{ marginLeft: 8 }} />
                       )}
                     </View>
                   </TouchableOpacity>
@@ -4082,7 +4083,7 @@ export default function OnboardingScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalBackdrop}
         >
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.modalDismissArea}
             activeOpacity={1}
             onPress={() => {
@@ -4151,7 +4152,7 @@ export default function OnboardingScreen({ navigation }) {
                 returnKeyType="search"
               />
               {Boolean(dialSearch) && (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   onPress={() => {
                     safeHaptic('light');
                     setDialSearch('');
@@ -4188,7 +4189,7 @@ export default function OnboardingScreen({ navigation }) {
               renderItem={({ item }) => {
                 const isSelected = dialCode === item.dial && (country === item.name || !DIAL_CODES.some(d => d.dial === item.dial && d.name === country));
                 return (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[
                       styles.modalListItem,
                       isSelected && styles.modalListItemSelectedEmerald,
@@ -4319,7 +4320,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: -0.6,
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
   stepSubtitle: {
     color: '#ac888b',
@@ -4331,8 +4332,8 @@ const styles = StyleSheet.create({
   // ── Living Cockpit Sliding Showcase ──
   marqueeSectionWrap: {
     marginHorizontal: -22,
-    marginTop: 4,
-    marginBottom: 20,
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.xl,
   },
   marqueeWindow: {
     width: '100%',
@@ -4352,14 +4353,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     borderColor: 'rgba(255, 102, 136, 0.24)',
     overflow: 'hidden',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 18,
     elevation: 8,
   },
   cockpitCardGradient: {
-    padding: 16,
+    padding: uiTheme.spacing.lg,
   },
   cockpitHeaderRow: {
     flexDirection: 'row',
@@ -4367,7 +4368,7 @@ const styles = StyleSheet.create({
   },
   cockpitAvatarWrap: {
     position: 'relative',
-    marginRight: 12,
+    marginRight: uiTheme.spacing.md,
   },
   cockpitAvatarImage: {
     width: 48,
@@ -4395,15 +4396,17 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   cockpitProfileName: {
+    fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
   cockpitProfileSub: {
-    color: '#ac888b',
-    fontSize: 11.5,
-    fontWeight: '400',
+    fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   cockpitScoreWrap: {
     flexDirection: 'row',
@@ -4412,23 +4415,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   cockpitScoreText: {
+    fontFamily: 'Inter_700Bold',
     color: '#00E676',
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   cockpitHairline: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    marginVertical: 12,
+    marginVertical: uiTheme.spacing.md,
   },
   cockpitOpenerBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.035)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
+    padding: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.md,
   },
   cockpitOpenerHeader: {
     flexDirection: 'row',
@@ -4436,22 +4440,25 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   cockpitOpenerLabel: {
+    fontFamily: 'Inter_600SemiBold',
     color: '#C49BFF',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   cockpitOpenerText: {
+    fontFamily: 'Inter_500Medium',
     color: '#FFFFFF',
     fontSize: 12.8,
     lineHeight: 18,
-    fontWeight: '500',
+    fontWeight: 'normal',
     fontStyle: 'italic',
   },
   cockpitCursor: {
-    color: '#FF3366',
-    fontWeight: '900',
-    fontSize: 14,
+    fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.primary,
+    fontWeight: 'normal',
+    fontSize: uiTheme.type.label.fontSize,
   },
   cockpitFooterStrip: {
     flexDirection: 'row',
@@ -4462,12 +4469,13 @@ const styles = StyleSheet.create({
   cockpitFooterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
   },
   cockpitFooterItemText: {
-    color: '#ac888b',
-    fontSize: 11,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   cockpitFooterDot: {
     width: 3,
@@ -4478,8 +4486,8 @@ const styles = StyleSheet.create({
 
   // ── Step 1: Feature List (Apple HIG Borderless with Specular Disks) ──
   featureList: {
-    gap: 16,
-    marginTop: 4,
+    gap: uiTheme.spacing.lg,
+    marginTop: uiTheme.spacing.xs,
   },
   featureRow: {
     flexDirection: 'row',
@@ -4506,17 +4514,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   featureTitle: {
+    fontFamily: 'Manrope_700Bold',
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.2,
     marginBottom: 3,
   },
   featureDesc: {
-    color: '#ac888b',
+    fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
     lineHeight: 17.5,
-    fontWeight: '400',
+    fontWeight: 'normal',
   },
 
   // ── Step 2: About You (Regional Context & VIP Alerts) ──
@@ -4525,8 +4535,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     borderColor: 'rgba(255, 102, 136, 0.22)',
     overflow: 'hidden',
-    marginBottom: 16,
-    shadowColor: '#FF3366',
+    marginBottom: uiTheme.spacing.lg,
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.16,
     shadowRadius: 16,
@@ -4537,7 +4547,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     borderColor: 'rgba(0, 230, 118, 0.22)',
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
     shadowColor: '#00E676',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.14,
@@ -4545,12 +4555,12 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   step2CardGradient: {
-    padding: 16,
+    padding: uiTheme.spacing.lg,
   },
   step2SectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   step2IconDiskCoral: {
     width: 36,
@@ -4561,7 +4571,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 51, 102, 0.28)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: uiTheme.spacing.md,
   },
   step2IconDiskAmethyst: {
     width: 36,
@@ -4572,7 +4582,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(179, 136, 255, 0.28)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: uiTheme.spacing.md,
   },
   step2IconDiskEmerald: {
     width: 36,
@@ -4583,7 +4593,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 230, 118, 0.28)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: uiTheme.spacing.md,
   },
   step2HeaderTextWrap: {
     flex: 1,
@@ -4595,9 +4605,10 @@ const styles = StyleSheet.create({
     paddingRight: 2,
   },
   step2SectionTitle: {
+    fontFamily: 'Manrope_700Bold',
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
   step2CoralBadgePill: {
@@ -4606,12 +4617,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 51, 102, 0.28)',
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
   },
   step2CoralBadgeText: {
-    color: '#FFAA80',
-    fontSize: 11,
-    fontWeight: '800',
+    fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   step2LangCountPill: {
     backgroundColor: 'rgba(179, 136, 255, 0.12)',
@@ -4619,12 +4631,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(179, 136, 255, 0.28)',
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
   },
   step2LangCountText: {
+    fontFamily: 'Inter_700Bold',
     color: '#B388FF',
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   step2OptionalPill: {
     backgroundColor: 'rgba(0, 230, 118, 0.12)',
@@ -4632,17 +4645,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 230, 118, 0.28)',
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
   },
   step2OptionalText: {
+    fontFamily: 'Inter_700Bold',
     color: '#00E676',
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   step2SectionSub: {
-    color: '#ac888b',
-    fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 2,
   },
   step2SelectTrigger: {
@@ -4673,13 +4688,15 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   step2FlagEmoji: {
-    fontSize: 18,
+    fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.section.fontSize,
     lineHeight: 22,
   },
   step2SelectTriggerText: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     flexShrink: 1,
   },
   step2ChevronWrap: {
@@ -4691,12 +4708,12 @@ const styles = StyleSheet.create({
   step2Divider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    marginVertical: 16,
+    marginVertical: uiTheme.spacing.lg,
   },
   langChipsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   langChip: {
     flexDirection: 'row',
@@ -4710,21 +4727,23 @@ const styles = StyleSheet.create({
     paddingVertical: 7.5,
   },
   langChipSelected: {
-    borderColor: '#FF3366',
+    borderColor: uiTheme.colors.primary,
     backgroundColor: 'rgba(255, 51, 102, 0.16)',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
   },
   langChipText: {
+    fontFamily: 'Inter_600SemiBold',
     color: '#D8D0DD',
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   langChipTextSelected: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   moreLangChip: {
     flexDirection: 'row',
@@ -4734,13 +4753,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 170, 128, 0.25)',
     borderRadius: 18,
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 7.5,
   },
   moreLangChipText: {
-    color: '#FFAA80',
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   secondaryLangWrap: {
     overflow: 'hidden',
@@ -4748,8 +4768,8 @@ const styles = StyleSheet.create({
   langChipsContainerSecondary: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    paddingTop: 8,
+    gap: uiTheme.spacing.sm,
+    paddingTop: uiTheme.spacing.sm,
   },
   phoneInputWrap: {
     flexDirection: 'row',
@@ -4759,7 +4779,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.09)',
     borderRadius: 15,
     height: 52,
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
   },
   phoneInputWrapFocused: {
     borderColor: 'rgba(0, 230, 118, 0.55)',
@@ -4776,29 +4796,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.xs,
   },
   dialFlagText: {
-    fontSize: 15,
-    marginRight: 4,
+    fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.body.fontSize,
+    marginRight: uiTheme.spacing.xs,
   },
   dialCodeText: {
+    fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
   dialDivider: {
     width: 1,
     height: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    marginHorizontal: 8,
+    marginHorizontal: uiTheme.spacing.sm,
   },
   phoneInput: {
+    fontFamily: 'Inter_600SemiBold',
     flex: 1,
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   phoneFeedbackRow: {
     flexDirection: 'row',
@@ -4807,21 +4830,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   privacyReassuranceText: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.6)',
-    fontSize: 11.5,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     lineHeight: 16,
   },
   privacyReassuranceActiveText: {
+    fontFamily: 'Inter_600SemiBold',
     color: '#00E676',
-    fontSize: 11.5,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     lineHeight: 16,
   },
   hintTextError: {
-    color: '#FF5E7E',
-    fontSize: 11.5,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.accent,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     lineHeight: 16,
   },
 
@@ -4841,13 +4867,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   step3Subtitle: {
-    color: '#ac888b',
+    color: uiTheme.colors.muted,
     fontSize: 13.5,
     lineHeight: 18,
-    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
     flex: 1,
   },
   goalCountPill: {
@@ -4855,8 +4881,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
+    paddingVertical: uiTheme.spacing.xs,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.25)',
   },
@@ -4865,9 +4891,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 229, 255, 0.28)',
   },
   goalCountText: {
-    color: '#FF3366',
-    fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   goalCountTextContinuous: {
@@ -4879,15 +4906,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 170, 128, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 170, 128, 0.28)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderRadius: uiTheme.radius.input,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 7,
     marginBottom: 10,
   },
   goalFeedbackText: {
-    color: '#FFAA80',
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   goalsList: {
     gap: 10,
@@ -4897,7 +4925,7 @@ const styles = StyleSheet.create({
   },
   goalGlow: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
+    borderRadius: uiTheme.radius.card,
   },
   goalShadow: {
     ...StyleSheet.absoluteFillObject,
@@ -4911,7 +4939,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.4,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 18,
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     paddingHorizontal: 14,
     overflow: 'hidden',
   },
@@ -4930,12 +4958,13 @@ const styles = StyleSheet.create({
   },
   goalInfo: {
     flex: 1,
-    paddingRight: 8,
+    paddingRight: uiTheme.spacing.sm,
   },
   goalTitle: {
+    fontFamily: 'Manrope_800ExtraBold',
     color: 'rgba(255, 255, 255, 0.95)',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     marginBottom: 3,
     letterSpacing: 0.1,
   },
@@ -4943,10 +4972,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   goalDesc: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.80)',
     fontSize: 12.5,
     lineHeight: 17,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
   goalDescSelected: {
     color: 'rgba(255, 255, 255, 0.95)',
@@ -4981,7 +5011,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   strategyCard: {
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     paddingHorizontal: 14,
   },
   strategyHeaderRow: {
@@ -4996,33 +5026,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 170, 128, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: uiTheme.spacing.sm,
   },
   strategyHeaderTitle: {
+    fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: 0.15,
     flex: 1,
   },
   strategyGamePlanBadge: {
     backgroundColor: 'rgba(255, 170, 128, 0.12)',
-    paddingHorizontal: 8,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(255, 170, 128, 0.25)',
   },
   strategyGamePlanBadgeText: {
-    color: '#FFAA80',
-    fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   strategySummaryText: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.92)',
     fontSize: 12.5,
     lineHeight: 18,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
 
   // ── Step 4: Behavior & Style (Luxury Obsidian Glass Card) ──
@@ -5090,18 +5123,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   step4SectionTitle: {
+    fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
   step4SectionSub: {
-    color: '#ac888b',
-    fontSize: 11.5,
-    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 1,
   },
   step4AmethystBadgePill: {
@@ -5111,15 +5146,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(179, 136, 255, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(179, 136, 255, 0.32)',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 7.5,
     paddingVertical: 2,
     height: 22,
   },
   step4AmethystBadgeText: {
+    fontFamily: 'Inter_700Bold',
     color: '#B388FF',
-    fontSize: 10.5,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     includeFontPadding: false,
   },
   step4CoralBadgePill: {
@@ -5129,15 +5165,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 51, 102, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.32)',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 7.5,
     paddingVertical: 2,
     height: 22,
   },
   step4CoralBadgeText: {
-    color: '#FF3366',
-    fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     includeFontPadding: false,
   },
   step4Divider: {
@@ -5158,14 +5195,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(12, 7, 18, 0.72)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
   personalityPillText: {
+    fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 240, 0.75)',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   voicePreviewWrapper: {
     borderRadius: 14,
@@ -5196,16 +5234,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   voiceHeaderTitle: {
+    fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   voiceLiveBeaconRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginLeft: 4,
+    gap: uiTheme.spacing.xs,
+    marginLeft: uiTheme.spacing.xs,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -5217,8 +5256,9 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
   },
   voiceLiveText: {
-    fontSize: 9.5,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
     includeFontPadding: false,
   },
@@ -5233,8 +5273,9 @@ const styles = StyleSheet.create({
     height: 20,
   },
   voiceTagBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     includeFontPadding: false,
   },
   voiceBubble: {
@@ -5243,7 +5284,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
     paddingHorizontal: 11,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
     minHeight: 48,
     justifyContent: 'center',
     marginBottom: 6,
@@ -5251,7 +5292,7 @@ const styles = StyleSheet.create({
   voiceDraftingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     paddingVertical: 2,
   },
   typingDotsRow: {
@@ -5266,15 +5307,17 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
   },
   voiceDraftingText: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 11.5,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     fontStyle: 'italic',
   },
   voiceOpenerText: {
+    fontFamily: 'Inter_600SemiBold',
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     fontStyle: 'italic',
     lineHeight: 17,
   },
@@ -5298,9 +5341,10 @@ const styles = StyleSheet.create({
     borderRadius: 1.25,
   },
   voiceVibeDesc: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.72)',
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     lineHeight: 15,
     flex: 1,
   },
@@ -5324,7 +5368,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.65)',
     overflow: 'hidden',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.40,
     shadowRadius: 5,
@@ -5341,14 +5385,16 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   cadenceSegmentLabel: {
+    fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 240, 0.70)',
-    fontSize: 11.5,
-    fontWeight: '600',
-    marginRight: 4,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
+    marginRight: uiTheme.spacing.xs,
   },
   cadenceSegmentLabelActive: {
+    fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   cadenceTimePill: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
@@ -5360,14 +5406,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 51, 102, 0.35)',
   },
   cadenceTimeText: {
+    fontFamily: 'Inter_700Bold',
     color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 9.5,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     includeFontPadding: false,
   },
   cadenceTimeTextActive: {
-    color: '#FFAA80',
-    fontWeight: '800',
+    fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.secondary,
+    fontWeight: 'normal',
   },
   cadenceInsightRow: {
     flexDirection: 'row',
@@ -5380,13 +5428,14 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#FF3366',
+    backgroundColor: uiTheme.colors.primary,
     flexShrink: 0,
   },
   cadenceInsightText: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.75)',
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     lineHeight: 15,
     flex: 1,
   },
@@ -5406,7 +5455,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    gap: 4,
+    gap: uiTheme.spacing.xs,
   },
   shieldBeaconPillDimmed: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -5422,9 +5471,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#8E8E93',
   },
   shieldBeaconText: {
+    fontFamily: 'Inter_700Bold',
     color: '#00E676',
-    fontSize: 9.5,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
     includeFontPadding: false,
   },
@@ -5435,7 +5485,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
   },
   shieldPillarCard: {
     flex: 1,
@@ -5457,18 +5507,20 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   shieldPillarTitle: {
+    fontFamily: 'Manrope_700Bold',
     color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     includeFontPadding: false,
   },
   shieldPillarTitleDimmed: {
     color: '#8E8E93',
   },
   shieldPillarSub: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.60)',
-    fontSize: 8.5,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Step 5: Grand Match Hero & Swipe Deck ──
@@ -5606,6 +5658,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4.5,
   },
   heroCompatibilityText: {
+    fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '800',
@@ -5714,6 +5767,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 230, 118, 0.15)',
   },
   stampLikeText: {
+    fontFamily: 'Inter_800ExtraBold',
     color: '#00E676',
     fontSize: 24,
     fontWeight: '900',
@@ -5864,7 +5918,7 @@ const styles = StyleSheet.create({
   // ── Sticky Bottom Footer (Visually Matches Create Account / Sign In) ──
   footer: {
     paddingHorizontal: 22,
-    paddingTop: 12,
+    paddingTop: uiTheme.spacing.md,
     paddingBottom: 10,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.06)',
@@ -5873,7 +5927,7 @@ const styles = StyleSheet.create({
   continueBtn: {
     borderRadius: 26,
     overflow: 'hidden',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.38,
     shadowRadius: 16,
@@ -5885,14 +5939,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.35)',
   },
   continueBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
     letterSpacing: 0.2,
   },
   footerSubSlot: {
@@ -5907,9 +5961,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ctaReassuranceText: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(255, 255, 255, 0.45)',
-    fontSize: 11.5,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   signInFooterBtn: {
@@ -5946,8 +6001,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     borderColor: 'rgba(255, 255, 255, 0.14)',
     height: '82%',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: uiTheme.spacing.lg,
+    paddingTop: uiTheme.spacing.sm,
     paddingBottom: Platform.OS === 'ios' ? 36 : 20,
     overflow: 'hidden',
     shadowColor: '#000000',
@@ -5962,8 +6017,8 @@ const styles = StyleSheet.create({
     borderRadius: 2.25,
     backgroundColor: 'rgba(255, 255, 255, 0.32)',
     alignSelf: 'center',
-    marginTop: 4,
-    marginBottom: 16,
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalHandle: {
     width: 38,
@@ -5971,8 +6026,8 @@ const styles = StyleSheet.create({
     borderRadius: 2.25,
     backgroundColor: 'rgba(255, 255, 255, 0.32)',
     alignSelf: 'center',
-    marginTop: 4,
-    marginBottom: 16,
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalList: {
     flex: 1,
@@ -5986,13 +6041,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginBottom: 16,
+    paddingHorizontal: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: uiTheme.spacing.md,
     flex: 1,
   },
   modalHeaderIconDiskCoral: {
@@ -6019,20 +6074,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalTitle: {
+    fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 19,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.3,
   },
   modalSub: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(255, 255, 255, 0.65)',
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: 'normal',
     marginTop: 2,
   },
   modalCloseBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
     borderWidth: 1,
@@ -6050,10 +6107,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: 14,
     height: 48,
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   modalSearchWrapFocusedCoral: {
-    borderColor: '#FF3366',
+    borderColor: uiTheme.colors.primary,
     backgroundColor: 'rgba(255, 51, 102, 0.08)',
   },
   modalSearchWrapFocusedEmerald: {
@@ -6061,10 +6118,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 230, 118, 0.08)',
   },
   modalSearchInput: {
+    fontFamily: 'Inter_500Medium',
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
   },
   modalMatchCountPill: {
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
@@ -6075,17 +6133,18 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   modalMatchCountText: {
+    fontFamily: 'Inter_700Bold',
     color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   modalListItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 13,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingHorizontal: uiTheme.spacing.md,
+    borderRadius: uiTheme.radius.input,
   },
   modalListItemSelected: {
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
@@ -6096,47 +6155,53 @@ const styles = StyleSheet.create({
   modalListItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: uiTheme.spacing.md,
     flex: 1,
   },
   modalItemFlag: {
-    fontSize: 24,
+    fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.title.fontSize,
     width: 32,
     textAlign: 'center',
   },
   modalListText: {
+    fontFamily: 'Inter_600SemiBold',
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'normal',
     flex: 1,
     letterSpacing: -0.2,
   },
   modalListTextSelected: {
-    color: '#FF5E7E',
-    fontWeight: '800',
+    fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.accent,
+    fontWeight: 'normal',
   },
   modalListTextSelectedEmerald: {
+    fontFamily: 'Inter_800ExtraBold',
     color: '#00E676',
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   modalListItemRight: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   modalItemDialText: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(255, 255, 255, 0.42)',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
   modalItemDialTextSelected: {
-    color: '#FFAA80',
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontWeight: 'normal',
   },
   modalDialBadge: {
     backgroundColor: 'rgba(0, 230, 118, 0.10)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: uiTheme.spacing.xs,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
     borderColor: 'rgba(0, 230, 118, 0.25)',
   },
@@ -6145,28 +6210,32 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 230, 118, 0.55)',
   },
   modalDialText: {
+    fontFamily: 'Inter_800ExtraBold',
     color: '#00E676',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   modalDialTextSelected: {
+    fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: 'normal',
   },
   modalEmptyWrap: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 56,
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   modalEmptyTitle: {
+    fontFamily: 'Manrope_700Bold',
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   modalEmptySub: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
 });

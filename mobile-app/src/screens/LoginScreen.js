@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../theme';
 // src/screens/LoginScreen.js — Upgraded Luxury Dark Dating App Login Screen
 // Featuring Cinematic Background Carousel, Luminous Aura Emblem, and Modern Glassmorphic Inputs
 import React, { useState, useRef, useEffect } from 'react';
@@ -39,7 +40,7 @@ const safeHaptic = (type) => {
     else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     else if (type === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-  } catch (_) {}
+  } catch (_) { }
 };
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -125,7 +126,7 @@ export default function LoginScreen({ navigation }) {
     // 1. Pre-cache all 6 images immediately
     CAROUSEL_SLIDES.forEach((slide) => {
       if (slide.uri && slide.uri.startsWith('http')) {
-        Image.prefetch(slide.uri).catch(() => {});
+        Image.prefetch(slide.uri).catch(() => { });
       }
     });
 
@@ -227,7 +228,7 @@ export default function LoginScreen({ navigation }) {
           return;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       if (isSignUp) {
@@ -235,7 +236,7 @@ export default function LoginScreen({ navigation }) {
       } else {
         await SupabaseService.loginUser({ email: cleanEmail });
       }
-    } catch (_) {}
+    } catch (_) { }
 
     setIsLoading(false);
     safeHaptic('success');
@@ -298,7 +299,7 @@ export default function LoginScreen({ navigation }) {
           style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}
         />
         <LinearGradient
-          colors={['transparent', 'rgba(14, 8, 18, 0.82)', '#0a050d']}
+          colors={['transparent', 'rgba(14, 8, 18, 0.82)', uiTheme.colors.background]}
           locations={[0.35, 0.68, 1]}
           style={[StyleSheet.absoluteFill, { zIndex: 1001 }]}
         />
@@ -306,8 +307,10 @@ export default function LoginScreen({ navigation }) {
 
       {/* ── Main Content ── */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
+        keyboardVerticalOffset={0}
+        enabled
       >
         <ScrollView
           contentContainerStyle={[
@@ -323,7 +326,7 @@ export default function LoginScreen({ navigation }) {
           <View style={styles.brandContainer}>
             <View style={styles.emblemWrapper}>
               <LinearGradient
-                colors={['#FF3366', '#FFAA80', '#FFD166']}
+                colors={[uiTheme.colors.primary, uiTheme.colors.secondary, '#FFD166']}
                 start={{ x: 0, y: 1 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.emblemFrame}
@@ -364,13 +367,13 @@ export default function LoginScreen({ navigation }) {
                 <Ionicons
                   name="mail-outline"
                   size={19}
-                  color={isFocusedEmail ? '#FFAA80' : '#ac888b'}
+                  color={isFocusedEmail ? uiTheme.colors.secondary : uiTheme.colors.muted}
                   style={styles.inputIcon}
                 />
                 <TextInput
                   style={styles.textInput}
                   placeholder="name@example.com"
-                  placeholderTextColor="#7a6266"
+                  placeholderTextColor={uiTheme.colors.muted}
                   value={email}
                   onChangeText={(t) => {
                     setEmail(t);
@@ -380,8 +383,8 @@ export default function LoginScreen({ navigation }) {
                   autoCapitalize="none"
                   autoCorrect={false}
                   spellCheck={false}
-                  selectionColor="#FFAA80"
-                  cursorColor="#FFAA80"
+                  selectionColor={uiTheme.colors.secondary}
+                  cursorColor={uiTheme.colors.secondary}
                   underlineColorAndroid="transparent"
                   keyboardType="email-address"
                   onFocus={() => setIsFocusedEmail(true)}
@@ -399,7 +402,7 @@ export default function LoginScreen({ navigation }) {
                     accessibilityRole="button"
                     accessibilityLabel="Clear email"
                   >
-                    <Ionicons name="close-circle" size={16} color="#ac888b" />
+                    <Ionicons name="close-circle" size={16} color={uiTheme.colors.muted} />
                   </TouchableOpacity>
                 )}
                 {isValidEmail(email) && (
@@ -427,7 +430,7 @@ export default function LoginScreen({ navigation }) {
                   <Text style={styles.domainLabel}>Quick suggestions:</Text>
                   <View style={styles.domainChipsRow}>
                     {DOMAIN_SUGGESTIONS.map((d) => (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={d}
                         style={styles.domainChip}
                         onPress={() => handleSelectDomain(d)}
@@ -448,25 +451,25 @@ export default function LoginScreen({ navigation }) {
                 <Ionicons
                   name="lock-closed-outline"
                   size={19}
-                  color={isFocusedPassword ? '#FFAA80' : '#ac888b'}
+                  color={isFocusedPassword ? uiTheme.colors.secondary : uiTheme.colors.muted}
                   style={styles.inputIcon}
                 />
                 <TextInput
                   style={styles.textInput}
                   placeholder="••••••••"
-                  placeholderTextColor="#7a6266"
+                  placeholderTextColor={uiTheme.colors.muted}
                   value={password}
                   onChangeText={setPassword}
                   autoCorrect={false}
                   spellCheck={false}
-                  selectionColor="#FFAA80"
-                  cursorColor="#FFAA80"
+                  selectionColor={uiTheme.colors.secondary}
+                  cursorColor={uiTheme.colors.secondary}
                   underlineColorAndroid="transparent"
                   secureTextEntry={!showPassword}
                   onFocus={() => setIsFocusedPassword(true)}
                   onBlur={() => setIsFocusedPassword(false)}
                 />
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   onPress={() => setShowPassword(!showPassword)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   style={styles.eyeButton}
@@ -474,7 +477,7 @@ export default function LoginScreen({ navigation }) {
                   <Ionicons
                     name={showPassword ? 'eye-outline' : 'eye-off-outline'}
                     size={19}
-                    color="#ac888b"
+                    color={uiTheme.colors.muted}
                   />
                 </TouchableOpacity>
               </View>
@@ -554,7 +557,7 @@ export default function LoginScreen({ navigation }) {
             {/* Agreement Warning if unselected */}
             {isSignUp && agreementError && (
               <View style={styles.agreementWarningRow}>
-                <Ionicons name="alert-circle" size={13} color="#FF5E7E" />
+                <Ionicons name="alert-circle" size={13} color={uiTheme.colors.accent} />
                 <Text style={styles.agreementWarningText}>
                   Please check the box to accept the Terms & 18+ policy to continue
                 </Text>
@@ -565,7 +568,7 @@ export default function LoginScreen({ navigation }) {
             {accountConflict === 'exists' && (
               <View style={styles.conflictBanner}>
                 <View style={styles.conflictBannerHeader}>
-                  <Ionicons name="information-circle" size={17} color="#FFAA80" />
+                  <Ionicons name="information-circle" size={17} color={uiTheme.colors.secondary} />
                   <Text style={styles.conflictBannerTitle}>
                     An account with this email already exists.
                   </Text>
@@ -587,7 +590,7 @@ export default function LoginScreen({ navigation }) {
             {accountConflict === 'not_found' && (
               <View style={styles.conflictBanner}>
                 <View style={styles.conflictBannerHeader}>
-                  <Ionicons name="information-circle" size={17} color="#FFAA80" />
+                  <Ionicons name="information-circle" size={17} color={uiTheme.colors.secondary} />
                   <Text style={styles.conflictBannerTitle}>
                     No account found with this email.
                   </Text>
@@ -608,7 +611,7 @@ export default function LoginScreen({ navigation }) {
             {/* Standard Error */}
             {Boolean(errorMessage) && !accountConflict && (
               <View style={styles.errorRow}>
-                <Ionicons name="alert-circle" size={14} color="#FF5E7E" />
+                <Ionicons name="alert-circle" size={14} color={uiTheme.colors.accent} />
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             )}
@@ -628,7 +631,7 @@ export default function LoginScreen({ navigation }) {
                 colors={
                   isSignUp && !isAgreed
                     ? ['rgba(255, 51, 102, 0.55)', 'rgba(255, 94, 126, 0.55)', 'rgba(255, 170, 128, 0.55)']
-                    : ['#FF3366', '#FF5E7E', '#FFAA80']
+                    : [uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -736,7 +739,7 @@ export default function LoginScreen({ navigation }) {
                 accessibilityRole="button"
                 accessibilityLabel="Close legal document"
               >
-                <Ionicons name="close" size={22} color="#edddf1" />
+                <Ionicons name="close" size={22} color={uiTheme.colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -799,7 +802,7 @@ export default function LoginScreen({ navigation }) {
               {legalTab === 'terms' ? (
                 <View style={styles.legalSection}>
                   <View style={styles.legalBadgeRow}>
-                    <Ionicons name="shield-checkmark" size={14} color="#FFAA80" />
+                    <Ionicons name="shield-checkmark" size={14} color={uiTheme.colors.secondary} />
                     <Text style={styles.legalBadgeText}>18+ Age Requirement & Community Honor Code</Text>
                   </View>
 
@@ -826,7 +829,7 @@ export default function LoginScreen({ navigation }) {
               ) : (
                 <View style={styles.legalSection}>
                   <View style={styles.legalBadgeRow}>
-                    <Ionicons name="lock-closed" size={14} color="#FFAA80" />
+                    <Ionicons name="lock-closed" size={14} color={uiTheme.colors.secondary} />
                     <Text style={styles.legalBadgeText}>256-Bit TLS Encryption & GDPR / CCPA Compliant</Text>
                   </View>
 
@@ -868,7 +871,7 @@ export default function LoginScreen({ navigation }) {
                 accessibilityLabel="I Understand and Accept"
               >
                 <LinearGradient
-                  colors={['#FF3366', '#FF5E7E', '#FFAA80']}
+                  colors={[uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.modalAcceptGradient}
@@ -912,7 +915,7 @@ export default function LoginScreen({ navigation }) {
                 accessibilityRole="button"
                 accessibilityLabel="Close support"
               >
-                <Ionicons name="close" size={22} color="#edddf1" />
+                <Ionicons name="close" size={22} color={uiTheme.colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -925,7 +928,7 @@ export default function LoginScreen({ navigation }) {
               {/* Tip 1 */}
               <View style={styles.supportTipCard}>
                 <View style={styles.supportTipIconWrap}>
-                  <Ionicons name="mail" size={18} color="#FFAA80" />
+                  <Ionicons name="mail" size={18} color={uiTheme.colors.secondary} />
                 </View>
                 <View style={styles.supportTipBody}>
                   <Text style={styles.supportTipTitle}>Trouble Signing In?</Text>
@@ -938,7 +941,7 @@ export default function LoginScreen({ navigation }) {
               {/* Tip 2 */}
               <View style={styles.supportTipCard}>
                 <View style={styles.supportTipIconWrap}>
-                  <Ionicons name="sync" size={18} color="#FFAA80" />
+                  <Ionicons name="sync" size={18} color={uiTheme.colors.secondary} />
                 </View>
                 <View style={styles.supportTipBody}>
                   <Text style={styles.supportTipTitle}>Forgot Your Password?</Text>
@@ -951,7 +954,7 @@ export default function LoginScreen({ navigation }) {
               {/* Tip 3 */}
               <View style={styles.supportTipCard}>
                 <View style={styles.supportTipIconWrap}>
-                  <Ionicons name="shield-checkmark" size={18} color="#FFAA80" />
+                  <Ionicons name="shield-checkmark" size={18} color={uiTheme.colors.secondary} />
                 </View>
                 <View style={styles.supportTipBody}>
                   <Text style={styles.supportTipTitle}>Account Status & Inquiries</Text>
@@ -966,20 +969,20 @@ export default function LoginScreen({ navigation }) {
                 style={styles.conciergeContactBtn}
                 onPress={() => {
                   safeHaptic('medium');
-                  Linking.openURL('mailto:support@flint.dating?subject=Flint%20Login%20Assistance').catch(() => {});
+                  Linking.openURL('mailto:support@flint.dating?subject=Flint%20Login%20Assistance').catch(() => { });
                 }}
                 activeOpacity={0.88}
                 accessibilityRole="button"
                 accessibilityLabel="Email Flint Concierge Support"
               >
-                <Ionicons name="chatbubbles" size={18} color="#FFAA80" />
+                <Ionicons name="chatbubbles" size={18} color={uiTheme.colors.secondary} />
                 <Text style={styles.conciergeContactBtnText}>Contact Flint Concierge</Text>
-                <Ionicons name="open-outline" size={16} color="#ac888b" />
+                <Ionicons name="open-outline" size={16} color={uiTheme.colors.muted} />
               </TouchableOpacity>
             </ScrollView>
 
             <View style={styles.modalBottomBar}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.modalDismissSimpleBtn}
                 onPress={() => setSupportModalVisible(false)}
                 activeOpacity={0.7}
@@ -1008,15 +1011,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    width: '100%', maxWidth: 480, alignSelf: 'center',
     flexGrow: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: uiTheme.spacing.xxl,
     justifyContent: 'center',
   },
 
   // ── Brand Header ──
   brandContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: uiTheme.spacing.xxl,
   },
   emblemWrapper: {
     position: 'relative',
@@ -1040,7 +1044,7 @@ const styles = StyleSheet.create({
   emblemInner: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
+    borderRadius: uiTheme.radius.card,
     overflow: 'hidden',
     backgroundColor: 'rgba(18, 10, 23, 0.96)',
     borderWidth: 1,
@@ -1053,22 +1057,24 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   brandTitle: {
+    fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 42,
-    fontWeight: '900',
+    fontWeight: 'normal',
     letterSpacing: -0.7,
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
     textShadowColor: 'rgba(255, 51, 102, 0.45)',
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 12,
   },
   heroDialogue: {
+    fontFamily: 'Inter_600SemiBold',
     color: 'rgba(255, 240, 245, 0.92)',
     fontSize: 15.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
     textAlign: 'center',
     letterSpacing: 0.2,
-    marginTop: 4,
+    marginTop: uiTheme.spacing.xs,
     maxWidth: 320,
     lineHeight: 22,
     textShadowColor: 'rgba(0, 0, 0, 0.65)',
@@ -1082,7 +1088,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 26,
-    padding: 24,
+    padding: uiTheme.spacing.xxl,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
@@ -1090,23 +1096,25 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   cardTitle: {
+    fontFamily: 'Manrope_800ExtraBold',
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: 'normal',
     color: '#FFFFFF',
     letterSpacing: -0.2,
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
     textAlign: 'center',
   },
   cardSubtitle: {
+    fontFamily: 'Inter_400Regular',
     fontSize: 13.5,
     color: 'rgba(245, 235, 240, 0.75)',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: uiTheme.spacing.xl,
   },
 
   // ── Input Fields ──
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   fieldLabelRow: {
     flexDirection: 'row',
@@ -1119,46 +1127,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     marginTop: 6,
-    paddingLeft: 4,
+    paddingLeft: uiTheme.spacing.xs,
   },
   fieldHintText: {
+    fontFamily: 'Inter_400Regular',
     color: 'rgba(237, 221, 241, 0.52)',
-    fontSize: 11,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 15,
   },
 
   // ── Domain Chips ──
   domainSection: {
     marginTop: 10,
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
   },
   domainLabel: {
-    color: '#ac888b',
-    fontSize: 11,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginBottom: 6,
   },
   domainChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   domainChip: {
     backgroundColor: 'rgba(59, 49, 64, 0.6)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   domainChipText: {
-    color: '#edddf1',
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   inputLabel: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     color: 'rgba(237, 221, 241, 0.65)',
     marginBottom: 7,
     letterSpacing: 0.4,
@@ -1174,37 +1186,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   inputBoxFocused: {
-    borderColor: '#FFAA80',
+    borderColor: uiTheme.colors.secondary,
     backgroundColor: 'rgba(32, 20, 40, 0.92)',
   },
   inputIcon: {
     marginRight: 10,
   },
   textInput: {
+    fontFamily: 'Inter_400Regular',
     flex: 1,
     fontSize: 14.5,
-    color: '#edddf1',
+    color: uiTheme.colors.text,
     paddingVertical: Platform.OS === 'ios' ? 10 : 6,
   },
   eyeButton: {
-    padding: 4,
+    padding: uiTheme.spacing.xs,
   },
   forgotPasswordButton: {
     alignSelf: 'flex-end',
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
   },
   forgotPasswordText: {
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 12.5,
-    color: '#FFAA80',
-    fontWeight: '600',
+    color: uiTheme.colors.secondary,
+    fontWeight: 'normal',
   },
 
   // ── Primary CTA (Stitch Velvet & Peach Gradient) ──
   primaryButton: {
     borderRadius: 26,
     overflow: 'hidden',
-    marginTop: 8,
-    shadowColor: '#FF3366',
+    marginTop: uiTheme.spacing.sm,
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.38,
     shadowRadius: 16,
@@ -1221,14 +1235,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.35)',
   },
   primaryButtonText: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
 
@@ -1236,10 +1251,10 @@ const styles = StyleSheet.create({
   consentCheckboxRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: uiTheme.spacing.md,
     paddingHorizontal: 2,
     paddingVertical: 6,
-    marginTop: 4,
+    marginTop: uiTheme.spacing.xs,
     marginBottom: 14,
   },
   consentCheckboxRowError: {},
@@ -1255,14 +1270,15 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   consentBoxChecked: {
-    backgroundColor: '#FF3366',
-    borderColor: '#FF5E7E',
+    backgroundColor: uiTheme.colors.primary,
+    borderColor: uiTheme.colors.accent,
   },
   consentBoxError: {
     borderColor: '#FF4D6D',
     backgroundColor: 'rgba(255, 77, 109, 0.25)',
   },
   consentText: {
+    fontFamily: 'Inter_400Regular',
     flex: 1,
     color: 'rgba(245, 235, 240, 0.82)',
     fontSize: 12.5,
@@ -1272,13 +1288,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
-    paddingHorizontal: 4,
+    marginBottom: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.xs,
   },
   agreementWarningText: {
-    color: '#FF5E7E',
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.accent,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Account Conflict Banner (Option 1 Inline Switcher) ──
@@ -1288,50 +1305,53 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 170, 128, 0.35)',
     borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     marginBottom: 14,
     gap: 10,
   },
   conflictBannerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   conflictBannerTitle: {
-    color: '#edddf1',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
     flex: 1,
     lineHeight: 18,
   },
   conflictActionBtn: {
-    backgroundColor: '#FF3366',
+    backgroundColor: uiTheme.colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
     paddingHorizontal: 14,
     borderRadius: 10,
     alignSelf: 'flex-start',
   },
   conflictActionText: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.1,
   },
   errorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
     paddingLeft: 2,
   },
   errorText: {
-    color: '#FF5E7E',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.accent,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
 
   // ── Guest Link ──
@@ -1340,12 +1360,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     minHeight: 44,
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
   },
   guestBottomLinkText: {
+    fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 211, 0.72)',
     fontSize: 13.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
 
@@ -1355,28 +1376,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 18,
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   footerText: {
+    fontFamily: 'Inter_400Regular',
     fontSize: 13.5,
-    color: '#e5bdc0',
+    color: uiTheme.colors.textSecondary,
   },
   footerActionText: {
+    fontFamily: 'Inter_700Bold',
     fontSize: 13.5,
-    fontWeight: '700',
-    color: '#FFAA80',
+    fontWeight: 'normal',
+    color: uiTheme.colors.secondary,
   },
 
   // ── Legal & Links ──
   legalDisclaimerText: {
-    color: '#ac888b',
-    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     textAlign: 'center',
     lineHeight: 18,
   },
   legalLink: {
-    color: '#FFAA80',
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontWeight: 'normal',
   },
 
   // ── Modals & Bottom Sheets (Apple HIG & App Store Compliance) ──
@@ -1389,7 +1414,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalCard: {
-    backgroundColor: '#140D1B',
+    backgroundColor: uiTheme.colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
@@ -1397,7 +1422,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     maxHeight: '86%',
     minHeight: 460,
-    paddingTop: 12,
+    paddingTop: uiTheme.spacing.md,
     paddingHorizontal: 22,
     paddingBottom: Platform.OS === 'ios' ? 34 : 22,
     shadowColor: '#000',
@@ -1416,31 +1441,33 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalHeaderTitleGroup: {
     flex: 1,
   },
   modalTitle: {
+    fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 21,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.3,
   },
   modalSub: {
-    color: '#ac888b',
+    fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
     marginTop: 2,
   },
   modalCloseBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
@@ -1451,7 +1478,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: 14,
     padding: 3,
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalTabBtn: {
     flex: 1,
@@ -1463,48 +1490,53 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.14)',
   },
   modalTabText: {
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
-    fontWeight: '600',
-    color: '#ac888b',
+    fontWeight: 'normal',
+    color: uiTheme.colors.muted,
   },
   modalTabTextActive: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   modalScroll: {
     flexGrow: 0,
     maxHeight: 340,
   },
   modalScrollContent: {
-    paddingBottom: 16,
+    paddingBottom: uiTheme.spacing.lg,
   },
   legalSection: {
-    gap: 12,
+    gap: uiTheme.spacing.md,
   },
   legalBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.25)',
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: uiTheme.spacing.md,
+    paddingVertical: uiTheme.spacing.sm,
     marginBottom: 6,
   },
   legalBadgeText: {
-    color: '#FFAA80',
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   legalParagraphHead: {
-    color: '#edddf1',
-    fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
     marginTop: 6,
   },
   legalParagraph: {
+    fontFamily: 'Inter_400Regular',
     color: 'rgba(245, 235, 240, 0.78)',
     fontSize: 13,
     lineHeight: 20,
@@ -1516,9 +1548,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   modalAcceptBtn: {
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
     overflow: 'hidden',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
@@ -1526,14 +1558,15 @@ const styles = StyleSheet.create({
   },
   modalAcceptGradient: {
     height: 48,
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalAcceptBtnText: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   supportTipCard: {
@@ -1544,7 +1577,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,
-    gap: 12,
+    gap: uiTheme.spacing.md,
   },
   supportTipIconWrap: {
     width: 32,
@@ -1559,12 +1592,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   supportTipTitle: {
-    color: '#edddf1',
+    fontFamily: 'Manrope_700Bold',
+    color: uiTheme.colors.text,
     fontSize: 13.5,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.xs,
   },
   supportTipText: {
+    fontFamily: 'Inter_400Regular',
     color: 'rgba(245, 235, 240, 0.7)',
     fontSize: 12.5,
     lineHeight: 18,
@@ -1573,27 +1608,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     backgroundColor: 'rgba(255, 51, 102, 0.14)',
     borderWidth: 1.2,
-    borderColor: '#FF5E7E',
+    borderColor: uiTheme.colors.accent,
     borderRadius: 22,
-    paddingVertical: 12,
-    marginTop: 8,
-    marginBottom: 4,
+    paddingVertical: uiTheme.spacing.md,
+    marginTop: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.xs,
   },
   conciergeContactBtnText: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
   modalDismissSimpleBtn: {
     alignItems: 'center',
     paddingVertical: 10,
   },
   modalDismissSimpleText: {
-    color: '#ac888b',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
     fontSize: 13.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
 });

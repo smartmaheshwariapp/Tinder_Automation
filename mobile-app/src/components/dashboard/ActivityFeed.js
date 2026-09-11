@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/ActivityFeed.js — Live Stream Timeline of AI Engine Actions with Match Moments Hub
 import React, { useRef, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
@@ -6,17 +7,17 @@ import { Ionicons } from '@expo/vector-icons';
 // ─── Feed metadata with clean vector icons ────────────────────────────────────
 const FEED_META = {
   opener_sent:      { icon: 'mail-outline',          label: 'Opener Sent',        color: '#EC4899' },
-  message_replied:  { icon: 'chatbubbles-outline',   label: 'Reply Sent',         color: '#818CF8' },
-  profile_liked:    { icon: 'heart',                 label: 'Profile Liked',      color: '#FE3C72' },
+  message_replied:  { icon: 'chatbubbles-outline',   label: 'Reply Sent',         color: uiTheme.colors.info },
+  profile_liked:    { icon: 'heart',                 label: 'Profile Liked',      color: uiTheme.colors.primary },
   match_detected:   { icon: 'sparkles',              label: 'New Match',          color: '#FFB800' },
-  handoff_detected: { icon: 'star',                  label: 'Match Moment',       color: '#10B981' },
-  cycle_complete:   { icon: 'checkmark-done',        label: 'Batch Completed',    color: '#10B981' },
-  persona_update:   { icon: 'options-outline',       label: 'AI Tone Calibrated', color: '#818CF8' },
-  swipe_progress:   { icon: 'trending-up-outline',   label: 'Swiping Session',    color: '#FE3C72' },
+  handoff_detected: { icon: 'star',                  label: 'Match Moment',       color: uiTheme.colors.success },
+  cycle_complete:   { icon: 'checkmark-done',        label: 'Batch Completed',    color: uiTheme.colors.success },
+  persona_update:   { icon: 'options-outline',       label: 'AI Tone Calibrated', color: uiTheme.colors.info },
+  swipe_progress:   { icon: 'trending-up-outline',   label: 'Swiping Session',    color: uiTheme.colors.primary },
   msg_progress:     { icon: 'chatbox-ellipses',      label: 'Messaging Queue',    color: '#EC4899' },
-  rate_limit:       { icon: 'shield-outline',        label: 'Safety Rate Limit',  color: '#EF4444' },
-  trial_ended:      { icon: 'flag-outline',          label: 'Cycle Paused',       color: '#716E89' },
-  error:            { icon: 'alert-circle-outline',  label: 'Attention Needed',   color: '#EF4444' },
+  rate_limit:       { icon: 'shield-outline',        label: 'Safety Rate Limit',  color: uiTheme.colors.error },
+  trial_ended:      { icon: 'flag-outline',          label: 'Cycle Paused',       color: uiTheme.colors.muted },
+  error:            { icon: 'alert-circle-outline',  label: 'Attention Needed',   color: uiTheme.colors.error },
 };
 
 function formatTimeAgo(timestamp) {
@@ -44,15 +45,15 @@ function FeedItem({ event }) {
 
   return (
     <View style={[styles.feedItem, isMoment && styles.feedItemMoment]}>
-      <View style={[styles.accentBar, { backgroundColor: isMoment ? '#10B981' : meta.color }]} />
-      <View style={[styles.iconWrap, { backgroundColor: (isMoment ? '#10B981' : meta.color) + '15' }]}>
-        <Ionicons name={isMoment ? 'star' : meta.icon} size={15} color={isMoment ? '#10B981' : meta.color} />
+      <View style={[styles.accentBar, { backgroundColor: isMoment ? uiTheme.colors.success : meta.color }]} />
+      <View style={[styles.iconWrap, { backgroundColor: (isMoment ? uiTheme.colors.success : meta.color) + '15' }]}>
+        <Ionicons name={isMoment ? 'star' : meta.icon} size={15} color={isMoment ? uiTheme.colors.success : meta.color} />
       </View>
       <View style={styles.itemContent}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <Text style={styles.itemTitle} numberOfLines={1}>
             {isMoment ? 'Match Moment (Goal Reached)' : meta.label}
-            {nameLabel ? <Text style={[styles.itemName, { color: isMoment ? '#10B981' : meta.color }]}>{nameLabel}</Text> : null}
+            {nameLabel ? <Text style={[styles.itemName, { color: isMoment ? uiTheme.colors.success : meta.color }]}>{nameLabel}</Text> : null}
           </Text>
         </View>
         {detailText ? (
@@ -68,7 +69,7 @@ function EmptyFeed() {
   return (
     <View style={styles.emptyWrap}>
       <View style={styles.emptyIconWrap}>
-        <Ionicons name="sparkles-outline" size={24} color="#716E89" />
+        <Ionicons name="sparkles-outline" size={24} color={uiTheme.colors.muted} />
       </View>
       <Text style={styles.emptyTitle}>Live Feed Standby</Text>
       <Text style={styles.emptyDesc}>
@@ -100,7 +101,7 @@ export default function ActivityFeed({ progressFeed }) {
           <Text style={styles.sectionTitle}>Live Activity Timeline</Text>
           {momentsCount > 0 && (
             <View style={styles.momentBadge}>
-              <Ionicons name="star" size={10} color="#10B981" />
+              <Ionicons name="star" size={10} color={uiTheme.colors.success} />
               <Text style={styles.momentBadgeText}>{momentsCount} Leads</Text>
             </View>
           )}
@@ -131,12 +132,12 @@ export default function ActivityFeed({ progressFeed }) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   feedHeader: {
     flexDirection: 'row',
@@ -144,9 +145,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  sectionTitle: {
+  sectionTitle: { fontFamily: 'Manrope_800ExtraBold',
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
     color: '#FFF',
     letterSpacing: -0.2,
   },
@@ -161,23 +162,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
-  momentBadgeText: {
-    color: '#10B981',
-    fontSize: 10,
-    fontWeight: '800',
+  momentBadgeText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   countBadge: {
-    backgroundColor: '#1C192E',
+    backgroundColor: uiTheme.colors.elevated,
     paddingHorizontal: 7,
     paddingVertical: 2.5,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
-  countText: {
-    color: '#8E8DA3',
-    fontSize: 10.5,
-    fontWeight: '700',
+  countText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   scroll: {
     maxHeight: 220,
@@ -185,7 +186,7 @@ const styles = StyleSheet.create({
   feedItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#221E33',
@@ -211,56 +212,56 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
-    marginLeft: 4,
+    marginLeft: uiTheme.spacing.xs,
   },
   itemContent: {
     flex: 1,
   },
-  itemTitle: {
+  itemTitle: { fontFamily: 'Manrope_700Bold',
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     color: '#FFF',
   },
-  itemName: {
-    fontWeight: '800',
+  itemName: { fontFamily: 'Inter_800ExtraBold',
+    fontWeight: 'normal',
   },
-  itemDetail: {
-    fontSize: 11,
-    color: '#8E8DA3',
+  itemDetail: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
     marginTop: 1,
   },
-  itemTime: {
-    fontSize: 10.5,
-    color: '#716E89',
-    fontWeight: '600',
+  itemTime: { fontFamily: 'Inter_600SemiBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
+    fontWeight: 'normal',
     marginLeft: 6,
   },
   emptyWrap: {
-    paddingVertical: 24,
+    paddingVertical: uiTheme.spacing.xxl,
     alignItems: 'center',
   },
   emptyIconWrap: {
     width: 44,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: '#1C192E',
+    borderRadius: uiTheme.radius.input,
+    backgroundColor: uiTheme.colors.elevated,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
-  emptyTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+  emptyTitle: { fontFamily: 'Manrope_700Bold',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
     color: '#FFF',
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
   },
-  emptyDesc: {
-    fontSize: 12,
-    color: '#716E89',
+  emptyDesc: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
     textAlign: 'center',
     lineHeight: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
   },
 });

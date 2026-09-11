@@ -44,7 +44,8 @@
     "owner": "miiscoorg",
     "plugins": [
       "expo-web-browser",
-      "expo-location"
+      "expo-location",
+      "expo-font"
     ]
   }
 }

@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/common/V2Dropdown.js
 // Custom animated Dropdown component matching Desktop Plugin V2 UI trigger and options list (5 items visible + scroll)
 import React, { useState } from 'react';
@@ -64,6 +65,9 @@ export default function V2Dropdown({
         onPress={toggleDropdown}
         activeOpacity={0.8}
         disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={`${label || 'Select option'}: ${displayLabel}`}
+        accessibilityState={{ expanded: isOpen, disabled }}
       >
         <Text style={styles.triggerValue} numberOfLines={1}>
           {displayLabel}
@@ -71,7 +75,7 @@ export default function V2Dropdown({
         <Ionicons
           name={isOpen ? 'chevron-up' : 'chevron-down'}
           size={16}
-          color="#8E8DA3"
+          color={uiTheme.colors.muted}
         />
       </TouchableOpacity>
 
@@ -93,6 +97,9 @@ export default function V2Dropdown({
                   style={[styles.optionItem, isSelected && styles.optionItemSelected]}
                   onPress={() => handleSelect(val)}
                   activeOpacity={0.7}
+                  accessibilityRole="radio"
+                  accessibilityLabel={opt.label}
+                  accessibilityState={{ selected: isSelected }}
                 >
                   <View style={styles.optionContent}>
                     {opt.flag && <Text style={styles.optionFlag}>{opt.flag}</Text>}
@@ -100,7 +107,7 @@ export default function V2Dropdown({
                       <Ionicons
                         name={opt.icon}
                         size={15}
-                        color={isSelected ? '#FE3C72' : '#8E8DA3'}
+                        color={isSelected ? uiTheme.colors.primary : uiTheme.colors.muted}
                         style={{ marginRight: 8 }}
                       />
                     )}
@@ -117,7 +124,7 @@ export default function V2Dropdown({
                   </View>
 
                   {isSelected && (
-                    <Ionicons name="checkmark" size={16} color="#FE3C72" />
+                    <Ionicons name="checkmark" size={16} color={uiTheme.colors.primary} />
                   )}
                 </TouchableOpacity>
               );
@@ -137,48 +144,50 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   labelRow: {
+    flexWrap: 'wrap',
     flexDirection: 'row',
     alignItems: 'baseline',
     marginBottom: 6,
     gap: 6,
   },
-  dropdownLabel: {
-    color: '#E0DFEC',
+  dropdownLabel: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
-  dropdownSublabel: {
-    color: '#716E89',
-    fontSize: 11,
+  dropdownSublabel: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
   },
   trigger: {
-    height: 44,
-    backgroundColor: '#161424',
+    minHeight: 48,
+    paddingVertical: uiTheme.spacing.md,
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
   },
   triggerOpen: {
-    borderColor: '#FE3C72',
+    borderColor: uiTheme.colors.primary,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
-  triggerValue: {
+  triggerValue: { fontFamily: 'Inter_600SemiBold',
     color: '#FFF',
     fontSize: 13.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
     flex: 1,
-    marginRight: 8,
+    marginRight: uiTheme.spacing.sm,
   },
   optionsList: {
-    backgroundColor: '#12101E',
+    backgroundColor: uiTheme.colors.surface,
     borderWidth: 1,
     borderTopWidth: 0,
-    borderColor: '#FE3C72',
+    borderColor: uiTheme.colors.primary,
     borderBottomLeftRadius: 10,
     borderBottomRightRadius: 10,
     overflow: 'hidden',
@@ -193,8 +202,8 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E1B2E',
-    minHeight: 43,
+    borderBottomColor: uiTheme.colors.elevated,
+    minHeight: 48,
   },
   optionItemSelected: {
     backgroundColor: 'rgba(254, 60, 114, 0.08)',
@@ -204,22 +213,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  optionFlag: {
-    fontSize: 15,
-    marginRight: 8,
+  optionFlag: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.body.fontSize,
+    marginRight: uiTheme.spacing.sm,
   },
-  optionText: {
-    color: '#B2B0C8',
+  optionText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.textSecondary,
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
-  optionTextSelected: {
-    color: '#FE3C72',
-    fontWeight: '700',
+  optionTextSelected: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontWeight: 'normal',
   },
-  optionDesc: {
-    color: '#716E89',
-    fontSize: 11,
+  optionDesc: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 1,
   },
 });

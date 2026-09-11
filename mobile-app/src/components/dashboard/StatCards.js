@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/StatCards.js — High-end Glassmorphic Stat Metrics
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -24,7 +25,7 @@ function StatCard({ iconName, label, value, todayDelta, accentColor }) {
         </View>
       ) : (
         <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)' }]}>
-          <Text style={[styles.badgeText, { color: '#716E89' }]}>Total</Text>
+          <Text style={[styles.badgeText, { color: uiTheme.colors.muted }]}>Total</Text>
         </View>
       )}
     </View>
@@ -48,7 +49,7 @@ export default function StatCards({ lifetimeStats }) {
         label="Swipes"
         value={totalSwipes}
         todayDelta={todaySwipes}
-        accentColor="#FE3C72"
+        accentColor={uiTheme.colors.primary}
       />
       <StatCard
         iconName="chatbubbles"
@@ -62,7 +63,7 @@ export default function StatCards({ lifetimeStats }) {
         label="Matches"
         value={totalMatches}
         todayDelta={activeChats}
-        accentColor="#818CF8"
+        accentColor={uiTheme.colors.info}
       />
     </View>
   );
@@ -71,35 +72,35 @@ export default function StatCards({ lifetimeStats }) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
+    gap: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.md,
   },
   card: {
     flex: 1,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    paddingVertical: uiTheme.spacing.md,
+    paddingHorizontal: uiTheme.spacing.sm,
     alignItems: 'center',
   },
   iconWrap: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 6,
   },
-  cardValue: {
-    fontSize: 18,
-    fontWeight: '800',
+  cardValue: { fontFamily: 'Inter_800ExtraBold',
+    fontSize: uiTheme.type.section.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.4,
   },
-  cardLabel: {
-    fontSize: 11,
-    color: '#8E8DA3',
-    fontWeight: '600',
+  cardLabel: { fontFamily: 'Inter_600SemiBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
+    fontWeight: 'normal',
     marginTop: 2,
   },
   badge: {
@@ -109,8 +110,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1,
   },
-  badgeText: {
-    fontSize: 9.5,
-    fontWeight: '700',
+  badgeText: { fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 });

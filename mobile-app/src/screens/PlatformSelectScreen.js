@@ -1,5 +1,6 @@
+import { theme as uiTheme } from "../theme";
 // PlatformSelectScreen.js — FlirtEasy AI Cockpit (Root Home Screen)
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -7,7 +8,6 @@ import {
   TouchableOpacity,
   StatusBar,
   TextInput,
-  Image,
   Animated,
   Modal,
   Dimensions,
@@ -16,13 +16,17 @@ import {
   Platform,
   ScrollView,
   Alert,
-} from 'react-native';
-import ActivityIndicator from '../components/common/SafeActivityIndicator';
+} from "react-native";
+import ActivityIndicator from "../components/common/SafeActivityIndicator";
 
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import { getAutoDetectedLocalIp, resolveLocalUrl, postJsonWithTimeout } from '../utils/network';
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import {
+  getAutoDetectedLocalIp,
+  resolveLocalUrl,
+  postJsonWithTimeout,
+} from "../utils/network";
 import {
   startHyperbeamCloudSession,
   getTinderAuthState,
@@ -45,47 +49,57 @@ import {
   saveOnDeviceSessionState,
   pushProgressFeedEvent,
   getOnDeviceWorker,
-} from '../utils/sessionManager';
-import useExtensionStats from '../hooks/useExtensionStats';
-import { DashboardPanel } from '../components/dashboard';
-import SupabaseService from '../services/supabase';
-import trackingService from '../services/trackingService';
-import NotificationService from '../services/notifications';
-import NotificationCenterModal from '../components/NotificationCenterModal';
-import PermissionPrePromptModal from '../components/common/PermissionPrePromptModal';
-import LocationNoticeModal from '../components/common/LocationNoticeModal';
-import LocationService from '../services/locationService';
+} from "../utils/sessionManager";
+import useExtensionStats from "../hooks/useExtensionStats";
+import { DashboardPanel } from "../components/dashboard";
+import HomeOverview, {
+  HomeBottomNavigation,
+} from "../components/dashboard/HomeOverview";
+import AppSettings from "../components/dashboard/AppSettings";
+import ProfileDetails from "../components/dashboard/ProfileDetails";
+import { LinearGradient } from "expo-linear-gradient";
+import SupabaseService from "../services/supabase";
+import NotificationService from "../services/notifications";
+import NotificationCenterModal from "../components/NotificationCenterModal";
+import PermissionPrePromptModal from "../components/common/PermissionPrePromptModal";
+import LocationNoticeModal from "../components/common/LocationNoticeModal";
+import LocationService from "../services/locationService";
 
-const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
-const TINDER_IMG = require('../../assets/flirteasy/tinder.jpg');
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function PlatformSelectScreen({ navigation, route }) {
-  const [selectedPlatform, setSelectedPlatform] = useState('Tinder');
-  const [environment, setEnvironmentState] = useState(() => getSelectedEnvironment() || 'on_device');
+  const [homeTab, setHomeTab] = useState("home");
+  const [deviceLatencyMs, setDeviceLatencyMs] = useState(null);
+  const [selectedPlatform, setSelectedPlatform] = useState("Tinder");
+  const [environment, setEnvironmentState] = useState(
+    () => getSelectedEnvironment() || "on_device",
+  );
   const setEnvironment = useCallback((env) => {
     setSelectedEnvironment(env);
     setEnvironmentState(env);
   }, []);
-  const [userRegion, setUserRegion] = useState('israel'); // 'israel' | 'direct'
+  const [userRegion, setUserRegion] = useState("israel"); // 'israel' | 'direct'
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
 
   // Connection endpoints
-  const [vpsUrl, setVpsUrl] = useState('https://stream.smartmaheshwari.com/?usr=User&pwd=admin');
-  const [vpsProxy, setVpsProxy] = useState('');
+  const [vpsUrl, setVpsUrl] = useState(
+    "https://stream.smartmaheshwari.com/?usr=User&pwd=admin",
+  );
+  const [vpsProxy, setVpsProxy] = useState("");
 
   const autoIp = getAutoDetectedLocalIp();
-  const [localUrl, setLocalUrl] = useState(`http://${autoIp}:8080/?usr=User&pwd=admin`);
-  const [localProxy, setLocalProxy] = useState('');
+  const [localUrl, setLocalUrl] = useState(
+    `http://${autoIp}:8080/?usr=User&pwd=admin`,
+  );
+  const [localProxy, setLocalProxy] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [updatingGpsLocation, setUpdatingGpsLocation] = useState(false);
   const [locationNoticeModal, setLocationNoticeModal] = useState(null);
 
   const handleLocationAcquired = useCallback((res) => {
     if (res && res.cityName && res.latitude && res.longitude) {
-      setLocalSettings(prev => {
+      setLocalSettings((prev) => {
         const updated = {
           ...(prev || {}),
           useDeviceLocation: true,
@@ -108,38 +122,41 @@ export default function PlatformSelectScreen({ navigation, route }) {
         handleLocationAcquired(res);
         setLocationNoticeModal({
           visible: true,
-          type: 'connected',
-          title: 'Location Connected',
+          type: "connected",
+          title: "Location Connected",
           cityName: res.cityName,
         });
-      } else if (res?.code === 'SERVICES_DISABLED') {
+      } else if (res?.code === "SERVICES_DISABLED") {
         setLocationNoticeModal({
           visible: true,
-          type: 'services_disabled',
-          title: 'Location Turned Off',
+          type: "services_disabled",
+          title: "Location Turned Off",
           message: res.error,
         });
-      } else if (res?.code === 'PERMISSION_BLOCKED' || res?.canAskAgain === false) {
+      } else if (
+        res?.code === "PERMISSION_BLOCKED" ||
+        res?.canAskAgain === false
+      ) {
         setLocationNoticeModal({
           visible: true,
-          type: 'access_needed',
-          title: 'Location Access Needed',
+          type: "access_needed",
+          title: "Location Access Needed",
           message: res.error,
         });
       } else {
         setLocationNoticeModal({
           visible: true,
-          type: 'access_needed',
-          title: 'Location Access Needed',
-          message: res?.error || 'Location access was not granted.',
+          type: "access_needed",
+          title: "Location Access Needed",
+          message: res?.error || "Location access was not granted.",
         });
       }
     } catch (e) {
       setLocationNoticeModal({
         visible: true,
-        type: 'notice',
-        title: 'Location Notice',
-        message: e.message || 'Could not update location.',
+        type: "notice",
+        title: "Location Notice",
+        message: e.message || "Could not update location.",
       });
     } finally {
       setUpdatingGpsLocation(false);
@@ -147,7 +164,9 @@ export default function PlatformSelectScreen({ navigation, route }) {
   }, [updatingGpsLocation, handleLocationAcquired]);
 
   // ── Login Detection State ──
-  const [isLoggedIn, setIsLoggedIn] = useState(() => getTinderAuthState()?.isLoggedIn ?? null);
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => getTinderAuthState()?.isLoggedIn ?? null,
+  );
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   // Synchronous re-entrancy lock for handleLogout.
@@ -157,13 +176,15 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
   // ── Synced Parent Agent State & Settings (Unified Master Control) ──
   const [agentState, setAgentState] = useState(() => getSharedAgentState());
-  const [localSettings, setLocalSettings] = useState(() => getSharedExtensionSettings());
+  const [localSettings, setLocalSettings] = useState(() =>
+    getSharedExtensionSettings(),
+  );
 
   useEffect(() => {
     const unsubAgent = subscribeSharedAgentState(setAgentState);
     const unsubSettings = subscribeSharedExtensionSettings(setLocalSettings);
     const unsubAuth = subscribeTinderAuthState((auth) => {
-      if (auth && typeof auth.isLoggedIn === 'boolean') {
+      if (auth && typeof auth.isLoggedIn === "boolean") {
         setIsLoggedIn(auth.isLoggedIn);
       }
     });
@@ -196,28 +217,42 @@ export default function PlatformSelectScreen({ navigation, route }) {
         dialCode,
       } = route.params.onboardingData;
 
-      const fullPhone = whatsapp ? `${dialCode || ''}${whatsapp}` : null;
+      const fullPhone = whatsapp ? `${dialCode || ""}${whatsapp}` : null;
       try {
         const worker = getOnDeviceWorker();
-        if (worker && typeof worker.updateSettings === 'function') {
+        if (worker && typeof worker.updateSettings === "function") {
           worker.updateSettings({
             ...(personality ? { chattingStyle: personality } : {}),
             ...(frequency ? { scheduleInterval: frequency } : {}),
-            ...(safeMode !== undefined ? { minDelay: safeMode ? 2 : 1, maxDelay: safeMode ? 5 : 2 } : {}),
-            ...(goals ? {
-              intentions: goals.includes('never_stop') ? 'continuous' : (goals.includes('relationship') ? 'long_term' : 'short_term'),
-              stopConditions: goals,
-            } : {}),
-            ...(fullPhone ? { contactDetails: { phone: fullPhone, whatsapp: fullPhone } } : {}),
+            ...(safeMode !== undefined
+              ? { minDelay: safeMode ? 2 : 1, maxDelay: safeMode ? 5 : 2 }
+              : {}),
+            ...(goals
+              ? {
+                intentions: goals.includes("never_stop")
+                  ? "continuous"
+                  : goals.includes("relationship")
+                    ? "long_term"
+                    : "short_term",
+                stopConditions: goals,
+              }
+              : {}),
+            ...(fullPhone
+              ? { contactDetails: { phone: fullPhone, whatsapp: fullPhone } }
+              : {}),
           });
         }
-      } catch (_) {}
+      } catch (_) { }
 
       setLocalSettings((prev) => {
         const merged = {
           ...(prev || {}),
-          ...(personality ? { personalityStyle: personality, chattingStyle: personality } : {}),
-          ...(frequency ? { replyFrequencyMinutes: frequency, scheduleInterval: frequency } : {}),
+          ...(personality
+            ? { personalityStyle: personality, chattingStyle: personality }
+            : {}),
+          ...(frequency
+            ? { replyFrequencyMinutes: frequency, scheduleInterval: frequency }
+            : {}),
           ...(safeMode !== undefined ? { safeModeEnabled: safeMode } : {}),
           ...(goals ? { primaryGoals: goals } : {}),
           ...(country ? { targetCountry: country } : {}),
@@ -230,40 +265,64 @@ export default function PlatformSelectScreen({ navigation, route }) {
     }
   }, [route?.params?.onboardingData]);
 
-  const handleSaveSettings = useCallback(async (updatedSettings) => {
-    const merged = { ...localSettings, ...updatedSettings };
-    setLocalSettings(merged);
-    setSharedExtensionSettings(merged);
-    const userId = route?.params?.userId || route?.params?.user?.id;
-    if (userId) {
-      SupabaseService.saveUserSnapshot(userId, {
-        platform: 'tinder',
-        settings: merged,
-      }).catch(() => {});
-    }
-    return true;
-  }, [localSettings, route?.params?.userId, route?.params?.user?.id]);
+  const handleSaveSettings = useCallback(
+    async (updatedSettings) => {
+      const merged = { ...localSettings, ...updatedSettings };
+      setLocalSettings(merged);
+      setSharedExtensionSettings(merged);
+      const userId = route?.params?.userId;
+      if (userId) {
+        SupabaseService.saveUserSnapshot(userId, {
+          platform: "tinder",
+          settings: merged,
+        }).catch(() => { });
+      }
+      return true;
+    },
+    [localSettings, route?.params?.userId],
+  );
 
   const handleSyncProfileFromHome = useCallback(async () => {
     const auth = getTinderAuthState();
     if (!auth?.token) {
-      return { success: false, error: 'Please connect your Tinder account first.' };
+      return {
+        success: false,
+        error: "Please connect your Tinder account first.",
+      };
     }
     const res = await probeTinderSession(auth.token);
     if (res?.ok && res.user) {
       const u = res.user;
       const profile = {
         name: u.name || null,
-        bio: u.bio || '',
-        interests: (u.user_interests || u.interests || []).map(i => i.name || i).filter(Boolean),
-        job: (u.jobs || []).map(j => (j.title && j.title.name) || (j.company && j.company.name) || '').filter(Boolean).join(', ') || null,
-        school: (u.schools || []).map(s => s.name).filter(Boolean).join(', ') || null,
-        photos: (u.photos || []).map(p => p.url).filter(Boolean),
+        bio: u.bio || "",
+        interests: (u.user_interests || u.interests || [])
+          .map((i) => i.name || i)
+          .filter(Boolean),
+        job:
+          (u.jobs || [])
+            .map(
+              (j) =>
+                (j.title && j.title.name) ||
+                (j.company && j.company.name) ||
+                "",
+            )
+            .filter(Boolean)
+            .join(", ") || null,
+        school:
+          (u.schools || [])
+            .map((s) => s.name)
+            .filter(Boolean)
+            .join(", ") || null,
+        photos: (u.photos || []).map((p) => p.url).filter(Boolean),
       };
       await handleSaveSettings({ userProfile: profile });
       return { success: true, profile };
     }
-    return { success: false, error: 'Could not sync profile. Please open the Tinder browser session.' };
+    return {
+      success: false,
+      error: "Could not sync profile. Please open the Tinder browser session.",
+    };
   }, [handleSaveSettings]);
 
   // ── Notification Center State ──
@@ -286,7 +345,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
             setHasPromptedPermissions(true);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, []);
 
@@ -295,11 +354,14 @@ export default function PlatformSelectScreen({ navigation, route }) {
     setHasPromptedPermissions(true);
   }, []);
 
-  const handlePermissionsGranted = useCallback((res) => {
-    setShowPermissionModal(false);
-    setHasPromptedPermissions(true);
-    handleLocationAcquired(res);
-  }, [handleLocationAcquired]);
+  const handlePermissionsGranted = useCallback(
+    (res) => {
+      setShowPermissionModal(false);
+      setHasPromptedPermissions(true);
+      handleLocationAcquired(res);
+    },
+    [handleLocationAcquired],
+  );
 
   useEffect(() => {
     const unsub = NotificationService.subscribeInbox((items) => {
@@ -309,46 +371,50 @@ export default function PlatformSelectScreen({ navigation, route }) {
   }, []);
 
   // ── Animations ──
-  const fadeAnim = useRef(new Animated.Value(0)).current;
   const modalSlide = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
   useEffect(() => {
     const detected = getAutoDetectedLocalIp();
-    if (detected && detected !== 'localhost' && localUrl.includes('localhost')) {
+    if (
+      detected &&
+      detected !== "localhost" &&
+      localUrl.includes("localhost")
+    ) {
       setLocalUrl(`http://${detected}:8080/?usr=User&pwd=admin`);
     }
   }, []);
 
-  const activeStreamUrl = environment === 'on_device'
-    ? 'on_device'
-    : (environment === 'hyperbeam'
-      ? 'hyperbeam'
-      : (environment === 'vps' ? vpsUrl : localUrl));
+  const activeStreamUrl =
+    environment === "on_device"
+      ? "on_device"
+      : environment === "hyperbeam"
+        ? "hyperbeam"
+        : environment === "vps"
+          ? vpsUrl
+          : localUrl;
 
-  const activeProxy = environment === 'vps'
-    ? vpsProxy
-    : (environment === 'hyperbeam' || environment === 'on_device' ? '' : localProxy);
+  const activeProxy =
+    environment === "vps"
+      ? vpsProxy
+      : environment === "hyperbeam" || environment === "on_device"
+        ? ""
+        : localProxy;
 
-  const orchestratorUrl = environment === 'on_device'
-    ? null
-    : (environment === 'vps'
-      ? 'https://api.smartmaheshwari.com'
-      : resolveLocalUrl('http://localhost:3001'));
+  const orchestratorUrl =
+    environment === "on_device"
+      ? null
+      : environment === "vps"
+        ? "https://api.smartmaheshwari.com"
+        : resolveLocalUrl("http://localhost:3001");
 
   // Stats polling (active only for remote VPS or Local Neko mode)
-  const { stats, loading, error, refresh: refreshStats } = useExtensionStats(
-    orchestratorUrl,
-    environment !== 'on_device'
-  );
-
-  // Fade-in animation on mount
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim]);
+  const {
+    stats,
+    loading,
+    error,
+    latencyMs: remoteLatencyMs,
+    refresh: refreshStats,
+  } = useExtensionStats(orchestratorUrl, environment !== "on_device");
 
   // Auth detection & login status refresh
   const checkAuthStatus = useCallback(async () => {
@@ -362,21 +428,30 @@ export default function PlatformSelectScreen({ navigation, route }) {
     const auth = getTinderAuthState();
 
     // 2. For On-Device mode: strictly validate using real Tinder API token
-    if (environment === 'on_device') {
+    if (environment === "on_device") {
+      setDeviceLatencyMs(null);
       if (auth?.token) {
-        probeTinderSession(auth.token).then((res) => {
-          if (res?.ok) {
-            setIsLoggedIn(true);
-          } else if (res?.expired) {
-            setIsLoggedIn(false);
-          }
-        }).catch(() => {});
+        const requestStarted = Date.now();
+        probeTinderSession(auth.token)
+          .then((res) => {
+            if (res?.ok) {
+              setDeviceLatencyMs(Math.max(0, Date.now() - requestStarted));
+              setIsLoggedIn(true);
+            } else if (res?.expired) {
+              setIsLoggedIn(false);
+            }
+          })
+          .catch(() => { });
         setIsLoggedIn(Boolean(auth?.isLoggedIn));
       } else {
         // Unauthenticated or closed without logging in — no valid token exists.
         // Cleanse any dirty/corrupted auth state.
         if (auth?.isLoggedIn) {
-          setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+          setTinderAuthState({
+            isLoggedIn: false,
+            accountName: null,
+            token: null,
+          });
         }
         setIsLoggedIn(false);
       }
@@ -385,7 +460,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
     }
 
     // 3. For Remote/VPS mode: Check in-memory shared & persisted auth state
-    if (auth && typeof auth.isLoggedIn === 'boolean') {
+    if (auth && typeof auth.isLoggedIn === "boolean") {
       setIsLoggedIn(auth.isLoggedIn);
       setCheckingAuth(false);
       if (auth.isLoggedIn) return;
@@ -397,7 +472,8 @@ export default function PlatformSelectScreen({ navigation, route }) {
     if (stats && stats.tinderAccount?.isLoggedIn) {
       setTinderAuthState({
         isLoggedIn: true,
-        accountName: stats.tinderAccount?.name || cachedProfile?.name || 'Tinder Account',
+        accountName:
+          stats.tinderAccount?.name || cachedProfile?.name || "Tinder Account",
         accountEmail: stats.tinderAccount?.email || null,
       });
       setIsLoggedIn(true);
@@ -406,25 +482,39 @@ export default function PlatformSelectScreen({ navigation, route }) {
     }
 
     // 5. Query backend orchestrator for active page and auth state (Neko mode)
-    const backendUrl = orchestratorUrl || (environment === 'vps' ? 'https://api.smartmaheshwari.com' : resolveLocalUrl('http://localhost:3001'));
+    const backendUrl =
+      orchestratorUrl ||
+      (environment === "vps"
+        ? "https://api.smartmaheshwari.com"
+        : resolveLocalUrl("http://localhost:3001"));
     if (backendUrl) {
       try {
-        const pageStateRes = await fetch(`${backendUrl}/check-page-state`).then(r => r.json()).catch(() => null);
-        if (pageStateRes?.state === 'logged_in') {
-          setTinderAuthState({ isLoggedIn: true, accountName: cachedProfile?.name || 'Tinder Account' });
+        const pageStateRes = await fetch(`${backendUrl}/check-page-state`)
+          .then((r) => r.json())
+          .catch(() => null);
+        if (pageStateRes?.state === "logged_in") {
+          setTinderAuthState({
+            isLoggedIn: true,
+            accountName: cachedProfile?.name || "Tinder Account",
+          });
           setIsLoggedIn(true);
           setCheckingAuth(false);
           return;
         }
 
-        const authStatusRes = await fetch(`${backendUrl}/auth-status`).then(r => r.json()).catch(() => null);
+        const authStatusRes = await fetch(`${backendUrl}/auth-status`)
+          .then((r) => r.json())
+          .catch(() => null);
         if (authStatusRes?.success && authStatusRes.isLoggedIn) {
-          setTinderAuthState({ isLoggedIn: true, accountName: cachedProfile?.name || 'Tinder Account' });
+          setTinderAuthState({
+            isLoggedIn: true,
+            accountName: cachedProfile?.name || "Tinder Account",
+          });
           setIsLoggedIn(true);
           setCheckingAuth(false);
           return;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Default to false if no live verification confirms logged in
@@ -441,13 +531,21 @@ export default function PlatformSelectScreen({ navigation, route }) {
       checkAuthStatus();
 
       // Hydrate userProfile and settings from backend orchestrator if reachable
-      const backendUrl = orchestratorUrl || (environment === 'vps' ? 'https://api.smartmaheshwari.com' : resolveLocalUrl('http://localhost:3001'));
+      const backendUrl =
+        orchestratorUrl ||
+        (environment === "vps"
+          ? "https://api.smartmaheshwari.com"
+          : resolveLocalUrl("http://localhost:3001"));
       if (backendUrl) {
         fetch(`${backendUrl}/extension-settings`)
-          .then(r => r.json())
-          .then(data => {
-            if (data?.success && data.settings?.userProfile && (data.settings.userProfile.name || data.settings.userProfile.bio)) {
-              setLocalSettings(prev => {
+          .then((r) => r.json())
+          .then((data) => {
+            if (
+              data?.success &&
+              data.settings?.userProfile &&
+              (data.settings.userProfile.name || data.settings.userProfile.bio)
+            ) {
+              setLocalSettings((prev) => {
                 const merged = { ...(prev || {}), ...data.settings };
                 setSharedExtensionSettings(merged);
                 return merged;
@@ -459,9 +557,9 @@ export default function PlatformSelectScreen({ navigation, route }) {
               // FE_AUTH_STEP messages from the browser WebView.
             }
           })
-          .catch(() => {});
+          .catch(() => { });
       }
-    }, [checkAuthStatus, orchestratorUrl, environment])
+    }, [checkAuthStatus, orchestratorUrl, environment]),
   );
 
   // Modal open/close handlers
@@ -484,104 +582,131 @@ export default function PlatformSelectScreen({ navigation, route }) {
     }).start(() => setShowSettingsModal(false));
   };
 
-
   // Open live browser session (supports autoStartAgent and custom launch parameters)
-  const handleOpenLiveFeed = useCallback(async (platformName, extraParams = {}) => {
-    const targetPlatform = typeof platformName === 'string' ? platformName : selectedPlatform;
-    const realProxy = activeProxy;
+  const handleOpenLiveFeed = useCallback(
+    async (platformName, extraParams = {}) => {
+      const targetPlatform =
+        typeof platformName === "string" ? platformName : selectedPlatform;
+      const realProxy = activeProxy;
 
-    if (environment === 'hyperbeam') {
-      setStartingSession(true);
-      try {
-        const { embedUrl } = await startHyperbeamCloudSession({
-          platform: targetPlatform,
-          proxyIp: realProxy,
-          orchestratorUrl,
-        });
-        setStartingSession(false);
-        navigation.navigate('Browser', {
-          vpsUrl: embedUrl,
-          platform: targetPlatform,
-          environment: 'hyperbeam',
-          isHyperbeam: true,
-          proxyIp: realProxy,
-          orchestratorUrl,
-          userId: route?.params?.userId || route?.params?.user?.id || 'dev_user_1',
-          ...extraParams,
-        });
-      } catch (err) {
-        setStartingSession(false);
-        console.error('[PlatformSelectScreen] Hyperbeam start error:', err);
-        Alert.alert(
-          'Hyperbeam Connection Error',
-          `Could not connect to Hyperbeam: ${err.message}\n\nPlease verify your Hyperbeam API key or switch to VPS / Local in Settings.`,
-          [
-            { text: 'Settings', onPress: openModal },
-            { text: 'OK', style: 'cancel' }
-          ]
-        );
+      if (environment === "hyperbeam") {
+        setStartingSession(true);
+        try {
+          const { embedUrl } = await startHyperbeamCloudSession({
+            platform: targetPlatform,
+            proxyIp: realProxy,
+            orchestratorUrl,
+          });
+          setStartingSession(false);
+          navigation.navigate("Browser", {
+            vpsUrl: embedUrl,
+            platform: targetPlatform,
+            environment: "hyperbeam",
+            isHyperbeam: true,
+            proxyIp: realProxy,
+            orchestratorUrl,
+            userId:
+              route?.params?.userId || route?.params?.user?.id || "dev_user_1",
+            ...extraParams,
+          });
+        } catch (err) {
+          setStartingSession(false);
+          console.error("[PlatformSelectScreen] Hyperbeam start error:", err);
+          Alert.alert(
+            "Hyperbeam Connection Error",
+            `Could not connect to Hyperbeam: ${err.message}\n\nPlease verify your Hyperbeam API key or switch to VPS / Local in Settings.`,
+            [
+              { text: "Settings", onPress: openModal },
+              { text: "OK", style: "cancel" },
+            ],
+          );
+        }
+        return;
       }
-      return;
-    }
 
-    const resolvedUrl = resolveLocalUrl(activeStreamUrl);
-    // Only purge if an explicit logout was triggered. Never purge just because unauthenticated.
-    const needPurge = Boolean(getPendingWebViewPurge());
+      const resolvedUrl = resolveLocalUrl(activeStreamUrl);
+      // Only purge if an explicit logout was triggered. Never purge just because unauthenticated.
+      const needPurge = Boolean(getPendingWebViewPurge());
 
-    navigation.navigate('Browser', {
-      vpsUrl: resolvedUrl,
-      platform: targetPlatform,
-      environment: environment,
-      isOnDevice: environment === 'on_device',
-      proxyIp: realProxy,
+      navigation.navigate("Browser", {
+        vpsUrl: resolvedUrl,
+        platform: targetPlatform,
+        environment: environment,
+        isOnDevice: environment === "on_device",
+        proxyIp: realProxy,
+        orchestratorUrl,
+        forceLogout: needPurge,
+        userId:
+          route?.params?.userId || route?.params?.user?.id || "dev_user_1",
+        ...extraParams,
+      });
+    },
+    [
+      navigation,
+      activeProxy,
+      activeStreamUrl,
+      environment,
+      selectedPlatform,
       orchestratorUrl,
-      forceLogout: needPurge,
-      userId: route?.params?.userId || route?.params?.user?.id || 'dev_user_1',
-      ...extraParams,
-    });
-  }, [navigation, activeProxy, activeStreamUrl, environment, selectedPlatform, orchestratorUrl, route?.params]);
+      route?.params,
+    ],
+  );
 
   // Toggle agent (handles both local on-device automation and remote orchestrator CDP)
   const handleToggleAgent = useCallback(async () => {
-    if (environment === 'on_device') {
+    if (environment === "on_device") {
       const currentState = getSharedAgentState();
       const nextRunning = !currentState?.agentState?.isRunning;
       updateSharedAgentState({
         agentState: {
           isRunning: nextRunning,
           isPaused: !nextRunning,
-          currentPhase: nextRunning ? 'liking' : 'stopped',
-        }
+          currentPhase: nextRunning ? "liking" : "stopped",
+        },
       });
       // If user tapped Start Agent from the Home Screen, launch live browser with auto-start
       if (nextRunning) {
         saveOnDeviceSessionState({ isRunning: true });
-        pushProgressFeedEvent('persona_update', 'AI Wingman Activated — Swiping & Chatting', null, 0);
-        handleOpenLiveFeed('Tinder', { autoStartAgent: true, isOnDevice: true });
+        pushProgressFeedEvent(
+          "persona_update",
+          "AI Wingman Activated — Swiping & Chatting",
+          null,
+          0,
+        );
+        handleOpenLiveFeed("Tinder", {
+          autoStartAgent: true,
+          isOnDevice: true,
+        });
       } else {
         updateSharedAgentState({
           agentState: {
             isRunning: false,
             isPaused: true,
-            currentPhase: 'stopped',
-            source: 'home_screen',
-          }
+            currentPhase: "stopped",
+            source: "home_screen",
+          },
         });
         saveOnDeviceSessionState({ isRunning: false });
-        pushProgressFeedEvent('cycle_complete', 'Automation paused from Home Screen', null, 0);
+        pushProgressFeedEvent(
+          "cycle_complete",
+          "Automation paused from Home Screen",
+          null,
+          0,
+        );
       }
       return;
     }
     try {
       const isRunning = Boolean(
         stats?.agentState?.isRunning ||
-        (stats?.agentState?.currentPhase && stats.agentState.currentPhase !== 'stopped')
+        (stats?.agentState?.currentPhase &&
+          stats.agentState.currentPhase !== "stopped"),
       );
-      const endpoint = isRunning ? '/stop-agent' : '/start-agent';
+      const endpoint = isRunning ? "/stop-agent" : "/start-agent";
       await fetch(`${orchestratorUrl}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: 'Tinder' }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: "Tinder" }),
       });
       setTimeout(refreshStats, 400);
     } catch (_) { }
@@ -610,10 +735,22 @@ export default function PlatformSelectScreen({ navigation, route }) {
       agentState: {
         isRunning: false,
         isPaused: true,
-        currentPhase: 'stopped',
-        stats: { swipes: 0, matches: 0, messages: 0, likesCompleted: 0, matchesCreated: 0, messagesSent: 0 },
+        currentPhase: "stopped",
+        stats: {
+          swipes: 0,
+          matches: 0,
+          messages: 0,
+          likesCompleted: 0,
+          matchesCreated: 0,
+          messagesSent: 0,
+        },
       },
-      lifetimeStats: { totalLikes: 0, matchesCreated: 0, messagesSent: 0, activeConversations: 0 },
+      lifetimeStats: {
+        totalLikes: 0,
+        matchesCreated: 0,
+        messagesSent: 0,
+        activeConversations: 0,
+      },
       progressFeed: [],
     });
 
@@ -621,14 +758,20 @@ export default function PlatformSelectScreen({ navigation, route }) {
     // Best-effort and bounded: local state is already cleared, and both modal
     // buttons are disabled while this runs, so an unreachable backend must never
     // be able to strand the user on the spinner.
-    const backendUrl = orchestratorUrl || (environment === 'vps' ? 'https://api.smartmaheshwari.com' : resolveLocalUrl('http://localhost:3001'));
+    const backendUrl =
+      orchestratorUrl ||
+      (environment === "vps"
+        ? "https://api.smartmaheshwari.com"
+        : resolveLocalUrl("http://localhost:3001"));
     if (backendUrl) {
       const acknowledged = await postJsonWithTimeout(`${backendUrl}/logout`, {
-        userId: route?.params?.userId || route?.params?.user?.id || 'dev_user_1',
-        platform: 'tinder',
+        userId: route?.params?.userId || "dev_user_1",
+        platform: "tinder",
       });
       if (!acknowledged) {
-        console.warn('[PlatformSelect] Orchestrator did not acknowledge logout; local session already cleared.');
+        console.warn(
+          "[PlatformSelect] Orchestrator did not acknowledge logout; local session already cleared.",
+        );
       }
     }
 
@@ -656,288 +799,366 @@ export default function PlatformSelectScreen({ navigation, route }) {
     return () => clearTimeout(timer);
   }, [route?.params?.justSignedOut, navigation]);
 
-  const handleLaunch = useCallback((platformName) => {
-    const targetPlatform = typeof platformName === 'string' ? platformName : selectedPlatform;
-    const realProxy = activeProxy;
+  const handleLaunch = useCallback(
+    (platformName) => {
+      const targetPlatform =
+        typeof platformName === "string" ? platformName : selectedPlatform;
+      const realProxy = activeProxy;
 
-    const resolvedUrl = environment === 'hyperbeam' ? 'hyperbeam' : resolveLocalUrl(activeStreamUrl);
+      const resolvedUrl =
+        environment === "hyperbeam"
+          ? "hyperbeam"
+          : resolveLocalUrl(activeStreamUrl);
 
-    navigation.navigate('PlatformConfig', {
-      platform: targetPlatform,
-      vpsUrl: resolvedUrl,
-      environment: environment,
-      proxyIp: realProxy,
-    });
-  }, [navigation, activeProxy, activeStreamUrl, environment, selectedPlatform]);
+      navigation.navigate("PlatformConfig", {
+        platform: targetPlatform,
+        vpsUrl: resolvedUrl,
+        environment: environment,
+        proxyIp: realProxy,
+      });
+    },
+    [navigation, activeProxy, activeStreamUrl, environment, selectedPlatform],
+  );
 
   const handleOpenCloudHub = useCallback(() => {
     const realProxy = activeProxy;
 
-    navigation.navigate('CloudDashboard', {
+    navigation.navigate("CloudDashboard", {
       orchestratorUrl,
-      vpsUrl: environment === 'hyperbeam' ? 'hyperbeam' : resolveLocalUrl(activeStreamUrl),
+      vpsUrl:
+        environment === "hyperbeam"
+          ? "hyperbeam"
+          : resolveLocalUrl(activeStreamUrl),
       platform: selectedPlatform,
       proxyIp: realProxy,
     });
-  }, [navigation, orchestratorUrl, environment, activeStreamUrl, activeProxy, selectedPlatform]);
+  }, [
+    navigation,
+    orchestratorUrl,
+    environment,
+    activeStreamUrl,
+    activeProxy,
+    selectedPlatform,
+  ]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#09080E" />
+      <LinearGradient
+        pointerEvents="none"
+        colors={["#201020", uiTheme.colors.surface, uiTheme.colors.background]}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={uiTheme.colors.background}
+      />
 
       {/* Confirms the sign-out that just closed the browser session, so the
           screen change does not read as a crash. Deliberately local rather than
           the app-wide notification banner, which always offers an "Open Tinder"
           action and would contradict the message. */}
       {signedOutToast && (
-        <View style={styles.signedOutToast} accessibilityRole="alert" accessibilityLiveRegion="polite">
-          <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+        <View
+          style={styles.signedOutToast}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          <Ionicons
+            name="checkmark-circle"
+            size={16}
+            color={uiTheme.colors.success}
+          />
           <Text style={styles.signedOutToastText}>Signed out of Tinder</Text>
         </View>
       )}
 
-      {/* ═══════════════════ HEADER BAR ═══════════════════ */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" />
+      <View style={homeStyles.header}>
+        <View style={homeStyles.brand}>
+          <LinearGradient
+            colors={[
+              uiTheme.colors.primary,
+              uiTheme.colors.secondary,
+              "#FFD166",
+            ]}
+            style={homeStyles.brandIcon}
+          >
+            <Ionicons name="flame" size={25} color="#FFFFFF" />
+          </LinearGradient>
           <View>
-            <Text style={styles.headerTitle}>Flint</Text>
-            <Text style={styles.headerSub}>AI Dating Assistant</Text>
+            <Text style={homeStyles.brandName}>Flint</Text>
+            <Text style={homeStyles.brandCaption}>
+              YOUR AI DATING ASSISTANT
+            </Text>
           </View>
         </View>
-
-        <View style={styles.headerActions}>
-          {/* Notification Bell with Badge */}
+        <View style={homeStyles.headerActions}>
           <TouchableOpacity
-            style={styles.notifBtn}
+            style={homeStyles.headerButton}
             onPress={() => setShowNotifModal(true)}
-            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Notifications, ${unreadNotifCount} unread`}
           >
-            <Ionicons name="notifications-outline" size={18} color="#D8D6E8" />
+            <Ionicons
+              name="notifications-outline"
+              size={20}
+              color={uiTheme.colors.text}
+            />
             {unreadNotifCount > 0 && (
-              <View style={styles.headerBadge}>
-                <Text style={styles.headerBadgeText}>{unreadNotifCount}</Text>
-              </View>
+              <View style={homeStyles.notificationDot} />
             )}
           </TouchableOpacity>
-
-          {/* Connection Settings Gear */}
-          <TouchableOpacity
-            style={styles.gearBtn}
-            onPress={openModal}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="options-outline" size={18} color="#8E8DA3" />
-          </TouchableOpacity>
-
-          {/* App Sign Out */}
-          <TouchableOpacity
-            style={styles.headerSignOutBtn}
-            onPress={() => navigation.replace('Auth')}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="log-out-outline" size={17} color="#FE3C72" />
-          </TouchableOpacity>
+          {homeTab !== "profile" && (
+            <TouchableOpacity
+              style={homeStyles.headerButton}
+              onPress={() => setHomeTab("profile")}
+              accessibilityRole="button"
+              accessibilityLabel="Profile details and settings"
+            >
+              <Ionicons
+                name="person-outline"
+                size={20}
+                color={uiTheme.colors.text}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* ═══════════════════ UNIFIED TINDER HERO STATUS & PRIMARY ACTION CARD ═══════════════════ */}
-      <View style={styles.heroCardContainer}>
-        {isLoggedIn ? (
-          /* ── Connected / Active Cockpit State ── */
-          <View style={styles.heroCardActive}>
-            <View style={styles.heroActiveTopRow}>
-              <View style={styles.heroActiveLeft}>
-                <View style={styles.heroAvatarWrap}>
-                  <Image source={TINDER_IMG} style={styles.heroAvatarIcon} />
-                  <View style={styles.heroLiveDot} />
-                </View>
-                <View style={styles.heroActiveInfo}>
-                  <View style={styles.heroActiveTitleRow}>
-                    <Text style={styles.heroActiveTitle} numberOfLines={1}>
-                      {stats?.tinderAccount?.name || stats?.tinderAccount?.email || getTinderAuthState()?.accountName || 'Tinder Account'}
-                    </Text>
-                    <View style={styles.heroOnlinePill}>
-                      <View style={styles.heroPulseDot} />
-                      <Text style={styles.heroOnlineText}>ONLINE</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.heroActiveSub} numberOfLines={1}>
-                    ✨ Finding singles in {localSettings?.locationCity || 'your area'} • Active
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.heroLogoutBtn}
-                onPress={confirmLogout}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="log-out-outline" size={15} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Primary Action Row */}
-            <View style={styles.heroActiveActionRow}>
-              <TouchableOpacity
-                style={[styles.heroPrimaryBtn, startingSession && { opacity: 0.8 }]}
-                onPress={() => handleOpenLiveFeed('Tinder')}
-                disabled={startingSession}
-                activeOpacity={0.88}
-              >
-                {startingSession ? (
-                  <>
-                    <ActivityIndicator size="small" color="#FFF" />
-                    <Text style={styles.heroPrimaryBtnText}>Opening Tinder...</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons name="flame" size={16} color="#FFF" />
-                    <Text style={styles.heroPrimaryBtnText}>Open Tinder</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.heroConfigureBtn}
-                onPress={() => handleLaunch('Tinder')}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="options-outline" size={15} color="#FE3C72" />
-                <Text style={styles.heroConfigureBtnText}>Preferences</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          /* ── Disconnected / Action Required State ── */
-          <View style={styles.heroCardInactive}>
-            <View style={styles.heroInactiveHeader}>
-              <View style={styles.heroInactiveIconWrap}>
-                <Image source={TINDER_IMG} style={styles.heroInactiveIcon} />
-                <View style={styles.heroInactiveDot} />
-              </View>
-              <View style={styles.heroInactiveTextWrap}>
-                <View style={styles.heroInactiveTitleRow}>
-                  <Text style={styles.heroInactiveTitle}>Connect Tinder Account</Text>
-                  <View style={styles.heroOfflinePill}>
-                    <Text style={styles.heroOfflineText}>NOT CONNECTED</Text>
-                  </View>
-                </View>
-                <Text style={styles.heroInactiveSub}>
-                  Link your account to activate 24/7 automated swiping, smart matching & conversation
-                </Text>
-              </View>
-            </View>
-
+      {homeTab === "home" ? (
+        <HomeOverview
+          stats={environment === "on_device" ? agentState : stats}
+          settings={localSettings}
+          isLoggedIn={isLoggedIn}
+          starting={startingSession}
+          checking={checkingAuth}
+          latencyMs={
+            environment === "on_device" ? deviceLatencyMs : remoteLatencyMs
+          }
+          onOpenBrowser={() => handleOpenLiveFeed("Tinder")}
+          onToggleAgent={handleToggleAgent}
+          onAutomation={() => setHomeTab("automation")}
+          onSettings={() => setHomeTab("settings")}
+          onActivity={() => setHomeTab("activity")}
+        />
+      ) : homeTab === "profile" ? (
+        <ProfileDetails
+          settings={localSettings}
+          user={route?.params?.user}
+          isLoggedIn={isLoggedIn}
+          onBack={() => setHomeTab("home")}
+          onOpenTinder={() => handleOpenLiveFeed("Tinder")}
+          onSync={handleSyncProfileFromHome}
+          onSave={handleSaveSettings}
+        />
+      ) : homeTab === "appSettings" ? (
+        <AppSettings
+          settings={localSettings}
+          isLoggedIn={isLoggedIn}
+          environment={environment}
+          unreadCount={unreadNotifCount}
+          updatingLocation={updatingGpsLocation}
+          onRefreshLocation={handleRefreshDeviceLocation}
+          onNotifications={() => setShowNotifModal(true)}
+          onPreferences={openModal}
+          onSession={() => handleLaunch("Tinder")}
+          onAutomation={() => setHomeTab("automation")}
+          onConnect={() => handleOpenLiveFeed("Tinder")}
+          onBack={() => setHomeTab("home")}
+        />
+      ) : (
+        <View style={homeStyles.dashboard}>
+          <View style={homeStyles.sectionHeader}>
             <TouchableOpacity
-              style={[styles.heroConnectBtn, startingSession && { opacity: 0.8 }]}
-              onPress={() => handleOpenLiveFeed('Tinder')}
-              disabled={startingSession}
-              activeOpacity={0.88}
+              onPress={() => setHomeTab("home")}
+              style={homeStyles.backButton}
+              accessibilityRole="button"
+              accessibilityLabel="Back to home"
             >
-              {startingSession ? (
-                <>
-                  <ActivityIndicator size="small" color="#FFF" />
-                  <Text style={styles.heroConnectBtnText}>Starting Tinder Session...</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.heroConnectBtnText}>Connect Tinder Account</Text>
-                  <Ionicons name="arrow-forward" size={15} color="#FFF" />
-                </>
-              )}
+              <Ionicons name="chevron-back" size={20} color="#EFEFF0" />
+            </TouchableOpacity>
+            <Text style={homeStyles.sectionTitle}>
+              {homeTab === "settings"
+                ? "Settings"
+                : homeTab === "automation"
+                  ? "Automation"
+                  : "Activity"}
+            </Text>
+            <TouchableOpacity
+              onPress={openModal}
+              style={homeStyles.backButton}
+              accessibilityRole="button"
+              accessibilityLabel="App preferences"
+            >
+              <Ionicons name="options-outline" size={20} color="#B4B4B9" />
             </TouchableOpacity>
           </View>
-        )}
-      </View>
-
-          {/* ═══════════════════ MAIN DASHBOARD BODY ═══════════════════ */}
-          <Animated.View style={[styles.dashboardWrap, { opacity: fadeAnim }]}>
-            <DashboardPanel
-              stats={environment === 'on_device' ? agentState : (stats || (isLoggedIn ? agentState : null))}
-              loading={environment === 'on_device' ? false : (isLoggedIn ? false : loading)}
-              error={environment === 'on_device' ? null : (isLoggedIn ? null : error)}
-              orchestratorUrl={orchestratorUrl || (environment === 'vps' ? 'https://api.smartmaheshwari.com' : resolveLocalUrl('http://localhost:3001'))}
-              onToggleAgent={handleToggleAgent}
-              onLogout={handleLogout}
-              onConnect={() => handleOpenLiveFeed('Tinder')}
-              isLoggedIn={isLoggedIn}
-              onSaveSettings={handleSaveSettings}
-              settings={localSettings}
-              onSyncProfile={environment === 'on_device' ? handleSyncProfileFromHome : undefined}
-              controlsContent={
-                <View style={styles.infoBox}>
-                  <View style={styles.infoTitleRow}>
-                    <Ionicons name="sparkles" size={16} color="#FE3C72" />
-                    <Text style={styles.infoTitle}>
-                      {isLoggedIn ? 'Tinder Assistant Active' : 'Getting Started'}
-                    </Text>
-                  </View>
-                  <Text style={styles.infoText}>
-                    {isLoggedIn
-                      ? 'Your AI assistant continuously evaluates recommendations, filters compatible profiles, and handles intelligent conversations.'
-                      : 'Connect your Tinder profile above to start finding matches and chatting automatically.'}
+          <DashboardPanel
+            selectedTab={homeTab}
+            onTabChange={setHomeTab}
+            stats={
+              environment === "on_device"
+                ? agentState
+                : stats || (isLoggedIn ? agentState : null)
+            }
+            loading={
+              environment === "on_device" ? false : isLoggedIn ? false : loading
+            }
+            error={
+              environment === "on_device" ? null : isLoggedIn ? null : error
+            }
+            orchestratorUrl={
+              orchestratorUrl ||
+              (environment === "vps"
+                ? "https://api.smartmaheshwari.com"
+                : resolveLocalUrl("http://localhost:3001"))
+            }
+            onToggleAgent={handleToggleAgent}
+            onLogout={handleLogout}
+            onConnect={() => handleOpenLiveFeed("Tinder")}
+            isLoggedIn={isLoggedIn}
+            onSaveSettings={handleSaveSettings}
+            settings={localSettings}
+            onSyncProfile={
+              environment === "on_device"
+                ? handleSyncProfileFromHome
+                : undefined
+            }
+            controlsContent={
+              <View style={homeStyles.extraActions}>
+                <TouchableOpacity
+                  style={homeStyles.secondaryAction}
+                  onPress={() => handleLaunch("Tinder")}
+                  accessibilityRole="button"
+                >
+                  <Ionicons
+                    name="options-outline"
+                    size={17}
+                    color={uiTheme.colors.accent}
+                  />
+                  <Text style={homeStyles.secondaryLabel}>
+                    Session preferences
                   </Text>
-                </View>
-              }
-            />
-          </Animated.View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={homeStyles.secondaryAction}
+                  onPress={() => navigation.replace("Auth")}
+                  accessibilityRole="button"
+                >
+                  <Ionicons
+                    name="log-out-outline"
+                    size={17}
+                    color={uiTheme.colors.accent}
+                  />
+                  <Text style={homeStyles.secondaryLabel}>
+                    Back to Flint login
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            }
+          />
+        </View>
+      )}
+      <HomeBottomNavigation
+        activeTab={homeTab}
+        onSelect={(tab) => {
+          if (tab === "browser") handleOpenLiveFeed("Tinder");
+          else setHomeTab(tab);
+        }}
+      />
 
       {/* ═══════════════════ CONNECTION SETTINGS SHEET ═══════════════════ */}
       {showSettingsModal && (
         <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFillObject} onPress={closeModal} />
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={closeModal}
+          />
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={styles.modalKeyboard}
           >
             <Animated.View
-              style={[styles.modalSheet, { transform: [{ translateY: modalSlide }] }]}
+              style={[
+                styles.modalSheet,
+                { transform: [{ translateY: modalSlide }] },
+              ]}
             >
               <Pressable onPress={() => { }} /* prevent overlay dismiss */>
                 <View style={styles.modalHandle} />
 
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>App Preferences</Text>
-                  <TouchableOpacity onPress={closeModal} activeOpacity={0.8}>
-                    <Ionicons name="close-circle" size={22} color="#716E89" />
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={closeModal}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={22}
+                      color={uiTheme.colors.muted}
+                    />
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                  contentContainerStyle={styles.modalBody}
+                  showsVerticalScrollIndicator={false}
+                >
                   {/* ─── 1. Your Dating Location ─── */}
                   <View style={styles.consumerSectionCard}>
                     <View style={styles.consumerSectionHeader}>
                       <View style={styles.consumerIconWrap}>
-                        <Ionicons name="location" size={18} color="#FE3C72" />
+                        <Ionicons
+                          name="location"
+                          size={18}
+                          color={uiTheme.colors.primary}
+                        />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.consumerCardTitle}>Your Location</Text>
+                        <Text style={styles.consumerCardTitle}>
+                          Your Location
+                        </Text>
                         <Text style={styles.consumerCardSub}>
-                          {localSettings?.useDeviceLocation ? '📍 Current Location' : '🌐 Selected City'}
+                          {localSettings?.useDeviceLocation
+                            ? "📍 Current Location"
+                            : "🌐 Selected City"}
                         </Text>
                       </View>
                     </View>
 
                     <View style={styles.consumerCityBox}>
-                      <Text style={styles.consumerCityName}>{localSettings?.locationCity || 'New York, NY'}</Text>
+                      <Text style={styles.consumerCityName}>
+                        {localSettings?.locationCity || "New York, NY"}
+                      </Text>
                       <Text style={styles.consumerCityCoords}>
                         Personalized profiles in this area
                       </Text>
                     </View>
 
                     <TouchableOpacity
+                      accessibilityRole="button"
                       style={styles.consumerRefreshGpsBtn}
                       onPress={handleRefreshDeviceLocation}
                       disabled={updatingGpsLocation}
                       activeOpacity={0.85}
                     >
                       {updatingGpsLocation ? (
-                        <ActivityIndicator size="small" color="#10B981" />
+                        <ActivityIndicator
+                          size="small"
+                          color={uiTheme.colors.success}
+                        />
                       ) : (
                         <>
-                          <Ionicons name="locate" size={14} color="#10B981" />
-                          <Text style={styles.consumerRefreshGpsText}>Update to Current Location</Text>
+                          <Ionicons
+                            name="locate"
+                            size={14}
+                            color={uiTheme.colors.success}
+                          />
+                          <Text style={styles.consumerRefreshGpsText}>
+                            Update to Current Location
+                          </Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -946,96 +1167,176 @@ export default function PlatformSelectScreen({ navigation, route }) {
                   {/* ─── 2. Dating Assistant ─── */}
                   <View style={styles.consumerSectionCard}>
                     <View style={styles.consumerSectionHeader}>
-                      <View style={[styles.consumerIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-                        <Ionicons name="sparkles" size={18} color="#10B981" />
+                      <View
+                        style={[
+                          styles.consumerIconWrap,
+                          { backgroundColor: "rgba(16, 185, 129, 0.12)" },
+                        ]}
+                      >
+                        <Ionicons
+                          name="sparkles"
+                          size={18}
+                          color={uiTheme.colors.success}
+                        />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.consumerCardTitle}>Dating Assistant</Text>
-                        <Text style={styles.consumerCardSub}>Finding matches & starting conversations</Text>
+                        <Text style={styles.consumerCardTitle}>
+                          Dating Assistant
+                        </Text>
+                        <Text style={styles.consumerCardSub}>
+                          Finding matches & starting conversations
+                        </Text>
                       </View>
                     </View>
                     <View style={styles.consumerStatusRow}>
-                      <Text style={styles.consumerStatusLabel}>Matching Pace</Text>
-                      <Text style={styles.consumerStatusVal}>Natural & Active</Text>
+                      <Text style={styles.consumerStatusLabel}>
+                        Matching Pace
+                      </Text>
+                      <Text style={styles.consumerStatusVal}>
+                        Natural & Active
+                      </Text>
                     </View>
                   </View>
 
                   {/* ─── 3. Developer / Advanced Network (Tucked Away Behind Toggle) ─── */}
                   <TouchableOpacity
+                    accessibilityRole="button"
                     style={styles.advancedToggleRow}
                     onPress={() => setShowAdvanced(!showAdvanced)}
                     activeOpacity={0.8}
                   >
                     <Text style={styles.advancedToggleText}>
-                      {showAdvanced ? 'Hide Developer Settings' : '🛠️ Advanced / Developer Options'}
+                      {showAdvanced
+                        ? "Hide Developer Settings"
+                        : "🛠️ Advanced / Developer Options"}
                     </Text>
                     <Ionicons
-                      name={showAdvanced ? 'chevron-up' : 'chevron-down'}
+                      name={showAdvanced ? "chevron-up" : "chevron-down"}
                       size={15}
-                      color="#8E8DA3"
+                      color={uiTheme.colors.muted}
                     />
                   </TouchableOpacity>
 
                   {showAdvanced && (
                     <View style={styles.advancedDrawer}>
-                      <Text style={styles.modalSectionLabel}>Server Environment</Text>
+                      <Text style={styles.modalSectionLabel}>
+                        Server Environment
+                      </Text>
                       <View style={styles.envSelector}>
                         <TouchableOpacity
-                          style={[styles.envOption, environment === 'on_device' && styles.envOptionActive]}
-                          onPress={() => setEnvironment('on_device')}
+                          accessibilityRole="button"
+                          style={[
+                            styles.envOption,
+                            environment === "on_device" &&
+                            styles.envOptionActive,
+                          ]}
+                          onPress={() => setEnvironment("on_device")}
                           activeOpacity={0.8}
                         >
                           <Ionicons
                             name="phone-portrait-outline"
                             size={15}
-                            color={environment === 'on_device' ? '#10B981' : '#716E89'}
+                            color={
+                              environment === "on_device"
+                                ? uiTheme.colors.success
+                                : uiTheme.colors.muted
+                            }
                           />
-                          <Text style={[styles.envOptionText, environment === 'on_device' && styles.envOptionTextActive]}>
+                          <Text
+                            style={[
+                              styles.envOptionText,
+                              environment === "on_device" &&
+                              styles.envOptionTextActive,
+                            ]}
+                          >
                             On-Device
                           </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.envOption, environment === 'hyperbeam' && styles.envOptionActive]}
-                          onPress={() => setEnvironment('hyperbeam')}
+                          accessibilityRole="button"
+                          style={[
+                            styles.envOption,
+                            environment === "hyperbeam" &&
+                            styles.envOptionActive,
+                          ]}
+                          onPress={() => setEnvironment("hyperbeam")}
                           activeOpacity={0.8}
                         >
                           <Ionicons
                             name="flash-outline"
                             size={15}
-                            color={environment === 'hyperbeam' ? '#FE3C72' : '#716E89'}
+                            color={
+                              environment === "hyperbeam"
+                                ? uiTheme.colors.primary
+                                : uiTheme.colors.muted
+                            }
                           />
-                          <Text style={[styles.envOptionText, environment === 'hyperbeam' && styles.envOptionTextActive]}>
+                          <Text
+                            style={[
+                              styles.envOptionText,
+                              environment === "hyperbeam" &&
+                              styles.envOptionTextActive,
+                            ]}
+                          >
                             Cloud
                           </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.envOption, environment === 'vps' && styles.envOptionActive]}
-                          onPress={() => setEnvironment('vps')}
+                          accessibilityRole="button"
+                          style={[
+                            styles.envOption,
+                            environment === "vps" && styles.envOptionActive,
+                          ]}
+                          onPress={() => setEnvironment("vps")}
                           activeOpacity={0.8}
                         >
                           <Ionicons
                             name="cloud-done-outline"
                             size={15}
-                            color={environment === 'vps' ? '#FFF' : '#716E89'}
+                            color={
+                              environment === "vps"
+                                ? "#FFF"
+                                : uiTheme.colors.muted
+                            }
                           />
-                          <Text style={[styles.envOptionText, environment === 'vps' && styles.envOptionTextActive]}>
+                          <Text
+                            style={[
+                              styles.envOptionText,
+                              environment === "vps" &&
+                              styles.envOptionTextActive,
+                            ]}
+                          >
                             VPS
                           </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.envOption, environment === 'local' && styles.envOptionActive]}
-                          onPress={() => setEnvironment('local')}
+                          accessibilityRole="button"
+                          style={[
+                            styles.envOption,
+                            environment === "local" && styles.envOptionActive,
+                          ]}
+                          onPress={() => setEnvironment("local")}
                           activeOpacity={0.8}
                         >
                           <Ionicons
                             name="laptop-outline"
                             size={15}
-                            color={environment === 'local' ? '#FFF' : '#716E89'}
+                            color={
+                              environment === "local"
+                                ? "#FFF"
+                                : uiTheme.colors.muted
+                            }
                           />
-                          <Text style={[styles.envOptionText, environment === 'local' && styles.envOptionTextActive]}>
+                          <Text
+                            style={[
+                              styles.envOptionText,
+                              environment === "local" &&
+                              styles.envOptionTextActive,
+                            ]}
+                          >
                             Local
                           </Text>
                         </TouchableOpacity>
@@ -1045,9 +1346,19 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
                   {/* Active Session & Disconnect */}
                   {isLoggedIn && (
-                    <View style={{ marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' }}>
-                      <Text style={styles.modalSectionLabel}>Active Tinder Account</Text>
+                    <View
+                      style={{
+                        marginTop: 20,
+                        paddingTop: 16,
+                        borderTopWidth: 1,
+                        borderColor: "rgba(255, 255, 255, 0.08)",
+                      }}
+                    >
+                      <Text style={styles.modalSectionLabel}>
+                        Active Tinder Account
+                      </Text>
                       <TouchableOpacity
+                        accessibilityRole="button"
                         style={styles.modalLogoutBtn}
                         onPress={() => {
                           closeModal();
@@ -1055,8 +1366,14 @@ export default function PlatformSelectScreen({ navigation, route }) {
                         }}
                         activeOpacity={0.85}
                       >
-                        <Ionicons name="log-out-outline" size={16} color="#EF4444" />
-                        <Text style={styles.modalLogoutBtnText}>Log Out & End Session</Text>
+                        <Ionicons
+                          name="log-out-outline"
+                          size={16}
+                          color={uiTheme.colors.error}
+                        />
+                        <Text style={styles.modalLogoutBtnText}>
+                          Log Out & End Session
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -1078,16 +1395,18 @@ export default function PlatformSelectScreen({ navigation, route }) {
         <View style={styles.logoutModalOverlay}>
           <View style={styles.logoutModalCard}>
             <View style={styles.logoutIconBadge}>
-              <Ionicons name="log-out" size={28} color="#EF4444" />
+              <Ionicons name="log-out" size={28} color={uiTheme.colors.error} />
             </View>
 
             <Text style={styles.logoutModalTitle}>Log Out of Tinder?</Text>
             <Text style={styles.logoutModalSubtitle}>
-              This will end the active Tinder session and pause your AI automation assistant until you sign back in.
+              This will end the active Tinder session and pause your AI
+              automation assistant until you sign back in.
             </Text>
 
             <View style={styles.logoutModalBtnRow}>
               <TouchableOpacity
+                accessibilityRole="button"
                 style={styles.logoutModalCancelBtn}
                 onPress={() => setShowLogoutConfirm(false)}
                 disabled={loggingOut}
@@ -1097,6 +1416,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
               </TouchableOpacity>
 
               <TouchableOpacity
+                accessibilityRole="button"
                 style={styles.logoutModalConfirmBtn}
                 onPress={handleLogout}
                 disabled={loggingOut}
@@ -1130,7 +1450,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
       {/* ═══════════════════ UNIVERSAL SYNCED LOCATION NOTICE MODAL ═══════════════════ */}
       <LocationNoticeModal
         visible={Boolean(locationNoticeModal?.visible)}
-        type={locationNoticeModal?.type || 'connected'}
+        type={locationNoticeModal?.type || "connected"}
         title={locationNoticeModal?.title}
         cityName={locationNoticeModal?.cityName}
         message={locationNoticeModal?.message}
@@ -1138,11 +1458,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
         onChooseCityManually={() => {
           setLocationNoticeModal(null);
           closeModal();
-          navigation.navigate('Browser', { targetSettingsSection: 'location' });
+          navigation.navigate("Browser", { targetSettingsSection: "location" });
         }}
         onLocationAcquired={handleLocationAcquired}
       />
-
     </SafeAreaView>
   );
 }
@@ -1150,23 +1469,23 @@ export default function PlatformSelectScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09080E',
+    backgroundColor: uiTheme.colors.background,
   },
 
   // ── Header ──
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: uiTheme.spacing.lg,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    backgroundColor: '#12101C',
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    backgroundColor: uiTheme.colors.background,
   },
   headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   headerLogo: {
@@ -1175,211 +1494,218 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   headerTitle: {
-    color: '#FFF',
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFF",
     fontSize: 16.5,
-    fontWeight: '900',
+    fontWeight: "normal",
     letterSpacing: -0.3,
   },
   headerSub: {
-    color: '#8E8DA3',
-    fontSize: 10.5,
-    fontWeight: '600',
+    fontFamily: "Inter_600SemiBold",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
     marginTop: 1,
   },
   headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.sm,
   },
   notifBtn: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 9,
-    backgroundColor: '#1E1B2E',
+    backgroundColor: uiTheme.colors.elevated,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
   },
   headerBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: -4,
     right: -4,
-    backgroundColor: '#FE3C72',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.small,
     minWidth: 16,
     height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 3,
   },
   headerBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '900',
+    fontFamily: "Inter_800ExtraBold",
+    color: "#FFFFFF",
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
   },
   headerLaunchBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FE3C72',
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.xs,
+    backgroundColor: uiTheme.colors.primary,
     paddingVertical: 7,
     paddingHorizontal: 10,
     borderRadius: 9,
-    shadowColor: '#FE3C72',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
     shadowRadius: 6,
     elevation: 3,
   },
   headerLaunchBtnText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: '800',
+    fontFamily: "Inter_800ExtraBold",
+    color: "#FFF",
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
   },
   gearBtn: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 9,
-    backgroundColor: '#1E1B2E',
+    backgroundColor: uiTheme.colors.elevated,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerSignOutBtn: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 9,
-    backgroundColor: 'rgba(254, 60, 114, 0.10)',
+    backgroundColor: "rgba(254, 60, 114, 0.10)",
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "rgba(254, 60, 114, 0.25)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   // ── Quick Launch Action Bar (Tinder) ──
   quickLaunchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
     paddingVertical: 10,
-    backgroundColor: '#151322',
+    backgroundColor: "#151322",
     borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: "rgba(255, 255, 255, 0.06)",
   },
   quickLaunchPrimaryBtn: {
     flex: 1,
-    backgroundColor: '#FE3C72',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.input,
     paddingVertical: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#FE3C72',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: uiTheme.spacing.sm,
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   quickLaunchPrimaryText: {
-    color: '#FFF',
+    fontFamily: "Inter_800ExtraBold",
+    color: "#FFF",
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: "normal",
   },
   quickLaunchSecondaryBtn: {
-    backgroundColor: 'rgba(254, 60, 114, 0.10)',
+    backgroundColor: "rgba(254, 60, 114, 0.10)",
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.30)',
-    borderRadius: 12,
+    borderColor: "rgba(254, 60, 114, 0.30)",
+    borderRadius: uiTheme.radius.input,
     paddingVertical: 11,
     paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
   },
   quickLaunchSecondaryText: {
-    color: '#FE3C72',
+    fontFamily: "Inter_700Bold",
+    color: uiTheme.colors.primary,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "normal",
   },
 
   // ── Unified Tinder Hero Status & Action Card ──
   heroCardContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: uiTheme.spacing.lg,
+    paddingTop: uiTheme.spacing.md,
     paddingBottom: 6,
   },
   heroCardActive: {
-    backgroundColor: '#14121F',
-    borderRadius: 20,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1.5,
-    borderColor: 'rgba(16, 185, 129, 0.28)',
-    padding: 16,
-    shadowColor: '#10B981',
+    borderColor: "rgba(16, 185, 129, 0.28)",
+    padding: uiTheme.spacing.lg,
+    shadowColor: uiTheme.colors.success,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 4,
   },
   heroActiveTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 14,
   },
   heroActiveLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.md,
     flex: 1,
   },
   heroAvatarWrap: {
-    position: 'relative',
+    position: "relative",
   },
   heroAvatarIcon: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1.5,
-    borderColor: 'rgba(254, 60, 114, 0.4)',
+    borderColor: "rgba(254, 60, 114, 0.4)",
   },
   heroLiveDot: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -1,
     right: -1,
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
     borderWidth: 2,
-    borderColor: '#14121F',
+    borderColor: uiTheme.colors.surface,
   },
   heroActiveInfo: {
     flex: 1,
   },
   heroActiveTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 7,
   },
   heroActiveTitle: {
-    color: '#FFFFFF',
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "normal",
     letterSpacing: -0.3,
   },
   heroOnlinePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.14)',
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.xs,
+    backgroundColor: "rgba(16, 185, 129, 0.14)",
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.35)',
+    borderColor: "rgba(16, 185, 129, 0.35)",
     paddingHorizontal: 6,
     paddingVertical: 1.5,
     borderRadius: 6,
@@ -1388,166 +1714,174 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
   },
   heroOnlineText: {
-    color: '#10B981',
-    fontSize: 9,
-    fontWeight: '800',
+    fontFamily: "Manrope_800ExtraBold",
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
     letterSpacing: 0.5,
   },
   heroActiveSub: {
-    color: '#8E8DA3',
-    fontSize: 11,
-    fontWeight: '500',
+    fontFamily: "Inter_500Medium",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
     marginTop: 2,
   },
   heroLogoutBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: 9,
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(239, 68, 68, 0.22)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   heroActiveActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   heroPrimaryBtn: {
     flex: 1,
-    backgroundColor: '#FE3C72',
-    borderRadius: 12,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.input,
+    paddingVertical: uiTheme.spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 7,
-    shadowColor: '#FE3C72',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   heroPrimaryBtnText: {
-    color: '#FFF',
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFF",
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: "normal",
   },
   heroConfigureBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(254, 60, 114, 0.3)",
+    borderRadius: uiTheme.radius.input,
+    paddingVertical: uiTheme.spacing.md,
+    paddingHorizontal: uiTheme.spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
   },
   heroConfigureBtnText: {
-    color: '#FE3C72',
+    fontFamily: "Manrope_700Bold",
+    color: uiTheme.colors.primary,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "normal",
   },
 
   /* Disconnected Hero State */
   heroCardInactive: {
-    backgroundColor: '#14121F',
-    borderRadius: 20,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.32)',
-    padding: 16,
-    shadowColor: '#F59E0B',
+    borderColor: "rgba(245, 158, 11, 0.32)",
+    padding: uiTheme.spacing.lg,
+    shadowColor: uiTheme.colors.warning,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 4,
   },
   heroInactiveHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.md,
     marginBottom: 14,
   },
   heroInactiveIconWrap: {
-    position: 'relative',
+    position: "relative",
   },
   heroInactiveIcon: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderColor: "rgba(245, 158, 11, 0.4)",
   },
   heroInactiveDot: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -1,
     right: -1,
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#F59E0B',
+    backgroundColor: uiTheme.colors.warning,
     borderWidth: 2,
-    borderColor: '#14121F',
+    borderColor: uiTheme.colors.surface,
   },
   heroInactiveTextWrap: {
     flex: 1,
   },
   heroInactiveTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 7,
   },
   heroInactiveTitle: {
-    color: '#FFFFFF',
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "normal",
     letterSpacing: -0.3,
   },
   heroOfflinePill: {
-    backgroundColor: 'rgba(245, 158, 11, 0.14)',
+    backgroundColor: "rgba(245, 158, 11, 0.14)",
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderColor: "rgba(245, 158, 11, 0.35)",
     paddingHorizontal: 6,
     paddingVertical: 1.5,
     borderRadius: 6,
   },
   heroOfflineText: {
-    color: '#F59E0B',
-    fontSize: 8.5,
-    fontWeight: '800',
+    fontFamily: "Manrope_800ExtraBold",
+    color: uiTheme.colors.warning,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
     letterSpacing: 0.5,
   },
   heroInactiveSub: {
-    color: '#8E8DA3',
-    fontSize: 11,
-    fontWeight: '500',
+    fontFamily: "Inter_500Medium",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
     marginTop: 2,
     lineHeight: 15,
   },
   heroConnectBtn: {
-    backgroundColor: '#FE3C72',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.input,
     paddingVertical: 13,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#FE3C72',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: uiTheme.spacing.sm,
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 4,
   },
   heroConnectBtnText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '800',
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFF",
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: "normal",
     letterSpacing: 0.2,
   },
 
@@ -1558,89 +1892,92 @@ const styles = StyleSheet.create({
 
   // ── Settings Info Box ──
   infoBox: {
-    backgroundColor: '#14121F',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 16,
-    marginTop: 4,
-    marginBottom: 12,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    padding: uiTheme.spacing.lg,
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.md,
   },
   infoTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.sm,
     marginBottom: 6,
   },
   infoTitle: {
-    color: '#FFF',
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFF",
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: "normal",
   },
   infoText: {
-    color: '#8E8DA3',
-    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 17,
   },
 
   // ── Connection Modal ──
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    justifyContent: "flex-end",
     zIndex: 1000,
     elevation: 1000,
   },
   modalKeyboard: {
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   modalSheet: {
-    backgroundColor: '#14121F',
+    backgroundColor: uiTheme.colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: SCREEN_HEIGHT * 0.72,
     borderTopWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
   modalHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#3F3D52',
-    alignSelf: 'center',
+    backgroundColor: "#3F3D52",
+    alignSelf: "center",
     marginTop: 10,
     marginBottom: 6,
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: uiTheme.spacing.xl,
+    paddingVertical: uiTheme.spacing.md,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: "rgba(255, 255, 255, 0.06)",
   },
   modalTitle: {
-    color: '#FFF',
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFF",
     fontSize: 15.5,
-    fontWeight: '800',
+    fontWeight: "normal",
   },
   modalBody: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: uiTheme.spacing.xl,
+    paddingTop: uiTheme.spacing.lg,
     paddingBottom: 36,
   },
   consumerSectionCard: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     padding: 14,
     marginBottom: 14,
   },
   consumerSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     marginBottom: 10,
   },
@@ -1648,233 +1985,249 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(254, 60, 114, 0.12)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   consumerCardTitle: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontFamily: "Manrope_700Bold",
+    color: "#FFF",
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: "normal",
   },
   consumerCardSub: {
-    color: '#8E8DA3',
-    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 1,
   },
   consumerCityBox: {
-    backgroundColor: '#1E1B2E',
+    backgroundColor: uiTheme.colors.elevated,
     borderRadius: 10,
     padding: 10,
     marginBottom: 10,
   },
   consumerCityName: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '800',
+    fontFamily: "Inter_800ExtraBold",
+    color: "#FFF",
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: "normal",
   },
   consumerCityCoords: {
-    color: '#8E8DA3',
-    fontSize: 11,
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 2,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   consumerRefreshGpsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderRadius: 8,
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: "rgba(16, 185, 129, 0.3)",
     paddingVertical: 9,
   },
   consumerRefreshGpsText: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: "Inter_700Bold",
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
   },
   consumerStatusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-    paddingTop: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: uiTheme.spacing.xs,
+    paddingTop: uiTheme.spacing.sm,
     borderTopWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: "rgba(255, 255, 255, 0.05)",
   },
   consumerStatusLabel: {
-    color: '#8E8DA3',
-    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
   },
   consumerStatusVal: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: "Inter_700Bold",
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
   },
   modalSectionLabel: {
-    color: '#8E8DA3',
-    fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: "Inter_700Bold",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
     letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: 8,
+    textTransform: "uppercase",
+    marginBottom: uiTheme.spacing.sm,
   },
   envSelector: {
-    flexDirection: 'row',
-    backgroundColor: '#0D0B14',
-    borderRadius: 12,
+    flexDirection: "row",
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.input,
     padding: 3,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    marginBottom: 16,
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    marginBottom: uiTheme.spacing.lg,
   },
   envOption: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     paddingVertical: 10,
     borderRadius: 9,
   },
   envOptionActive: {
-    backgroundColor: '#26223B',
+    backgroundColor: uiTheme.colors.elevated,
   },
   envOptionText: {
-    color: '#716E89',
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: "Inter_600SemiBold",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
   },
   envOptionTextActive: {
-    color: '#FFF',
-    fontWeight: '700',
+    fontFamily: "Inter_700Bold",
+    color: "#FFF",
+    fontWeight: "normal",
   },
   regionCardRow: {
-    gap: 8,
-    marginBottom: 16,
+    gap: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.lg,
   },
   regionPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#0D0B14',
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.sm,
+    backgroundColor: uiTheme.colors.background,
     borderRadius: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: "rgba(255, 255, 255, 0.06)",
   },
   regionPillActive: {
-    borderColor: 'rgba(254, 60, 114, 0.4)',
-    backgroundColor: 'rgba(254, 60, 114, 0.05)',
+    borderColor: "rgba(254, 60, 114, 0.4)",
+    backgroundColor: "rgba(254, 60, 114, 0.05)",
   },
   regionPillText: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '500',
+    fontFamily: "Inter_500Medium",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
   },
   regionPillTextActive: {
-    color: '#FFF',
-    fontWeight: '600',
+    fontFamily: "Inter_600SemiBold",
+    color: "#FFF",
+    fontWeight: "normal",
   },
   advancedToggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 10,
     marginBottom: 6,
   },
   advancedToggleText: {
-    color: '#FE3C72',
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: "Inter_700Bold",
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
   },
   advancedDrawer: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    padding: 12,
-    marginBottom: 16,
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    padding: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.lg,
   },
   inputGroup: {
-    gap: 4,
+    gap: uiTheme.spacing.xs,
   },
   inputLabel: {
-    color: '#8E8DA3',
-    fontSize: 11,
-    fontWeight: '600',
+    fontFamily: "Inter_600SemiBold",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
   },
   textInput: {
-    backgroundColor: '#161424',
-    borderRadius: 8,
+    fontFamily: "Inter_400Regular",
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    color: '#FFF',
-    fontSize: 12,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    color: "#FFF",
+    fontSize: uiTheme.type.caption.fontSize,
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
   },
   modalLogoutBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.10)',
+    backgroundColor: "rgba(239, 68, 68, 0.10)",
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.30)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 8,
+    borderColor: "rgba(239, 68, 68, 0.30)",
+    borderRadius: uiTheme.radius.input,
+    paddingVertical: uiTheme.spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: uiTheme.spacing.sm,
+    marginTop: uiTheme.spacing.sm,
   },
   modalLogoutBtnText: {
-    color: '#EF4444',
+    fontFamily: "Inter_700Bold",
+    color: uiTheme.colors.error,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontWeight: "normal",
   },
 
   // ── Sign-out confirmation toast ──
   signedOutToast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    alignSelf: 'center',
-    marginTop: 8,
-    marginHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.sm,
+    alignSelf: "center",
+    marginTop: uiTheme.spacing.sm,
+    marginHorizontal: uiTheme.spacing.xl,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderRadius: uiTheme.radius.input,
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.32)',
+    borderColor: "rgba(16, 185, 129, 0.32)",
   },
   signedOutToastText: {
-    color: '#10B981',
+    fontFamily: "Inter_700Bold",
+    color: uiTheme.colors.success,
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: "normal",
   },
 
   // ── Custom Logout Confirmation Modal ──
   logoutModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(5, 4, 10, 0.80)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    backgroundColor: "rgba(5, 4, 10, 0.80)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: uiTheme.spacing.xxl,
   },
   logoutModalCard: {
-    width: '100%',
+    width: "100%",
     maxWidth: 340,
-    backgroundColor: '#141220',
-    borderRadius: 24,
+    backgroundColor: "#141220",
+    borderRadius: uiTheme.radius.sheet,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.28)',
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#EF4444',
+    borderColor: "rgba(239, 68, 68, 0.28)",
+    padding: uiTheme.spacing.xxl,
+    alignItems: "center",
+    shadowColor: uiTheme.colors.error,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 24,
@@ -1884,67 +2237,168 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.32)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
+    borderColor: "rgba(239, 68, 68, 0.32)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: uiTheme.spacing.lg,
   },
   logoutModalTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFFFFF",
+    fontSize: uiTheme.type.section.fontSize,
+    fontWeight: "normal",
     letterSpacing: -0.3,
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: uiTheme.spacing.sm,
+    textAlign: "center",
   },
   logoutModalSubtitle: {
-    color: '#8E8DA3',
+    fontFamily: "Inter_400Regular",
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
     lineHeight: 18,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 22,
   },
   logoutModalBtnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
-    width: '100%',
+    width: "100%",
   },
   logoutModalCancelBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: uiTheme.radius.input,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   logoutModalCancelText: {
-    color: '#D8D6E8',
+    fontFamily: "Inter_700Bold",
+    color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "normal",
   },
   logoutModalConfirmBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: '#EF4444',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: uiTheme.radius.input,
+    backgroundColor: uiTheme.colors.error,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 6,
-    shadowColor: '#EF4444',
+    shadowColor: uiTheme.colors.error,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 4,
   },
   logoutModalConfirmText: {
-    color: '#FFFFFF',
+    fontFamily: "Inter_800ExtraBold",
+    color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: "normal",
+  },
+});
+
+const homeStyles = StyleSheet.create({
+  header: {
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 22,
+    paddingTop: uiTheme.spacing.md,
+    paddingBottom: 14,
+    gap: 10,
+  },
+  brand: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.md,
+    flex: 1,
+  },
+  brandIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandName: {
+    fontFamily: "Manrope_800ExtraBold",
+    color: uiTheme.colors.text,
+    fontSize: 21,
+    fontWeight: "normal",
+    letterSpacing: -0.8,
+  },
+  brandCaption: {
+    fontFamily: "Inter_600SemiBold",
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    letterSpacing: 1.1,
+    fontWeight: "normal",
+    marginTop: uiTheme.spacing.xs,
+  },
+  headerActions: { flexDirection: "row", gap: uiTheme.spacing.sm },
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: uiTheme.colors.border,
+    backgroundColor: uiTheme.colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notificationDot: {
+    position: "absolute",
+    top: 10,
+    right: 12,
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: uiTheme.colors.primary,
+  },
+  dashboard: { flex: 1, paddingBottom: 80 },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingBottom: uiTheme.spacing.sm,
+    gap: uiTheme.spacing.sm,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionTitle: {
+    fontFamily: "Manrope_700Bold",
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.section.fontSize,
+    fontWeight: "normal",
+    flex: 1,
+  },
+  extraActions: { padding: uiTheme.spacing.md, gap: uiTheme.spacing.md },
+  secondaryAction: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  secondaryLabel: {
+    fontFamily: "Inter_600SemiBold",
+    color: uiTheme.colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "normal",
   },
 });

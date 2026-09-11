@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../theme';
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler } from 'react-native';
 import ActivityIndicator from '../components/common/SafeActivityIndicator';
@@ -2060,14 +2061,14 @@ export default function BrowserScreen({ route, navigation }) {
       >
         {/* ─── Upgraded Modern Glass Header ─── */}
         <View style={styles.header}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.closeBtnCircular}
             onPress={() => {
               cleanupCurrentSession();
               navigation.goBack();
             }}
           >
-            <Ionicons name="close" size={18} color="#D8D6E8" />
+            <Ionicons name="close" size={18} color={uiTheme.colors.text} />
           </TouchableOpacity>
           <View style={styles.headerLeft}>
             <View style={styles.headerTitleRow}>
@@ -2080,7 +2081,7 @@ export default function BrowserScreen({ route, navigation }) {
                   so it stays. */}
               {!isOnDevice && timeLeft !== null && (
                 <View style={styles.countdownBadge}>
-                  <Ionicons name="timer-outline" size={11} color="#10B981" />
+                  <Ionicons name="timer-outline" size={11} color={uiTheme.colors.success} />
                   <Text style={styles.countdownBadgeText}>
                     {Math.floor(timeLeft / 60)}:{(timeLeft % 60) < 10 ? '0' : ''}{timeLeft % 60}
                   </Text>
@@ -2120,12 +2121,12 @@ export default function BrowserScreen({ route, navigation }) {
                 <Ionicons
                   name={onDeviceSwiping ? "flash" : "options"}
                   size={13}
-                  color={onDeviceSwiping ? "#10B981" : "#FE3C72"}
+                  color={onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.primary}
                 />
                 {/* No swipe count here: it is already on the subtitle line and in
                     the dashboard, and an unbounded number in this label is what
                     pushed the row past the width of a 360dp screen. */}
-                <Text style={[styles.onDeviceDashboardBtnText, { color: onDeviceSwiping ? "#10B981" : "#FFF" }]}>
+                <Text style={[styles.onDeviceDashboardBtnText, { color: onDeviceSwiping ? uiTheme.colors.success : "#FFF" }]}>
                   {onDeviceSwiping ? 'AI Active' : 'AI Controls'}
                 </Text>
               </TouchableOpacity>
@@ -2142,7 +2143,7 @@ export default function BrowserScreen({ route, navigation }) {
                   accessibilityRole="button"
                   accessibilityLabel="Log out of Tinder"
                 >
-                  <Ionicons name="log-out-outline" size={14} color="#EF4444" />
+                  <Ionicons name="log-out-outline" size={14} color={uiTheme.colors.error} />
                 </TouchableOpacity>
               ) : (
                 <View
@@ -2154,57 +2155,57 @@ export default function BrowserScreen({ route, navigation }) {
             </View>
           ) : (loginStep !== 'done' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.toggleNekoBtn, { marginRight: 4 }]}
                 onPress={() => setIsExpanded(!isExpanded)}
               >
-                <Ionicons name={isExpanded ? "contract-outline" : "expand-outline"} size={13} color="#D8D6E8" />
+                <Ionicons name={isExpanded ? "contract-outline" : "expand-outline"} size={13} color={uiTheme.colors.text} />
                 <Text style={styles.toggleNekoBtnText}>
                   {isExpanded ? 'Split' : 'Expand'}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.toggleNekoBtn, { marginRight: 4 }]}
                 onPress={() => setShowNeko(!showNeko)}
               >
-                <Ionicons name={showNeko ? "eye-off-outline" : "eye-outline"} size={13} color="#D8D6E8" />
+                <Ionicons name={showNeko ? "eye-off-outline" : "eye-outline"} size={13} color={uiTheme.colors.text} />
                 <Text style={styles.toggleNekoBtnText}>
                   {showNeko ? 'Hide' : 'View'}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.dashboardBtn, { marginRight: 4 }]}
                 onPress={() => setShowDashboard(true)}
               >
-                <Ionicons name="stats-chart-outline" size={15} color="#FE3C72" />
+                <Ionicons name="stats-chart-outline" size={15} color={uiTheme.colors.primary} />
               </TouchableOpacity>
               {sessionStatus === SESSION_SIGNED_IN && (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.dashboardBtn, { marginRight: 4, backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
                   onPress={confirmLogout}
                 >
-                  <Ionicons name="log-out-outline" size={14} color="#EF4444" />
+                  <Ionicons name="log-out-outline" size={14} color={uiTheme.colors.error} />
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.skipBtn} onPress={() => setLoginStep('done')}>
+              <TouchableOpacity accessibilityRole="button" style={styles.skipBtn} onPress={() => setLoginStep('done')}>
                 <Text style={styles.skipBtnText}>Skip</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.dashboardBtn, { marginRight: 6 }]}
                 onPress={() => setShowDashboard(true)}
               >
-                <Ionicons name="stats-chart-outline" size={15} color="#FE3C72" />
+                <Ionicons name="stats-chart-outline" size={15} color={uiTheme.colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.dashboardBtn, { marginRight: 6, backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
                 onPress={confirmLogout}
               >
-                <Ionicons name="log-out-outline" size={14} color="#EF4444" />
+                <Ionicons name="log-out-outline" size={14} color={uiTheme.colors.error} />
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.menuBtn, { marginRight: 8, backgroundColor: '#3A3A4A15', borderColor: '#3A3A4A40' }]}
                 onPress={() => inputRef.current.focus()}
               >
@@ -2225,25 +2226,25 @@ export default function BrowserScreen({ route, navigation }) {
           <SafeAreaView style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="stats-chart" size={16} color="#FD297B" />
+                <Ionicons name="stats-chart" size={16} color={uiTheme.colors.primary} />
                 <Text style={styles.modalTitle}>Flint Dashboard</Text>
               </View>
               <View style={styles.headerRightActions}>
                 {(isOnDevice ? (sessionStatus === SESSION_SIGNED_IN) : (loginStep === 'done' || sessionStatus === SESSION_SIGNED_IN)) && (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={styles.headerLogoutBtn}
                     onPress={confirmLogout}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="log-out-outline" size={15} color="#EF4444" />
+                    <Ionicons name="log-out-outline" size={15} color={uiTheme.colors.error} />
                     <Text style={styles.headerLogoutBtnText}>Log Out</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.modalCloseBtn}
                   onPress={() => setShowDashboard(false)}
                 >
-                  <Ionicons name="close" size={16} color="#D8D6E8" />
+                  <Ionicons name="close" size={16} color={uiTheme.colors.text} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -2268,7 +2269,7 @@ export default function BrowserScreen({ route, navigation }) {
               controlsContent={
                 isOnDevice ? (
                   <View style={styles.onDeviceControlsBox}>
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.onDeviceQuickChatsBtn}
                       onPress={() => {
                         setShowDashboard(false);
@@ -2276,7 +2277,7 @@ export default function BrowserScreen({ route, navigation }) {
                       }}
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="chatbubbles" size={15} color="#818CF8" />
+                      <Ionicons name="chatbubbles" size={15} color={uiTheme.colors.info} />
                       <Text style={styles.onDeviceQuickChatsBtnText}>💬 Reply to Unread Matches with AI</Text>
                     </TouchableOpacity>
                   </View>
@@ -2291,7 +2292,7 @@ export default function BrowserScreen({ route, navigation }) {
                       autoCapitalize="none"
                       autoCorrect={false}
                     />
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.sendBtn}
                       onPress={handleSendText}
                       disabled={sendingText}
@@ -2302,7 +2303,7 @@ export default function BrowserScreen({ route, navigation }) {
                         <Text style={styles.sendBtnText}>Send</Text>
                       )}
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.enterBtn} onPress={handlePressEnter}>
+                    <TouchableOpacity accessibilityRole="button" style={styles.enterBtn} onPress={handlePressEnter}>
                       <Text style={styles.enterBtnText}>⏎ Enter</Text>
                     </TouchableOpacity>
                   </View>
@@ -2323,7 +2324,7 @@ export default function BrowserScreen({ route, navigation }) {
           <View style={styles.logoutModalOverlay}>
             <View style={styles.logoutModalCard}>
               <View style={styles.logoutIconBadge}>
-                <Ionicons name="log-out" size={28} color="#EF4444" />
+                <Ionicons name="log-out" size={28} color={uiTheme.colors.error} />
               </View>
 
               <Text style={styles.logoutModalTitle}>Log Out of Tinder?</Text>
@@ -2332,7 +2333,7 @@ export default function BrowserScreen({ route, navigation }) {
               </Text>
 
               <View style={styles.logoutModalBtnRow}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.logoutModalCancelBtn}
                   onPress={() => setShowLogoutConfirm(false)}
                   disabled={loggingOut}
@@ -2341,7 +2342,7 @@ export default function BrowserScreen({ route, navigation }) {
                   <Text style={styles.logoutModalCancelText}>Cancel</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.logoutModalConfirmBtn}
                   onPress={handleLogout}
                   disabled={loggingOut}
@@ -2762,45 +2763,45 @@ export default function BrowserScreen({ route, navigation }) {
           )}
           {lastCoord && (
             <View style={styles.coordHudBadge} pointerEvents="box-none">
-              <Ionicons name="locate" size={13} color="#10B981" />
+              <Ionicons name="locate" size={13} color={uiTheme.colors.success} />
               <Text style={styles.coordHudText}>
                 X: {lastCoord.x}  |  Y: {lastCoord.y}
               </Text>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 onPress={() => setLastCoord(null)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="close-circle" size={14} color="#8E8DA3" />
+                <Ionicons name="close-circle" size={14} color={uiTheme.colors.muted} />
               </TouchableOpacity>
             </View>
           )}
           {startingHyperbeam && (
             <View style={styles.loaderContainer} pointerEvents="none">
-              <ActivityIndicator size="large" color="#FE3C72" />
+              <ActivityIndicator size="large" color={uiTheme.colors.primary} />
               <Text style={styles.loaderText}>Starting Hyperbeam Cloud Browser...</Text>
             </View>
           )}
           {loading && !startingHyperbeam && !connectionError && Boolean(finalUrl) && (
             <View style={styles.loaderContainer} pointerEvents="none">
-              <ActivityIndicator size="large" color="#FE3C72" />
+              <ActivityIndicator size="large" color={uiTheme.colors.primary} />
               <Text style={styles.loaderText}>Connecting to Virtual Browser...</Text>
             </View>
           )}
           {!startingHyperbeam && (!finalUrl || connectionError) && (
             <View style={styles.errorOverlay}>
-              <Ionicons name="cloud-offline-outline" size={44} color="#FE3C72" />
+              <Ionicons name="cloud-offline-outline" size={44} color={uiTheme.colors.primary} />
               <Text style={styles.errorTitle}>Cannot Connect to Virtual Browser</Text>
               <Text style={styles.errorDetail}>
                 {!finalUrl
                   ? 'Hyperbeam cloud session could not be established. Please check your Hyperbeam API key or switch to VPS / Local mode in Connection Settings.'
                   : (connectionError?.code === -2 || connectionError?.description?.includes('ERR_NAME_NOT_RESOLVED')
                     ? 'DNS / Host Lookup Failed (Error -2)\nThe phone could not resolve the server address.'
-                    : (connectionError?.description || `Connection failed (Error code: ${connectionError?.code || -2})`))}
+                    : 'The browser could not connect. Check your connection and try again.')}
               </Text>
               {Boolean(finalUrl) && <Text style={styles.errorUrl} numberOfLines={2}>Target: {finalUrl}</Text>}
               <View style={styles.errorActions}>
                 {Boolean(finalUrl) && (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={styles.retryBtn}
                     onPress={() => {
                       setConnectionError(null);
@@ -2812,7 +2813,7 @@ export default function BrowserScreen({ route, navigation }) {
                     <Text style={styles.retryBtnText}>Retry</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.backToSetupBtn}
                   onPress={() => {
                     cleanupCurrentSession();
@@ -2839,7 +2840,7 @@ export default function BrowserScreen({ route, navigation }) {
                 </View>
 
                 {/* Primary Tinder Pink Gradient Card */}
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.tinderPrimaryCard}
                   disabled={sendingText}
                   activeOpacity={0.88}
@@ -2860,7 +2861,7 @@ export default function BrowserScreen({ route, navigation }) {
                 </TouchableOpacity>
 
                 {/* Secondary Google Glass Card */}
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.googleGlassCard}
                   disabled={sendingText}
                   activeOpacity={0.88}
@@ -2881,7 +2882,7 @@ export default function BrowserScreen({ route, navigation }) {
                 </TouchableOpacity>
 
                 {/* Tertiary Trouble Logging In Link */}
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.troubleLinkBtn}
                   disabled={sendingText}
                   activeOpacity={0.7}
@@ -2900,13 +2901,13 @@ export default function BrowserScreen({ route, navigation }) {
             {loginStep === 'google_email' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Google Sign-In 🌐</Text>
-                  <TouchableOpacity style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
                     <Text style={styles.wizardDoneBtnText}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
@@ -2917,14 +2918,14 @@ export default function BrowserScreen({ route, navigation }) {
                 <TextInput
                   style={styles.wizardInput}
                   placeholder="Email or Phone..."
-                  placeholderTextColor="#8E8DA3"
+                  placeholderTextColor={uiTheme.colors.muted}
                   value={inputText}
                   onChangeText={setInputText}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.wizardBtn}
                   disabled={sendingText}
                   activeOpacity={0.88}
@@ -2957,13 +2958,13 @@ export default function BrowserScreen({ route, navigation }) {
             {loginStep === 'google_password' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Enter Google Password 🔒</Text>
-                  <TouchableOpacity style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
                     <Text style={styles.wizardDoneBtnText}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
@@ -2974,13 +2975,13 @@ export default function BrowserScreen({ route, navigation }) {
                 <TextInput
                   style={styles.wizardInput}
                   placeholder="Google Password..."
-                  placeholderTextColor="#8E8DA3"
+                  placeholderTextColor={uiTheme.colors.muted}
                   value={inputText}
                   onChangeText={setInputText}
                   secureTextEntry
                 />
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.wizardBtn}
                   disabled={sendingText}
                   activeOpacity={0.88}
@@ -3013,7 +3014,7 @@ export default function BrowserScreen({ route, navigation }) {
             {loginStep === 'email' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
@@ -3034,7 +3035,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <TextInput
                   style={styles.wizardInput}
                   placeholder="email@example.com"
-                  placeholderTextColor="#8E8DA3"
+                  placeholderTextColor={uiTheme.colors.muted}
                   value={inputText}
                   onChangeText={(txt) => {
                     setInputText(txt);
@@ -3049,7 +3050,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <View style={{ marginBottom: 14 }}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                     {['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'].map((domain) => (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={domain}
                         style={styles.wizardDomainChip}
                         onPress={() => {
@@ -3068,17 +3069,17 @@ export default function BrowserScreen({ route, navigation }) {
                 </View>
 
                 <View style={styles.wizardActionRow}>
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.wizardBtnSecondary, { flex: 1 }]}
                     onPress={() => {
                       setInputText('');
                       setEmailErrorText('');
                     }}
                   >
-                    <Text style={[styles.wizardBtnSecondaryText, { color: '#8E8DA3' }]}>🧹 Clear</Text>
+                    <Text style={[styles.wizardBtnSecondaryText, { color: uiTheme.colors.muted }]}>🧹 Clear</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.wizardBtn, { flex: 1, marginTop: 0 }]}
                     disabled={sendingText}
                     activeOpacity={0.88}
@@ -3109,13 +3110,13 @@ export default function BrowserScreen({ route, navigation }) {
             {loginStep === 'phone' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Enter Mobile Number</Text>
-                  <TouchableOpacity style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
                     <Text style={styles.wizardDoneBtnText}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
@@ -3127,7 +3128,7 @@ export default function BrowserScreen({ route, navigation }) {
                   <TextInput
                     style={styles.countryCodeInput}
                     placeholder="+91"
-                    placeholderTextColor="#8E8DA3"
+                    placeholderTextColor={uiTheme.colors.muted}
                     value={countryCode}
                     onChangeText={setCountryCode}
                     keyboardType="phone-pad"
@@ -3135,7 +3136,7 @@ export default function BrowserScreen({ route, navigation }) {
                   <TextInput
                     style={styles.phoneNumberInput}
                     placeholder="Mobile Number"
-                    placeholderTextColor="#8E8DA3"
+                    placeholderTextColor={uiTheme.colors.muted}
                     value={inputText}
                     onChangeText={setInputText}
                     keyboardType="phone-pad"
@@ -3143,7 +3144,7 @@ export default function BrowserScreen({ route, navigation }) {
                   />
                 </View>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.wizardBtn}
                   disabled={sendingText}
                   activeOpacity={0.88}
@@ -3172,7 +3173,7 @@ export default function BrowserScreen({ route, navigation }) {
             {loginStep === 'waiting_email' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
@@ -3185,7 +3186,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <View style={styles.wizardHelpBox}>
                   <Text style={styles.wizardHelpLabel}>Didn't receive a link?</Text>
 
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
                     disabled={sendingText}
                     onPress={async () => {
@@ -3205,7 +3206,7 @@ export default function BrowserScreen({ route, navigation }) {
                     <Text style={styles.wizardBtnSecondaryText}>✉️ Use a different email</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={styles.wizardBtnSecondary}
                     disabled={sendingText}
                     onPress={async () => {
@@ -3231,7 +3232,7 @@ export default function BrowserScreen({ route, navigation }) {
             {loginStep === 'waiting_otp' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
@@ -3241,7 +3242,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <Text style={styles.wizardDesc}>
                   A verification code is being sent to your phone. This may take a few seconds.
                 </Text>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={styles.wizardGhostBtn}
                   onPress={() => setLoginStep('otp')}
                 >
@@ -3253,15 +3254,15 @@ export default function BrowserScreen({ route, navigation }) {
             {loginStep === 'otp' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>
                     {otpSubtype === 'sms' ? 'Device Verification 📱' : 'Email Verification 📧'}
                   </Text>
-                  <TouchableOpacity style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
                     <Text style={styles.wizardDoneBtnText}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
@@ -3278,7 +3279,7 @@ export default function BrowserScreen({ route, navigation }) {
                 <TextInput
                   style={styles.wizardInput}
                   placeholder="Enter 6-digit OTP..."
-                  placeholderTextColor="#8E8DA3"
+                  placeholderTextColor={uiTheme.colors.muted}
                   value={inputText}
                   onChangeText={setInputText}
                   keyboardType="number-pad"
@@ -3286,7 +3287,7 @@ export default function BrowserScreen({ route, navigation }) {
                 />
 
                 <View style={styles.wizardActionRow}>
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={styles.resendBtn}
                     disabled={sendingText || resendingCode}
                     onPress={async () => {
@@ -3304,7 +3305,7 @@ export default function BrowserScreen({ route, navigation }) {
                   </TouchableOpacity>
 
                   {otpSubtype === 'sms' && (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.wizardTroubleBtn}
                       disabled={sendingText}
                       onPress={async () => {
@@ -3321,13 +3322,13 @@ export default function BrowserScreen({ route, navigation }) {
                 </View>
 
                 {resendStatusText ? (
-                  <Text style={[styles.resendStatusText, { color: resendStatusText.includes('✅') ? '#10B981' : '#FFCB37' }]}>
+                  <Text style={[styles.resendStatusText, { color: resendStatusText.includes('✅') ? uiTheme.colors.success : '#FFCB37' }]}>
                     {resendStatusText}
                   </Text>
                 ) : null}
 
                 <View style={styles.wizardBtnRow}>
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.wizardBtnPrimary, { flex: 1 }]}
                     disabled={sendingText || !inputText.trim()}
                     activeOpacity={0.88}
@@ -3351,7 +3352,7 @@ export default function BrowserScreen({ route, navigation }) {
             {loginStep === 'captcha' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
@@ -3371,7 +3372,7 @@ export default function BrowserScreen({ route, navigation }) {
                   <TextInput
                     style={styles.wizardInput}
                     placeholder="Enter captcha text (if text-based)..."
-                    placeholderTextColor="#8E8DA3"
+                    placeholderTextColor={uiTheme.colors.muted}
                     value={captchaText}
                     onChangeText={setCaptchaText}
                     autoCapitalize="none"
@@ -3380,7 +3381,7 @@ export default function BrowserScreen({ route, navigation }) {
                 </View>
 
                 <View style={styles.wizardBtnRow}>
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.wizardBtnSecondary, { flex: 1 }]}
                     disabled={sendingText}
                     onPress={() => {
@@ -3390,7 +3391,7 @@ export default function BrowserScreen({ route, navigation }) {
                   >
                     <Text style={styles.wizardBtnSecondaryText}>Skip to OTP ➔</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.wizardBtn, { flex: 1 }]}
                     disabled={sendingText}
                     activeOpacity={0.88}
@@ -3447,7 +3448,7 @@ export default function BrowserScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#050505',
+    backgroundColor: uiTheme.colors.background,
   },
   header: {
     // minHeight, not height: with the Android status-bar paddingTop below, a
@@ -3467,7 +3468,7 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
     minWidth: 0,
-    marginHorizontal: 8,
+    marginHorizontal: uiTheme.spacing.sm,
     flexDirection: 'column',
   },
   headerTitleRow: {
@@ -3505,24 +3506,24 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  statusIndicatorText: {
+  statusIndicatorText: { fontFamily: 'Inter_800ExtraBold',
     color: 'rgba(255, 255, 255, 0.45)',
-    fontSize: 9.5,
-    fontWeight: '800',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
-  headerTitle: {
+  headerTitle: { fontFamily: 'Manrope_800ExtraBold',
     flexShrink: 1,
     color: '#FFFFFF',
     fontSize: 21,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.3,
   },
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   headerLogoutBtn: {
     flexDirection: 'row',
@@ -3532,14 +3533,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.32)',
     borderRadius: 19,
-    paddingHorizontal: 12,
-    height: 38,
+    paddingHorizontal: uiTheme.spacing.md,
+    height: 44,
     justifyContent: 'center',
   },
-  headerLogoutBtnText: {
-    color: '#EF4444',
+  headerLogoutBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.error,
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   closeBtnCircular: {
@@ -3556,12 +3557,12 @@ const styles = StyleSheet.create({
   actionBarGrid: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: uiTheme.spacing.xl,
     marginBottom: 10,
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   actionBtn: {
-    height: 42,
+    height: 44,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
@@ -3581,13 +3582,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(253, 41, 123, 0.12)',
     borderColor: 'rgba(253, 41, 123, 0.3)',
   },
-  actionBtnText: {
+  actionBtnText: { fontFamily: 'Inter_600SemiBold',
     color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   webviewContainer: {
-    marginHorizontal: 16,
+    marginHorizontal: uiTheme.spacing.lg,
     position: 'relative',
   },
   webviewContainerSplit: {
@@ -3645,22 +3646,22 @@ const styles = StyleSheet.create({
   },
   loaderContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#050505',
+    backgroundColor: uiTheme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loaderText: {
-    color: '#8E8DA3',
+  loaderText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
     marginTop: 15,
     fontSize: 13.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   wizardPanel: {
     flex: 0.38,
     backgroundColor: 'transparent',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
+    paddingHorizontal: uiTheme.spacing.xl,
+    paddingTop: uiTheme.spacing.lg,
+    paddingBottom: uiTheme.spacing.xl,
     justifyContent: 'center',
   },
   wizardPanelFull: {
@@ -3673,13 +3674,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  wizardOptionsTitle: {
+  wizardOptionsTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 21,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
-  wizardOptionsSubtitle: {
+  wizardOptionsSubtitle: { fontFamily: 'Inter_400Regular',
     color: 'rgba(255, 255, 255, 0.45)',
     fontSize: 12.5,
     marginTop: 3,
@@ -3688,14 +3689,14 @@ const styles = StyleSheet.create({
   tinderPrimaryCard: {
     width: '100%',
     height: 60,
-    borderRadius: 20,
-    backgroundColor: '#FD297B',
+    borderRadius: uiTheme.radius.card,
+    backgroundColor: uiTheme.colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 18,
     marginBottom: 10,
-    shadowColor: '#FD297B',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 14,
@@ -3704,26 +3705,26 @@ const styles = StyleSheet.create({
   cardLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: uiTheme.spacing.md,
   },
   tinderIconSquare: {
     width: 36,
     height: 36,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tinderPrimaryCardText: {
+  tinderPrimaryCardText: { fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 15.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   googleGlassCard: {
     width: '100%',
     height: 60,
-    borderRadius: 20,
+    borderRadius: uiTheme.radius.card,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
@@ -3736,87 +3737,87 @@ const styles = StyleSheet.create({
   glassIconSquare: {
     width: 36,
     height: 36,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  googleCardText: {
+  googleCardText: { fontFamily: 'Inter_600SemiBold',
     color: 'rgba(255, 255, 255, 0.92)',
     fontSize: 15.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
     letterSpacing: 0.1,
   },
   troubleLinkBtn: {
-    height: 38,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  troubleLinkText: {
+  troubleLinkText: { fontFamily: 'Inter_600SemiBold',
     color: 'rgba(255, 255, 255, 0.45)',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
     letterSpacing: 0.1,
   },
   wizardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
   wizardDoneBtn: {
     marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     paddingVertical: 5,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     backgroundColor: 'rgba(16, 185, 129, 0.10)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.25)',
   },
-  wizardDoneBtnText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontWeight: '700',
+  wizardDoneBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   wizardBackBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 9,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginRight: 8,
+    marginRight: uiTheme.spacing.sm,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  wizardBackBtnText: {
+  wizardBackBtnText: { fontFamily: 'Inter_700Bold',
     color: '#E0E0E6',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  wizardTitle: {
+  wizardTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 15.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: 0.15,
     flexShrink: 1,
   },
-  wizardDesc: {
-    color: '#8E8DA3',
-    fontSize: 12,
+  wizardDesc: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginBottom: 10,
     lineHeight: 16.5,
   },
-  wizardInput: {
+  wizardInput: { fontFamily: 'Inter_400Regular',
     height: 46,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 14,
     paddingHorizontal: 14,
     color: '#FFF',
-    fontSize: 14,
+    fontSize: uiTheme.type.label.fontSize,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: 10,
@@ -3825,67 +3826,67 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  wizardDomainChipText: {
-    color: '#D8D6E8',
-    fontSize: 11,
-    fontWeight: '700',
+  wizardDomainChipText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   phoneInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
-  countryCodeInput: {
+  countryCodeInput: { fontFamily: 'Inter_600SemiBold',
     width: 72,
     height: 46,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 14,
     paddingHorizontal: 10,
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     textAlign: 'center',
   },
-  phoneNumberInput: {
+  phoneNumberInput: { fontFamily: 'Inter_400Regular',
     flex: 1,
     height: 46,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 14,
     paddingHorizontal: 14,
     color: '#FFF',
-    fontSize: 14,
+    fontSize: uiTheme.type.label.fontSize,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   wizardBtn: {
     height: 48,
-    backgroundColor: '#FD297B',
+    backgroundColor: uiTheme.colors.primary,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#FD297B',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 5,
   },
-  wizardBtnText: {
+  wizardBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
     fontSize: 13.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   wizardBtnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   wizardBtnSecondary: {
     height: 48,
@@ -3897,18 +3898,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  wizardBtnSecondaryText: {
+  wizardBtnSecondaryText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
     fontSize: 13.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   wizardBtnPrimary: {
     height: 48,
-    backgroundColor: '#FD297B',
+    backgroundColor: uiTheme.colors.primary,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#FD297B',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -3917,8 +3918,8 @@ const styles = StyleSheet.create({
   wizardActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
+    gap: uiTheme.spacing.sm,
+    marginTop: uiTheme.spacing.xs,
   },
   wizardErrorBox: {
     backgroundColor: 'rgba(239, 68, 68, 0.10)',
@@ -3928,25 +3929,25 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
-  wizardErrorText: {
-    color: '#EF4444',
-    fontSize: 12,
-    fontWeight: '600',
+  wizardErrorText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.error,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     textAlign: 'center',
   },
   wizardHelpBox: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.input,
+    padding: uiTheme.spacing.md,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
   },
-  wizardHelpLabel: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
-    fontWeight: '700',
-    marginBottom: 8,
+  wizardHelpLabel: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.sm,
   },
   wizardGhostBtn: {
     height: 46,
@@ -3957,14 +3958,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  wizardGhostBtnText: {
-    color: '#8E8DA3',
+  wizardGhostBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   wizardTroubleBtn: {
     flex: 1,
-    height: 42,
+    height: 44,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: 10,
     alignItems: 'center',
@@ -3972,35 +3973,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 203, 55, 0.20)',
   },
-  wizardTroubleBtnText: {
+  wizardTroubleBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFCB37',
-    fontSize: 11.5,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   // ── Dashboard Modal ──
   modalContainer: {
     flex: 1,
-    backgroundColor: '#0F0F13',
+    backgroundColor: uiTheme.colors.background,
   },
   modalHeader: {
     height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: '#1E1E2E',
     backgroundColor: '#16161E',
   },
-  modalTitle: {
+  modalTitle: { fontFamily: 'Manrope_700Bold',
     color: '#F1F1F5',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   modalCloseBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    paddingHorizontal: uiTheme.spacing.md,
+    borderRadius: uiTheme.radius.small,
     backgroundColor: 'rgba(253, 41, 123, 0.10)',
     borderWidth: 1,
     borderColor: 'rgba(253, 41, 123, 0.25)',
@@ -4011,29 +4012,29 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 203, 55, 0.25)',
     borderRadius: 14,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
-  puzzleWarningTitle: {
+  puzzleWarningTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFCB37',
     fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 4,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.xs,
   },
-  puzzleWarningDesc: {
+  puzzleWarningDesc: { fontFamily: 'Inter_400Regular',
     color: '#C8C8D0',
     fontSize: 12.5,
     lineHeight: 18,
     marginBottom: 6,
   },
-  puzzleInstructionText: {
+  puzzleInstructionText: { fontFamily: 'Inter_600SemiBold',
     color: '#FFF',
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
     lineHeight: 18,
   },
   resendBtn: {
     flex: 1,
-    height: 42,
+    height: 44,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: 10,
     alignItems: 'center',
@@ -4041,14 +4042,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  resendBtnText: {
+  resendBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFCB37',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  resendStatusText: {
-    fontSize: 11,
-    fontWeight: '600',
+  resendStatusText: { fontFamily: 'Inter_600SemiBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -4058,27 +4059,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     zIndex: 100,
   },
-  errorTitle: {
+  errorTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFF',
-    fontSize: 18,
-    fontWeight: '700',
-    marginTop: 16,
-    marginBottom: 8,
+    fontSize: uiTheme.type.section.fontSize,
+    fontWeight: 'normal',
+    marginTop: uiTheme.spacing.lg,
+    marginBottom: uiTheme.spacing.sm,
     textAlign: 'center',
   },
-  errorDetail: {
+  errorDetail: { fontFamily: 'Inter_400Regular',
     color: '#9E9EB0',
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
-  errorUrl: {
+  errorUrl: { fontFamily: 'Inter_400Regular',
     color: '#65657A',
-    fontSize: 11,
+    fontSize: uiTheme.type.caption.fontSize,
     textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 16,
+    marginBottom: uiTheme.spacing.xxl,
+    paddingHorizontal: uiTheme.spacing.lg,
   },
   errorActions: {
     width: '100%',
@@ -4086,17 +4087,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   retryBtn: {
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     height: 44,
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  retryBtnText: {
+  retryBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
   backToSetupBtn: {
     backgroundColor: '#222230',
@@ -4107,10 +4108,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#343448',
   },
-  backToSetupBtnText: {
+  backToSetupBtnText: { fontFamily: 'Inter_600SemiBold',
     color: '#C4C4D6',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
 
 
@@ -4124,38 +4125,38 @@ const styles = StyleSheet.create({
     gap: 7,
     backgroundColor: 'rgba(18, 16, 28, 0.95)',
     borderWidth: 1,
-    borderColor: '#10B981',
+    borderColor: uiTheme.colors.success,
     paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
+    paddingHorizontal: uiTheme.spacing.md,
+    borderRadius: uiTheme.radius.card,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 8,
   },
-  coordHudText: {
+  coordHudText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.4,
   },
   countdownBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     backgroundColor: '#10B98118',
     borderWidth: 1,
     borderColor: '#10B98140',
     paddingVertical: 2,
     paddingHorizontal: 7,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     marginLeft: 6,
   },
-  countdownBadgeText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontWeight: '800',
+  countdownBadgeText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── On-Device Header Controls ──
@@ -4165,7 +4166,7 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 11,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
   },
   onDeviceDashboardBtnIdle: {
     backgroundColor: 'rgba(254, 60, 114, 0.16)',
@@ -4176,21 +4177,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 185, 129, 0.16)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.4)',
-    shadowColor: '#10B981',
+    shadowColor: uiTheme.colors.success,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 2,
   },
-  onDeviceDashboardBtnText: {
-    fontSize: 11.5,
-    fontWeight: '700',
+  onDeviceDashboardBtnText: { fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   onDeviceLogsBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: uiTheme.radius.small,
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
@@ -4198,43 +4199,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   onDeviceControlsBox: {
-    paddingVertical: 4,
+    paddingVertical: uiTheme.spacing.xs,
   },
   onDeviceQuickChatsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     backgroundColor: 'rgba(99, 102, 241, 0.16)',
     borderWidth: 1,
     borderColor: 'rgba(99, 102, 241, 0.4)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderRadius: uiTheme.radius.input,
+    paddingVertical: uiTheme.spacing.md,
+    paddingHorizontal: uiTheme.spacing.lg,
   },
-  onDeviceQuickChatsBtnText: {
-    color: '#818CF8',
+  onDeviceQuickChatsBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.info,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   // ── Header ──
   headerBtnDisabled: {
     opacity: 0.4,
   },
-  subtitle: {
+  subtitle: { fontFamily: 'Inter_600SemiBold',
     color: 'rgba(255, 255, 255, 0.45)',
-    fontSize: 11.5,
-    fontWeight: '600',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 2,
   },
   // Square icon button used for the header action row (dashboard, logs, logout).
   // Callers layer their own backgroundColor / borderColor on top, so the base
   // only owns geometry plus a neutral glass fallback.
   dashboardBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: uiTheme.radius.small,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
@@ -4244,102 +4245,102 @@ const styles = StyleSheet.create({
 
   // ── Header chips (remote / Neko session controls) ──
   toggleNekoBtn: {
-    height: 32,
+    height: 44,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  toggleNekoBtnText: {
+  toggleNekoBtnText: { fontFamily: 'Inter_700Bold',
     color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 11.5,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   menuBtn: {
-    height: 32,
+    height: 44,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuBtnText: {
+  menuBtnText: { fontFamily: 'Inter_700Bold',
     color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 11.5,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   skipBtn: {
-    height: 32,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    height: 44,
+    paddingHorizontal: uiTheme.spacing.md,
+    borderRadius: uiTheme.radius.small,
     backgroundColor: 'rgba(253, 41, 123, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(253, 41, 123, 0.30)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  skipBtnText: {
-    color: '#FD297B',
-    fontSize: 11.5,
-    fontWeight: '700',
+  skipBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  modalCloseBtnText: {
-    color: '#FD297B',
-    fontSize: 12,
-    fontWeight: '700',
+  modalCloseBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Manual text input panel (remote / Neko session) ──
   inputPanel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
+    gap: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.lg,
     paddingVertical: 10,
   },
-  textInput: {
+  textInput: { fontFamily: 'Inter_400Regular',
     flex: 1,
     height: 42,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     paddingHorizontal: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: uiTheme.type.label.fontSize,
   },
   sendBtn: {
-    height: 42,
+    height: 44,
     paddingHorizontal: 18,
-    borderRadius: 12,
-    backgroundColor: '#FD297B',
+    borderRadius: uiTheme.radius.input,
+    backgroundColor: uiTheme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnText: {
+  sendBtnText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   enterBtn: {
-    height: 42,
+    height: 44,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  enterBtnText: {
+  enterBtnText: { fontFamily: 'Inter_700Bold',
     color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   // ── Logout Confirmation Modal ──
@@ -4352,18 +4353,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 4, 10, 0.80)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: uiTheme.spacing.xxl,
   },
   logoutModalCard: {
     width: '100%',
     maxWidth: 340,
     backgroundColor: '#141220',
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.28)',
-    padding: 24,
+    padding: uiTheme.spacing.xxl,
     alignItems: 'center',
-    shadowColor: '#EF4444',
+    shadowColor: uiTheme.colors.error,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 24,
@@ -4378,18 +4379,18 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(239, 68, 68, 0.32)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
-  logoutModalTitle: {
+  logoutModalTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: uiTheme.type.section.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.3,
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
     textAlign: 'center',
   },
-  logoutModalSubtitle: {
-    color: '#8E8DA3',
+  logoutModalSubtitle: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
     lineHeight: 18,
     textAlign: 'center',
@@ -4404,36 +4405,36 @@ const styles = StyleSheet.create({
   logoutModalCancelBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoutModalCancelText: {
-    color: '#D8D6E8',
+  logoutModalCancelText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   logoutModalConfirmBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: '#EF4444',
+    borderRadius: uiTheme.radius.input,
+    backgroundColor: uiTheme.colors.error,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
-    shadowColor: '#EF4444',
+    shadowColor: uiTheme.colors.error,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 4,
   },
-  logoutModalConfirmText: {
+  logoutModalConfirmText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
 });

@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../theme';
 // src/screens/AuthScreen.js — Upgraded Luxury Dark Dating App Auth Flow
 // Ken-Burns Crossfade Carousel, Luminous Emblem Aura & Seamless Multi-Phase Auth
 import React, { useState, useRef, useEffect } from 'react';
@@ -249,7 +250,7 @@ export default function AuthScreen({ navigation, route }) {
   useEffect(() => {
     CAROUSEL_SLIDES.forEach((slide) => {
       if (slide.uri && slide.uri.startsWith('http')) {
-        Image.prefetch(slide.uri).catch(() => {});
+        Image.prefetch(slide.uri).catch(() => { });
       }
     });
 
@@ -683,7 +684,7 @@ export default function AuthScreen({ navigation, route }) {
         }
         console.log(`[OTP] Worker is in mock mode; dispatching verification code ${generatedCode} via live Zapier webhook...`);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Fallback Zapier webhook delivery
     try {
@@ -759,7 +760,7 @@ export default function AuthScreen({ navigation, route }) {
 
     try {
       await sendEmailOtp(cleanEmail, name.trim());
-    } catch (_) {}
+    } catch (_) { }
 
     setIsLoading(false);
     setCountdown(45);
@@ -893,7 +894,7 @@ export default function AuthScreen({ navigation, route }) {
     setSuccessNotice('A fresh verification code has been dispatched to your email!');
     try {
       await sendEmailOtp(email.trim().toLowerCase(), name.trim());
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // ═════════════════════════════════════════════════════════════════
@@ -922,7 +923,7 @@ export default function AuthScreen({ navigation, route }) {
           ]}
         >
           <LinearGradient
-            colors={['#FF3366', '#FFAA80', '#FFD166']}
+            colors={[uiTheme.colors.primary, uiTheme.colors.secondary, '#FFD166']}
             start={{ x: 0, y: 1 }}
             end={{ x: 1, y: 0 }}
             style={styles.auraFrame}
@@ -967,7 +968,7 @@ export default function AuthScreen({ navigation, route }) {
             accessibilityHint="Start your onboarding journey with FlintAI"
           >
             <LinearGradient
-              colors={['#FF3366', '#FF5E7E', '#FFAA80']}
+              colors={[uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.btnCreateAccountGradient}
@@ -1181,7 +1182,7 @@ export default function AuthScreen({ navigation, route }) {
                     <Ionicons
                       name={focusedField === 'name' ? 'person' : 'person-outline'}
                       size={18}
-                      color={focusedField === 'name' ? '#FFAA80' : '#ac888b'}
+                      color={focusedField === 'name' ? uiTheme.colors.secondary : uiTheme.colors.muted}
                       style={styles.inputIcon}
                     />
                     <TextInput
@@ -1200,8 +1201,8 @@ export default function AuthScreen({ navigation, route }) {
                       autoCorrect={false}
                       blurOnSubmit={false}
                       returnKeyType="next"
-                      selectionColor="#FFAA80"
-                      cursorColor="#FFAA80"
+                      selectionColor={uiTheme.colors.secondary}
+                      cursorColor={uiTheme.colors.secondary}
                       underlineColorAndroid="transparent"
                       onSubmitEditing={() => emailInputRef.current?.focus()}
                     />
@@ -1216,7 +1217,7 @@ export default function AuthScreen({ navigation, route }) {
                         accessibilityRole="button"
                         accessibilityLabel="Clear name"
                       >
-                        <Ionicons name="close-circle" size={16} color="#ac888b" />
+                        <Ionicons name="close-circle" size={16} color={uiTheme.colors.muted} />
                       </TouchableOpacity>
                     )}
                     {isValidName(name) && (
@@ -1248,7 +1249,7 @@ export default function AuthScreen({ navigation, route }) {
                   <Ionicons
                     name={focusedField === 'email' ? 'mail' : 'mail-outline'}
                     size={18}
-                    color={focusedField === 'email' ? '#FFAA80' : '#ac888b'}
+                    color={focusedField === 'email' ? uiTheme.colors.secondary : uiTheme.colors.muted}
                     style={styles.inputIcon}
                   />
                   <TextInput
@@ -1270,8 +1271,8 @@ export default function AuthScreen({ navigation, route }) {
                     keyboardType="email-address"
                     textContentType="emailAddress"
                     keyboardAppearance="dark"
-                    selectionColor="#FFAA80"
-                    cursorColor="#FFAA80"
+                    selectionColor={uiTheme.colors.secondary}
+                    cursorColor={uiTheme.colors.secondary}
                     underlineColorAndroid="transparent"
                     returnKeyType="done"
                     onSubmitEditing={handleFormSubmit}
@@ -1288,7 +1289,7 @@ export default function AuthScreen({ navigation, route }) {
                       accessibilityRole="button"
                       accessibilityLabel="Clear email"
                     >
-                      <Ionicons name="close-circle" size={16} color="#ac888b" />
+                      <Ionicons name="close-circle" size={16} color={uiTheme.colors.muted} />
                     </TouchableOpacity>
                   )}
                   {isValidEmail(email) && (
@@ -1340,7 +1341,7 @@ export default function AuthScreen({ navigation, route }) {
                   <Text style={styles.domainLabel}>Quick suggestions:</Text>
                   <View style={styles.domainChipsRow}>
                     {DOMAIN_SUGGESTIONS.map((d) => (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={d}
                         style={styles.domainChip}
                         onPress={() => handleSelectDomain(d)}
@@ -1378,7 +1379,7 @@ export default function AuthScreen({ navigation, route }) {
                   ]}
                 >
                   <View style={styles.conflictBannerHeader}>
-                    <Ionicons name="information-circle" size={17} color="#FFAA80" />
+                    <Ionicons name="information-circle" size={17} color={uiTheme.colors.secondary} />
                     <Text style={styles.conflictBannerTitle}>
                       An account with this email already exists.
                     </Text>
@@ -1421,7 +1422,7 @@ export default function AuthScreen({ navigation, route }) {
                   ]}
                 >
                   <View style={styles.conflictBannerHeader}>
-                    <Ionicons name="information-circle" size={17} color="#FFAA80" />
+                    <Ionicons name="information-circle" size={17} color={uiTheme.colors.secondary} />
                     <Text style={styles.conflictBannerTitle}>
                       No account found with this email.
                     </Text>
@@ -1442,7 +1443,7 @@ export default function AuthScreen({ navigation, route }) {
               {/* Generic Error */}
               {Boolean(errorMessage) && !accountConflict && (
                 <View style={styles.errorRow}>
-                  <Ionicons name="alert-circle" size={14} color="#FF5E7E" />
+                  <Ionicons name="alert-circle" size={14} color={uiTheme.colors.accent} />
                   <Text style={styles.errorText}>{errorMessage}</Text>
                 </View>
               )}
@@ -1522,7 +1523,7 @@ export default function AuthScreen({ navigation, route }) {
                 {/* Agreement Warning if unselected */}
                 {agreementError && (
                   <View style={styles.agreementWarningRow}>
-                    <Ionicons name="alert-circle" size={13} color="#FF5E7E" />
+                    <Ionicons name="alert-circle" size={13} color={uiTheme.colors.accent} />
                     <Text style={styles.agreementWarningText}>
                       Please check the box to confirm you are 18+ and agree
                     </Text>
@@ -1547,7 +1548,7 @@ export default function AuthScreen({ navigation, route }) {
                   accessibilityLabel={authMode === 'signup' ? 'Create Account' : 'Sign In'}
                 >
                   <LinearGradient
-                    colors={['#FF3366', '#FF5E7E', '#FFAA80']}
+                    colors={[uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.formCtaGradient}
@@ -1669,7 +1670,7 @@ export default function AuthScreen({ navigation, route }) {
             accessibilityRole="button"
             accessibilityLabel="Preview Onboarding Steps"
           >
-            <Ionicons name="sparkles" size={13} color="#FFAA80" style={{ marginRight: 6 }} />
+            <Ionicons name="sparkles" size={13} color={uiTheme.colors.secondary} style={{ marginRight: 6 }} />
             <Text style={styles.devOnboardingBtnText}>Preview Onboarding Steps (Dev)</Text>
           </TouchableOpacity>
 
@@ -1804,8 +1805,8 @@ export default function AuthScreen({ navigation, route }) {
                 onBlur={() => setFocusedField(null)}
                 keyboardType="number-pad"
                 textContentType="oneTimeCode"
-                selectionColor="#FFAA80"
-                cursorColor="#FFAA80"
+                selectionColor={uiTheme.colors.secondary}
+                cursorColor={uiTheme.colors.secondary}
                 underlineColorAndroid="transparent"
                 maxLength={6}
                 selectTextOnFocus
@@ -1817,7 +1818,7 @@ export default function AuthScreen({ navigation, route }) {
         {/* Error */}
         {Boolean(errorMessage) && (
           <View style={styles.errorRow}>
-            <Ionicons name="alert-circle" size={14} color="#FF5E7E" />
+            <Ionicons name="alert-circle" size={14} color={uiTheme.colors.accent} />
             <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
         )}
@@ -1825,7 +1826,7 @@ export default function AuthScreen({ navigation, route }) {
         {/* Resend */}
         <View style={styles.resendRow}>
           <Text style={styles.resendInfoText}>Didn't get a code?</Text>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={handleResendCode}
             disabled={!resendActive}
             activeOpacity={0.7}
@@ -1843,7 +1844,7 @@ export default function AuthScreen({ navigation, route }) {
 
         {/* Verify CTA with Tactile Spring */}
         <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[
               styles.formCta,
               (isLoading || otp.some((d) => !d)) && { opacity: 0.5 },
@@ -1855,7 +1856,7 @@ export default function AuthScreen({ navigation, route }) {
             activeOpacity={0.88}
           >
             <LinearGradient
-              colors={['#FF3366', '#FF5E7E', '#FFAA80']}
+              colors={[uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.formCtaGradient}
@@ -1883,7 +1884,7 @@ export default function AuthScreen({ navigation, route }) {
           accessibilityRole="button"
           accessibilityLabel="Need help signing in?"
         >
-          <Ionicons name="help-circle-outline" size={15} color="#FFAA80" />
+          <Ionicons name="help-circle-outline" size={15} color={uiTheme.colors.secondary} />
           <Text style={styles.helpLinkText}>Need help signing in?</Text>
         </TouchableOpacity>
       </View>
@@ -2058,7 +2059,7 @@ export default function AuthScreen({ navigation, route }) {
         />
         {/* Bottom-to-Top Scrim */}
         <LinearGradient
-          colors={['transparent', 'rgba(14, 8, 18, 0.82)', '#0a050d']}
+          colors={['transparent', 'rgba(14, 8, 18, 0.82)', uiTheme.colors.background]}
           locations={[0.35, 0.68, 1]}
           style={[StyleSheet.absoluteFill, { zIndex: 1001 }]}
         />
@@ -2068,10 +2069,10 @@ export default function AuthScreen({ navigation, route }) {
 
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.kavContainer}
           keyboardVerticalOffset={0}
-          enabled={Platform.OS === 'ios'}
+          enabled
         >
           {renderStage()}
         </KeyboardAvoidingView>
@@ -2108,7 +2109,7 @@ export default function AuthScreen({ navigation, route }) {
                 accessibilityRole="button"
                 accessibilityLabel="Close legal document"
               >
-                <Ionicons name="close" size={22} color="#edddf1" />
+                <Ionicons name="close" size={22} color={uiTheme.colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -2171,7 +2172,7 @@ export default function AuthScreen({ navigation, route }) {
               {legalTab === 'terms' ? (
                 <View style={styles.legalSection}>
                   <View style={styles.legalBadgeRow}>
-                    <Ionicons name="shield-checkmark" size={14} color="#FFAA80" />
+                    <Ionicons name="shield-checkmark" size={14} color={uiTheme.colors.secondary} />
                     <Text style={styles.legalBadgeText}>18+ Age Requirement & Community Honor Code</Text>
                   </View>
 
@@ -2198,7 +2199,7 @@ export default function AuthScreen({ navigation, route }) {
               ) : (
                 <View style={styles.legalSection}>
                   <View style={styles.legalBadgeRow}>
-                    <Ionicons name="lock-closed" size={14} color="#FFAA80" />
+                    <Ionicons name="lock-closed" size={14} color={uiTheme.colors.secondary} />
                     <Text style={styles.legalBadgeText}>256-Bit TLS Encryption & GDPR / CCPA Compliant</Text>
                   </View>
 
@@ -2240,7 +2241,7 @@ export default function AuthScreen({ navigation, route }) {
                 accessibilityLabel="I Understand and Accept"
               >
                 <LinearGradient
-                  colors={['#FF3366', '#FF5E7E', '#FFAA80']}
+                  colors={[uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.modalAcceptGradient}
@@ -2284,7 +2285,7 @@ export default function AuthScreen({ navigation, route }) {
                 accessibilityRole="button"
                 accessibilityLabel="Close support"
               >
-                <Ionicons name="close" size={22} color="#edddf1" />
+                <Ionicons name="close" size={22} color={uiTheme.colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -2297,7 +2298,7 @@ export default function AuthScreen({ navigation, route }) {
               {/* Tip 1 */}
               <View style={styles.supportTipCard}>
                 <View style={styles.supportTipIconWrap}>
-                  <Ionicons name="mail" size={18} color="#FFAA80" />
+                  <Ionicons name="mail" size={18} color={uiTheme.colors.secondary} />
                 </View>
                 <View style={styles.supportTipBody}>
                   <Text style={styles.supportTipTitle}>Verification Code Delayed?</Text>
@@ -2310,7 +2311,7 @@ export default function AuthScreen({ navigation, route }) {
               {/* Tip 2 */}
               <View style={styles.supportTipCard}>
                 <View style={styles.supportTipIconWrap}>
-                  <Ionicons name="sync" size={18} color="#FFAA80" />
+                  <Ionicons name="sync" size={18} color={uiTheme.colors.secondary} />
                 </View>
                 <View style={styles.supportTipBody}>
                   <Text style={styles.supportTipTitle}>Changed Email or Device?</Text>
@@ -2323,7 +2324,7 @@ export default function AuthScreen({ navigation, route }) {
               {/* Tip 3 */}
               <View style={styles.supportTipCard}>
                 <View style={styles.supportTipIconWrap}>
-                  <Ionicons name="shield-checkmark" size={18} color="#FFAA80" />
+                  <Ionicons name="shield-checkmark" size={18} color={uiTheme.colors.secondary} />
                 </View>
                 <View style={styles.supportTipBody}>
                   <Text style={styles.supportTipTitle}>Account Status & Inquiries</Text>
@@ -2338,20 +2339,20 @@ export default function AuthScreen({ navigation, route }) {
                 style={styles.conciergeContactBtn}
                 onPress={() => {
                   safeHaptic('medium');
-                  Linking.openURL('mailto:support@flint.dating?subject=Flint%20Login%20Assistance').catch(() => {});
+                  Linking.openURL('mailto:support@flint.dating?subject=Flint%20Login%20Assistance').catch(() => { });
                 }}
                 activeOpacity={0.88}
                 accessibilityRole="button"
                 accessibilityLabel="Email Flint Concierge Support"
               >
-                <Ionicons name="chatbubbles" size={18} color="#FFAA80" />
+                <Ionicons name="chatbubbles" size={18} color={uiTheme.colors.secondary} />
                 <Text style={styles.conciergeContactBtnText}>Contact Flint Concierge</Text>
-                <Ionicons name="open-outline" size={16} color="#ac888b" />
+                <Ionicons name="open-outline" size={16} color={uiTheme.colors.muted} />
               </TouchableOpacity>
             </ScrollView>
 
             <View style={styles.modalBottomBar}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.modalDismissSimpleBtn}
                 onPress={() => setSupportModalVisible(false)}
                 activeOpacity={0.7}
@@ -2390,8 +2391,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   loginTermsWrap: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: uiTheme.spacing.lg,
+    paddingVertical: uiTheme.spacing.sm,
     alignItems: 'center',
     marginBottom: 10,
   },
@@ -2474,7 +2475,7 @@ const styles = StyleSheet.create({
   welcomeContainer: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: uiTheme.spacing.xxl,
     paddingTop: Platform.OS === 'ios' ? 16 : 28,
     paddingBottom: Platform.OS === 'ios' ? 12 : 20,
   },
@@ -2487,7 +2488,7 @@ const styles = StyleSheet.create({
   emblemContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   auraFrame: {
     width: 92,
@@ -2516,7 +2517,7 @@ const styles = StyleSheet.create({
   auraImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
   },
 
   // ── Companion Greeting Typography ──
@@ -2547,10 +2548,10 @@ const styles = StyleSheet.create({
   greetingSub: {
     color: 'rgba(255, 240, 245, 0.92)',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'normal',
     textAlign: 'center',
     letterSpacing: 0.2,
-    marginTop: 4,
+    marginTop: uiTheme.spacing.xs,
     maxWidth: 320,
     lineHeight: 22,
     textShadowColor: 'rgba(0, 0, 0, 0.65)',
@@ -2561,13 +2562,13 @@ const styles = StyleSheet.create({
   // ── Bottom Action Zone (Stitch Velvet & Peach Palette) ──
   actionZone: {
     width: '100%',
-    gap: 12,
-    paddingBottom: 4,
+    gap: uiTheme.spacing.md,
+    paddingBottom: uiTheme.spacing.xs,
   },
   btnCreateAccount: {
     borderRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.38,
     shadowRadius: 18,
@@ -2584,17 +2585,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 20,
+    gap: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.xl,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.35)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.15)',
   },
   btnCreateAccountText: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 16.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.25,
   },
   btnArrowIcon: {
@@ -2603,28 +2605,30 @@ const styles = StyleSheet.create({
 
   // ── Sign In Link ──
   signInLinkBtn: {
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
     alignItems: 'center',
   },
   signInLinkText: {
+    fontFamily: 'Inter_500Medium',
     color: 'rgba(245, 230, 240, 0.78)',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
   signInHighlight: {
-    color: '#FFAA80',
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontWeight: 'normal',
   },
 
   // ── Mandatory Consent Checkbox & Warning ──
   consentCheckboxRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: uiTheme.spacing.md,
     paddingHorizontal: 2,
     paddingVertical: 6,
     marginTop: 6,
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   consentCheckboxRowError: {},
   consentBox: {
@@ -2639,14 +2643,15 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   consentBoxChecked: {
-    backgroundColor: '#FF3366',
-    borderColor: '#FF5E7E',
+    backgroundColor: uiTheme.colors.primary,
+    borderColor: uiTheme.colors.accent,
   },
   consentBoxError: {
     borderColor: '#FF4D6D',
     backgroundColor: 'rgba(255, 77, 109, 0.25)',
   },
   consentText: {
+    fontFamily: 'Inter_400Regular',
     flex: 1,
     color: 'rgba(245, 235, 240, 0.82)',
     fontSize: 12.5,
@@ -2658,35 +2663,39 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: -8,
     marginBottom: 10,
-    paddingHorizontal: 4,
+    paddingHorizontal: uiTheme.spacing.xs,
   },
   agreementWarningText: {
-    color: '#FF5E7E',
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.accent,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Legal & Guest ──
   legalDisclaimerText: {
+    fontFamily: 'Inter_400Regular',
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 16,
     color: 'rgba(230, 215, 225, 0.45)',
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
   },
   legalLink: {
-    color: '#FFAA80',
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontWeight: 'normal',
   },
   guestLink: {
     alignItems: 'center',
     paddingVertical: 6,
-    marginTop: 4,
+    marginTop: uiTheme.spacing.xs,
   },
   guestLinkText: {
+    fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 211, 0.72)',
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
 
@@ -2694,20 +2703,21 @@ const styles = StyleSheet.create({
   // PHASE 2 & 3: FORM & OTP STYLES
   // ═══════════════════════════════════════════
   formContainer: {
+    width: '100%', maxWidth: 480, alignSelf: 'center',
     flex: 1,
     paddingTop: Platform.OS === 'ios' ? 14 : 22,
-    paddingBottom: 32,
+    paddingBottom: uiTheme.spacing.section,
   },
   backBtn: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     borderRadius: 21,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: uiTheme.spacing.xl,
   },
   formHeader: {
     marginBottom: 22,
@@ -2750,7 +2760,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
-    marginBottom: 20,
+    marginBottom: uiTheme.spacing.xl,
     backgroundColor: 'rgba(22, 14, 28, 0.78)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -2759,23 +2769,24 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   glassCardInner: {
-    padding: 24,
+    padding: uiTheme.spacing.xxl,
   },
 
   // ── Input Fields ──
   fieldGroup: {
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   fieldLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
   fieldLabel: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.1,
   },
   fieldHintRow: {
@@ -2801,8 +2812,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   fieldHintText: {
+    fontFamily: 'Inter_400Regular',
     color: 'rgba(237, 221, 241, 0.62)',
-    fontSize: 12,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 16,
   },
   inputWrap: {
@@ -2816,20 +2828,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   inputWrapFocused: {
-    borderColor: '#FFAA80',
+    borderColor: uiTheme.colors.secondary,
     backgroundColor: 'rgba(28, 16, 36, 0.88)',
   },
   inputWrapError: {
-    borderColor: '#FF5E7E',
+    borderColor: uiTheme.colors.accent,
   },
   inputIcon: {
     marginRight: 10,
   },
   textInput: {
+    fontFamily: 'Inter_500Medium',
     flex: 1,
-    color: '#edddf1',
-    fontSize: 15,
-    fontWeight: '500',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     paddingVertical: Platform.OS === 'ios' ? 12 : 8,
   },
 
@@ -2840,37 +2853,39 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 170, 128, 0.35)',
     borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     marginBottom: 14,
     gap: 10,
   },
   conflictBannerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   conflictBannerTitle: {
-    color: '#edddf1',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
     flex: 1,
     lineHeight: 18,
   },
   conflictActionBtn: {
-    backgroundColor: '#FF3366',
+    backgroundColor: uiTheme.colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
     paddingHorizontal: 14,
     borderRadius: 10,
     alignSelf: 'flex-start',
   },
   conflictActionText: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.1,
   },
 
@@ -2879,30 +2894,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
     paddingLeft: 2,
   },
   errorText: {
-    color: '#FF5E7E',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.accent,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   successRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
     backgroundColor: 'rgba(255, 170, 128, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 170, 128, 0.3)',
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: uiTheme.spacing.md,
+    paddingVertical: uiTheme.spacing.sm,
   },
   successText: {
-    color: '#FFAA80',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.secondary,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
     flex: 1,
   },
 
@@ -2911,35 +2928,37 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   domainLabel: {
-    color: '#ac888b',
-    fontSize: 11,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.sm,
   },
   domainChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   domainChip: {
     backgroundColor: 'rgba(59, 49, 64, 0.6)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   domainChipText: {
-    color: '#edddf1',
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Form CTA Button (Stitch Velvet & Peach Gradient) ──
   formCta: {
     borderRadius: 26,
     overflow: 'hidden',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.38,
     shadowRadius: 16,
@@ -2955,14 +2974,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.32)',
   },
   formCtaText: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
 
@@ -2972,7 +2992,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   modeToggleLayer: {
     position: 'absolute',
@@ -2981,14 +3001,14 @@ const styles = StyleSheet.create({
   },
   modeToggleTouch: {
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
   },
   modeToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   ctaLabelWrap: {
     flexDirection: 'row',
@@ -3008,25 +3028,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modeToggleText: {
-    color: '#e5bdc0',
+    fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.textSecondary,
     fontSize: 13.5,
   },
   modeToggleLink: {
-    color: '#FFAA80',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   // ── Form Guest Link ──
   formGuestLink: {
     alignItems: 'center',
     paddingVertical: 6,
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
   },
   formGuestLinkText: {
+    fontFamily: 'Inter_600SemiBold',
     color: 'rgba(245, 230, 211, 0.65)',
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   devOnboardingBtn: {
     flexDirection: 'row',
@@ -3042,9 +3065,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   devOnboardingBtnText: {
-    color: '#FFAA80',
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
 
@@ -3053,13 +3077,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 10,
-    marginBottom: 20,
+    marginBottom: uiTheme.spacing.xl,
   },
   otpCellWrap: {
     flex: 1,
     maxWidth: 50,
   },
   otpCell: {
+    fontFamily: 'Inter_800ExtraBold',
     height: 56,
     backgroundColor: 'rgba(18, 10, 23, 0.85)',
     borderRadius: 14,
@@ -3067,17 +3092,17 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.12)',
     color: '#FFFFFF',
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: 'normal',
     textAlign: 'center',
   },
   otpCellFilled: {
-    borderColor: '#FFAA80',
+    borderColor: uiTheme.colors.secondary,
     backgroundColor: 'rgba(32, 20, 40, 0.92)',
   },
   otpCellFocused: {
-    borderColor: '#FF5E7E',
+    borderColor: uiTheme.colors.accent,
     backgroundColor: 'rgba(38, 22, 48, 0.96)',
-    shadowColor: '#FF5E7E',
+    shadowColor: uiTheme.colors.accent,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.45,
     shadowRadius: 8,
@@ -3090,31 +3115,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginBottom: 24,
+    marginBottom: uiTheme.spacing.xxl,
   },
   resendInfoText: {
-    color: '#ac888b',
+    fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 13,
   },
   resendBtnText: {
-    color: '#7a6266',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.muted,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   resendBtnActive: {
-    color: '#FFAA80',
+    color: uiTheme.colors.secondary,
   },
 
   // ── Terms ──
   termsText: {
-    color: '#ac888b',
-    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     textAlign: 'center',
     lineHeight: 18,
   },
   termsLink: {
-    color: '#FFAA80',
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontWeight: 'normal',
   },
 
   // ── Help Link (OTP / Form) ──
@@ -3123,13 +3152,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 12,
-    marginTop: 8,
+    paddingVertical: uiTheme.spacing.md,
+    marginTop: uiTheme.spacing.sm,
   },
   helpLinkText: {
-    color: '#FFAA80',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.secondary,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
 
   // ── Modals & Bottom Sheets (Apple HIG & App Store Compliance) ──
@@ -3142,7 +3172,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalCard: {
-    backgroundColor: '#140D1B',
+    backgroundColor: uiTheme.colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
@@ -3150,7 +3180,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     maxHeight: '86%',
     minHeight: 460,
-    paddingTop: 12,
+    paddingTop: uiTheme.spacing.md,
     paddingHorizontal: 22,
     paddingBottom: Platform.OS === 'ios' ? 34 : 22,
     shadowColor: '#000',
@@ -3169,31 +3199,33 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalHeaderTitleGroup: {
     flex: 1,
   },
   modalTitle: {
+    fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 21,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.3,
   },
   modalSub: {
-    color: '#ac888b',
+    fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
     marginTop: 2,
   },
   modalCloseBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
@@ -3204,7 +3236,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: 14,
     padding: 3,
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
   modalTabBtn: {
     flex: 1,
@@ -3216,48 +3248,53 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.14)',
   },
   modalTabText: {
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
-    fontWeight: '600',
-    color: '#ac888b',
+    fontWeight: 'normal',
+    color: uiTheme.colors.muted,
   },
   modalTabTextActive: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   modalScroll: {
     flexGrow: 0,
     maxHeight: 340,
   },
   modalScrollContent: {
-    paddingBottom: 16,
+    paddingBottom: uiTheme.spacing.lg,
   },
   legalSection: {
-    gap: 12,
+    gap: uiTheme.spacing.md,
   },
   legalBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     backgroundColor: 'rgba(255, 51, 102, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 51, 102, 0.25)',
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: uiTheme.spacing.md,
+    paddingVertical: uiTheme.spacing.sm,
     marginBottom: 6,
   },
   legalBadgeText: {
-    color: '#FFAA80',
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.secondary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   legalParagraphHead: {
-    color: '#edddf1',
-    fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
     marginTop: 6,
   },
   legalParagraph: {
+    fontFamily: 'Inter_400Regular',
     color: 'rgba(245, 235, 240, 0.78)',
     fontSize: 13,
     lineHeight: 20,
@@ -3269,9 +3306,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   modalAcceptBtn: {
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
     overflow: 'hidden',
-    shadowColor: '#FF3366',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
@@ -3279,14 +3316,15 @@ const styles = StyleSheet.create({
   },
   modalAcceptGradient: {
     height: 48,
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalAcceptBtnText: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   supportTipCard: {
@@ -3297,7 +3335,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,
-    gap: 12,
+    gap: uiTheme.spacing.md,
   },
   supportTipIconWrap: {
     width: 32,
@@ -3312,12 +3350,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   supportTipTitle: {
-    color: '#edddf1',
+    fontFamily: 'Manrope_700Bold',
+    color: uiTheme.colors.text,
     fontSize: 13.5,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.xs,
   },
   supportTipText: {
+    fontFamily: 'Inter_400Regular',
     color: 'rgba(245, 235, 240, 0.7)',
     fontSize: 12.5,
     lineHeight: 18,
@@ -3326,27 +3366,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     backgroundColor: 'rgba(255, 51, 102, 0.14)',
     borderWidth: 1.2,
-    borderColor: '#FF5E7E',
+    borderColor: uiTheme.colors.accent,
     borderRadius: 22,
-    paddingVertical: 12,
-    marginTop: 8,
-    marginBottom: 4,
+    paddingVertical: uiTheme.spacing.md,
+    marginTop: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.xs,
   },
   conciergeContactBtnText: {
+    fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
   modalDismissSimpleBtn: {
     alignItems: 'center',
     paddingVertical: 10,
   },
   modalDismissSimpleText: {
-    color: '#ac888b',
+    fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
     fontSize: 13.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
 });

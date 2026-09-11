@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../theme';
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -208,11 +209,11 @@ export default function PlatformConfigScreen({ route, navigation }) {
     });
   };
 
-  const themeColor = platform.toLowerCase() === 'tinder' ? '#FE3C72' : '#FFB800';
+  const themeColor = platform.toLowerCase() === 'tinder' ? uiTheme.colors.primary : '#FFB800';
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0B14" />
+      <StatusBar barStyle="light-content" backgroundColor={uiTheme.colors.background} />
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={themeColor} />
@@ -226,8 +227,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={18} color="#D8D6E8" />
+          <TouchableOpacity accessibilityRole="button" style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={18} color={uiTheme.colors.text} />
             <Text style={styles.backBtnText}>Back</Text>
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
@@ -251,7 +252,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
 
             <View style={styles.goalGrid}>
               {V2_GOALS.map(goal => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={goal.id}
                   style={[styles.goalPill, selectedGoal === goal.id && { borderColor: themeColor, backgroundColor: themeColor + '12' }]}
                   onPress={() => setSelectedGoal(goal.id)}
@@ -260,9 +261,9 @@ export default function PlatformConfigScreen({ route, navigation }) {
                   <Ionicons
                     name={goal.icon}
                     size={14}
-                    color={selectedGoal === goal.id ? themeColor : '#8E8DA3'}
+                    color={selectedGoal === goal.id ? themeColor : uiTheme.colors.muted}
                   />
-                  <Text style={[styles.goalPillText, selectedGoal === goal.id && { color: '#FFF', fontWeight: '700' }]}>
+                  <Text style={[styles.goalPillText, selectedGoal === goal.id && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' }]}>
                     {goal.label}
                   </Text>
                 </TouchableOpacity>
@@ -277,7 +278,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 <TextInput
                   style={styles.textInput}
                   placeholder={selectedGoal === 'phone' ? '+1 (234) 567-8900' : '@username'}
-                  placeholderTextColor="#7A7990"
+                  placeholderTextColor={uiTheme.colors.muted}
                   value={contactHandle}
                   onChangeText={setContactHandle}
                   autoCapitalize="none"
@@ -294,7 +295,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 <Text style={styles.sectionHeader}>Session Duration Timer</Text>
               </View>
               <View style={[styles.activePill, { backgroundColor: '#10B98118', borderColor: '#10B98140' }]}>
-                <Text style={[styles.activePillText, { color: '#10B981' }]}>Alarm Clock UI</Text>
+                <Text style={[styles.activePillText, { color: uiTheme.colors.success }]}>Alarm Clock UI</Text>
               </View>
             </View>
             <Text style={styles.sectionDesc}>Automation automatically stops after the selected duration until you start it again.</Text>
@@ -307,7 +308,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 { mins: 60, label: '60 Min' },
                 { mins: 0, label: 'No Limit' }
               ].map(opt => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={opt.mins}
                   style={[
                     styles.durationPill,
@@ -347,11 +348,11 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 <Text style={styles.stepperHelper}>Target profiles to like</Text>
               </View>
               <View style={styles.stepperControls}>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(likesPerCycle, setLikesPerCycle, 10, 0)}>
+                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(likesPerCycle, setLikesPerCycle, 10, 0)}>
                   <Feather name="minus" size={14} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.stepperValue}>{likesPerCycle}</Text>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => increment(likesPerCycle, setLikesPerCycle, 10, 200)}>
+                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(likesPerCycle, setLikesPerCycle, 10, 200)}>
                   <Feather name="plus" size={14} color="#FFF" />
                 </TouchableOpacity>
               </View>
@@ -366,11 +367,11 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 <Text style={styles.stepperHelper}>First messages to new matches</Text>
               </View>
               <View style={styles.stepperControls}>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(messagesPerCycle, setMessagesPerCycle, 5, 0)}>
+                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(messagesPerCycle, setMessagesPerCycle, 5, 0)}>
                   <Feather name="minus" size={14} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.stepperValue}>{messagesPerCycle}</Text>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => increment(messagesPerCycle, setMessagesPerCycle, 5, 100)}>
+                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(messagesPerCycle, setMessagesPerCycle, 5, 100)}>
                   <Feather name="plus" size={14} color="#FFF" />
                 </TouchableOpacity>
               </View>
@@ -385,14 +386,14 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 <Text style={styles.stepperHelper}>Rest time before next session</Text>
               </View>
               <View style={styles.stepperControls}>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => decrement(scheduleInterval, setScheduleInterval, 5, 5)}>
+                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(scheduleInterval, setScheduleInterval, 5, 5)}>
                   <Feather name="minus" size={14} color="#FFF" />
                 </TouchableOpacity>
                 <View style={styles.stepperValueWrapper}>
                   <Text style={styles.stepperValue}>{scheduleInterval}</Text>
                   <Text style={styles.stepperUnit}>min</Text>
                 </View>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => increment(scheduleInterval, setScheduleInterval, 5, 1440)}>
+                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(scheduleInterval, setScheduleInterval, 5, 1440)}>
                   <Feather name="plus" size={14} color="#FFF" />
                 </TouchableOpacity>
               </View>
@@ -412,8 +413,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
               <Switch
                 value={useCustomIntro}
                 onValueChange={setUseCustomIntro}
-                trackColor={{ false: '#26223B', true: themeColor }}
-                thumbColor={useCustomIntro ? '#FFF' : '#7A7990'}
+                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
+                thumbColor={useCustomIntro ? '#FFF' : uiTheme.colors.muted}
               />
             </View>
 
@@ -426,7 +427,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
                   onChangeText={setCustomIntroPrompt}
                   multiline={true}
                   placeholder="Tell your assistant how you like to start conversations..."
-                  placeholderTextColor="#7A7990"
+                  placeholderTextColor={uiTheme.colors.muted}
                   numberOfLines={3}
                 />
               </View>
@@ -450,8 +451,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
               <Switch
                 value={notifyGoals}
                 onValueChange={setNotifyGoals}
-                trackColor={{ false: '#26223B', true: themeColor }}
-                thumbColor={notifyGoals ? '#FFF' : '#7A7990'}
+                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
+                thumbColor={notifyGoals ? '#FFF' : uiTheme.colors.muted}
               />
             </View>
 
@@ -466,8 +467,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
               <Switch
                 value={notifyMatches}
                 onValueChange={setNotifyMatches}
-                trackColor={{ false: '#26223B', true: themeColor }}
-                thumbColor={notifyMatches ? '#FFF' : '#7A7990'}
+                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
+                thumbColor={notifyMatches ? '#FFF' : uiTheme.colors.muted}
               />
             </View>
 
@@ -482,8 +483,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
               <Switch
                 value={notifyCycles}
                 onValueChange={setNotifyCycles}
-                trackColor={{ false: '#26223B', true: themeColor }}
-                thumbColor={notifyCycles ? '#FFF' : '#7A7990'}
+                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
+                thumbColor={notifyCycles ? '#FFF' : uiTheme.colors.muted}
               />
             </View>
           </View>
@@ -507,8 +508,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 onValueChange={(val) => {
                   NotificationService.setRedirectPreference('tinder', val ? 'always_ask' : 'auto_open');
                 }}
-                trackColor={{ false: '#26223B', true: themeColor }}
-                thumbColor={redirectPrefs.tinder === 'always_ask' ? '#FFF' : '#7A7990'}
+                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
+                thumbColor={redirectPrefs.tinder === 'always_ask' ? '#FFF' : uiTheme.colors.muted}
               />
             </View>
 
@@ -525,8 +526,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 onValueChange={(val) => {
                   NotificationService.setRedirectPreference('whatsapp', val ? 'always_ask' : 'auto_open');
                 }}
-                trackColor={{ false: '#26223B', true: themeColor }}
-                thumbColor={redirectPrefs.whatsapp === 'always_ask' ? '#FFF' : '#7A7990'}
+                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
+                thumbColor={redirectPrefs.whatsapp === 'always_ask' ? '#FFF' : uiTheme.colors.muted}
               />
             </View>
 
@@ -543,14 +544,14 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 onValueChange={(val) => {
                   NotificationService.setRedirectPreference('instagram', val ? 'always_ask' : 'auto_open');
                 }}
-                trackColor={{ false: '#26223B', true: themeColor }}
-                thumbColor={redirectPrefs.instagram === 'always_ask' ? '#FFF' : '#7A7990'}
+                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
+                thumbColor={redirectPrefs.instagram === 'always_ask' ? '#FFF' : uiTheme.colors.muted}
               />
             </View>
           </View>
 
           {/* Launch Button */}
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.launchBtn, { backgroundColor: themeColor }]}
             onPress={handleStartSession}
             activeOpacity={0.85}
@@ -573,71 +574,71 @@ export default function PlatformConfigScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
   },
   header: {
     height: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
     borderBottomWidth: 1,
-    borderColor: '#26223B',
-    backgroundColor: '#161424',
+    borderColor: uiTheme.colors.elevated,
+    backgroundColor: uiTheme.colors.surface,
   },
   backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: '#26223B',
+    borderRadius: uiTheme.radius.small,
+    backgroundColor: uiTheme.colors.elevated,
   },
-  backBtnText: {
-    color: '#D8D6E8',
+  backBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   headerTitleWrap: {
     alignItems: 'center',
   },
-  title: {
+  title: { fontFamily: 'Manrope_700Bold',
     color: '#FFF',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
   },
-  headerSubtitle: {
-    fontSize: 10.5,
-    fontWeight: '700',
+  headerSubtitle: { fontFamily: 'Manrope_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 1,
   },
-  scrollContent: {
-    padding: 16,
+  scrollContent: { width: '100%', maxWidth: 760, alignSelf: 'center',
+    padding: uiTheme.spacing.lg,
     paddingBottom: 36,
   },
   sectionCard: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    padding: uiTheme.spacing.lg,
+    marginBottom: uiTheme.spacing.lg,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
   },
   cardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
-  sectionHeader: {
-    fontSize: 15,
-    fontWeight: '700',
+  sectionHeader: { fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     color: '#FFF',
   },
   activePill: {
@@ -646,66 +647,66 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
   },
-  activePillText: {
-    fontSize: 10.5,
-    fontWeight: '700',
+  activePillText: { fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  sectionDesc: {
-    fontSize: 12,
-    color: '#8E8DA3',
+  sectionDesc: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
     lineHeight: 17,
     marginTop: 2,
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   goalGrid: {
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   goalPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
     borderRadius: 10,
     paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
     borderWidth: 1,
     borderColor: '#221E33',
   },
-  goalPillText: {
-    color: '#8E8DA3',
+  goalPillText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
   divider: {
     height: 1,
     backgroundColor: '#221E33',
-    marginVertical: 12,
+    marginVertical: uiTheme.spacing.md,
   },
   durationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 6,
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
   },
   durationPill: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#1E1B2E',
+    paddingVertical: uiTheme.spacing.sm,
+    borderRadius: uiTheme.radius.small,
+    backgroundColor: uiTheme.colors.elevated,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  durationPillText: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
-    fontWeight: '700',
+  durationPillText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  durationPillTextActive: {
+  durationPillTextActive: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   stepperContainer: {
     flexDirection: 'row',
@@ -716,36 +717,36 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 10,
   },
-  stepperLabel: {
+  stepperLabel: { fontFamily: 'Inter_600SemiBold',
     fontSize: 13.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
     color: '#FFF',
   },
-  stepperHelper: {
-    fontSize: 11,
-    color: '#716E89',
+  stepperHelper: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
     marginTop: 2,
   },
   stepperControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
     padding: 3,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
   },
   stepBtn: {
-    width: 30,
-    height: 30,
+    width: 44,
+    height: 44,
     borderRadius: 6,
-    backgroundColor: '#26223B',
+    backgroundColor: uiTheme.colors.elevated,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  stepperValue: {
-    fontSize: 14,
-    fontWeight: '700',
+  stepperValue: { fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
     color: '#FFF',
     minWidth: 36,
     textAlign: 'center',
@@ -756,9 +757,9 @@ const styles = StyleSheet.create({
     minWidth: 44,
     justifyContent: 'center',
   },
-  stepperUnit: {
-    fontSize: 10,
-    color: '#716E89',
+  stepperUnit: { fontFamily: 'Inter_400Regular',
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
     marginLeft: 2,
   },
   toggleHeaderRow: {
@@ -767,32 +768,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   expandableContent: {
-    marginTop: 12,
+    marginTop: uiTheme.spacing.md,
     borderTopWidth: 1,
     borderColor: '#221E33',
-    paddingTop: 12,
+    paddingTop: uiTheme.spacing.md,
   },
-  inputLabel: {
-    fontSize: 11.5,
-    fontWeight: '600',
+  inputLabel: { fontFamily: 'Inter_600SemiBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     color: '#A09FB5',
     marginBottom: 6,
   },
-  textInput: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
+  textInput: { fontFamily: 'Inter_400Regular',
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
-    borderColor: '#26223B',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: uiTheme.colors.elevated,
+    paddingHorizontal: uiTheme.spacing.md,
+    paddingVertical: uiTheme.spacing.sm,
     color: '#FFF',
     fontSize: 12.5,
   },
-  textArea: {
-    backgroundColor: '#0D0B14',
+  textArea: { fontFamily: 'Inter_400Regular',
+    backgroundColor: uiTheme.colors.background,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     padding: 10,
     color: '#FFF',
     fontSize: 12.5,
@@ -802,15 +803,15 @@ const styles = StyleSheet.create({
   launchBtn: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
-    borderRadius: 12,
+    gap: uiTheme.spacing.sm,
+    borderRadius: uiTheme.radius.input,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
   },
-  launchBtnText: {
+  launchBtnText: { fontFamily: 'Inter_700Bold',
     fontSize: 14.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
   loadingOverlay: {
@@ -820,15 +821,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 999,
   },
-  loadingText: {
+  loadingText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     marginTop: 14,
   },
-  loadingSubtext: {
-    color: '#716E89',
-    fontSize: 12,
-    marginTop: 4,
+  loadingSubtext: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    marginTop: uiTheme.spacing.xs,
   },
 });

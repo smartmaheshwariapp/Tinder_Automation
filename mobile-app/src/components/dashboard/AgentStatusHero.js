@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/AgentStatusHero.js — Sleek Live Status Hero with Native Vector Icons
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
@@ -11,19 +12,19 @@ import { Ionicons } from '@expo/vector-icons';
 
 // ─── Phase metadata with clean vector icons ─────────────────────────────────
 const PHASE_META = {
-  liking:        { label: 'SWIPING',       color: '#FE3C72', icon: 'heart' },
+  liking:        { label: 'SWIPING',       color: uiTheme.colors.primary, icon: 'heart' },
   messaging:     { label: 'MESSAGING',     color: '#EC4899', icon: 'chatbubbles' },
   lead_scan:     { label: 'SCANNING',      color: '#C026D3', icon: 'scan' },
-  waiting:       { label: 'WAITING',       color: '#F59E0B', icon: 'time-outline' },
-  polling:       { label: 'SYNCING',       color: '#818CF8', icon: 'sync' },
+  waiting:       { label: 'WAITING',       color: uiTheme.colors.warning, icon: 'time-outline' },
+  polling:       { label: 'SYNCING',       color: uiTheme.colors.info, icon: 'sync' },
   transitioning: { label: 'COOLDOWN',      color: '#8B5CF6', icon: 'hourglass-outline' },
-  initializing:  { label: 'INITIALIZING',  color: '#FE3C72', icon: 'sparkles' },
-  starting:      { label: 'STARTING',      color: '#FE3C72', icon: 'flash' },
-  checking:      { label: 'CHECKING',      color: '#818CF8', icon: 'search' },
-  connecting:    { label: 'CONNECTING',    color: '#818CF8', icon: 'radio-outline' },
-  network_wait:  { label: 'OFFLINE',       color: '#EF4444', icon: 'cloud-offline' },
-  locked:        { label: 'SAFETY LOCK',   color: '#EF4444', icon: 'lock-closed' },
-  stopped:       { label: 'STANDBY',       color: '#716E89', icon: 'pause' },
+  initializing:  { label: 'INITIALIZING',  color: uiTheme.colors.primary, icon: 'sparkles' },
+  starting:      { label: 'STARTING',      color: uiTheme.colors.primary, icon: 'flash' },
+  checking:      { label: 'CHECKING',      color: uiTheme.colors.info, icon: 'search' },
+  connecting:    { label: 'CONNECTING',    color: uiTheme.colors.info, icon: 'radio-outline' },
+  network_wait:  { label: 'OFFLINE',       color: uiTheme.colors.error, icon: 'cloud-offline' },
+  locked:        { label: 'SAFETY LOCK',   color: uiTheme.colors.error, icon: 'lock-closed' },
+  stopped:       { label: 'STANDBY',       color: uiTheme.colors.muted, icon: 'pause' },
 };
 
 function resolvePhase(agentState) {
@@ -132,8 +133,8 @@ export default function AgentStatusHero({ agentState, onToggleAgent }) {
         <View style={styles.phaseRow}>
           <Text style={[styles.phaseLabel, { color: meta.color }]}>{meta.label}</Text>
           <View style={[styles.runningBadge, { backgroundColor: isRunning ? 'rgba(16, 185, 129, 0.12)' : 'rgba(113, 110, 137, 0.15)', borderColor: isRunning ? 'rgba(16, 185, 129, 0.3)' : 'rgba(113, 110, 137, 0.3)' }]}>
-            <View style={[styles.runningDot, { backgroundColor: isRunning ? '#10B981' : '#716E89' }]} />
-            <Text style={[styles.runningText, { color: isRunning ? '#10B981' : '#716E89' }]}>
+            <View style={[styles.runningDot, { backgroundColor: isRunning ? uiTheme.colors.success : uiTheme.colors.muted }]} />
+            <Text style={[styles.runningText, { color: isRunning ? uiTheme.colors.success : uiTheme.colors.muted }]}>
               {isRunning ? 'ACTIVE' : 'IDLE'}
             </Text>
           </View>
@@ -145,7 +146,7 @@ export default function AgentStatusHero({ agentState, onToggleAgent }) {
 
       {/* Right: Remote Start/Stop Trigger Button */}
       {onToggleAgent ? (
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[
             styles.toggleBtn,
             {
@@ -159,9 +160,9 @@ export default function AgentStatusHero({ agentState, onToggleAgent }) {
           <Ionicons
             name={isRunning ? 'square' : 'play'}
             size={12}
-            color={isRunning ? '#EF4444' : '#FE3C72'}
+            color={isRunning ? uiTheme.colors.error : uiTheme.colors.primary}
           />
-          <Text style={[styles.toggleBtnText, { color: isRunning ? '#EF4444' : '#FE3C72' }]}>
+          <Text style={[styles.toggleBtnText, { color: isRunning ? uiTheme.colors.error : uiTheme.colors.primary }]}>
             {isRunning ? 'Stop' : 'Start'}
           </Text>
         </TouchableOpacity>
@@ -174,25 +175,25 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: uiTheme.spacing.md,
   },
   orbWrap: {
     width: 48,
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: uiTheme.spacing.md,
   },
   orbRing: {
     position: 'absolute',
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
     borderWidth: 1.5,
   },
   orb: {
@@ -209,17 +210,17 @@ const styles = StyleSheet.create({
   phaseRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
-  phaseLabel: {
+  phaseLabel: { fontFamily: 'Inter_800ExtraBold',
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: 0.5,
   },
   runningBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
     paddingHorizontal: 7,
     paddingVertical: 2.5,
     borderRadius: 6,
@@ -230,29 +231,29 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 2.5,
   },
-  runningText: {
-    fontSize: 9,
-    fontWeight: '800',
+  runningText: { fontFamily: 'Inter_800ExtraBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.8,
   },
-  progressLabel: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#8E8DA3',
-    fontWeight: '500',
+  progressLabel: { fontFamily: 'Inter_500Medium',
+    marginTop: uiTheme.spacing.xs,
+    fontSize: uiTheme.type.caption.fontSize,
+    color: uiTheme.colors.muted,
+    fontWeight: 'normal',
   },
   toggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    paddingHorizontal: uiTheme.spacing.md,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
-    marginLeft: 8,
+    marginLeft: uiTheme.spacing.sm,
   },
-  toggleBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
+  toggleBtnText: { fontFamily: 'Inter_800ExtraBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 });

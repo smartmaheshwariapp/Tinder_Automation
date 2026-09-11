@@ -1,3 +1,4 @@
+import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/SettingsPanel.js — Exact 1:1 FlirtEasy V2 Settings Architecture
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
@@ -648,7 +649,7 @@ export default function SettingsPanel({
   if (loading || !form) {
     return (
       <View style={styles.centerWrap}>
-        <ActivityIndicator size="small" color="#FE3C72" />
+        <ActivityIndicator size="small" color={uiTheme.colors.primary} />
         <Text style={styles.loadingText}>Syncing Linksy Settings...</Text>
       </View>
     );
@@ -675,7 +676,7 @@ export default function SettingsPanel({
         <View style={styles.card}>
           {/* Section Header with Independent Safety Toggle & Chevron */}
           <View style={styles.cardHeaderRow}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.headerLeftTouchable}
               onPress={() => {
                 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -687,7 +688,7 @@ export default function SettingsPanel({
               <Ionicons
                 name={safetyCollapsed ? 'chevron-down' : 'chevron-up'}
                 size={16}
-                color="#8E8DA3"
+                color={uiTheme.colors.muted}
                 style={{ marginLeft: 4 }}
               />
             </TouchableOpacity>
@@ -697,8 +698,8 @@ export default function SettingsPanel({
               onValueChange={v => {
                 updateField('safetyMode', v);
               }}
-              trackColor={{ false: '#26223B', true: '#FE3C72' }}
-              thumbColor={isSafetyOn ? '#FFF' : '#716E89'}
+              trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
+              thumbColor={isSafetyOn ? '#FFF' : uiTheme.colors.muted}
             />
           </View>
 
@@ -738,12 +739,12 @@ export default function SettingsPanel({
                   <Ionicons
                     name={isSafetyOn ? "checkmark" : "close"}
                     size={13}
-                    color={isSafetyOn ? "#16a34a" : "#ef4444"}
+                    color={isSafetyOn ? "#16a34a" : uiTheme.colors.error}
                   />
                   <Text
                     style={[
                       styles.safetyFeatureText,
-                      { color: isSafetyOn ? "#16a34a" : "#ef4444" },
+                      { color: isSafetyOn ? "#16a34a" : uiTheme.colors.error },
                     ]}
                   >
                     {isSafetyOn ? "Auto-managed" : "Manual overrides"}
@@ -754,12 +755,12 @@ export default function SettingsPanel({
                   <Ionicons
                     name={isSafetyOn ? "checkmark" : "warning"}
                     size={13}
-                    color={isSafetyOn ? "#16a34a" : "#ef4444"}
+                    color={isSafetyOn ? "#16a34a" : uiTheme.colors.error}
                   />
                   <Text
                     style={[
                       styles.safetyFeatureText,
-                      { color: isSafetyOn ? "#16a34a" : "#ef4444" },
+                      { color: isSafetyOn ? "#16a34a" : uiTheme.colors.error },
                     ]}
                   >
                     {isSafetyOn ? "Shadowban secure" : "Shadowban risk"}
@@ -779,7 +780,7 @@ export default function SettingsPanel({
                   <Text style={styles.presetLabel}>Swipes per cycle</Text>
                   <View style={styles.presetButtonGroup}>
                     {SWIPE_PRESETS.map(val => (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={val}
                         disabled={isSafetyOn}
                         style={[
@@ -807,7 +808,7 @@ export default function SettingsPanel({
                   <Text style={styles.presetLabel}>Messages per cycle</Text>
                   <View style={styles.presetButtonGroup}>
                     {MSG_PRESETS.map(val => (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={val}
                         disabled={isSafetyOn}
                         style={[
@@ -835,7 +836,7 @@ export default function SettingsPanel({
                   <Text style={styles.presetLabel}>Schedule AI agent every</Text>
                   <View style={styles.presetButtonGroup}>
                     {SCHEDULE_PRESETS.map(item => (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={item.value}
                         disabled={isSafetyOn}
                         style={[
@@ -860,7 +861,7 @@ export default function SettingsPanel({
 
                 {isSafetyOn && (
                   <View style={styles.lockedNoteRow}>
-                    <Ionicons name="lock-closed" size={12} color="#8E8DA3" style={{ marginRight: 6 }} />
+                    <Ionicons name="lock-closed" size={12} color={uiTheme.colors.muted} style={{ marginRight: 6 }} />
                     <Text style={styles.lockedNoteText}>
                       Presets locked to safe defaults. Toggle Safety Mode OFF above to customize.
                     </Text>
@@ -875,7 +876,7 @@ export default function SettingsPanel({
         <Text style={styles.categoryLabel}>MATCHING LOCATION</Text>
 
         <View style={styles.card}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.cardHeaderRow}
             onPress={() => {
               LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -885,7 +886,7 @@ export default function SettingsPanel({
           >
             <View style={styles.locationHeaderLeft}>
               <View style={styles.locationIconWrap}>
-                <Ionicons name="navigate-circle" size={18} color="#FE3C72" />
+                <Ionicons name="navigate-circle" size={18} color={uiTheme.colors.primary} />
               </View>
               <Text style={styles.cardTitle}>Matching Location</Text>
             </View>
@@ -900,7 +901,7 @@ export default function SettingsPanel({
               <Ionicons
                 name={locationCollapsed ? 'chevron-down' : 'chevron-up'}
                 size={16}
-                color="#8E8DA3"
+                color={uiTheme.colors.muted}
               />
             </View>
           </TouchableOpacity>
@@ -909,7 +910,7 @@ export default function SettingsPanel({
             <View style={{ marginTop: 10 }}>
               {/* Segmented Mode Selector: Live Near Me | Pick a City */}
               <View style={styles.segmentedSelector}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[
                     styles.segBtn,
                     form?.useDeviceLocation && styles.segBtnActive,
@@ -926,12 +927,12 @@ export default function SettingsPanel({
                     <Ionicons
                       name="navigate"
                       size={13}
-                      color={form?.useDeviceLocation ? '#10B981' : '#8E8DA3'}
+                      color={form?.useDeviceLocation ? uiTheme.colors.success : uiTheme.colors.muted}
                     />
                     <Text
                       style={[
                         styles.segBtnText,
-                        form?.useDeviceLocation && { color: '#FFF', fontWeight: '700' },
+                        form?.useDeviceLocation && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' },
                       ]}
                     >
                       Live Near Me
@@ -939,7 +940,7 @@ export default function SettingsPanel({
                   </View>
                 </TouchableOpacity>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[
                     styles.segBtn,
                     !form?.useDeviceLocation && styles.segBtnActive,
@@ -956,12 +957,12 @@ export default function SettingsPanel({
                     <Ionicons
                       name="globe-outline"
                       size={13}
-                      color={!form?.useDeviceLocation ? '#FE3C72' : '#8E8DA3'}
+                      color={!form?.useDeviceLocation ? uiTheme.colors.primary : uiTheme.colors.muted}
                     />
                     <Text
                       style={[
                         styles.segBtnText,
-                        !form?.useDeviceLocation && { color: '#FFF', fontWeight: '700' },
+                        !form?.useDeviceLocation && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' },
                       ]}
                     >
                       Pick a City
@@ -989,17 +990,17 @@ export default function SettingsPanel({
                         </Text>
                       </View>
 
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={styles.refreshGpsBtn}
                         onPress={() => handleToggleDeviceLocation(true)}
                         disabled={fetchingGps}
                         activeOpacity={0.8}
                       >
                         {fetchingGps ? (
-                          <ActivityIndicator size="small" color="#10B981" />
+                          <ActivityIndicator size="small" color={uiTheme.colors.success} />
                         ) : (
                           <>
-                            <Ionicons name="refresh" size={13} color="#10B981" />
+                            <Ionicons name="refresh" size={13} color={uiTheme.colors.success} />
                             <Text style={styles.refreshGpsBtnText}>Update</Text>
                           </>
                         )}
@@ -1014,12 +1015,12 @@ export default function SettingsPanel({
                   <View style={styles.selectedCityBanner}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                       {CITY_PRESETS.find(p => (form?.locationCity || '').includes(p.short))?.flag ? (
-                        <Text style={{ fontSize: 22 }}>
+                        <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 22 }}>
                           {CITY_PRESETS.find(p => (form?.locationCity || '').includes(p.short)).flag}
                         </Text>
                       ) : (
                         <View style={styles.selectedCityIconWrap}>
-                          <Ionicons name="globe-outline" size={20} color="#FE3C72" />
+                          <Ionicons name="globe-outline" size={20} color={uiTheme.colors.primary} />
                         </View>
                       )}
                       <View style={{ flex: 1 }}>
@@ -1047,7 +1048,7 @@ export default function SettingsPanel({
                           (Math.abs((form?.locationLatitude || 0) - preset.latitude) < 0.05 &&
                            Math.abs((form?.locationLongitude || 0) - preset.longitude) < 0.05);
                         return (
-                          <TouchableOpacity
+                          <TouchableOpacity accessibilityRole="button"
                             key={preset.id}
                             style={[styles.quickChip, isSelected && styles.quickChipActive]}
                             onPress={() => handleSelectCity(preset)}
@@ -1058,7 +1059,7 @@ export default function SettingsPanel({
                               {preset.short}
                             </Text>
                             {isSelected && (
-                              <Ionicons name="checkmark-circle" size={12} color="#FE3C72" style={{ marginLeft: 2 }} />
+                              <Ionicons name="checkmark-circle" size={12} color={uiTheme.colors.primary} style={{ marginLeft: 2 }} />
                             )}
                           </TouchableOpacity>
                         );
@@ -1068,7 +1069,7 @@ export default function SettingsPanel({
 
                   {/* Search Bar for Cities */}
                   <View style={styles.hubSearchWrap}>
-                    <Ionicons name="search-outline" size={15} color="#8E8DA3" style={{ marginRight: 8 }} />
+                    <Ionicons name="search-outline" size={15} color={uiTheme.colors.muted} style={{ marginRight: 8 }} />
                     <TextInput
                       style={styles.hubSearchInput}
                       placeholder="Search city or country (e.g. London, Tokyo, Miami)..."
@@ -1078,11 +1079,11 @@ export default function SettingsPanel({
                       autoCapitalize="none"
                     />
                     {citySearchQuery.length > 0 && (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         onPress={() => setCitySearchQuery('')}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <Ionicons name="close-circle" size={16} color="#8E8DA3" />
+                        <Ionicons name="close-circle" size={16} color={uiTheme.colors.muted} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1095,7 +1096,7 @@ export default function SettingsPanel({
                     contentContainerStyle={styles.regionFilterContainer}
                   >
                     {REGION_FILTERS.map(region => (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={region}
                         style={[styles.regionTab, selectedRegion === region && styles.regionTabActive]}
                         onPress={() => {
@@ -1123,7 +1124,7 @@ export default function SettingsPanel({
                         (Math.abs((form?.locationLatitude || 0) - preset.latitude) < 0.05 &&
                          Math.abs((form?.locationLongitude || 0) - preset.longitude) < 0.05);
                       return (
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           key={preset.id}
                           style={[styles.hubCard, isActive && styles.hubCardActive]}
                           onPress={() => handleSelectCity(preset)}
@@ -1132,7 +1133,7 @@ export default function SettingsPanel({
                           <View style={styles.hubCardTop}>
                             <Text style={styles.hubCardFlag}>{preset.flag}</Text>
                             {isActive ? (
-                              <Ionicons name="checkmark-circle" size={15} color="#FE3C72" />
+                              <Ionicons name="checkmark-circle" size={15} color={uiTheme.colors.primary} />
                             ) : (
                               <Text style={styles.hubCountryCode}>{preset.langCode.toUpperCase()}</Text>
                             )}
@@ -1152,14 +1153,14 @@ export default function SettingsPanel({
                     <View style={styles.noHubsFoundWrap}>
                       <Ionicons name="search-outline" size={22} color="#555268" />
                       <Text style={styles.noHubsFoundText}>No cities matching "{citySearchQuery}"</Text>
-                      <TouchableOpacity onPress={() => setCitySearchQuery('')} style={{ marginTop: 4 }}>
+                      <TouchableOpacity accessibilityRole="button" onPress={() => setCitySearchQuery('')} style={{ marginTop: 4 }}>
                         <Text style={styles.resetFilterText}>Clear search</Text>
                       </TouchableOpacity>
                     </View>
                   )}
 
                   {/* Custom Location Accordion Toggle */}
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={styles.customAccordionToggle}
                     onPress={() => {
                       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1171,7 +1172,7 @@ export default function SettingsPanel({
                       <Ionicons
                         name={showCustomCoords ? "chevron-up" : "add-circle-outline"}
                         size={14}
-                        color="#8E8DA3"
+                        color={uiTheme.colors.muted}
                       />
                       <Text style={styles.customAccordionText}>
                         {showCustomCoords ? "Hide custom place" : "Can't find your city? Set a custom place"}
@@ -1227,7 +1228,7 @@ export default function SettingsPanel({
 
               {/* Information Footnote */}
               <View style={styles.locationNoteRow}>
-                <Ionicons name="sparkles" size={13} color="#FE3C72" />
+                <Ionicons name="sparkles" size={13} color={uiTheme.colors.primary} />
                 <Text style={styles.locationNoteText}>
                   Linksy synchronizes your dating location automatically so you can meet people anywhere.
                 </Text>
@@ -1241,7 +1242,7 @@ export default function SettingsPanel({
 
         <View style={styles.card}>
           {/* Card Title Row with Chevron */}
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.cardHeaderRow}
             onPress={() => {
               LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1253,14 +1254,14 @@ export default function SettingsPanel({
             <Ionicons
               name={bioCollapsed ? 'chevron-down' : 'chevron-up'}
               size={18}
-              color="#8E8DA3"
+              color={uiTheme.colors.muted}
             />
           </TouchableOpacity>
 
           {/* Segmented Mode Selector: Sync | Custom | Generate */}
           <View style={styles.segmentedSelector}>
             {BIO_MODES.map(bm => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={bm.id}
                 style={[
                   styles.segBtn,
@@ -1297,7 +1298,7 @@ export default function SettingsPanel({
                   </Text>
 
                   <View style={styles.syncRow}>
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.syncBtn}
                       onPress={handleSyncNow}
                       disabled={syncing}
@@ -1312,19 +1313,19 @@ export default function SettingsPanel({
                       )}
                     </TouchableOpacity>
 
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.previewEyeBtn}
                       onPress={() => setPreviewVisible(true)}
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="eye-outline" size={15} color="#FE3C72" />
+                      <Ionicons name="eye-outline" size={15} color={uiTheme.colors.primary} />
                       <Text style={styles.previewEyeBtnText}>How AI Sees You</Text>
                     </TouchableOpacity>
                   </View>
 
                   {syncError ? (
                     <View style={styles.syncErrorCard}>
-                      <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                      <Ionicons name="alert-circle" size={14} color={uiTheme.colors.error} />
                       <Text style={styles.syncErrorText}>{syncError}</Text>
                     </View>
                   ) : (
@@ -1366,13 +1367,13 @@ export default function SettingsPanel({
                   {genStep === 0 && (
                     <View style={styles.genStepWrap}>
                       <View style={styles.magicIconWrap}>
-                        <Ionicons name="sparkles" size={24} color="#FE3C72" />
+                        <Ionicons name="sparkles" size={24} color={uiTheme.colors.primary} />
                       </View>
                       <Text style={styles.magicTitle}>Generate a Magic Bio</Text>
                       <Text style={styles.magicDesc}>
                         Let AI analyze your profile and craft the perfect bio to maximize your matches.
                       </Text>
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={styles.magicCtaBtn}
                         onPress={handleRunGenerate}
                         activeOpacity={0.85}
@@ -1385,7 +1386,7 @@ export default function SettingsPanel({
 
                   {genStep === 1 && (
                     <View style={styles.genLoadingWrap}>
-                      <ActivityIndicator size="small" color="#FE3C72" />
+                      <ActivityIndicator size="small" color={uiTheme.colors.primary} />
                       <Text style={styles.genLoadingText}>
                         ✨ AI is crafting your personalized bio...
                       </Text>
@@ -1423,14 +1424,14 @@ export default function SettingsPanel({
 
                       {pushError && (
                         <View style={styles.syncErrorCard}>
-                          <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                          <Ionicons name="alert-circle" size={14} color={uiTheme.colors.error} />
                           <Text style={styles.syncErrorText}>{pushError}</Text>
                         </View>
                       )}
 
                       {/* Action Buttons */}
                       <View style={styles.genActionsRow}>
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={styles.genActionSecBtn}
                           onPress={handleRunGenerate}
                           activeOpacity={0.8}
@@ -1438,7 +1439,7 @@ export default function SettingsPanel({
                           <Text style={styles.genActionSecText}>↺ Regen</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={[
                             styles.genActionPushBtn,
                             pushSuccess && styles.genActionPushBtnSuccess,
@@ -1461,7 +1462,7 @@ export default function SettingsPanel({
                           )}
                         </TouchableOpacity>
 
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={styles.genActionSecBtn}
                           onPress={handleCopyBio}
                           activeOpacity={0.8}
@@ -1469,7 +1470,7 @@ export default function SettingsPanel({
                           <Text
                             style={[
                               styles.genActionSecText,
-                              copySuccess && { color: "#10B981" },
+                              copySuccess && { color: uiTheme.colors.success },
                             ]}
                           >
                             {copySuccess ? '✓ Copied' : 'Copy'}
@@ -1535,23 +1536,23 @@ export default function SettingsPanel({
 
           {/* Dynamic Action Button: Logout if Connected, Connect if Disconnected */}
           {isTinderLoggedIn ? (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.accountLogoutBtn}
               onPress={handleLogoutPress}
               disabled={loggingOut}
               activeOpacity={0.85}
             >
               {loggingOut ? (
-                <ActivityIndicator size="small" color="#EF4444" />
+                <ActivityIndicator size="small" color={uiTheme.colors.error} />
               ) : (
                 <View style={styles.accountLogoutBtnInner}>
-                  <Ionicons name="log-out-outline" size={16} color="#EF4444" />
+                  <Ionicons name="log-out-outline" size={16} color={uiTheme.colors.error} />
                   <Text style={styles.accountLogoutBtnText}>Log Out of Tinder</Text>
                 </View>
               )}
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.accountConnectBtn}
               onPress={handleConnectPress}
               activeOpacity={0.85}
@@ -1570,7 +1571,7 @@ export default function SettingsPanel({
           <>
             <Text style={styles.categoryLabel}>VIRTUAL CONTAINER CONTROLS</Text>
             <View style={styles.card}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.cardHeaderRow}
                 onPress={() => {
                   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1579,13 +1580,13 @@ export default function SettingsPanel({
                 activeOpacity={0.85}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="keypad-outline" size={16} color="#818CF8" />
+                  <Ionicons name="keypad-outline" size={16} color={uiTheme.colors.info} />
                   <Text style={styles.cardTitle}>Direct OTP & Keypad</Text>
                 </View>
                 <Ionicons
                   name={showRawControls ? 'chevron-up' : 'chevron-down'}
                   size={18}
-                  color="#8E8DA3"
+                  color={uiTheme.colors.muted}
                 />
               </TouchableOpacity>
 
@@ -1614,11 +1615,11 @@ export default function SettingsPanel({
                 <Text style={styles.modalTitle}>How AI Sees You</Text>
                 <Text style={styles.modalSubtitle}>YOUR SYNCED PROFILE CONTEXT</Text>
               </View>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.modalCloseBtn}
                 onPress={() => setPreviewVisible(false)}
               >
-                <Ionicons name="close" size={20} color="#D8D6E8" />
+                <Ionicons name="close" size={20} color={uiTheme.colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -1630,20 +1631,20 @@ export default function SettingsPanel({
               );
               return (
                 <View style={styles.modalProfileStatusBadge}>
-                  <View style={[styles.syncStatusDot, { backgroundColor: isProfileSynced ? '#10B981' : '#F59E0B' }]} />
+                  <View style={[styles.syncStatusDot, { backgroundColor: isProfileSynced ? uiTheme.colors.success : uiTheme.colors.warning }]} />
                   <Text style={styles.modalProfileStatusText} numberOfLines={1}>
                     {isProfileSynced
                       ? `Connected as ${form.userProfile.name || 'Tinder Profile'} · Synced ${lastSyncTime}`
                       : 'Profile not yet synced from Tinder'}
                   </Text>
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={styles.modalQuickSyncBtn}
                     onPress={handleSyncNow}
                     disabled={syncing}
                     activeOpacity={0.8}
                   >
                     {syncing ? (
-                      <ActivityIndicator size="small" color="#FE3C72" />
+                      <ActivityIndicator size="small" color={uiTheme.colors.primary} />
                     ) : (
                       <Text style={styles.modalQuickSyncBtnText}>
                         {isProfileSynced ? 'Re-sync' : 'Sync Now'}
@@ -1665,7 +1666,7 @@ export default function SettingsPanel({
                 return (
                   <View key={field.key} style={styles.previewField}>
                     <View style={styles.previewFieldHeader}>
-                      <Ionicons name={field.icon} size={13} color="#FE3C72" />
+                      <Ionicons name={field.icon} size={13} color={uiTheme.colors.primary} />
                       <Text style={styles.previewLabel}>{field.label}</Text>
                     </View>
                     <Text style={[styles.previewValue, !hasRealVal && styles.previewValueEmpty]}>
@@ -1690,7 +1691,7 @@ export default function SettingsPanel({
         <View style={styles.logoutModalOverlay}>
           <View style={styles.logoutModalCard}>
             <View style={styles.logoutIconBadge}>
-              <Ionicons name="log-out" size={28} color="#EF4444" />
+              <Ionicons name="log-out" size={28} color={uiTheme.colors.error} />
             </View>
 
             <Text style={styles.logoutModalTitle}>Log Out of Tinder?</Text>
@@ -1699,7 +1700,7 @@ export default function SettingsPanel({
             </Text>
 
             <View style={styles.logoutModalBtnRow}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.logoutModalCancelBtn}
                 onPress={() => setShowLogoutConfirm(false)}
                 disabled={loggingOut}
@@ -1708,7 +1709,7 @@ export default function SettingsPanel({
                 <Text style={styles.logoutModalCancelText}>Cancel</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.logoutModalConfirmBtn}
                 onPress={executeLogout}
                 disabled={loggingOut}
@@ -1746,17 +1747,17 @@ export default function SettingsPanel({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
   },
   centerWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#0D0B14',
+    padding: uiTheme.spacing.xl,
+    backgroundColor: uiTheme.colors.background,
   },
-  loadingText: {
-    color: '#8E8DA3',
+  loadingText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     marginTop: 10,
     fontSize: 13,
   },
@@ -1769,22 +1770,22 @@ const styles = StyleSheet.create({
     gap: 6,
   },
 
-  categoryLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+  categoryLabel: { fontFamily: 'Inter_600SemiBold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     color: '#94a3b8',
     letterSpacing: 0.8,
     marginTop: 10,
-    marginBottom: 4,
-    marginLeft: 4,
+    marginBottom: uiTheme.spacing.xs,
+    marginLeft: uiTheme.spacing.xs,
     textTransform: 'uppercase',
   },
 
   card: {
-    backgroundColor: '#161424',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     padding: 14,
     marginBottom: 6,
   },
@@ -1798,19 +1799,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    paddingVertical: 4,
+    paddingVertical: uiTheme.spacing.xs,
   },
-  cardTitle: {
+  cardTitle: { fontFamily: 'Inter_600SemiBold',
     color: '#FFF',
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: uiTheme.type.body.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.1,
   },
 
   // ── 2 Independent Side-by-Side Meter Boxes ──
   metersRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     marginTop: 10,
   },
   meterBox: {
@@ -1818,25 +1819,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: '#221E33',
   },
-  meterLabel: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '500',
+  meterLabel: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  meterValue: {
+  meterValue: { fontFamily: 'Inter_700Bold',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
     color: '#FFF',
   },
   meterValueDanger: {
-    color: '#ef4444',
+    color: uiTheme.colors.error,
   },
 
   // ── Badges Row ──
@@ -1844,24 +1845,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
     paddingHorizontal: 2,
-    marginTop: 4,
+    marginTop: uiTheme.spacing.xs,
   },
   safetyFeatureChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: uiTheme.spacing.xs,
   },
-  safetyFeatureText: {
-    fontSize: 12,
-    fontWeight: '500',
+  safetyFeatureText: { fontFamily: 'Inter_500Medium',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Presets ──
   presetSection: {
     marginTop: 10,
-    gap: 12,
+    gap: uiTheme.spacing.md,
   },
   presetSectionLocked: {
     opacity: 0.55,
@@ -1869,15 +1870,15 @@ const styles = StyleSheet.create({
   presetRow: {
     gap: 6,
   },
-  presetLabel: {
+  presetLabel: { fontFamily: 'Inter_500Medium',
     color: '#9ca3af',
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   presetButtonGroup: {
     flexDirection: 'row',
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
     padding: 3,
     gap: 3,
     borderWidth: 1,
@@ -1891,25 +1892,25 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   presetBtnActive: {
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
   },
-  presetBtnText: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '500',
+  presetBtnText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  presetBtnTextActive: {
+  presetBtnTextActive: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   lockedNoteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 4,
+    paddingTop: uiTheme.spacing.xs,
   },
-  lockedNoteText: {
-    color: '#8E8DA3',
-    fontSize: 11,
+  lockedNoteText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     fontStyle: 'italic',
     flex: 1,
   },
@@ -1917,8 +1918,8 @@ const styles = StyleSheet.create({
   // ── Segmented Mode Selector ──
   segmentedSelector: {
     flexDirection: 'row',
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
     padding: 3,
     gap: 3,
     borderWidth: 1,
@@ -1933,69 +1934,69 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   segBtnActive: {
-    backgroundColor: '#26223B',
+    backgroundColor: uiTheme.colors.elevated,
   },
-  segBtnText: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '500',
+  segBtnText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  segBtnTextActive: {
+  segBtnTextActive: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   bioSubPanel: {
     marginTop: 10,
   },
-  bioPanelHint: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
+  bioPanelHint: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 16,
   },
   syncRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 8,
+    gap: uiTheme.spacing.sm,
+    marginTop: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.sm,
   },
   syncBtn: {
     flex: 1,
-    backgroundColor: '#FE3C72',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.small,
     paddingVertical: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  syncBtnText: {
+  syncBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   previewEyeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#1C192E',
+    backgroundColor: uiTheme.colors.elevated,
     borderWidth: 1,
     borderColor: 'rgba(254, 60, 114, 0.3)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderRadius: uiTheme.radius.small,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 9,
   },
-  previewEyeBtnText: {
-    color: '#FE3C72',
-    fontSize: 12,
-    fontWeight: '600',
+  previewEyeBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   syncStatusCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
-    padding: 8,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
+    padding: uiTheme.spacing.sm,
     borderWidth: 1,
     borderColor: '#221E33',
   },
@@ -2004,30 +2005,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: 'rgba(239, 68, 68, 0.08)',
-    borderRadius: 8,
-    padding: 8,
+    borderRadius: uiTheme.radius.small,
+    padding: uiTheme.spacing.sm,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.25)',
   },
-  syncErrorText: {
-    color: '#EF4444',
-    fontSize: 11,
+  syncErrorText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.error,
+    fontSize: uiTheme.type.caption.fontSize,
     flex: 1,
   },
   syncStatusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
   },
-  syncStatusText: {
-    color: '#8E8DA3',
-    fontSize: 11,
+  syncStatusText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
   },
 
-  bioTextArea: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
+  bioTextArea: { fontFamily: 'Inter_400Regular',
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
     borderColor: '#221E33',
     color: '#FFF',
@@ -2042,62 +2043,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 6,
   },
-  charCountText: {
-    color: '#716E89',
-    fontSize: 10.5,
+  charCountText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
   },
 
   // ── Magic Bio Studio ──
   genStepWrap: {
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
   },
   magicIconWrap: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     backgroundColor: 'rgba(254, 60, 114, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
   },
-  magicTitle: {
+  magicTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFF',
     fontSize: 14.5,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontWeight: 'normal',
+    marginBottom: uiTheme.spacing.xs,
   },
-  magicDesc: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
+  magicDesc: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     textAlign: 'center',
     lineHeight: 16,
-    paddingHorizontal: 12,
-    marginBottom: 12,
+    paddingHorizontal: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.md,
   },
   magicCtaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FE3C72',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.small,
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: uiTheme.spacing.xl,
   },
-  magicCtaBtnText: {
+  magicCtaBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   genLoadingWrap: {
-    paddingVertical: 24,
+    paddingVertical: uiTheme.spacing.xxl,
     alignItems: 'center',
     gap: 10,
   },
-  genLoadingText: {
-    color: '#8E8DA3',
-    fontSize: 12,
+  genLoadingText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
   },
 
   genResultWrap: {
@@ -2106,8 +2107,8 @@ const styles = StyleSheet.create({
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
     padding: 10,
     borderWidth: 1,
     borderColor: '#221E33',
@@ -2115,21 +2116,21 @@ const styles = StyleSheet.create({
   scoreRing: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 2.5,
-    borderColor: '#FE3C72',
+    borderColor: uiTheme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scoreNumber: {
+  scoreNumber: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
   },
-  scoreLabel: {
+  scoreLabel: { fontFamily: 'Inter_600SemiBold',
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   activeScoreTag: {
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -2137,65 +2138,65 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  activeScoreTagText: {
-    color: '#10B981',
-    fontSize: 9.5,
-    fontWeight: '700',
+  activeScoreTagText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  scoreSub: {
-    color: '#8E8DA3',
-    fontSize: 11,
+  scoreSub: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 2,
   },
   bioBoxResult: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
+    padding: uiTheme.spacing.md,
     borderWidth: 1,
     borderColor: '#221E33',
   },
-  bioResultText: {
-    color: '#E0DFEC',
+  bioResultText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.text,
     fontSize: 12.5,
     lineHeight: 18,
   },
   genActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   genActionSecBtn: {
-    backgroundColor: '#26223B',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    backgroundColor: uiTheme.colors.elevated,
+    paddingVertical: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.md,
     borderRadius: 7,
   },
-  genActionSecText: {
-    color: '#D8D6E8',
-    fontSize: 11.5,
-    fontWeight: '600',
+  genActionSecText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   genActionPushBtn: {
     flex: 1,
-    backgroundColor: '#FE3C72',
-    paddingVertical: 8,
+    backgroundColor: uiTheme.colors.primary,
+    paddingVertical: uiTheme.spacing.sm,
     alignItems: 'center',
     borderRadius: 7,
   },
   genActionPushBtnSuccess: {
     backgroundColor: '#059669',
   },
-  genActionPushText: {
+  genActionPushText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Account & Platforms ──
   accountProfileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: uiTheme.spacing.md,
   },
   accountIconWrap: {
     position: 'relative',
@@ -2203,7 +2204,7 @@ const styles = StyleSheet.create({
   accountLogo: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
   },
   accountActiveDot: {
     position: 'absolute',
@@ -2212,7 +2213,7 @@ const styles = StyleSheet.create({
     width: 11,
     height: 11,
     borderRadius: 6,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
     borderWidth: 2,
     borderColor: '#151322',
   },
@@ -2229,10 +2230,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 3,
   },
-  accountTitle: {
+  accountTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
   accountPlanBadge: {
@@ -2247,26 +2248,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(148, 163, 184, 0.12)',
     borderColor: 'rgba(148, 163, 184, 0.25)',
   },
-  accountPlanText: {
-    color: '#FE3C72',
-    fontSize: 9.5,
-    fontWeight: '800',
+  accountPlanText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.5,
   },
   accountInactiveBadgeText: {
     color: '#94A3B8',
   },
-  accountSubText: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
-    fontWeight: '500',
+  accountSubText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   accountLogoutBtn: {
     backgroundColor: 'rgba(239, 68, 68, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.28)',
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: uiTheme.radius.input,
+    paddingVertical: uiTheme.spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2275,18 +2276,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  accountLogoutBtnText: {
-    color: '#EF4444',
+  accountLogoutBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.error,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   accountConnectBtn: {
-    backgroundColor: '#FE3C72',
-    borderRadius: 12,
-    paddingVertical: 12,
+    backgroundColor: uiTheme.colors.primary,
+    borderRadius: uiTheme.radius.input,
+    paddingVertical: uiTheme.spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FE3C72',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -2298,38 +2299,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  accountConnectBtnText: {
+  accountConnectBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 0.2,
   },
   cardDivider: {
     height: 1,
     backgroundColor: '#221E33',
-    marginVertical: 12,
+    marginVertical: uiTheme.spacing.md,
   },
   subStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  subStatusLabel: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '500',
+  subStatusLabel: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  subStatusValue: {
+  subStatusValue: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   rawControlsBody: {
     marginTop: 14,
     borderTopWidth: 1,
     borderColor: '#221E33',
-    paddingTop: 12,
+    paddingTop: uiTheme.spacing.md,
   },
 
   // ─── Desktop V2 Toast Banner ───
@@ -2337,21 +2338,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     backgroundColor: '#064E3B',
-    borderColor: '#10B981',
+    borderColor: uiTheme.colors.success,
     borderWidth: 1,
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: uiTheme.spacing.lg,
     marginHorizontal: 14,
     marginTop: 10,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     zIndex: 99,
   },
-  toastBannerText: {
+  toastBannerText: { fontFamily: 'Inter_700Bold',
     color: '#ECFDF5',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   // ─── Desktop V2 Sticky Save Bar ───
@@ -2360,11 +2361,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderTopWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: uiTheme.spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.35,
@@ -2376,7 +2377,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     height: 3,
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
@@ -2388,7 +2389,7 @@ const styles = StyleSheet.create({
   saveBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     flex: 1,
     marginRight: 10,
   },
@@ -2398,46 +2399,46 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   unsavedDot: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: uiTheme.colors.warning,
   },
   savedDot: {
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
   },
-  saveBarText: {
-    color: '#8E8DA3',
-    fontSize: 12,
-    fontWeight: '600',
+  saveBarText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  saveBarTextUnsaved: {
-    color: '#FE3C72',
-    fontWeight: '700',
+  saveBarTextUnsaved: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontWeight: 'normal',
   },
   saveBarActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   discardBtn: {
-    paddingVertical: 8,
+    paddingVertical: uiTheme.spacing.sm,
     paddingHorizontal: 13,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
-    borderColor: '#363252',
+    borderColor: uiTheme.colors.border,
     backgroundColor: 'transparent',
   },
-  discardBtnText: {
-    color: '#A19EBD',
+  discardBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.textSecondary,
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   saveChangesBtn: {
-    backgroundColor: '#FE3C72',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.primary,
+    paddingVertical: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.lg,
+    borderRadius: uiTheme.radius.small,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FE3C72',
+    shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
@@ -2448,22 +2449,22 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
   saveChangesBtnSuccess: {
-    backgroundColor: '#10B981',
-    shadowColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
+    shadowColor: uiTheme.colors.success,
   },
-  saveChangesBtnText: {
+  saveChangesBtnText: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   btnRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
   },
-  errorText: {
-    color: '#EF4444',
-    fontSize: 11,
+  errorText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.error,
+    fontSize: uiTheme.type.caption.fontSize,
     textAlign: 'center',
     marginBottom: 6,
   },
@@ -2475,12 +2476,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: '#161424',
+    backgroundColor: uiTheme.colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
-    borderColor: '#26223B',
-    padding: 16,
+    borderColor: uiTheme.colors.elevated,
+    padding: uiTheme.spacing.lg,
     maxHeight: '80%',
   },
   modalHeader: {
@@ -2489,35 +2490,35 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderBottomWidth: 1,
     borderColor: '#221E33',
-    paddingBottom: 12,
-    marginBottom: 12,
+    paddingBottom: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.md,
   },
-  modalTitle: {
+  modalTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
-  modalSubtitle: {
-    color: '#716E89',
-    fontSize: 10,
-    fontWeight: '700',
+  modalSubtitle: { fontFamily: 'Manrope_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.5,
     marginTop: 1,
   },
   modalCloseBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: 16,
-    backgroundColor: '#26223B',
+    backgroundColor: uiTheme.colors.elevated,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalBody: {
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   previewField: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
     padding: 10,
     borderWidth: 1,
     borderColor: '#221E33',
@@ -2529,13 +2530,13 @@ const styles = StyleSheet.create({
     gap: 5,
     marginBottom: 3,
   },
-  previewLabel: {
-    color: '#716E89',
-    fontSize: 10.5,
-    fontWeight: '700',
+  previewLabel: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     textTransform: 'uppercase',
   },
-  previewValue: {
+  previewValue: { fontFamily: 'Inter_400Regular',
     color: '#FFF',
     fontSize: 12.5,
     lineHeight: 17,
@@ -2548,32 +2549,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#161426',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: uiTheme.radius.small,
+    paddingHorizontal: uiTheme.spacing.md,
+    paddingVertical: uiTheme.spacing.sm,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#26223B',
-    gap: 8,
+    borderColor: uiTheme.colors.elevated,
+    gap: uiTheme.spacing.sm,
   },
-  modalProfileStatusText: {
-    color: '#D8D6E8',
-    fontSize: 11.5,
-    fontWeight: '500',
+  modalProfileStatusText: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     flex: 1,
   },
   modalQuickSyncBtn: {
-    backgroundColor: '#26223B',
+    backgroundColor: uiTheme.colors.elevated,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: uiTheme.spacing.xs,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#3D385A',
   },
-  modalQuickSyncBtnText: {
-    color: '#FE3C72',
-    fontSize: 11,
-    fontWeight: '600',
+  modalQuickSyncBtnText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Custom Logout Confirmation Modal ──
@@ -2582,18 +2583,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 4, 10, 0.80)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: uiTheme.spacing.xxl,
   },
   logoutModalCard: {
     width: '100%',
     maxWidth: 340,
     backgroundColor: '#141220',
-    borderRadius: 24,
+    borderRadius: uiTheme.radius.sheet,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.28)',
-    padding: 24,
+    padding: uiTheme.spacing.xxl,
     alignItems: 'center',
-    shadowColor: '#EF4444',
+    shadowColor: uiTheme.colors.error,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 24,
@@ -2608,18 +2609,18 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(239, 68, 68, 0.32)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: uiTheme.spacing.lg,
   },
-  logoutModalTitle: {
+  logoutModalTitle: { fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: uiTheme.type.section.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.3,
-    marginBottom: 8,
+    marginBottom: uiTheme.spacing.sm,
     textAlign: 'center',
   },
-  logoutModalSubtitle: {
-    color: '#8E8DA3',
+  logoutModalSubtitle: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
     fontSize: 12.5,
     lineHeight: 18,
     textAlign: 'center',
@@ -2634,44 +2635,44 @@ const styles = StyleSheet.create({
   logoutModalCancelBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 12,
+    borderRadius: uiTheme.radius.input,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoutModalCancelText: {
-    color: '#D8D6E8',
+  logoutModalCancelText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   logoutModalConfirmBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: '#EF4444',
+    borderRadius: uiTheme.radius.input,
+    backgroundColor: uiTheme.colors.error,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
-    shadowColor: '#EF4444',
+    shadowColor: uiTheme.colors.error,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 4,
   },
-  logoutModalConfirmText: {
+  logoutModalConfirmText: { fontFamily: 'Inter_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
 
   // ── Target Location & Passport Styles ──
   locationHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
     flex: 1,
   },
   locationIconWrap: {
@@ -2687,7 +2688,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: 'rgba(254, 60, 114, 0.10)',
-    paddingHorizontal: 8,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
@@ -2702,28 +2703,28 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#FE3C72',
+    backgroundColor: uiTheme.colors.primary,
   },
   locationActiveDotLive: {
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
   },
-  locationActiveText: {
-    color: '#FE3C72',
-    fontSize: 11,
-    fontWeight: '700',
+  locationActiveText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   locationActiveTextLive: {
-    color: '#10B981',
+    color: uiTheme.colors.success,
   },
 
   // ── Live GPS Card ──
   liveGpsCard: {
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
     borderRadius: 10,
-    padding: 12,
+    padding: uiTheme.spacing.md,
     borderWidth: 1,
     borderColor: '#221E33',
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
   },
   liveGpsTopRow: {
     flexDirection: 'row',
@@ -2734,18 +2735,18 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#10B981',
+    backgroundColor: uiTheme.colors.success,
   },
-  liveGpsCity: {
+  liveGpsCity: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
     fontSize: 14.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
-  liveGpsSub: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
-    fontWeight: '500',
+  liveGpsSub: { fontFamily: 'Inter_500Medium',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     marginTop: 2,
   },
   refreshGpsBtn: {
@@ -2755,14 +2756,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.25)',
   },
-  refreshGpsBtnText: {
-    color: '#10B981',
-    fontSize: 11.5,
-    fontWeight: '700',
+  refreshGpsBtnText: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.success,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Selected City Banner ──
@@ -2770,52 +2771,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
     borderRadius: 10,
-    padding: 12,
+    padding: uiTheme.spacing.md,
     borderWidth: 1,
     borderColor: '#221E33',
-    marginTop: 8,
+    marginTop: uiTheme.spacing.sm,
   },
   selectedCityIconWrap: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: uiTheme.radius.small,
     backgroundColor: 'rgba(254, 60, 114, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  selectedCityTitle: {
+  selectedCityTitle: { fontFamily: 'Manrope_700Bold',
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: uiTheme.type.label.fontSize,
+    fontWeight: 'normal',
     letterSpacing: -0.2,
   },
-  selectedCitySub: {
-    color: '#8E8DA3',
-    fontSize: 11,
+  selectedCitySub: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 2,
   },
   passportActivePill: {
     backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    paddingHorizontal: 8,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(254, 60, 114, 0.3)',
   },
-  passportActiveText: {
-    color: '#FE3C72',
-    fontSize: 10,
-    fontWeight: '800',
+  passportActiveText: { fontFamily: 'Inter_800ExtraBold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     letterSpacing: 0.5,
   },
 
   // ── Popular Destination Chips ──
-  quickLabel: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#716E89',
+  quickLabel: { fontFamily: 'Inter_700Bold',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
+    color: uiTheme.colors.muted,
     letterSpacing: 0.5,
     marginBottom: 6,
     textTransform: 'uppercase',
@@ -2831,49 +2832,49 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#0D0B14',
+    borderRadius: uiTheme.radius.small,
+    backgroundColor: uiTheme.colors.background,
     borderWidth: 1,
     borderColor: '#221E33',
   },
   quickChipActive: {
     backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    borderColor: '#FE3C72',
+    borderColor: uiTheme.colors.primary,
   },
-  quickChipFlag: {
+  quickChipFlag: { fontFamily: 'Inter_400Regular',
     fontSize: 13,
   },
-  quickChipText: {
-    color: '#D8D6E8',
-    fontSize: 11.5,
-    fontWeight: '600',
+  quickChipText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.text,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  quickChipTextActive: {
+  quickChipTextActive: { fontFamily: 'Inter_700Bold',
     color: '#FFF',
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
 
   // ── Hub Search & Filter ──
   hubSearchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderWidth: 1,
     borderColor: '#221E33',
     marginTop: 10,
   },
-  hubSearchInput: {
+  hubSearchInput: { fontFamily: 'Inter_400Regular',
     flex: 1,
     color: '#FFF',
-    fontSize: 12,
+    fontSize: uiTheme.type.caption.fontSize,
     paddingVertical: 2,
   },
   regionFilterScroll: {
-    marginTop: 8,
-    marginBottom: 4,
+    marginTop: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.xs,
   },
   regionFilterContainer: {
     flexDirection: 'row',
@@ -2884,90 +2885,90 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 6,
-    backgroundColor: '#0D0B14',
+    backgroundColor: uiTheme.colors.background,
     borderWidth: 1,
     borderColor: '#221E33',
   },
   regionTabActive: {
     backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    borderColor: '#FE3C72',
+    borderColor: uiTheme.colors.primary,
   },
-  regionTabText: {
-    color: '#8E8DA3',
-    fontSize: 11,
-    fontWeight: '600',
+  regionTabText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
-  regionTabTextActive: {
-    color: '#FE3C72',
-    fontWeight: '700',
+  regionTabTextActive: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.primary,
+    fontWeight: 'normal',
   },
   cityListScroll: {
     maxHeight: 220,
-    marginTop: 8,
-    borderRadius: 8,
+    marginTop: uiTheme.spacing.sm,
+    borderRadius: uiTheme.radius.small,
   },
   hubGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    paddingBottom: 4,
+    paddingBottom: uiTheme.spacing.xs,
   },
   hubCard: {
     width: '48.8%',
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
-    padding: 8,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
+    padding: uiTheme.spacing.sm,
     borderWidth: 1,
     borderColor: '#221E33',
   },
   hubCardActive: {
     backgroundColor: 'rgba(254, 60, 114, 0.15)',
-    borderColor: '#FE3C72',
+    borderColor: uiTheme.colors.primary,
   },
   hubCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
   },
-  hubCardFlag: {
+  hubCardFlag: { fontFamily: 'Inter_400Regular',
     fontSize: 16,
   },
-  hubCountryCode: {
-    color: '#716E89',
-    fontSize: 9.5,
-    fontWeight: '700',
+  hubCountryCode: { fontFamily: 'Inter_700Bold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: 4,
+    paddingHorizontal: uiTheme.spacing.xs,
     paddingVertical: 1,
     borderRadius: 3,
   },
-  hubCardCity: {
+  hubCardCity: { fontFamily: 'Inter_700Bold',
     color: '#E2E1EC',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   hubCardCityActive: {
     color: '#FFF',
   },
-  hubCardCountry: {
-    color: '#716E89',
-    fontSize: 10,
+  hubCardCountry: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     marginTop: 1,
   },
   noHubsFoundWrap: {
     alignItems: 'center',
     paddingVertical: 14,
-    gap: 4,
+    gap: uiTheme.spacing.xs,
   },
-  noHubsFoundText: {
-    color: '#8E8DA3',
-    fontSize: 12,
+  noHubsFoundText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
   },
-  resetFilterText: {
-    color: '#FE3C72',
-    fontSize: 12,
-    fontWeight: '600',
+  resetFilterText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.primary,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
 
   // ── Custom Location Accordion ──
@@ -2977,55 +2978,55 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginTop: 6,
   },
-  customAccordionText: {
-    color: '#8E8DA3',
-    fontSize: 11.5,
-    fontWeight: '600',
+  customAccordionText: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
   },
   customCoordsCard: {
-    backgroundColor: '#0D0B14',
-    borderRadius: 8,
+    backgroundColor: uiTheme.colors.background,
+    borderRadius: uiTheme.radius.small,
     padding: 10,
-    marginTop: 4,
+    marginTop: uiTheme.spacing.xs,
     borderWidth: 1,
     borderColor: '#221E33',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   customInputRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: uiTheme.spacing.sm,
   },
   customInputHalf: {
     flex: 1,
   },
-  customInputLabel: {
-    color: '#8E8DA3',
-    fontSize: 10,
-    fontWeight: '600',
+  customInputLabel: { fontFamily: 'Inter_600SemiBold',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: 'normal',
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
     letterSpacing: 0.5,
   },
-  customTextInput: {
-    backgroundColor: '#161424',
+  customTextInput: { fontFamily: 'Inter_400Regular',
+    backgroundColor: uiTheme.colors.surface,
     borderWidth: 1,
-    borderColor: '#26223B',
+    borderColor: uiTheme.colors.elevated,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
     color: '#FFF',
-    fontSize: 12,
+    fontSize: uiTheme.type.caption.fontSize,
   },
   locationNoteRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 10,
-    paddingHorizontal: 4,
+    paddingHorizontal: uiTheme.spacing.xs,
   },
-  locationNoteText: {
-    color: '#716E89',
-    fontSize: 11,
+  locationNoteText: { fontFamily: 'Inter_400Regular',
+    color: uiTheme.colors.muted,
+    fontSize: uiTheme.type.caption.fontSize,
     flex: 1,
     lineHeight: 15,
   },
@@ -3033,11 +3034,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#161424',
-    borderRadius: 12,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
-    borderColor: '#26223B',
-    paddingHorizontal: 12,
+    borderColor: uiTheme.colors.elevated,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: 10,
     marginBottom: 6,
   },
