@@ -147,11 +147,11 @@ export default function DashboardPanel({
         contentContainerStyle={styles.scrollContent}
       >
         {/* ── 1. Master Centerpiece Hero Controller (1:1 with Desktop V2) ── */}
-        <MasterHeroController
+        {activeTab !== 'activity' && <MasterHeroController
           agentState={agentState}
           settings={effectiveSettings}
           onToggleAgent={onToggleAgent}
-        />
+        />}
 
         {/* ── 2. Integrated Telemetry Capsule (Swipes, Messages, Matches) ── */}
         <QuickTelemetryCapsule lifetimeStats={lifetimeStats} />

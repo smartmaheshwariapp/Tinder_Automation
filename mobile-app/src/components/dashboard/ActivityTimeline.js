@@ -1,8 +1,7 @@
-import { theme as uiTheme } from '../../theme';
-// src/components/dashboard/ActivityTimeline.js — Minimalist Apple-Style Live Timeline
-import React, { useRef, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { theme as uiTheme } from '../../theme';
 
 const EVENT_CONFIG = {
   opener_sent:      { icon: 'mail-outline',          label: 'Opener Sent',        color: '#EC4899' },
@@ -28,351 +27,111 @@ const EVENT_CONFIG = {
   success:          { icon: 'sparkles',              label: 'Milestone',          color: uiTheme.colors.success },
 };
 
-function formatTimeAgo(timestamp) {
-  if (!timestamp) return 'Just now';
-  const ts = typeof timestamp === 'number' ? timestamp : Date.now();
-  const diff = Math.max(0, Date.now() - ts);
-  const secs = Math.floor(diff / 1000);
-  if (secs < 5) return 'Just now';
-  if (secs < 60) return `${secs}s ago`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return days === 1 ? 'Yesterday' : `${days}d ago`;
+
+const categories = {
+  Matches: ['match_detected', 'match', 'handoff_detected'],
+  Messages: ['opener_sent', 'message_replied', 'message', 'follow_up_sent', 'msg_progress'],
+};
+const timeValue = value => {
+  if (typeof value === 'number') return value < 1e12 ? value * 1000 : value;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+function timeLabel(value) {
+  if (!value) return 'Time unavailable';
+  const minutes = Math.max(0, Math.floor((Date.now() - value) / 60000));
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return minutes + 'm ago';
+  if (minutes < 1440) return Math.floor(minutes / 60) + 'h ago';
+  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-
-function truncateText(text, maxLen = 54) {
-  const clean = (text || '').replace(/\s+/g, ' ').trim();
-  return clean.length > maxLen ? `${clean.slice(0, maxLen - 1)}…` : clean;
+function dayLabel(value) {
+  if (!value) return 'Earlier activity';
+  const day = new Date(value).toDateString();
+  if (day === new Date().toDateString()) return 'Today';
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  if (day === yesterday.toDateString()) return 'Yesterday';
+  return new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 }
-
-function getEventDisplay(event) {
-  const config = EVENT_CONFIG[event.type] || EVENT_CONFIG.profile_liked;
-  let title = config.label;
-  let detail = (event.detail || event.message || event.text || '').trim();
-
-  switch (event.type) {
-    case 'profile_liked':
-    case 'like':
-      title = event.name ? `Liked ${event.name}` : 'Liked Profile';
-      // Eliminate tautological echoing ("Liked X's profile" -> contextual metadata)
-      if (!detail || detail.toLowerCase().includes('liked') || detail.toLowerCase().includes('swiped')) {
-        detail = event.age ? `Age ${event.age} · Verified Profile` : 'AI Compatibility Match · Safe Paced';
-      }
-      break;
-
-    case 'match_detected':
-    case 'match':
-      title = event.name ? `Matched with ${event.name}!` : 'New Match Connected!';
-      if (!detail || detail.toLowerCase().includes('match connected') || detail.toLowerCase().includes('new match')) {
-        detail = 'High Compatibility · Ready for Opener';
-      }
-      break;
-
-    case 'opener_sent':
-      title = event.name ? `Opener to ${event.name}` : 'Opener Sent';
-      break;
-
-    case 'message_replied':
-    case 'message':
-      title = event.name ? `Reply to ${event.name}` : 'Reply Sent';
-      break;
-
-    case 'handoff_detected':
-      title = event.name ? `Contact Exchanged (${event.name})` : 'Goal Reached: Lead Captured';
-      break;
-
-    case 'swipe_progress':
-    case 'action':
-      title = 'Batch Progress';
-      break;
-
-    case 'cycle_complete':
-      title = 'Batch Completed';
-      break;
-
-    case 'persona_update':
-    case 'info':
-      title = 'Wingman Active';
-      break;
-
-    default:
-      if (event.name) {
-        title = `${config.label} · ${event.name}`;
-      }
-      break;
-  }
-
-  return {
-    config,
-    title,
-    detailText: detail ? truncateText(detail, 54) : null,
-  };
-}
-
-function TimelineItem({ event, isLast }) {
-  const { config, title, detailText } = getEventDisplay(event);
-  const rawDetail = event.detail || event.message || event.text || '';
-  const isMoment = event.type === 'handoff_detected' || (
-    rawDetail && (
-      rawDetail.toLowerCase().includes('number') ||
-      rawDetail.toLowerCase().includes('date') ||
-      rawDetail.toLowerCase().includes('whatsapp') ||
-      rawDetail.toLowerCase().includes('instagram')
-    )
-  );
-
-  return (
-    <View style={styles.itemRow}>
-      {/* ── Vertical Timeline Connector ── */}
-      <View style={styles.timelineLeft}>
-        <View style={[
-          styles.nodeDot,
-          { backgroundColor: isMoment ? uiTheme.colors.success : config.color },
-        ]} />
-        {!isLast && <View style={styles.nodeLine} />}
-      </View>
-
-      {/* ── Event Content Card ── */}
-      <View style={[styles.card, isMoment && styles.cardMoment]}>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderLeft}>
-            <Ionicons
-              name={isMoment ? 'star' : config.icon}
-              size={12}
-              color={isMoment ? uiTheme.colors.success : config.color}
-            />
-            <Text style={[styles.cardTitle, isMoment && { color: uiTheme.colors.success }]} numberOfLines={1}>
-              {title}
-            </Text>
-          </View>
-          <Text style={styles.cardTime}>{formatTimeAgo(event.timestamp)}</Text>
-        </View>
-
-        {detailText ? (
-          <Text style={styles.cardDetail} numberOfLines={1}>
-            {detailText}
-          </Text>
-        ) : null}
-      </View>
+function EventRow({ event }) {
+  const [expanded, setExpanded] = useState(false);
+  const meta = EVENT_CONFIG[event.type] || { icon: 'pulse-outline', label: 'Activity update', color: uiTheme.colors.muted };
+  const detail = String(event.detail || event.message || event.text || '').trim();
+  const title = meta.label + (event.name ? ' · ' + event.name : '');
+  return <View style={styles.event}>
+    <View style={[styles.eventIcon, { backgroundColor: meta.color + '15' }]}><Ionicons name={meta.icon} size={20} color={meta.color} /></View>
+    <View style={styles.eventCopy}>
+      <Text style={styles.eventTitle}>{title}</Text>
+      <Text style={styles.time}>{timeLabel(event.time)}</Text>
+      {!!detail && <TouchableOpacity onPress={() => setExpanded(!expanded)} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse event details' : 'Expand event details'} accessibilityState={{ expanded }} style={styles.detailButton}>
+        <Text style={styles.detail} numberOfLines={expanded ? undefined : 2}>{detail}</Text>
+        <Text style={styles.expand}>{expanded ? 'Show less' : 'View details'}</Text>
+      </TouchableOpacity>}
+      {event.type === 'handoff_detected' && <View style={styles.milestone}><Ionicons name="checkmark-circle-outline" size={14} color={uiTheme.colors.success} /><Text style={styles.milestoneText}>Connection milestone</Text></View>}
     </View>
-  );
+  </View>;
 }
-
 export default function ActivityTimeline({ progressFeed }) {
-  const scrollRef = useRef(null);
-  const events = Array.isArray(progressFeed) ? progressFeed : [];
-
-  // Live timer to tick relative timestamps every 5 seconds
-  const [, setTick] = React.useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTick(t => t + 1);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const momentsCount = events.filter(e =>
-    e.type === 'handoff_detected' ||
-    (e.detail && (
-      e.detail.toLowerCase().includes('number') ||
-      e.detail.toLowerCase().includes('whatsapp') ||
-      e.detail.toLowerCase().includes('date')
-    ))
-  ).length;
-
-  const prevLengthRef = useRef(events.length);
-  useEffect(() => {
-    if (events.length > prevLengthRef.current && scrollRef.current) {
-      scrollRef.current.scrollTo({ y: 0, animated: true });
-    }
-    prevLengthRef.current = events.length;
-  }, [events.length]);
-
-  return (
-    <View style={styles.container}>
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.title}>Live Activity Feed</Text>
-          {momentsCount > 0 && (
-            <View style={styles.momentPill}>
-              <Ionicons name="star" size={10} color={uiTheme.colors.success} />
-              <Text style={styles.momentPillText}>{momentsCount} Leads</Text>
-            </View>
-          )}
-        </View>
-
-        {events.length > 0 && (
-          <Text style={styles.countText}>{events.length} {events.length === 1 ? 'event' : 'events'}</Text>
-        )}
-      </View>
-
-      {events.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <Ionicons name="sparkles-outline" size={22} color={uiTheme.colors.muted} />
-          <Text style={styles.emptyTitle}>Live Feed Ready</Text>
-          <Text style={styles.emptyDesc}>
-            Automated swipes, conversation openers, and match moments stream here in real time.
-          </Text>
-        </View>
-      ) : (
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          nestedScrollEnabled={true}
-          showsVerticalScrollIndicator={false}
-        >
-          {events.map((event, index) => (
-            <TimelineItem
-              key={event.id ? `${event.id}_${index}` : `timeline_event_${index}`}
-              event={event}
-              isLast={index === events.length - 1}
-            />
-          ))}
-        </ScrollView>
-      )}
+  const [filter, setFilter] = useState('All');
+  const [limit, setLimit] = useState(30);
+  const [, tick] = useState(0);
+  useEffect(() => { const timer = setInterval(() => tick(t => t + 1), 30000); return () => clearInterval(timer); }, []);
+  const events = useMemo(() => (Array.isArray(progressFeed) ? progressFeed : []).filter(e => e && typeof e === 'object').map(e => ({ ...e, time: timeValue(e.timestamp) })).sort((a, b) => b.time - a.time), [progressFeed]);
+  const filtered = events.filter(e => filter === 'All' || (categories[filter] ? categories[filter].includes(e.type) : !['profile_liked', 'like', ...categories.Matches, ...categories.Messages].includes(e.type)));
+  const visible = filtered.slice(0, limit);
+  const matches = events.filter(e => ['match', 'match_detected'].includes(e.type)).length;
+  const messages = events.filter(e => ['opener_sent', 'message_replied', 'message', 'follow_up_sent'].includes(e.type)).length;
+  return <View style={styles.container}>
+    <View style={styles.intro}><Text style={styles.title} accessibilityRole="header">Your activity, at a glance</Text><Text style={styles.subtitle}>Matches, conversations, and updates in one place.</Text></View>
+    <View style={styles.summary}>
+      {[['pulse-outline', events.length, 'Events'], ['heart-outline', matches, 'Matches'], ['chatbubble-outline', messages, 'Messages']].map(([icon, count, label]) => <View key={label} style={styles.summaryCell}><Ionicons name={icon} size={18} color={uiTheme.colors.accent} /><Text style={styles.summaryValue}>{count.toLocaleString()}</Text><Text style={styles.time}>{label}</Text></View>)}
     </View>
-  );
+    <Text style={styles.caption}>Counts reflect the available activity history.</Text>
+    <View style={styles.filters} accessibilityRole="tablist">
+      {['All', 'Matches', 'Messages', 'System'].map(label => <TouchableOpacity key={label} onPress={() => { setFilter(label); setLimit(30); }} style={[styles.filter, filter === label && styles.filterActive]} accessibilityRole="tab" accessibilityState={{ selected: filter === label }} activeOpacity={0.75}><Text style={[styles.filterText, filter === label && styles.filterTextActive]}>{label}</Text></TouchableOpacity>)}
+    </View>
+    {visible.length ? <View>
+      {visible.map((event, index) => <React.Fragment key={event.id ? String(event.id) + '_' + index : String(event.time) + '_' + index}>
+        {(index === 0 || dayLabel(event.time) !== dayLabel(visible[index - 1].time)) && <Text style={styles.day} accessibilityRole="header">{dayLabel(event.time)}</Text>}
+        <EventRow event={event} />
+      </React.Fragment>)}
+      {filtered.length > limit && <TouchableOpacity style={styles.more} onPress={() => setLimit(limit + 30)} accessibilityRole="button"><Text style={styles.filterTextActive}>Show more activity</Text><Ionicons name="chevron-down" size={18} color={uiTheme.colors.text} /></TouchableOpacity>}
+    </View> : <View style={styles.empty}>
+      <View style={styles.emptyIcon}><Ionicons name={filter === 'Messages' ? 'chatbubbles-outline' : filter === 'Matches' ? 'heart-outline' : 'pulse-outline'} size={28} color={uiTheme.colors.accent} /></View>
+      <Text style={styles.emptyTitle}>{events.length ? 'No ' + filter.toLowerCase() + ' updates yet' : 'Your story starts here'}</Text>
+      <Text style={styles.emptyText}>{events.length ? 'Try another filter to explore your recent activity.' : 'Start a session from Home. Your likes, matches, and conversations will appear here.'}</Text>
+      {filter !== 'All' && <TouchableOpacity style={styles.more} onPress={() => { setFilter('All'); setLimit(30); }} accessibilityRole="button"><Text style={styles.filterTextActive}>View all activity</Text></TouchableOpacity>}
+    </View>}
+  </View>;
 }
-
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.card,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: uiTheme.spacing.lg,
-    marginBottom: uiTheme.spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-  },
-  title: { fontFamily: 'Manrope_800ExtraBold',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-    color: '#FFF',
-    letterSpacing: -0.2,
-  },
-  momentPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  momentPillText: { fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.success,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  countText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  scroll: {
-    maxHeight: 280,
-  },
-  scrollContent: {
-    paddingTop: uiTheme.spacing.xs,
-    paddingBottom: 10,
-    paddingHorizontal: 2,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    gap: uiTheme.spacing.md,
-  },
-  timelineLeft: {
-    alignItems: 'center',
-    width: 12,
-    paddingTop: 10,
-  },
-  nodeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    zIndex: 2,
-  },
-  nodeLine: {
-    flex: 1,
-    width: 1.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginVertical: uiTheme.spacing.xs,
-  },
-  card: {
-    flex: 1,
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.input,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    padding: 10,
-    marginBottom: uiTheme.spacing.sm,
-  },
-  cardMoment: {
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-    backgroundColor: 'rgba(16, 185, 129, 0.06)',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  cardHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  cardTitle: { fontFamily: 'Manrope_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    color: '#FFF',
-  },
-  cardTime: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
-    color: uiTheme.colors.muted,
-    fontWeight: 'normal',
-    marginLeft: 6,
-  },
-  cardDetail: { fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.caption.fontSize,
-    color: uiTheme.colors.muted,
-    marginTop: 2,
-    lineHeight: 15,
-  },
-  emptyWrap: {
-    paddingVertical: 28,
-    alignItems: 'center',
-    gap: 6,
-  },
-  emptyTitle: { fontFamily: 'Manrope_700Bold',
-    fontSize: 13.5,
-    fontWeight: 'normal',
-    color: '#FFF',
-    marginTop: uiTheme.spacing.xs,
-  },
-  emptyDesc: { fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.caption.fontSize,
-    color: uiTheme.colors.muted,
-    textAlign: 'center',
-    lineHeight: 16,
-    paddingHorizontal: uiTheme.spacing.xl,
-  },
+  container: { gap: 16, paddingBottom: 20 },
+  intro: { gap: 6, paddingTop: 12 },
+  title: { ...uiTheme.type.title, color: uiTheme.colors.text },
+  subtitle: { ...uiTheme.type.body, color: uiTheme.colors.muted },
+  summary: { flexDirection: 'row', backgroundColor: uiTheme.colors.elevated, borderRadius: 20, paddingVertical: 20 },
+  summaryCell: { flex: 1, alignItems: 'center', gap: 6, paddingHorizontal: 4 },
+  summaryValue: { ...uiTheme.type.title, color: uiTheme.colors.text },
+  caption: { ...uiTheme.type.caption, color: uiTheme.colors.muted },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filter: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', borderRadius: 22, backgroundColor: uiTheme.colors.surface },
+  filterActive: { backgroundColor: uiTheme.colors.elevated, borderWidth: 1, borderColor: uiTheme.colors.accent },
+  filterText: { ...uiTheme.type.label, color: uiTheme.colors.muted },
+  filterTextActive: { ...uiTheme.type.label, color: uiTheme.colors.text },
+  day: { ...uiTheme.type.label, color: uiTheme.colors.textSecondary, paddingVertical: 16 },
+  event: { flexDirection: 'row', gap: 14, padding: 16, marginBottom: 8, borderRadius: 18, backgroundColor: uiTheme.colors.surface },
+  eventIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  eventCopy: { flex: 1, minWidth: 0, gap: 5 },
+  eventTitle: { ...uiTheme.type.label, color: uiTheme.colors.text },
+  time: { ...uiTheme.type.caption, color: uiTheme.colors.muted },
+  detailButton: { minHeight: 44, gap: 8, paddingTop: 4 },
+  detail: { ...uiTheme.type.body, color: uiTheme.colors.textSecondary },
+  expand: { ...uiTheme.type.caption, color: uiTheme.colors.accent },
+  milestone: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 4 },
+  milestoneText: { ...uiTheme.type.caption, color: uiTheme.colors.success },
+  more: { minHeight: 48, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 14, backgroundColor: uiTheme.colors.elevated, marginTop: 12 },
+  empty: { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 24, gap: 12, backgroundColor: uiTheme.colors.surface, borderRadius: 20 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 22, backgroundColor: uiTheme.colors.elevated, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { ...uiTheme.type.section, color: uiTheme.colors.text, textAlign: 'center' },
+  emptyText: { ...uiTheme.type.body, color: uiTheme.colors.muted, textAlign: 'center' },
 });

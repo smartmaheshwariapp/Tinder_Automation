@@ -137,3 +137,9 @@ Copy this template only after the full phase satisfies its requirements. Replace
 - Replaced stacked information cards with a gradient identity header, prominent edit action, editorial About You section, and grouped icon settings rows.
 - Preserved profile editing, email display, connected account actions, assistant bio editing and syncing. Synced details expand on demand; removed city/profession/education remain absent.
 - Added initials fallback, connection status, compact interests, and responsive 600px maximum content width. Android/iOS export passed; device visual verification remains pending.
+
+### Modern Activity layout (2026-09-11)
+- Added readable history summary, All/Matches/Messages/System filters, date grouping, newest-first sorting, expandable event details, contextual empty states and incremental history loading.
+- Removed the nested short scroll region and automatic scroll jumps. Kept lifetime telemetry; the large session controller remains available outside the activity tab.
+- Handles numeric and ISO event dates; unknown event types use neutral labels. Removed unsupported verification/compatibility claims and keyword-based milestone inference.
+- Android/iOS export and 83 regression tests passed. Device interaction and visual checks remain pending.

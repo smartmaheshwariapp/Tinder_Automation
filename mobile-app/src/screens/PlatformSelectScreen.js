@@ -900,6 +900,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
               <View style={homeStyles.notificationDot} />
             )}
           </TouchableOpacity>
+          {homeTab !== "profile" && (
           <TouchableOpacity
             style={homeStyles.headerButton}
             onPress={() => setHomeTab("profile")}
@@ -912,6 +913,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
               color={uiTheme.colors.text}
             />
           </TouchableOpacity>
+          )}
         </View>
       </View>
 

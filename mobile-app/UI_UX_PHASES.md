@@ -1126,3 +1126,4 @@ Do not commit or push any changes unless explicitly instructed.
 - Profile page task completed (2026-09-11): account icon opens profile details and editable assistant bio settings, separate from App Settings. Device UI verification remains pending.
 - Standard profile refinement completed: personal-details editor and conventional profile hierarchy added; device visual checks remain pending.
 - Modern profile visual refinement completed: compact identity card, grouped settings rows and expandable synced details. Device review remains pending.
+- Activity layout refinement completed: grouped timeline, filters, expandable details and history summary. Compilation/regression checks passed; device review remains pending.
