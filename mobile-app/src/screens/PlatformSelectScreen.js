@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StatusBar,
   TextInput,
-  Image,
   Animated,
   Modal,
   Dimensions,
@@ -48,6 +47,8 @@ import {
 } from '../utils/sessionManager';
 import useExtensionStats from '../hooks/useExtensionStats';
 import { DashboardPanel } from '../components/dashboard';
+import HomeOverview, { HomeBottomNavigation } from '../components/dashboard/HomeOverview';
+import { LinearGradient } from 'expo-linear-gradient';
 import SupabaseService from '../services/supabase';
 import NotificationService from '../services/notifications';
 import NotificationCenterModal from '../components/NotificationCenterModal';
@@ -55,12 +56,11 @@ import PermissionPrePromptModal from '../components/common/PermissionPrePromptMo
 import LocationNoticeModal from '../components/common/LocationNoticeModal';
 import LocationService from '../services/locationService';
 
-const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
-const TINDER_IMG = require('../../assets/flirteasy/tinder.jpg');
-
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function PlatformSelectScreen({ navigation, route }) {
+  const [homeTab, setHomeTab] = useState('home');
+  const [deviceLatencyMs, setDeviceLatencyMs] = useState(null);
   const [selectedPlatform, setSelectedPlatform] = useState('Tinder');
   const [environment, setEnvironmentState] = useState(() => getSelectedEnvironment() || 'on_device');
   const setEnvironment = useCallback((env) => {
@@ -300,7 +300,6 @@ export default function PlatformSelectScreen({ navigation, route }) {
   }, []);
 
   // ── Animations ──
-  const fadeAnim = useRef(new Animated.Value(0)).current;
   const modalSlide = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
   useEffect(() => {
@@ -327,19 +326,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
       : resolveLocalUrl('http://localhost:3001'));
 
   // Stats polling (active only for remote VPS or Local Neko mode)
-  const { stats, loading, error, refresh: refreshStats } = useExtensionStats(
+  const { stats, loading, error, latencyMs: remoteLatencyMs, refresh: refreshStats } = useExtensionStats(
     orchestratorUrl,
     environment !== 'on_device'
   );
-
-  // Fade-in animation on mount
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim]);
 
   // Auth detection & login status refresh
   const checkAuthStatus = useCallback(async () => {
@@ -354,9 +344,12 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
     // 2. For On-Device mode: strictly validate using real Tinder API token
     if (environment === 'on_device') {
+      setDeviceLatencyMs(null);
       if (auth?.token) {
+        const requestStarted = Date.now();
         probeTinderSession(auth.token).then((res) => {
           if (res?.ok) {
+            setDeviceLatencyMs(Math.max(0, Date.now() - requestStarted));
             setIsLoggedIn(true);
           } else if (res?.expired) {
             setIsLoggedIn(false);
@@ -674,7 +667,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#09080E" />
+      <StatusBar barStyle="light-content" backgroundColor="#080809" />
 
       {/* Confirms the sign-out that just closed the browser session, so the
           screen change does not read as a crash. Deliberately local rather than
@@ -687,192 +680,85 @@ export default function PlatformSelectScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* ═══════════════════ HEADER BAR ═══════════════════ */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" />
+      <View style={homeStyles.header}>
+        <View style={homeStyles.brand}>
+          <LinearGradient colors={['#FF275B', '#FE4169']} style={homeStyles.brandIcon}>
+            <Ionicons name="flame" size={25} color="#FFFFFF" />
+          </LinearGradient>
           <View>
-            <Text style={styles.headerTitle}>Flint</Text>
-            <Text style={styles.headerSub}>AI Dating Assistant</Text>
+            <Text style={homeStyles.brandName}>Flint</Text>
+            <Text style={homeStyles.brandCaption}>YOUR AI DATING ASSISTANT</Text>
           </View>
         </View>
-
-        <View style={styles.headerActions}>
-          {/* Notification Bell with Badge */}
-          <TouchableOpacity
-            style={styles.notifBtn}
-            onPress={() => setShowNotifModal(true)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="notifications-outline" size={18} color="#D8D6E8" />
-            {unreadNotifCount > 0 && (
-              <View style={styles.headerBadge}>
-                <Text style={styles.headerBadgeText}>{unreadNotifCount}</Text>
-              </View>
-            )}
+        <View style={homeStyles.headerActions}>
+          <TouchableOpacity style={homeStyles.headerButton} onPress={() => setShowNotifModal(true)} accessibilityRole="button" accessibilityLabel={`Notifications, ${unreadNotifCount} unread`}>
+            <Ionicons name="notifications-outline" size={20} color="#CBCBCF" />
+            {unreadNotifCount > 0 && <View style={homeStyles.notificationDot} />}
           </TouchableOpacity>
-
-          {/* Connection Settings Gear */}
-          <TouchableOpacity
-            style={styles.gearBtn}
-            onPress={openModal}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="options-outline" size={18} color="#8E8DA3" />
-          </TouchableOpacity>
-
-          {/* App Sign Out */}
-          <TouchableOpacity
-            style={styles.headerSignOutBtn}
-            onPress={() => navigation.replace('Auth')}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="log-out-outline" size={17} color="#FE3C72" />
+          <TouchableOpacity style={homeStyles.headerButton} onPress={() => setHomeTab('settings')} accessibilityRole="button" accessibilityLabel="Account and settings">
+            <Ionicons name="person-outline" size={20} color="#CBCBCF" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ═══════════════════ UNIFIED TINDER HERO STATUS & PRIMARY ACTION CARD ═══════════════════ */}
-      <View style={styles.heroCardContainer}>
-        {isLoggedIn ? (
-          /* ── Connected / Active Cockpit State ── */
-          <View style={styles.heroCardActive}>
-            <View style={styles.heroActiveTopRow}>
-              <View style={styles.heroActiveLeft}>
-                <View style={styles.heroAvatarWrap}>
-                  <Image source={TINDER_IMG} style={styles.heroAvatarIcon} />
-                  <View style={styles.heroLiveDot} />
-                </View>
-                <View style={styles.heroActiveInfo}>
-                  <View style={styles.heroActiveTitleRow}>
-                    <Text style={styles.heroActiveTitle} numberOfLines={1}>
-                      {stats?.tinderAccount?.name || stats?.tinderAccount?.email || getTinderAuthState()?.accountName || 'Tinder Account'}
-                    </Text>
-                    <View style={styles.heroOnlinePill}>
-                      <View style={styles.heroPulseDot} />
-                      <Text style={styles.heroOnlineText}>ONLINE</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.heroActiveSub} numberOfLines={1}>
-                    ✨ Finding singles in {localSettings?.locationCity || 'your area'} • Active
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.heroLogoutBtn}
-                onPress={confirmLogout}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="log-out-outline" size={15} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Primary Action Row */}
-            <View style={styles.heroActiveActionRow}>
-              <TouchableOpacity
-                style={[styles.heroPrimaryBtn, startingSession && { opacity: 0.8 }]}
-                onPress={() => handleOpenLiveFeed('Tinder')}
-                disabled={startingSession}
-                activeOpacity={0.88}
-              >
-                {startingSession ? (
-                  <>
-                    <ActivityIndicator size="small" color="#FFF" />
-                    <Text style={styles.heroPrimaryBtnText}>Opening Tinder...</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons name="flame" size={16} color="#FFF" />
-                    <Text style={styles.heroPrimaryBtnText}>Open Tinder</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.heroConfigureBtn}
-                onPress={() => handleLaunch('Tinder')}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="options-outline" size={15} color="#FE3C72" />
-                <Text style={styles.heroConfigureBtnText}>Preferences</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          /* ── Disconnected / Action Required State ── */
-          <View style={styles.heroCardInactive}>
-            <View style={styles.heroInactiveHeader}>
-              <View style={styles.heroInactiveIconWrap}>
-                <Image source={TINDER_IMG} style={styles.heroInactiveIcon} />
-                <View style={styles.heroInactiveDot} />
-              </View>
-              <View style={styles.heroInactiveTextWrap}>
-                <View style={styles.heroInactiveTitleRow}>
-                  <Text style={styles.heroInactiveTitle}>Connect Tinder Account</Text>
-                  <View style={styles.heroOfflinePill}>
-                    <Text style={styles.heroOfflineText}>NOT CONNECTED</Text>
-                  </View>
-                </View>
-                <Text style={styles.heroInactiveSub}>
-                  Link your account to activate 24/7 automated swiping, smart matching & conversation
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.heroConnectBtn, startingSession && { opacity: 0.8 }]}
-              onPress={() => handleOpenLiveFeed('Tinder')}
-              disabled={startingSession}
-              activeOpacity={0.88}
-            >
-              {startingSession ? (
-                <>
-                  <ActivityIndicator size="small" color="#FFF" />
-                  <Text style={styles.heroConnectBtnText}>Starting Tinder Session...</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.heroConnectBtnText}>Connect Tinder Account</Text>
-                  <Ionicons name="arrow-forward" size={15} color="#FFF" />
-                </>
-              )}
+      {homeTab === 'home' ? (
+        <HomeOverview
+          stats={environment === 'on_device' ? agentState : stats}
+          settings={localSettings}
+          isLoggedIn={isLoggedIn}
+          starting={startingSession}
+          checking={checkingAuth}
+          latencyMs={environment === 'on_device' ? deviceLatencyMs : remoteLatencyMs}
+          onOpenBrowser={() => handleOpenLiveFeed('Tinder')}
+          onToggleAgent={handleToggleAgent}
+          onAutomation={() => setHomeTab('automation')}
+          onSettings={() => setHomeTab('settings')}
+          onActivity={() => setHomeTab('activity')}
+        />
+      ) : (
+        <View style={homeStyles.dashboard}>
+          <View style={homeStyles.sectionHeader}>
+            <TouchableOpacity onPress={() => setHomeTab('home')} style={homeStyles.backButton} accessibilityRole="button" accessibilityLabel="Back to home">
+              <Ionicons name="chevron-back" size={20} color="#EFEFF0" />
+            </TouchableOpacity>
+            <Text style={homeStyles.sectionTitle}>{homeTab === 'settings' ? 'Settings' : homeTab === 'automation' ? 'Automation' : 'Activity'}</Text>
+            <TouchableOpacity onPress={openModal} style={homeStyles.backButton} accessibilityRole="button" accessibilityLabel="App preferences">
+              <Ionicons name="options-outline" size={20} color="#B4B4B9" />
             </TouchableOpacity>
           </View>
-        )}
-      </View>
-
-          {/* ═══════════════════ MAIN DASHBOARD BODY ═══════════════════ */}
-          <Animated.View style={[styles.dashboardWrap, { opacity: fadeAnim }]}>
-            <DashboardPanel
-              stats={environment === 'on_device' ? agentState : (stats || (isLoggedIn ? agentState : null))}
-              loading={environment === 'on_device' ? false : (isLoggedIn ? false : loading)}
-              error={environment === 'on_device' ? null : (isLoggedIn ? null : error)}
-              orchestratorUrl={orchestratorUrl || (environment === 'vps' ? 'https://api.smartmaheshwari.com' : resolveLocalUrl('http://localhost:3001'))}
-              onToggleAgent={handleToggleAgent}
-              onLogout={handleLogout}
-              onConnect={() => handleOpenLiveFeed('Tinder')}
-              isLoggedIn={isLoggedIn}
-              onSaveSettings={handleSaveSettings}
-              settings={localSettings}
-              onSyncProfile={environment === 'on_device' ? handleSyncProfileFromHome : undefined}
-              controlsContent={
-                <View style={styles.infoBox}>
-                  <View style={styles.infoTitleRow}>
-                    <Ionicons name="sparkles" size={16} color="#FE3C72" />
-                    <Text style={styles.infoTitle}>
-                      {isLoggedIn ? 'Tinder Assistant Active' : 'Getting Started'}
-                    </Text>
-                  </View>
-                  <Text style={styles.infoText}>
-                    {isLoggedIn
-                      ? 'Your AI assistant continuously evaluates recommendations, filters compatible profiles, and handles intelligent conversations.'
-                      : 'Connect your Tinder profile above to start finding matches and chatting automatically.'}
-                  </Text>
-                </View>
-              }
-            />
-          </Animated.View>
+          <DashboardPanel
+            selectedTab={homeTab}
+            onTabChange={setHomeTab}
+            stats={environment === 'on_device' ? agentState : (stats || (isLoggedIn ? agentState : null))}
+            loading={environment === 'on_device' ? false : (isLoggedIn ? false : loading)}
+            error={environment === 'on_device' ? null : (isLoggedIn ? null : error)}
+            orchestratorUrl={orchestratorUrl || (environment === 'vps' ? 'https://api.smartmaheshwari.com' : resolveLocalUrl('http://localhost:3001'))}
+            onToggleAgent={handleToggleAgent}
+            onLogout={handleLogout}
+            onConnect={() => handleOpenLiveFeed('Tinder')}
+            isLoggedIn={isLoggedIn}
+            onSaveSettings={handleSaveSettings}
+            settings={localSettings}
+            onSyncProfile={environment === 'on_device' ? handleSyncProfileFromHome : undefined}
+            controlsContent={
+              <View style={homeStyles.extraActions}>
+                <TouchableOpacity style={homeStyles.secondaryAction} onPress={() => handleLaunch('Tinder')} accessibilityRole="button">
+                  <Ionicons name="options-outline" size={17} color="#FF5277" />
+                  <Text style={homeStyles.secondaryLabel}>Session preferences</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={homeStyles.secondaryAction} onPress={() => navigation.replace('Auth')} accessibilityRole="button">
+                  <Ionicons name="log-out-outline" size={17} color="#FF5277" />
+                  <Text style={homeStyles.secondaryLabel}>Back to Flint login</Text>
+                </TouchableOpacity>
+              </View>
+            }
+          />
+        </View>
+      )}
+      <HomeBottomNavigation activeTab={homeTab} onSelect={(tab) => {
+        if (tab === 'browser') handleOpenLiveFeed('Tinder');
+        else setHomeTab(tab);
+      }} />
 
       {/* ═══════════════════ CONNECTION SETTINGS SHEET ═══════════════════ */}
       {showSettingsModal && (
@@ -1141,7 +1027,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09080E',
+    backgroundColor: '#080809',
   },
 
   // ── Header ──
@@ -1938,4 +1824,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
+});
+
+const homeStyles = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 12, paddingBottom: 14, gap: 10 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  brandIcon: { width: 42, height: 42, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  brandName: { color: '#F6F6F7', fontSize: 21, fontWeight: '800', letterSpacing: -0.8 },
+  brandCaption: { color: '#747479', fontSize: 8, letterSpacing: 1.1, fontWeight: '600', marginTop: 4 },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  headerButton: { width: 42, height: 42, borderRadius: 22, borderWidth: 1, borderColor: '#232326', backgroundColor: '#101011', alignItems: 'center', justifyContent: 'center' },
+  notificationDot: { position: 'absolute', top: 10, right: 12, width: 5, height: 5, borderRadius: 3, backgroundColor: '#FF365F' },
+  dashboard: { flex: 1, paddingBottom: 80 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 8, gap: 8 },
+  backButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { color: '#F4F4F5', fontSize: 18, fontWeight: '700', flex: 1 },
+  extraActions: { padding: 12, gap: 12 },
+  secondaryAction: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 10 },
+  secondaryLabel: { color: '#D5D5D9', fontSize: 13, fontWeight: '600' },
 });

@@ -2006,10 +2006,10 @@ export default function AuthScreen({ navigation, route }) {
 
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.kavContainer}
           keyboardVerticalOffset={0}
-          enabled={Platform.OS === 'ios'}
+          enabled
         >
           {renderStage()}
         </KeyboardAvoidingView>

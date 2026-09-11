@@ -43,19 +43,24 @@ export default function DashboardPanel({
   settings: propSettings,
   onSyncProfile,
   onPushBio,
+  selectedTab,
+  onTabChange,
 }) {
-  const [activeTab, setActiveTab] = useState('activity');
+  const [internalTab, setInternalTab] = useState('activity');
+  const activeTab = selectedTab || internalTab;
   const [targetSettingsSection, setTargetSettingsSection] = useState(null);
 
   const handleTabSelect = useCallback((tab) => {
     setTargetSettingsSection(null);
-    setActiveTab(tab);
-  }, []);
+    setInternalTab(tab);
+    onTabChange?.(tab);
+  }, [onTabChange]);
 
   const handleNavigateToSettings = useCallback((section) => {
     if (section) setTargetSettingsSection(section);
-    setActiveTab('settings');
-  }, []);
+    setInternalTab('settings');
+    onTabChange?.('settings');
+  }, [onTabChange]);
 
   const agentState    = stats?.agentState    ?? null;
   const lifetimeStats = stats?.lifetimeStats ?? null;

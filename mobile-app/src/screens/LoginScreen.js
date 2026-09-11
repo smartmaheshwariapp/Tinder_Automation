@@ -306,8 +306,10 @@ export default function LoginScreen({ navigation }) {
 
       {/* ── Main Content ── */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
+        keyboardVerticalOffset={0}
+        enabled
       >
         <ScrollView
           contentContainerStyle={[

@@ -14,6 +14,7 @@ export default function useExtensionStats(orchestratorUrl, enabled) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [latencyMs, setLatencyMs] = useState(null);
 
   // Keep a stable abort controller ref so we can cancel in-flight requests on cleanup
   const abortRef = useRef(null);
@@ -32,6 +33,7 @@ export default function useExtensionStats(orchestratorUrl, enabled) {
     abortRef.current = controller;
 
     try {
+      const requestStarted = Date.now();
       const res = await fetch(`${orchestratorUrl}/extension-stats`, {
         signal: controller.signal,
       });
@@ -43,6 +45,7 @@ export default function useExtensionStats(orchestratorUrl, enabled) {
       const data = await res.json();
 
       if (mountedRef.current) {
+        setLatencyMs(Math.max(0, Date.now() - requestStarted));
         setStats(data);
         setError(null);
         // Only show loading on the very first successful fetch
@@ -51,6 +54,7 @@ export default function useExtensionStats(orchestratorUrl, enabled) {
     } catch (err) {
       if (err.name === 'AbortError') return; // Cancelled — not an error
       if (mountedRef.current) {
+        setLatencyMs(null);
         setError(err.message);
         // Don't clear existing stats on transient errors — show stale data
       }
@@ -67,6 +71,7 @@ export default function useExtensionStats(orchestratorUrl, enabled) {
 
   useEffect(() => {
     // Clear any running interval when enabled/url changes
+    setLatencyMs(null);
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -100,7 +105,7 @@ export default function useExtensionStats(orchestratorUrl, enabled) {
     };
   }, [enabled, orchestratorUrl, fetchStats]);
 
-  return { stats, loading, error, refresh: fetchStats };
+  return { stats, loading, error, latencyMs, refresh: fetchStats };
 }
 
 export { useExtensionStats };
