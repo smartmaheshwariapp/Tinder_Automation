@@ -41,7 +41,6 @@
     "updates": {
       "url": "https://u.expo.dev/60d1aae8-292b-4e3f-83e9-37949213bba2"
     },
-    "owner": "miiscoorg",
     "plugins": [
       "expo-web-browser",
       "expo-location",
