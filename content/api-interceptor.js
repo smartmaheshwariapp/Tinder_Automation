@@ -110,6 +110,21 @@
         }
       }
 
+      // Intercept 401 Unauthorized responses to detect session expiration in-flight
+      if (response.status === 401 && typeof url === 'string' && (url.includes('gotinder.com') || url.includes('/v2/') || url.includes('/recs') || url.includes('/like/'))) {
+        warn('[FlirtEasy] 401 Unauthorized received from Tinder API! Session expired.');
+        try {
+          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'FE_SESSION_EXPIRED',
+              status: 401,
+              url: String(url),
+              timestamp: Date.now()
+            }));
+          }
+        } catch (_) {}
+      }
+
       // Intercept profile API to extract subscription tier (ground truth)
       if (typeof url === 'string' && /api\.gotinder\.com\/v2\/profile(\?|$)/.test(url) && (!args[1] || !args[1].method || args[1].method === 'GET')) {
         try {
@@ -120,6 +135,15 @@
             window.__flirtEasyAccountTier = tier;
             document.dispatchEvent(new CustomEvent('flirteasy:accountTierDetected', { detail: { tier } }));
             log('[FlirtEasy] Account tier from API:', tier);
+            try {
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'FE_PLAN_DETECTED',
+                  plan: tier,
+                  isPro: tier === 'platinum' || tier === 'gold' || tier === 'plus'
+                }));
+              }
+            } catch (_) {}
           }
         } catch (e) {
           error('[FlirtEasy] Error parsing profile tier:', e);
@@ -155,34 +179,40 @@
 
   function _extractAccountTier(data) {
     try {
-      const d = data?.data;
-      if (!d) return null;
+      const d = data?.data || data;
+      if (!d) return 'free';
 
-      // Tinder API uses "purchase" (singular key) with a nested "purchases" array.
-      // Each entry has product_type / product_id but no is_active flag.
-      const purchaseContainer = d.purchase || d.purchases;
-      if (purchaseContainer) {
-        const list = purchaseContainer.purchases || purchaseContainer.subscription_purchases || [];
-        for (const p of list) {
-          const sig = (p.product_type || '') + (p.product_id || '') + (p.plan || '');
-          if (/platinum|gold|plus/i.test(sig)) return 'paid';
-        }
+      const purchases = [
+        ...(Array.isArray(d?.purchases) ? d.purchases : []),
+        ...(Array.isArray(d?.purchase?.purchases) ? d.purchase.purchases : []),
+        ...(Array.isArray(d?.account?.purchases) ? d.account.purchases : []),
+        ...(Array.isArray(d?.user?.purchases) ? d.user.purchases : []),
+        ...(Array.isArray(d?.products) ? d.products : []),
+      ];
+
+      for (const p of purchases) {
+        const sig = String(p?.product_type || p?.product_id || p?.product_name || p?.plan || p?.name || '').toLowerCase();
+        if (sig.includes('platinum')) return 'platinum';
+        if (sig.includes('gold')) return 'gold';
+        if (sig.includes('plus')) return 'plus';
       }
 
-      // Check legacy subscription object
-      const sub = d.purchases?.subscription || d.purchase?.subscription;
-      if (sub?.status === 'active') return 'paid';
+      if (d.account?.is_platinum_subscriber) return 'platinum';
+      if (d.account?.is_gold_subscriber) return 'gold';
 
-      // Check explicit boolean flags
-      if (d.account?.is_platinum_subscriber || d.account?.is_gold_subscriber) return 'paid';
+      const acctType = String(d.account?.account_type || '').toLowerCase();
+      if (acctType.includes('platinum')) return 'platinum';
+      if (acctType.includes('gold')) return 'gold';
+      if (acctType.includes('plus')) return 'plus';
 
-      // account_type field
-      const acctType = (d.account?.account_type || '').toLowerCase();
-      if (/platinum|gold|plus/.test(acctType)) return 'paid';
+      const rawJson = JSON.stringify(d).toLowerCase();
+      if (rawJson.includes('tinder platinum') || rawJson.includes('"platinum"')) return 'platinum';
+      if (rawJson.includes('tinder gold') || rawJson.includes('"gold"')) return 'gold';
+      if (rawJson.includes('tinder plus') || rawJson.includes('"plus"')) return 'plus';
 
-      // Never assume free — return null so modal never fires for unrecognised paid tiers
+      return 'free';
     } catch (_) {}
-    return null;
+    return 'free';
   }
 
   function extractMatchId(url) {

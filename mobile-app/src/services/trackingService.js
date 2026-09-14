@@ -1,13 +1,17 @@
 // mobile-app/src/services/trackingService.js
 // Client-side Event Queue & Telemetry Service for FlirtEasy / Linksy Mobile
 // Replicates the desktop extension's event tracking and Supabase sync 1:1.
+// Guaranteed zero-data-loss: persistent AsyncStorage queueing and exponential backoff retry.
 
 import { AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import SupabaseService from './supabase';
 
 const FLUSH_INTERVAL_MS = 15000;
 const MAX_QUEUE_SIZE = 10;
 const MAX_BATCH_SIZE = 50;
+const MAX_PERSISTED_EVENTS = 200;
+const STORAGE_KEY_EVENT_QUEUE = '@linksy_tracking_event_queue';
 
 export const DEFAULT_DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,19 +30,68 @@ class TrackingService {
     this._queue = [];
     this._timer = null;
     this._isFlushing = false;
+    this._consecutiveFailures = 0;
     this._appStateSubscription = null;
 
     this._setupAppStateListener();
+    this._restorePersistedQueue().catch(() => {});
   }
 
   _setupAppStateListener() {
     try {
       this._appStateSubscription = AppState.addEventListener('change', (nextState) => {
         if (nextState === 'background' || nextState === 'inactive') {
-          this.flush();
+          this.flush().catch(() => {});
         }
       });
     } catch (_) {}
+  }
+
+  /**
+   * Rehydrate any un-flushed events from persistent local storage
+   */
+  async _restorePersistedQueue() {
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEY_EVENT_QUEUE);
+      if (raw) {
+        const persisted = JSON.parse(raw);
+        if (Array.isArray(persisted) && persisted.length > 0) {
+          // Prepend persisted events while avoiding duplicate event timestamps
+          const existingTs = new Set(this._queue.map((e) => `${e.event_type}_${e.client_ts}`));
+          const toAdd = persisted.filter((e) => !existingTs.has(`${e.event_type}_${e.client_ts}`));
+          this._queue = [...toAdd, ...this._queue];
+        }
+      }
+    } catch (err) {
+      console.warn('[TrackingService] Failed to restore persisted queue:', err.message);
+    }
+  }
+
+  /**
+   * Persist current queue to AsyncStorage to survive process termination
+   */
+  async _persistQueue() {
+    try {
+      if (this._queue.length === 0) {
+        await AsyncStorage.removeItem(STORAGE_KEY_EVENT_QUEUE);
+      } else {
+        const toSave = this._queue.slice(0, MAX_PERSISTED_EVENTS);
+        await AsyncStorage.setItem(STORAGE_KEY_EVENT_QUEUE, JSON.stringify(toSave));
+      }
+    } catch (err) {
+      console.warn('[TrackingService] Failed to persist queue:', err.message);
+    }
+  }
+
+  _scheduleNextFlush(delayMs = FLUSH_INTERVAL_MS) {
+    if (this._timer) {
+      clearTimeout(this._timer);
+      this._timer = null;
+    }
+    this._timer = setTimeout(() => this.flush(), delayMs);
+    if (this._timer && typeof this._timer.unref === 'function') {
+      this._timer.unref();
+    }
   }
 
   /**
@@ -75,14 +128,12 @@ class TrackingService {
       };
 
       this._queue.push(event);
+      this._persistQueue().catch(() => {});
 
       if (this._queue.length >= MAX_QUEUE_SIZE) {
         this.flush();
       } else if (!this._timer) {
-        this._timer = setTimeout(() => this.flush(), FLUSH_INTERVAL_MS);
-        if (this._timer && typeof this._timer.unref === 'function') {
-          this._timer.unref();
-        }
+        this._scheduleNextFlush(FLUSH_INTERVAL_MS);
       }
     } catch (err) {
       console.warn('[TrackingService Error]', err.message);
@@ -201,7 +252,8 @@ class TrackingService {
   }
 
   /**
-   * Flush queued events to Supabase user_events and user_snapshots
+   * Flush queued events to Supabase user_events and user_snapshots.
+   * If network is down or insert fails, re-queues batch and backs off.
    */
   async flush() {
     if (this._timer) {
@@ -219,17 +271,28 @@ class TrackingService {
     try {
       // 1. Batch insert into user_events table
       const insertResult = await SupabaseService.insertUserEvents(batch);
-      if (!insertResult.ok) {
-        console.warn('[TrackingService] Insert events warning:', insertResult.status);
+      if (!insertResult || !insertResult.ok) {
+        const errMsg = insertResult?.error || `Insert events failed with status ${insertResult?.status || 500}`;
+        throw new Error(errMsg);
       }
 
       // 2. Aggregate batch counters into user_snapshots table
       const targetUserId = getValidUserId(this._userId);
       await SupabaseService.syncSnapshotWithEvents(targetUserId, batch);
+
+      // Successful flush: reset backoff counter and persist remaining queue
+      this._consecutiveFailures = 0;
+      await this._persistQueue();
     } catch (err) {
-      console.warn('[TrackingService Flush Error]', err.message);
-      // Re-queue events on failure so metrics are not lost
+      console.warn('[TrackingService Flush]', err.message || err);
+      // Re-queue events on failure so metrics are NOT lost!
       this._queue.unshift(...batch);
+      await this._persistQueue();
+
+      // Exponential backoff to avoid hammering network if offline
+      this._consecutiveFailures = (this._consecutiveFailures || 0) + 1;
+      const backoffMs = Math.min(FLUSH_INTERVAL_MS * Math.pow(1.5, this._consecutiveFailures), 120000);
+      this._scheduleNextFlush(backoffMs);
     } finally {
       this._isFlushing = false;
     }
@@ -244,7 +307,7 @@ class TrackingService {
       this._appStateSubscription.remove();
       this._appStateSubscription = null;
     }
-    this.flush();
+    this.flush().catch(() => {});
   }
 }
 

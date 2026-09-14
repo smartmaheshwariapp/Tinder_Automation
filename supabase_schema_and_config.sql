@@ -198,6 +198,9 @@ BEGIN
     CREATE POLICY "Service role full access on notifications_history" ON public.notifications_history FOR ALL TO service_role USING (true) WITH CHECK (true);
     CREATE POLICY "Public read and write push tokens" ON public.user_push_tokens FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
     CREATE POLICY "Public read and write notifications" ON public.notifications_history FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+    CREATE POLICY "Public insert user_events" ON public.user_events FOR INSERT TO anon, authenticated WITH CHECK (true);
+    CREATE POLICY "Public read user_events" ON public.user_events FOR SELECT TO anon, authenticated USING (true);
+    CREATE POLICY "Public read and write user_snapshots" ON public.user_snapshots FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

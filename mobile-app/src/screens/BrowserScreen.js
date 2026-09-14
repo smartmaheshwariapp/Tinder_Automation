@@ -2576,6 +2576,31 @@ export default function BrowserScreen({ route, navigation }) {
                     });
                     pushProgressFeedEvent('rate_limit', 'Daily like limit reached. Refills in 12h.', null, 10);
                   }
+                  if (msg.type === 'FE_SESSION_EXPIRED') {
+                    addLog('⚠️ Tinder session expired (401 Unauthorized). Automation halted. Reconnect your account.', 'error');
+                    setOnDeviceSwiping(false);
+                    onDeviceSwipingRef.current = false;
+                    saveOnDeviceSessionState({ isRunning: false });
+                    clearTinderAuthState();
+                    trackingService.trackEvent('tinder_session_expired', {
+                      status: msg.status || 401,
+                      url: msg.url || null,
+                    });
+                    pushProgressFeedEvent('session_expired', 'Tinder session expired. Reconnect to continue.', null, 15);
+                  }
+                  if (msg.type === 'FE_PLAN_DETECTED') {
+                    const plan = msg.plan || 'free';
+                    const isPro = Boolean(msg.isPro);
+                    setTinderAuthState({ tinderPlan: plan, isTinderPro: isPro });
+                    if (onDeviceSettingsRef.current) {
+                      const prevProfile = onDeviceSettingsRef.current.userProfile || {};
+                      const updatedProfile = { ...prevProfile, tinderPlan: plan, isTinderPro: isPro };
+                      onDeviceSettingsRef.current = { ...onDeviceSettingsRef.current, userProfile: updatedProfile };
+                      setSharedExtensionSettings(onDeviceSettingsRef.current);
+                    }
+                    const planLabel = plan === 'platinum' ? 'Platinum 💎' : plan === 'gold' ? 'Gold 👑' : plan === 'plus' ? 'Plus ⚡' : 'Free';
+                    addLog(`Detected Tinder ${planLabel} tier.`, 'info');
+                  }
                   if (msg.type === 'FE_CYCLE_DONE') {
                     onDeviceSwipingRef.current = false;
                     setOnDeviceSwiping(false);

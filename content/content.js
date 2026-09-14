@@ -1156,6 +1156,7 @@ async function autoLike(count) {
     let likesCompleted = 0;
     let errors = [];
     let profilesChecked = 0;
+    let consecutiveLikeFailures = 0;
     const maxProfilesToCheck = count * 3;
 
     while (likesCompleted < count && profilesChecked < maxProfilesToCheck) {
@@ -1367,6 +1368,7 @@ async function autoLike(count) {
         console.log(`[FlirtEasy] Click result: ${clicked}`);
 
         if (clicked) {
+          consecutiveLikeFailures = 0;
           likesCompleted++;
           console.log(`[FlirtEasy] Liked profile ${likesCompleted}/${count}`);
 
@@ -1400,8 +1402,31 @@ async function autoLike(count) {
             }
           });
         } else {
-          console.warn(`[FlirtEasy] Failed to click like button`);
+          consecutiveLikeFailures++;
+          console.warn(`[FlirtEasy] Failed to click like button (consecutive failures: ${consecutiveLikeFailures})`);
           errors.push(`Failed to click like button at check ${profilesChecked}`);
+
+          // Scenario 4 fallback: If like button fails 3 times in a row and ANY modal dialog or overlay is open,
+          // treat as out-of-likes / paywall modal blocking the viewport
+          const blockingDialog = document.querySelector('[role="dialog"], div[aria-modal="true"]');
+          if (consecutiveLikeFailures >= 3 && blockingDialog) {
+            console.log('[FlirtEasy] Modal blocking viewport detected after repeated click failures — treating as out-of-likes paywall');
+            errors.push('Out of likes / Blocking modal');
+            try {
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'FE_OUT_OF_LIKES',
+                  timestamp: Date.now()
+                }));
+              }
+            } catch (_) {}
+            break;
+          }
+
+          if (consecutiveLikeFailures >= 5) {
+            console.warn('[FlirtEasy] 5 consecutive like click failures, stopping cycle for safety');
+            break;
+          }
         }
 
         await getSwipeDelay();

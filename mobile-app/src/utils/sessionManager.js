@@ -305,6 +305,10 @@ let tinderAuthState = {
   accountName: null,
   accountEmail: null,
   token: null,
+  tinderPlan: 'free',
+  isTinderPro: false,
+  likesRemaining: null,
+  rateLimitedUntil: null,
   lastUpdated: 0,
 };
 
@@ -416,6 +420,10 @@ export const clearTinderAuthState = async () => {
     accountName: null,
     accountEmail: null,
     token: null,
+    tinderPlan: 'free',
+    isTinderPro: false,
+    likesRemaining: null,
+    rateLimitedUntil: null,
     lastUpdated: Date.now()
   };
   pendingWebViewPurge = true;
@@ -449,8 +457,82 @@ export const getTinderAuthState = () => {
 };
 
 /**
+ * Analyzes Tinder profile / account payload to extract subscription tier
+ * (platinum, gold, plus, free) and rate limit indicators.
+ */
+export const parseTinderPlan = (profileData) => {
+  if (!profileData) {
+    return { plan: 'free', isPro: false, likesRemaining: null, rateLimitedUntil: null };
+  }
+
+  const data = profileData?.data || profileData;
+  const purchases = [
+    ...(Array.isArray(data?.purchases) ? data.purchases : []),
+    ...(Array.isArray(data?.purchase?.purchases) ? data.purchase.purchases : []),
+    ...(Array.isArray(data?.account?.purchases) ? data.account.purchases : []),
+    ...(Array.isArray(data?.user?.purchases) ? data.user.purchases : []),
+    ...(Array.isArray(data?.products) ? data.products : []),
+  ];
+
+  let detectedPlan = 'free';
+
+  // 1. Check purchases array
+  for (const item of purchases) {
+    const rawType = String(item?.product_type || item?.product_id || item?.product_name || item?.plan || item?.name || '').toLowerCase();
+    if (rawType.includes('platinum')) {
+      detectedPlan = 'platinum';
+      break;
+    } else if (rawType.includes('gold')) {
+      detectedPlan = 'gold';
+    } else if (rawType.includes('plus') && detectedPlan !== 'gold') {
+      detectedPlan = 'plus';
+    }
+  }
+
+  // 2. Check explicit flags on account
+  if (detectedPlan === 'free') {
+    if (data?.account?.is_platinum_subscriber) {
+      detectedPlan = 'platinum';
+    } else if (data?.account?.is_gold_subscriber) {
+      detectedPlan = 'gold';
+    } else if (data?.account?.is_plus_subscriber) {
+      detectedPlan = 'plus';
+    }
+  }
+
+  // 3. Check account_type / membership_type / plan
+  if (detectedPlan === 'free') {
+    const acctType = String(
+      data?.account?.account_type ||
+      data?.account?.membership_type ||
+      data?.account?.plan ||
+      data?.purchase?.subscription?.plan ||
+      data?.purchases?.subscription?.plan ||
+      ''
+    ).toLowerCase();
+
+    if (acctType.includes('platinum')) detectedPlan = 'platinum';
+    else if (acctType.includes('gold')) detectedPlan = 'gold';
+    else if (acctType.includes('plus')) detectedPlan = 'plus';
+  }
+
+  const likes = data?.likes || data?.user?.likes || null;
+  const likesRemaining = typeof likes?.likes_remaining === 'number' ? likes.likes_remaining : null;
+  const rateLimitedUntil = likes?.rate_limited_until || null;
+  const isPro = detectedPlan === 'platinum' || detectedPlan === 'gold' || detectedPlan === 'plus';
+
+  return {
+    plan: detectedPlan,
+    isPro,
+    likesRemaining,
+    rateLimitedUntil,
+  };
+};
+
+/**
  * Fast direct REST probe to test if an existing Tinder auth token is valid.
  * Confirms session in ~200ms without mounting a visible browser.
+ * Also extracts Tinder subscription tier (Platinum, Gold, Plus, Free).
  */
 export const probeTinderSession = async (tokenToTest) => {
   const token = tokenToTest || tinderAuthState?.token;
@@ -458,7 +540,7 @@ export const probeTinderSession = async (tokenToTest) => {
 
   try {
     const cleanToken = String(token).replace(/^["'](.*)["']$/, '$1').trim();
-    const res = await fetch('https://api.gotinder.com/v2/profile?include=account%2Cuser', {
+    const res = await fetch('https://api.gotinder.com/v2/profile?include=account%2Cuser%2Clikes%2Cpurchases', {
       method: 'GET',
       headers: {
         'x-auth-token': cleanToken,
@@ -474,23 +556,38 @@ export const probeTinderSession = async (tokenToTest) => {
       const name = user?.name || null;
       const email = account?.account_email || null;
 
+      const planInfo = parseTinderPlan(data);
+
       setTinderAuthState({
         isLoggedIn: true,
         token: cleanToken,
         accountName: name || tinderAuthState.accountName || 'Tinder Account',
         accountEmail: email || tinderAuthState.accountEmail,
+        tinderPlan: planInfo.plan,
+        isTinderPro: planInfo.isPro,
+        likesRemaining: planInfo.likesRemaining,
+        rateLimitedUntil: planInfo.rateLimitedUntil,
       });
 
-      return { ok: true, name, email, user };
+      return {
+        ok: true,
+        name,
+        email,
+        user,
+        plan: planInfo.plan,
+        isPro: planInfo.isPro,
+        likesRemaining: planInfo.likesRemaining,
+        rateLimitedUntil: planInfo.rateLimitedUntil,
+      };
     } else if (res.status === 401) {
       console.log('[SessionManager] Probe detected expired Tinder token (401)');
       try {
         trackingService.trackEvent('tinder_session_expired');
       } catch (_) {}
+      await clearTinderAuthState();
       try {
         pushProgressFeedEvent('session_expired', 'Tinder session expired. Please open browser to reconnect.', null, 15);
       } catch (_) {}
-      setTinderAuthState({ isLoggedIn: false, token: null, accountName: null });
       return { ok: false, expired: true };
     }
   } catch (err) {

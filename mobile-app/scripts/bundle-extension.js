@@ -20,6 +20,7 @@ const CONTENT_SCRIPTS = [
   'config.js',
   'utils/stop-conditions.js',
   'utils/language-detect.js',
+  'content/api-interceptor.js',
   'content/ui-alerts.js',
   'content/tinder-dom.js',
   'content/profile-parser.js',

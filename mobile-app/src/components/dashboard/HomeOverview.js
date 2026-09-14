@@ -122,9 +122,38 @@ export default function HomeOverview({
               </Text>
             </View>
           </View>
-          <Text style={styles.location} numberOfLines={1}>
-            {settings?.locationCity || "Choose your location"}
-          </Text>
+          <View style={styles.instanceMetaRow}>
+            <Text style={styles.location} numberOfLines={1}>
+              {settings?.locationCity || "Choose your location"}
+            </Text>
+            {isLoggedIn && (
+              <View
+                style={[
+                  styles.planBadge,
+                  settings?.userProfile?.tinderPlan === "platinum" && styles.planBadgePlatinum,
+                  settings?.userProfile?.tinderPlan === "gold" && styles.planBadgeGold,
+                  settings?.userProfile?.tinderPlan === "plus" && styles.planBadgePlus,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.planBadgeText,
+                    settings?.userProfile?.tinderPlan === "platinum" && styles.planTextPlatinum,
+                    settings?.userProfile?.tinderPlan === "gold" && styles.planTextGold,
+                    settings?.userProfile?.tinderPlan === "plus" && styles.planTextPlus,
+                  ]}
+                >
+                  {settings?.userProfile?.tinderPlan === "platinum"
+                    ? "💎 Platinum"
+                    : settings?.userProfile?.tinderPlan === "gold"
+                      ? "👑 Gold"
+                      : settings?.userProfile?.tinderPlan === "plus"
+                        ? "⚡ Plus"
+                        : "Free"}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
         <View style={styles.latency}>
           <Text style={styles.latencyLabel}>LATENCY</Text>
@@ -452,11 +481,51 @@ const styles = StyleSheet.create({
   },
   offlineBadge: { backgroundColor: "#281824" },
   offlineText: { color: uiTheme.colors.muted },
+  instanceMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 5,
+  },
   location: {
     fontFamily: "Inter_400Regular",
     color: uiTheme.colors.muted,
     fontSize: uiTheme.type.caption.fontSize,
-    marginTop: 5,
+  },
+  planBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+  },
+  planBadgePlatinum: {
+    backgroundColor: "rgba(56, 189, 248, 0.15)",
+    borderColor: "rgba(56, 189, 248, 0.45)",
+  },
+  planBadgeGold: {
+    backgroundColor: "rgba(234, 179, 8, 0.15)",
+    borderColor: "rgba(234, 179, 8, 0.45)",
+  },
+  planBadgePlus: {
+    backgroundColor: "rgba(168, 85, 247, 0.15)",
+    borderColor: "rgba(168, 85, 247, 0.45)",
+  },
+  planBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: uiTheme.colors.muted,
+    textTransform: "uppercase",
+  },
+  planTextPlatinum: {
+    color: "#38BDF8",
+  },
+  planTextGold: {
+    color: "#FACC15",
+  },
+  planTextPlus: {
+    color: "#C084FC",
   },
   latency: { alignItems: "flex-end", gap: uiTheme.spacing.xs, flexShrink: 0 },
   latencyLabel: {

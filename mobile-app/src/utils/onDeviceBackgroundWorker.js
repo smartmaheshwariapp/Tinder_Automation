@@ -16,6 +16,7 @@ import {
   savePersistedMoveOffAppStates,
   getPersistedMatchesCache,
   savePersistedMatchesCache,
+  getTinderAuthState,
 } from './sessionManager';
 
 /**
@@ -203,6 +204,12 @@ export class OnDeviceBackgroundWorker {
       // ── Settings & State ──
       case 'getSettings':
         return { ...this.settings };
+
+      case 'checkAccountTier': {
+        const auth = typeof getTinderAuthState === 'function' ? getTinderAuthState() : null;
+        const tier = auth?.tinderPlan || (auth?.isTinderPro ? 'paid' : 'unknown');
+        return { tier, isPro: Boolean(auth?.isTinderPro), success: true };
+      }
 
       case 'getAgentState':
         return {

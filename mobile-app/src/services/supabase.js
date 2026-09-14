@@ -57,16 +57,24 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     'Prefer': 'return=representation',
   };
 
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 10000) : null;
+
   try {
     const options = {
       method,
       headers,
     };
+    if (controller) {
+      options.signal = controller.signal;
+    }
     if (body) {
       options.body = JSON.stringify(body);
     }
 
     const response = await fetch(url, options);
+    if (timeoutId) clearTimeout(timeoutId);
+
     const text = await response.text();
     let data;
     try {
@@ -81,10 +89,24 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
       data,
     };
   } catch (error) {
-    console.error(`[Supabase Error] ${method} ${endpoint}:`, error);
+    if (timeoutId) clearTimeout(timeoutId);
+
+    const isNetworkOffline =
+      error?.name === 'AbortError' ||
+      /network\s*request\s*failed/i.test(error?.message || '') ||
+      /failed\s*to\s*fetch/i.test(error?.message || '') ||
+      /offline/i.test(error?.message || '');
+
+    if (isNetworkOffline) {
+      console.warn(`[Supabase Offline] ${method} ${endpoint}: Network unreachable or timed out (${error.message || 'offline'}).`);
+    } else {
+      console.error(`[Supabase Error] ${method} ${endpoint}:`, error);
+    }
+
     return {
       ok: false,
-      status: 500,
+      isOffline: isNetworkOffline,
+      status: isNetworkOffline ? 0 : 500,
       error: error.message || 'Network request failed',
     };
   }

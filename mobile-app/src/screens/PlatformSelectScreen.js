@@ -315,6 +315,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
             .filter(Boolean)
             .join(", ") || null,
         photos: (u.photos || []).map((p) => p.url).filter(Boolean),
+        tinderPlan: res.plan || 'free',
+        isTinderPro: Boolean(res.isPro),
+        likesRemaining: res.likesRemaining,
+        rateLimitedUntil: res.rateLimitedUntil,
       };
       await handleSaveSettings({ userProfile: profile });
       return { success: true, profile };
@@ -437,6 +441,26 @@ export default function PlatformSelectScreen({ navigation, route }) {
             if (res?.ok) {
               setDeviceLatencyMs(Math.max(0, Date.now() - requestStarted));
               setIsLoggedIn(true);
+              if (res.plan) {
+                setLocalSettings((prev) => {
+                  const prevProfile = prev?.userProfile || {};
+                  if (prevProfile.tinderPlan !== res.plan) {
+                    const updated = {
+                      ...(prev || {}),
+                      userProfile: {
+                        ...prevProfile,
+                        tinderPlan: res.plan,
+                        isTinderPro: Boolean(res.isPro),
+                        likesRemaining: res.likesRemaining,
+                        rateLimitedUntil: res.rateLimitedUntil,
+                      }
+                    };
+                    setSharedExtensionSettings(updated);
+                    return updated;
+                  }
+                  return prev;
+                });
+              }
             } else if (res?.expired) {
               setIsLoggedIn(false);
             }

@@ -113,7 +113,31 @@ export default function ProfileDetails({ settings, user, isLoggedIn, onBack, onO
         <View style={styles.list}>
           <TouchableOpacity style={styles.settingRow} onPress={onOpenTinder} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={isLoggedIn ? 'Manage connected Tinder account' : 'Connect Tinder'}>
             <View style={[styles.rowIcon, styles.tinderIcon]}><Ionicons name="flame" size={21} color={theme.colors.accent} /></View>
-            <View style={styles.flex}><Text style={styles.label}>Tinder</Text><View style={styles.connectionStatus}><View style={[styles.dot, { backgroundColor: isLoggedIn ? theme.colors.success : theme.colors.muted }]} /><Text style={styles.description}>{isLoggedIn ? 'Connected account' : 'Connect your account'}</Text></View></View>
+            <View style={styles.flex}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.label}>Tinder</Text>
+                {isLoggedIn && (
+                  <View style={[
+                    styles.tierBadge,
+                    tinderProfile?.tinderPlan === 'platinum' && styles.tierPlatinum,
+                    tinderProfile?.tinderPlan === 'gold' && styles.tierGold,
+                    tinderProfile?.tinderPlan === 'plus' && styles.tierPlus,
+                  ]}>
+                    <Text style={[
+                      styles.tierText,
+                      tinderProfile?.tinderPlan === 'platinum' && styles.tierTextPlatinum,
+                      tinderProfile?.tinderPlan === 'gold' && styles.tierTextGold,
+                      tinderProfile?.tinderPlan === 'plus' && styles.tierTextPlus,
+                    ]}>
+                      {tinderProfile?.tinderPlan === 'platinum' ? '💎 Platinum' :
+                       tinderProfile?.tinderPlan === 'gold' ? '👑 Gold' :
+                       tinderProfile?.tinderPlan === 'plus' ? '⚡ Plus' : 'Free Plan'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.connectionStatus}><View style={[styles.dot, { backgroundColor: isLoggedIn ? theme.colors.success : theme.colors.muted }]} /><Text style={styles.description}>{isLoggedIn ? 'Connected account' : 'Connect your account'}</Text></View>
+            </View>
             <Ionicons name="open-outline" size={18} color={theme.colors.muted} />
           </TouchableOpacity>
           <View style={styles.divider} />
@@ -218,5 +242,41 @@ const styles = StyleSheet.create({
   selected: { backgroundColor: theme.colors.elevated, borderColor: theme.colors.accent },
   input: { ...theme.type.body, color: theme.colors.text, minHeight: 160, padding: 16, borderRadius: 12, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
   error: { ...theme.type.body, color: theme.colors.error },
+  tierBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  tierPlatinum: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderColor: 'rgba(56, 189, 248, 0.45)',
+  },
+  tierGold: {
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    borderColor: 'rgba(234, 179, 8, 0.45)',
+  },
+  tierPlus: {
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    borderColor: 'rgba(168, 85, 247, 0.45)',
+  },
+  tierText: {
+    ...theme.type.caption,
+    fontSize: 10,
+    fontWeight: '700',
+    color: theme.colors.muted,
+    textTransform: 'uppercase',
+  },
+  tierTextPlatinum: {
+    color: '#38BDF8',
+  },
+  tierTextGold: {
+    color: '#FACC15',
+  },
+  tierTextPlus: {
+    color: '#C084FC',
+  },
 });
 

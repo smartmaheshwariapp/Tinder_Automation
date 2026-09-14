@@ -157,53 +157,88 @@ function closeSubscriptionPopup() {
 }
 
 function hasSubscriptionPopup() {
-  // Only match text that unambiguously signals the "out of likes" paywall,
-  // NOT subscription feature lists (which appear on the settings page for paid users too).
-  const text = (document.body.innerText || document.body.textContent).toLowerCase();
-  return text.includes('out of likes') ||
+  // Layer 1: Check text content across the document for unambiguous paywall signals
+  const text = (document.body.innerText || document.body.textContent || '').toLowerCase();
+  if (
+    text.includes('out of likes') ||
     text.includes("you've run out of likes") ||
-    text.includes('select a plan');
+    text.includes("you're out of likes") ||
+    text.includes('select a plan') ||
+    text.includes('unlimited likes') ||
+    text.includes('get more likes') ||
+    text.includes('likes reset in') ||
+    text.includes('unlock unlimited') ||
+    text.includes('no more likes') ||
+    text.includes('sin likes') ||
+    text.includes('plus de likes') ||
+    text.includes('keine likes') ||
+    text.includes('sem likes') ||
+    text.includes('geen likes')
+  ) {
+    return true;
+  }
+
+  // Layer 2: Check visible modal dialogs promoting Tinder Gold/Platinum/Plus upgrade
+  try {
+    const dialogs = Array.from(document.querySelectorAll('[role="dialog"], div[aria-modal="true"]'));
+    for (const d of dialogs) {
+      if (d.id === 'rebrand-mobile-menu') continue;
+      const dText = (d.innerText || d.textContent || '').toLowerCase();
+      const hasPaywallCTA =
+        dText.includes('tinder gold') ||
+        dText.includes('tinder platinum') ||
+        dText.includes('tinder plus') ||
+        dText.includes('super like') ||
+        dText.includes('boost');
+      const hasLikeContext =
+        dText.includes('like') ||
+        dText.includes('swipe') ||
+        dText.includes('plan') ||
+        dText.includes('unlock') ||
+        dText.includes('upgrade');
+
+      if (hasPaywallCTA && hasLikeContext) {
+        return true;
+      }
+    }
+  } catch (_) {}
+
+  return false;
 }
 
 function detectTinderAccountTier() {
   // Layer 1: API-sourced tier cached by api-interceptor.js (most reliable)
   if (window.__flirtEasyAccountTier) return window.__flirtEasyAccountTier;
 
-  // Layer 2: DOM selectors — broad set covering current & historical Tinder markup
-  const paidSelectors = [
-    '[data-testid*="gold"]',
-    '[data-testid*="platinum"]',
-    '[data-testid*="tinder-u"]',
-    '[class*="goldBadge"]',
-    '[class*="platinumBadge"]',
-    '[class*="premiumBadge"]',
-    '[class*="subscriptionBadge"]',
-    '[class*="subscription-badge"]',
-    '.premium-icon',
-    'img[alt*="platinum" i]',
-    'img[alt*="gold" i]',
-    'svg[aria-label*="platinum" i]',
-    'svg[aria-label*="gold" i]',
-  ];
-  for (const sel of paidSelectors) {
-    if (document.querySelector(sel)) return 'paid';
-  }
-
-  // Layer 3: Text scan — sidebar/header subscription label visible for paid users
-  // Scope to a small subtree to avoid false matches in the swipe card stack
-  const navCandidates = [
-    document.querySelector('nav'),
-    document.querySelector('[class*="sidebar" i]'),
-    document.querySelector('[class*="header" i]'),
-    document.querySelector('[class*="profile" i]'),
-  ].filter(Boolean);
-
-  for (const node of navCandidates) {
-    const t = node.textContent.toLowerCase();
-    if (t.includes('manage your subscription') ||
-        /tinder\s*(platinum|gold|plus)/i.test(node.textContent)) {
-      return 'paid';
+  // Layer 2: Inspect subscription cards on profile / settings page (e.g. tinder.com/app/profile)
+  // On Tinder's profile screen, upsell cards exist for other tiers, but ONLY the active tier says "Manage Your Subscription"
+  try {
+    const candidates = Array.from(document.querySelectorAll('div, a, button, [role="button"]'));
+    for (const el of candidates) {
+      const text = (el.innerText || el.textContent || '').toLowerCase();
+      if (text.includes('manage your subscription') || text.includes('manage subscription')) {
+        let current = el;
+        for (let i = 0; i < 6 && current; i++) {
+          const cText = (current.innerText || current.textContent || '').toLowerCase();
+          if (cText.includes('platinum')) return 'platinum';
+          if (cText.includes('gold')) return 'gold';
+          if (cText.includes('plus')) return 'plus';
+          current = current.parentElement;
+        }
+        return 'paid';
+      }
     }
+  } catch (_) {}
+
+  // Layer 3: Specific DOM badge selectors
+  if (document.querySelector('[data-testid*="platinum"], [class*="platinumBadge" i], img[alt*="platinum" i], svg[aria-label*="platinum" i]')) {
+    return 'platinum';
+  }
+  if (document.querySelector('[data-testid*="gold"], [class*="goldBadge" i], img[alt*="gold" i], svg[aria-label*="gold" i]')) {
+    return 'gold';
+  }
+  if (document.querySelector('[data-testid*="plus"], [class*="plusBadge" i], img[alt*="plus" i]')) {
+    return 'plus';
   }
 
   // Layer 4: Definitive free signal — paywall popup is visible
