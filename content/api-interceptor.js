@@ -59,6 +59,35 @@
     let url = args[0];
     const method = (args[1] && args[1].method) ? args[1].method.toUpperCase() : 'GET';
 
+    // Intercept outgoing x-auth-token headers to ensure live bearer token is always captured
+    try {
+      const headers = args[1]?.headers;
+      if (headers) {
+        let token = null;
+        if (typeof headers.get === 'function') {
+          token = headers.get('x-auth-token') || headers.get('X-Auth-Token');
+        } else if (typeof headers === 'object') {
+          token = headers['x-auth-token'] || headers['X-Auth-Token'];
+        }
+        if (token && typeof token === 'string' && token.length > 15) {
+          const cleanToken = token.replace(/^["'](.*)["']$/, '$1').trim();
+          if (window.__tinderAuthToken !== cleanToken) {
+            window.__tinderAuthToken = cleanToken;
+            try { localStorage.setItem('TinderWeb/APIToken', cleanToken); } catch (_) {}
+            try {
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'FE_TOKEN_CAPTURED',
+                  token: cleanToken,
+                  source: 'api_interceptor_fetch'
+                }));
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
+
     // Dispatch like event at request time so training overlay can capture photo before profile changes
     if (typeof url === 'string' && url.includes('/like/') && method === 'POST') {
       document.dispatchEvent(new CustomEvent('flirteasy:tinderLike'));

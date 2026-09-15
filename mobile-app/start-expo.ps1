@@ -27,6 +27,7 @@ if (-not $ip) {
 }
 
 $env:REACT_NATIVE_PACKAGER_HOSTNAME = $ip
+$env:NODE_OPTIONS = "--max-old-space-size=4096"
 
 # Pass through all arguments (--clear, etc.)
 if ($args -contains "--clear") {

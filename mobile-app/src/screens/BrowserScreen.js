@@ -1,6 +1,7 @@
 import { theme as uiTheme } from '../theme';
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import ActivityIndicator from '../components/common/SafeActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -17,6 +18,8 @@ import {
   setPendingWebViewPurge,
   getPendingStorageTeardown,
   setPendingStorageTeardown,
+  probeTinderSession,
+  parseTinderUserProfile,
   updateSharedAgentState,
   subscribeSharedAgentState,
   getSharedExtensionSettings,
@@ -328,10 +331,14 @@ export default function BrowserScreen({ route, navigation }) {
 
   useEffect(() => {
     return subscribeSharedExtensionSettings((newSettings) => {
-      setExtensionSettings(newSettings);
-      if (backgroundWorkerRef.current) {
-        backgroundWorkerRef.current.updateSettings(newSettings);
-      }
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setExtensionSettings(newSettings);
+          if (backgroundWorkerRef.current) {
+            backgroundWorkerRef.current.updateSettings(newSettings);
+          }
+        }
+      }, 0);
     });
   }, []);
 
@@ -367,11 +374,18 @@ export default function BrowserScreen({ route, navigation }) {
   // started there would be cut short by the unmount.
   const isExitingRef = useRef(false);
 
+  const loginSheetReadyRef = useRef(false);
+  const loginSheetTimeoutRef = useRef(null);
+
   useEffect(() => () => {
     isMountedRef.current = false;
     if (logoutFailsafeRef.current) {
       clearTimeout(logoutFailsafeRef.current);
       logoutFailsafeRef.current = null;
+    }
+    if (loginSheetTimeoutRef.current) {
+      clearTimeout(loginSheetTimeoutRef.current);
+      loginSheetTimeoutRef.current = null;
     }
   }, []);
 
@@ -379,6 +393,85 @@ export default function BrowserScreen({ route, navigation }) {
   const pushBioCallbacksRef = useRef(new Map());
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(true);
+  const [loadingStage, setLoadingStage] = useState(0);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0.4)).current;
+
+  // Rhythmic breathing pulse for the loader hero badge
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(pulseAnim, {
+            toValue: 1.08,
+            duration: 750,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0.9,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 750,
+            easing: Easing.in(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0.4,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim, glowAnim]);
+
+  // Dynamic user-facing progress hints (zero technical jargon)
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStage(0);
+      return;
+    }
+    const t1 = setTimeout(() => setLoadingStage(1), 800);
+    const t2 = setTimeout(() => setLoadingStage(2), 2400);
+    const t3 = setTimeout(() => setLoadingStage(3), 5000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [loading]);
+
+  const loaderTitle = useMemo(() => {
+    if (isOnDevice && getTinderAuthState()?.isLoggedIn) {
+      return 'Opening Tinder';
+    }
+    return 'Connecting to Tinder';
+  }, [isOnDevice]);
+
+  const loaderSubtitle = useMemo(() => {
+    if (isOnDevice && getTinderAuthState()?.isLoggedIn) {
+      return 'Loading your profile and matches…';
+    }
+    if (loadingStage === 0) {
+      return 'Connecting to Tinder…';
+    }
+    if (loadingStage === 1) {
+      return 'Preparing your sign-in options…';
+    }
+    if (loadingStage === 2) {
+      return 'Almost ready, opening login screen…';
+    }
+    return 'Just a moment, getting everything ready…';
+  }, [isOnDevice, loadingStage]);
+
   const [connectionError, setConnectionError] = useState(null);
   const sessionKey = `${platform || 'tinder'}_login_step`;
   const [loginStep, setLoginStepState] = useState(() => {
@@ -398,11 +491,15 @@ export default function BrowserScreen({ route, navigation }) {
   // Two-way auth synchronization: if home page or background logs out, reset UI state
   useEffect(() => {
     const unsub = subscribeTinderAuthState((state) => {
-      setSessionStatus(readSessionStatus());
-      if (!state?.isLoggedIn) {
-        setLoginStep('options');
-        delete persistentLoginCache[sessionKey];
-      }
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setSessionStatus(readSessionStatus());
+          if (!state?.isLoggedIn) {
+            setLoginStep('options');
+            delete persistentLoginCache[sessionKey];
+          }
+        }
+      }, 0);
     });
     return unsub;
   }, [sessionKey]);
@@ -577,13 +674,17 @@ export default function BrowserScreen({ route, navigation }) {
     return () => clearInterval(interval);
   }, [timeLeft, sessionDuration]);
 
-  // Safety timeout to dismiss loading overlay after 3 seconds max
+  // Safety timeout to dismiss loading overlay after 3 seconds max (Neko VPS only)
+  // For on-device disconnected sessions, loading stays active until FE_LOGIN_SHEET_READY arrives (or 15s failsafe in onLoadEnd)
   useEffect(() => {
+    if (isOnDevice && !getTinderAuthState()?.isLoggedIn && !route.params?.autoStartAgent) {
+      return;
+    }
     const timer = setTimeout(() => {
       setLoading(false);
     }, 3000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isOnDevice, route.params?.autoStartAgent]);
 
   const handleSwipe = (direction) => {
     const now = Date.now();
@@ -983,13 +1084,32 @@ export default function BrowserScreen({ route, navigation }) {
           try {
             var token = null;
             try {
-              token = localStorage.getItem('TinderWeb/APIToken');
+              if (window.__tinderAuthToken && window.__tinderAuthToken.length > 15) {
+                token = window.__tinderAuthToken;
+              }
+              if (!token) token = localStorage.getItem('TinderWeb/APIToken');
               if (!token) {
+                var persistRoot = localStorage.getItem('persist:root');
+                if (persistRoot) {
+                  try {
+                    var rootObj = JSON.parse(persistRoot);
+                    if (rootObj && rootObj.auth) {
+                      var authObj = typeof rootObj.auth === 'string' ? JSON.parse(rootObj.auth) : rootObj.auth;
+                      token = authObj && (authObj.apiToken || authObj.token || authObj.authToken || authObj.api_token);
+                    }
+                  } catch (_) {}
+                }
+              }
+              if (!token) {
+                var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                 for (var i = 0; i < localStorage.length; i++) {
                   var k = localStorage.key(i);
-                  if (k && (k.indexOf('APIToken') !== -1 || k.indexOf('authToken') !== -1)) {
-                    token = localStorage.getItem(k);
-                    if (token) break;
+                  if (k && (k.indexOf('APIToken') !== -1 || k.indexOf('authToken') !== -1 || k.indexOf('token') !== -1)) {
+                    var val = localStorage.getItem(k);
+                    if (val && uuidRegex.test(val.replace(/^["'](.*)["']$/, '$1').trim())) {
+                      token = val;
+                      break;
+                    }
                   }
                 }
               }
@@ -999,7 +1119,7 @@ export default function BrowserScreen({ route, navigation }) {
             if (token) {
               try {
                 var cleanToken = token.replace(/^"(.*)"$/, '$1');
-                var res = await fetch('https://api.gotinder.com/v2/profile?include=account%2Cuser', {
+                var res = await fetch('https://api.gotinder.com/v2/profile?include=account%2Cuser%2Clikes%2Cpurchases', {
                   headers: { 'x-auth-token': cleanToken, 'platform': 'web' }
                 });
                 if (res.ok) {
@@ -1014,9 +1134,25 @@ export default function BrowserScreen({ route, navigation }) {
             var domProfile = {};
             try {
               var nameEl = document.querySelector('h1, [data-testid="profile-name"], .profileContent h1');
-              if (nameEl) domProfile.name = nameEl.textContent.trim().replace(/\\d+$/, '').trim();
+              if (nameEl) {
+                var rawName = (nameEl.innerText || nameEl.textContent || '').trim();
+                var nameMatch = rawName.match(/^([^,]+)(?:,\s*(\d+))?/);
+                if (nameMatch) {
+                  domProfile.name = nameMatch[1].trim();
+                  if (nameMatch[2]) domProfile.age = parseInt(nameMatch[2], 10);
+                } else {
+                  domProfile.name = rawName.replace(/\d+$/, '').trim();
+                }
+              }
               var bioEl = document.querySelector('textarea, [data-testid="profile-bio"], .BreakWord');
               if (bioEl) domProfile.bio = (bioEl.value || bioEl.textContent || '').trim();
+
+              var domPhotos = [];
+              var imgEls = Array.from(document.querySelectorAll('img[src*="gotinder.com"], img[src*="images-ssl"]'));
+              imgEls.forEach(function(img) {
+                if (img.src && domPhotos.indexOf(img.src) === -1) domPhotos.push(img.src);
+              });
+              if (domPhotos.length > 0) domProfile.photos = domPhotos;
             } catch (_) {}
 
             if (apiUser) {
@@ -1032,9 +1168,40 @@ export default function BrowserScreen({ route, navigation }) {
                 return found ? ((found.choice_selections && found.choice_selections[0] && found.choice_selections[0].name) || found.name) : null;
               };
 
+              var photos = [];
+              if (Array.isArray(apiUser.photos)) {
+                photos = apiUser.photos.map(function(p) {
+                  if (typeof p === 'string' && p.indexOf('http') === 0) return p;
+                  if (p && typeof p === 'object') {
+                    if (p.url && typeof p.url === 'string') return p.url;
+                    if (Array.isArray(p.processedFiles) && p.processedFiles.length > 0) {
+                      var sorted = p.processedFiles.slice().sort(function(a, b) { return (b.width || 0) - (a.width || 0); });
+                      return sorted[0] && sorted[0].url ? sorted[0].url : (p.processedFiles[0] && p.processedFiles[0].url ? p.processedFiles[0].url : null);
+                    }
+                  }
+                  return null;
+                }).filter(Boolean);
+              }
+
+              var age = null;
+              if (typeof apiUser.age === 'number') {
+                age = apiUser.age;
+              } else if (apiUser.birth_date) {
+                try {
+                  var bday = new Date(apiUser.birth_date);
+                  var now = new Date();
+                  var calculated = now.getFullYear() - bday.getFullYear();
+                  var m = now.getMonth() - bday.getMonth();
+                  if (m < 0 || (m === 0 && now.getDate() < bday.getDate())) calculated--;
+                  if (calculated >= 18 && calculated <= 120) age = calculated;
+                } catch (_) {}
+              }
+
               var unified = {
                 name: apiUser.name || domProfile.name || null,
+                age: age || domProfile.age || null,
                 bio: apiUser.bio || domProfile.bio || '',
+                photos: photos.length > 0 ? photos : (domProfile.photos || []),
                 interests: interests,
                 job: jobs.join(', ') || null,
                 school: schools.join(', ') || null,
@@ -1058,7 +1225,8 @@ export default function BrowserScreen({ route, navigation }) {
                 type: 'FE_PROFILE_SYNC_RESPONSE',
                 requestId: '${requestId}',
                 success: true,
-                profile: unified
+                profile: unified,
+                token: cleanToken || null
               }));
               return;
             }
@@ -1068,7 +1236,8 @@ export default function BrowserScreen({ route, navigation }) {
                 type: 'FE_PROFILE_SYNC_RESPONSE',
                 requestId: '${requestId}',
                 success: true,
-                profile: domProfile
+                profile: domProfile,
+                token: cleanToken || null
               }));
               return;
             }
@@ -1312,21 +1481,24 @@ export default function BrowserScreen({ route, navigation }) {
   useEffect(() => {
     if (!isOnDevice) return;
     const unsub = subscribeSharedAgentState((shared) => {
-      const stats = shared?.agentState?.stats;
-      if (stats) {
-        if (typeof stats.swipes === 'number' && stats.swipes !== onDeviceSwipes) {
-          setOnDeviceSwipes(stats.swipes);
+      setTimeout(() => {
+        if (!isMountedRef.current) return;
+        const stats = shared?.agentState?.stats;
+        if (stats) {
+          if (typeof stats.swipes === 'number' && stats.swipes !== onDeviceSwipes) {
+            setOnDeviceSwipes(stats.swipes);
+          }
+          if (typeof stats.matches === 'number' && stats.matches !== onDeviceMatches) {
+            setOnDeviceMatches(stats.matches);
+          }
+          if (typeof stats.messages === 'number' && stats.messages !== onDeviceMessages) {
+            setOnDeviceMessages(stats.messages);
+          }
         }
-        if (typeof stats.matches === 'number' && stats.matches !== onDeviceMatches) {
-          setOnDeviceMatches(stats.matches);
+        if (typeof shared?.agentState?.isRunning === 'boolean' && shared.agentState.isRunning !== onDeviceSwiping) {
+          setOnDeviceSwiping(shared.agentState.isRunning);
         }
-        if (typeof stats.messages === 'number' && stats.messages !== onDeviceMessages) {
-          setOnDeviceMessages(stats.messages);
-        }
-      }
-      if (typeof shared?.agentState?.isRunning === 'boolean' && shared.agentState.isRunning !== onDeviceSwiping) {
-        setOnDeviceSwiping(shared.agentState.isRunning);
-      }
+      }, 0);
     });
     return unsub;
   }, [isOnDevice, onDeviceSwipes, onDeviceMatches, onDeviceMessages, onDeviceSwiping]);
@@ -2413,7 +2585,19 @@ export default function BrowserScreen({ route, navigation }) {
                 setConnectionError(null);
               }}
               onLoadEnd={() => {
-                setLoading(false);
+                const isDisconnectedOnDevice = isOnDevice && !getTinderAuthState()?.isLoggedIn && !route.params?.autoStartAgent;
+                if (!isDisconnectedOnDevice || loginSheetReadyRef.current) {
+                  setLoading(false);
+                } else {
+                  // Keep loading veil active until 3-button login modal is signaled by WebView.
+                  // Failsafe: reveal page after 15s in case Tinder layout changes or network hangs.
+                  if (loginSheetTimeoutRef.current) clearTimeout(loginSheetTimeoutRef.current);
+                  loginSheetTimeoutRef.current = setTimeout(() => {
+                    if (isMountedRef.current) {
+                      setLoading(false);
+                    }
+                  }, 15000);
+                }
                 injectConfigScript();
                 // If opening after an external logout (from Home Screen), purge and reset session cleanly once
                 if (isOnDevice && (getPendingWebViewPurge() || (shouldForceLogout && !hasExecutedPurgeRef.current))) {
@@ -2459,6 +2643,19 @@ export default function BrowserScreen({ route, navigation }) {
                 try {
                   const msg = JSON.parse(event.nativeEvent.data);
 
+                  // ── Sub-50ms login sheet ready signal (3 buttons visible) ──
+                  if (msg.type === 'FE_LOGIN_SHEET_READY') {
+                    loginSheetReadyRef.current = true;
+                    if (loginSheetTimeoutRef.current) {
+                      clearTimeout(loginSheetTimeoutRef.current);
+                      loginSheetTimeoutRef.current = null;
+                    }
+                    if (isMountedRef.current) {
+                      setLoading(false);
+                    }
+                    return;
+                  }
+
                   // ── Foreground renderer health probe response ──
                   if (msg.type === 'FE_RENDERER_NEEDS_RELOAD') {
                     addLog('Browser engine was reset while backgrounded — reloading session', 'warn');
@@ -2486,6 +2683,38 @@ export default function BrowserScreen({ route, navigation }) {
                     return;
                   }
 
+                  if (msg.type === 'FE_TOKEN_CAPTURED' && msg.token) {
+                    const cleanToken = String(msg.token).replace(/^["'](.*)["']$/, '$1').trim();
+                    if (cleanToken.length >= 16) {
+                      const current = getTinderAuthState();
+                      if (!current?.isLoggedIn || current?.token !== cleanToken) {
+                        setTinderAuthState({
+                          isLoggedIn: true,
+                          token: cleanToken,
+                          accountName: current?.accountName || 'Tinder Account',
+                        });
+                        addLog('🔑 Tinder session token securely captured', 'success');
+                        probeTinderSession(cleanToken).then((res) => {
+                          if (res?.ok && (res.profile || res.user)) {
+                            const profile = res.profile || parseTinderUserProfile(res.user, {
+                              plan: res.plan,
+                              isPro: res.isPro,
+                              likesRemaining: res.likesRemaining,
+                              rateLimitedUntil: res.rateLimitedUntil,
+                            });
+                            if (profile) {
+                              handleSaveOnDeviceSettings({
+                                userProfile: profile,
+                                manualBio: profile.bio || undefined,
+                              });
+                            }
+                          }
+                        }).catch(() => {});
+                      }
+                    }
+                    return;
+                  }
+
                   if (msg.type === 'FE_PROFILE_SYNC_RESPONSE') {
                     const cb = profileSyncCallbacksRef.current.get(msg.requestId);
                     if (cb) {
@@ -2493,9 +2722,11 @@ export default function BrowserScreen({ route, navigation }) {
                       cb(msg);
                     }
                     if (msg.success && msg.profile) {
-                      if (msg.profile.name) {
-                        setTinderAuthState({ isLoggedIn: true, accountName: msg.profile.name });
-                      }
+                      const profileToken = msg.token || msg.profile?.token;
+                      const authUpdates = { isLoggedIn: true };
+                      if (msg.profile.name) authUpdates.accountName = msg.profile.name;
+                      if (profileToken) authUpdates.token = profileToken;
+                      setTinderAuthState(authUpdates);
                       addLog(`Profile synced for ${msg.profile.name || 'user'}`, 'success');
                       handleSaveOnDeviceSettings({ userProfile: msg.profile, manualBio: msg.profile.bio || undefined });
                     }
@@ -2617,11 +2848,30 @@ export default function BrowserScreen({ route, navigation }) {
                     // Syncs the home screen to the live WebView page state on load.
                     if (typeof msg.isLoggedIn === 'boolean') {
                       if (msg.isLoggedIn) {
+                        const capturedToken = msg.token || undefined;
                         setTinderAuthState({
                           isLoggedIn: true,
-                          token: msg.token || undefined,
+                          token: capturedToken,
                           accountName: msg.accountName || 'Tinder Account'
                         });
+                        if (capturedToken) {
+                          probeTinderSession(capturedToken).then((res) => {
+                            if (res?.ok && (res.profile || res.user)) {
+                              const profile = res.profile || parseTinderUserProfile(res.user, {
+                                plan: res.plan,
+                                isPro: res.isPro,
+                                likesRemaining: res.likesRemaining,
+                                rateLimitedUntil: res.rateLimitedUntil,
+                              });
+                              if (profile) {
+                                handleSaveOnDeviceSettings({
+                                  userProfile: profile,
+                                  manualBio: profile.bio || undefined,
+                                });
+                              }
+                            }
+                          }).catch(() => {});
+                        }
                         triggerAutoStartIfReady();
                       } else {
                         const current = getTinderAuthState();
@@ -2639,11 +2889,30 @@ export default function BrowserScreen({ route, navigation }) {
                     if (msg.step === 'logged_in') {
                       if (isLoggingOutRef.current || getPendingWebViewPurge()) return;
                       setLoginStep('done');
+                      const capturedToken = msg.token || undefined;
                       setTinderAuthState({
                         isLoggedIn: true,
-                        token: msg.token || undefined,
+                        token: capturedToken,
                         accountName: msg.name || 'Tinder Account'
                       });
+                      if (capturedToken) {
+                        probeTinderSession(capturedToken).then((res) => {
+                          if (res?.ok && (res.profile || res.user)) {
+                            const profile = res.profile || parseTinderUserProfile(res.user, {
+                              plan: res.plan,
+                              isPro: res.isPro,
+                              likesRemaining: res.likesRemaining,
+                              rateLimitedUntil: res.rateLimitedUntil,
+                            });
+                            if (profile) {
+                              handleSaveOnDeviceSettings({
+                                userProfile: profile,
+                                manualBio: profile.bio || undefined,
+                              });
+                            }
+                          }
+                        }).catch(() => {});
+                      }
                       addLog('Logged into Tinder (Active Session)', 'success');
                       triggerAutoStartIfReady();
                     } else if (msg.step === 'logged_out') {
@@ -2803,25 +3072,19 @@ export default function BrowserScreen({ route, navigation }) {
           {startingHyperbeam && (
             <View style={styles.loaderContainer} pointerEvents="none">
               <ActivityIndicator size="large" color={uiTheme.colors.primary} />
-              <Text style={styles.loaderText}>Starting Hyperbeam Cloud Browser...</Text>
-            </View>
-          )}
-          {loading && !startingHyperbeam && !connectionError && Boolean(finalUrl) && (
-            <View style={styles.loaderContainer} pointerEvents="none">
-              <ActivityIndicator size="large" color={uiTheme.colors.primary} />
-              <Text style={styles.loaderText}>Connecting to Virtual Browser...</Text>
+              <Text style={styles.loaderText}>Starting Cloud Connection...</Text>
             </View>
           )}
           {!startingHyperbeam && (!finalUrl || connectionError) && (
             <View style={styles.errorOverlay}>
               <Ionicons name="cloud-offline-outline" size={44} color={uiTheme.colors.primary} />
-              <Text style={styles.errorTitle}>Cannot Connect to Virtual Browser</Text>
+              <Text style={styles.errorTitle}>Cannot Connect to Tinder</Text>
               <Text style={styles.errorDetail}>
                 {!finalUrl
-                  ? 'Hyperbeam cloud session could not be established. Please check your Hyperbeam API key or switch to VPS / Local mode in Connection Settings.'
+                  ? 'A secure session could not be established. Please check your internet connection or switch mode in Connection Settings.'
                   : (connectionError?.code === -2 || connectionError?.description?.includes('ERR_NAME_NOT_RESOLVED')
-                    ? 'DNS / Host Lookup Failed (Error -2)\nThe phone could not resolve the server address.'
-                    : 'The browser could not connect. Check your connection and try again.')}
+                    ? 'Connection failed. Please check your internet connection and try again.'
+                    : 'Could not establish connection to Tinder. Check your connection and try again.')}
               </Text>
               {Boolean(finalUrl) && <Text style={styles.errorUrl} numberOfLines={2}>Target: {finalUrl}</Text>}
               <View style={styles.errorActions}>
@@ -2845,7 +3108,7 @@ export default function BrowserScreen({ route, navigation }) {
                     navigation.goBack();
                   }}
                 >
-                  <Text style={styles.backToSetupBtnText}>Change Host / Mode</Text>
+                  <Text style={styles.backToSetupBtnText}>Connection Settings</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -3466,6 +3729,83 @@ export default function BrowserScreen({ route, navigation }) {
           onSubmitEditing={() => injectKeyEvent('\n')}
         />
       </KeyboardAvoidingView>
+
+      {/* ─── FULL-SCREEN IMMERSIVE LAZY LOADER ─── */}
+      {/* Completely covers 100% of the screen (status bar to nav bar) via native Modal until 3 login buttons appear */}
+      <Modal
+        visible={Boolean(loading && !startingHyperbeam && !connectionError && Boolean(finalUrl))}
+        transparent={false}
+        animationType="none"
+        statusBarTranslucent={true}
+        onRequestClose={() => {
+          cleanupCurrentSession();
+          navigation.goBack();
+        }}
+      >
+        <View style={styles.modalRootContainer}>
+          <LinearGradient
+            colors={['#11071B', '#09050D', '#040206']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={{ flex: 1 }}
+          >
+            <SafeAreaView style={styles.modalContentContainer}>
+              <View style={styles.lazyLoaderHeader}>
+                <TouchableOpacity
+                  style={styles.closeBtnCircular}
+                  onPress={() => {
+                    cleanupCurrentSession();
+                    navigation.goBack();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel"
+                  hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                >
+                  <Ionicons name="close" size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.lazyLoaderCenter}>
+                <View style={styles.loaderBadgeContainer}>
+                  {/* Ambient glowing aura */}
+                  <Animated.View
+                    style={[
+                      styles.loaderAuraGlow,
+                      {
+                        opacity: glowAnim,
+                        transform: [{ scale: pulseAnim }],
+                      },
+                    ]}
+                  />
+                  {/* Pulsing Tinder flame badge */}
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <LinearGradient
+                      colors={['#2B1224', '#170919']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.loaderIconBadge}
+                    >
+                      <Ionicons name="flame" size={48} color="#FE3C72" />
+                    </LinearGradient>
+                  </Animated.View>
+                </View>
+
+                <ActivityIndicator size="large" color="#FE3C72" style={{ marginTop: 28 }} />
+                <Text style={styles.loaderTitle}>{loaderTitle}</Text>
+                <Text style={styles.loaderSubtitle}>{loaderSubtitle}</Text>
+              </View>
+
+              {/* Bottom security and privacy trust indicator */}
+              <View style={styles.lazyLoaderFooter}>
+                <View style={styles.trustBadge}>
+                  <Ionicons name="shield-checkmark" size={15} color="#10B981" style={{ marginRight: 7 }} />
+                  <Text style={styles.trustBadgeText}>Private & Secure Connection</Text>
+                </View>
+              </View>
+            </SafeAreaView>
+          </LinearGradient>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -3671,11 +4011,96 @@ const styles = StyleSheet.create({
   },
   loaderContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: uiTheme.colors.background,
+    backgroundColor: '#08050B',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 9999,
+    paddingHorizontal: 24,
   },
-  loaderText: { fontFamily: 'Inter_600SemiBold',
+  modalRootContainer: {
+    flex: 1,
+    backgroundColor: '#08050B',
+  },
+  modalContentContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  lazyLoaderHeader: {
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    flexDirection: 'row',
+  },
+  lazyLoaderCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  loaderBadgeContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 120,
+    height: 120,
+  },
+  loaderAuraGlow: {
+    position: 'absolute',
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    backgroundColor: 'rgba(254, 60, 114, 0.22)',
+  },
+  loaderIconBadge: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(254, 60, 114, 0.42)',
+    shadowColor: '#FE3C72',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  loaderTitle: {
+    fontFamily: 'Manrope_700Bold',
+    color: '#FFFFFF',
+    fontSize: 20,
+    marginTop: 20,
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  loaderSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    color: 'rgba(255, 255, 255, 0.68)',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 21,
+    paddingHorizontal: 20,
+  },
+  lazyLoaderFooter: {
+    alignItems: 'center',
+    paddingBottom: 24,
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderRadius: 22,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  trustBadgeText: {
+    fontFamily: 'Inter_600SemiBold',
+    color: 'rgba(255, 255, 255, 0.62)',
+    fontSize: 12.5,
+    letterSpacing: 0.1,
+  },
+  loaderText: {
+    fontFamily: 'Inter_600SemiBold',
     color: uiTheme.colors.muted,
     marginTop: 15,
     fontSize: 13.5,

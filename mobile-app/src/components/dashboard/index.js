@@ -7,3 +7,4 @@ export { default as ActivityTimeline } from './ActivityTimeline';
 export { default as AutomationV2Panel } from './AutomationV2Panel';
 export { default as SettingsPanel } from './SettingsPanel';
 export { default as FloatingSaveBar } from './FloatingSaveBar';
+export { default as TinderProfileCard } from './TinderProfileCard';

@@ -194,6 +194,20 @@ describe('OnDeviceBackgroundWorker Plan Reporting', () => {
     expect(CONTENT_SCRIPT_BUNDLE.length).toBeGreaterThan(100000);
     expect(CONTENT_SCRIPT_BUNDLE).toContain('FE_SESSION_EXPIRED');
     expect(CONTENT_SCRIPT_BUNDLE).toContain('FE_PLAN_DETECTED');
+    expect(CONTENT_SCRIPT_BUNDLE).toContain('FE_TOKEN_CAPTURED');
+    expect(CONTENT_SCRIPT_BUNDLE).toContain('_extractTinderAuthToken');
+    expect(CONTENT_SCRIPT_BUNDLE).toContain('persist:root');
     expect(CONTENT_SCRIPT_BUNDLE).toContain('hasSubscriptionPopup');
   });
+
+  it('generateChromeShim injects early network interceptor for x-auth-token', () => {
+    const { generateChromeShim } = require('../chromeShim');
+    const shim = generateChromeShim({ navigation: {} }, { latitude: 40.7, longitude: -74.0 });
+    expect(typeof shim).toBe('string');
+    expect(shim).toContain('_notifyTinderToken');
+    expect(shim).toContain('x-auth-token');
+    expect(shim).toContain('FE_TOKEN_CAPTURED');
+    expect(shim).toContain('persist:root');
+  });
 });
+

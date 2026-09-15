@@ -4479,74 +4479,196 @@ if (typeof isLoggedIn === 'function') {
     };
 
     // Tinder's login / signup sheet is up, so step 2 landed and we are done.
-    // #rebrand-mobile-menu is the mobile nav drawer, which is also role="dialog"
-    // and must not be mistaken for the sheet.
+    // Tinder's 3-button login modal is up and ready for user interaction.
+    // Must NOT match cookie consent banners, GDPR notices, or mobile nav drawers.
     const isLoginSheetOpen = () => {
       try {
-        if (document.querySelector('input[type="tel"], input[type="email"], input[autocomplete="one-time-code"]')) {
+        // 1. Phone number or OTP or email input (if user entered phone flow)
+        if (document.querySelector('input[type="tel"], input[name="phone_number"], input[type="email"], input[autocomplete="one-time-code"]')) {
           return true;
         }
-        const dialogs = Array.from(document.querySelectorAll(
-          '[aria-labelledby="MODAL_LOGIN"], [role="dialog"], div[aria-modal="true"]'
-        ));
-        return dialogs.some(d => d.id !== 'rebrand-mobile-menu' && isVisible(d));
+
+        // 2. Google Identity iframe
+        const gsi = document.querySelector('iframe[src*="accounts.google.com"]');
+        if (gsi && isVisible(gsi)) return true;
+
+        // 3. Explicit MODAL_LOGIN dialog containing provider buttons
+        const loginModal = document.querySelector('[aria-labelledby="MODAL_LOGIN"]');
+        if (loginModal && isVisible(loginModal)) return true;
+
+        // 4. Primary 3 login buttons: Google, Apple, Facebook, Phone
+        const buttons = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+        const hasProviderButton = buttons.some(b => {
+          if (!isVisible(b)) return false;
+          const text = (b.innerText || b.textContent || '').trim().toLowerCase();
+          const aria = (b.getAttribute('aria-label') || '').toLowerCase();
+          const str = text + ' ' + aria;
+          const hasProvider = str.includes('google') || str.includes('phone') || str.includes('facebook') || str.includes('apple');
+          const hasAction = str.includes('log in') || str.includes('continue') || str.includes('sign in');
+          return hasProvider && hasAction;
+        });
+        if (hasProviderButton) {
+          const menu = document.getElementById('rebrand-mobile-menu');
+          if (menu) {
+            menu.style.setProperty('display', 'none', 'important');
+            menu.style.setProperty('pointer-events', 'none', 'important');
+          }
+          return true;
+        }
+
+        // 5. "Trouble logging in?" or "More options" buttons in auth modal
+        const hasTroubleOrMore = buttons.some(b => {
+          if (!isVisible(b)) return false;
+          const text = (b.innerText || b.textContent || '').trim().toLowerCase();
+          return text.includes('trouble logging in') || text === 'more options';
+        });
+        if (hasTroubleOrMore) return true;
       } catch (_) {
         return false;
       }
+      return false;
     };
 
-    const findCreateAccount = () => {
+    const findLoginTrigger = () => {
       const candidates = Array.from(document.querySelectorAll('a, button, [role="button"]'));
-      return candidates.find(el => {
+      // Prefer explicit "Log in" / "Sign in" buttons first
+      const loginBtn = candidates.find(el => {
         if (!isVisible(el)) return false;
+        if (el.closest('[aria-labelledby="MODAL_LOGIN"]') || el.closest('.StretchedBox')) return false;
         const text = (el.innerText || el.textContent || '').trim().toLowerCase();
         const aria = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+        const testId = (el.getAttribute('data-testid') || '').trim().toLowerCase();
+        const href = (el.getAttribute('href') || '').trim().toLowerCase();
+        if (text.includes('language') || aria.includes('language')) return false;
+        if (href.includes('play.google.com') || href.includes('apps.apple.com')) return false;
+        return (
+          text === 'log in' ||
+          text === 'login' ||
+          text === 'sign in' ||
+          text === 'iniciar sesión' ||
+          aria === 'log in' ||
+          aria === 'login' ||
+          aria === 'sign in' ||
+          testId.includes('login') ||
+          testId.includes('signin') ||
+          href.includes('/app/login') ||
+          href.includes('/app/signin')
+        );
+      });
+      if (loginBtn) return loginBtn;
+
+      // Fallback to "Create account" / "Sign up" buttons which also open the auth sheet
+      return candidates.find(el => {
+        if (!isVisible(el)) return false;
+        if (el.closest('[aria-labelledby="MODAL_LOGIN"]') || el.closest('.StretchedBox')) return false;
+        const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+        const aria = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+        const testId = (el.getAttribute('data-testid') || '').trim().toLowerCase();
+        const href = (el.getAttribute('href') || '').trim().toLowerCase();
         const label = text || aria;
-        return label === 'create account' ||
+        if (text.includes('language') || aria.includes('language')) return false;
+        if (href.includes('play.google.com') || href.includes('apps.apple.com')) return false;
+        return (
+          label === 'create account' ||
           label === 'create an account' ||
           label === 'sign up' ||
+          label === 'crear cuenta' ||
           aria === 'create account' ||
-          aria === 'create an account';
+          aria === 'create an account' ||
+          testId.includes('create-account') ||
+          testId.includes('signup') ||
+          href.includes('/app/signup')
+        );
       });
     };
 
-    console.log('[Tinder Login] Waiting for landing page "Create account" button...');
+    console.log('[Tinder Login] Instant login sheet trigger helper initialized.');
 
-    let attempts = 0;
     let clicks = 0;
-    const createAccountTimer = setInterval(() => {
-      attempts++;
+    let observer = null;
+    let checkInterval = null;
+    let lastClickTime = 0;
+    const startTime = Date.now();
 
-      // Hard stop after ~20s so nothing keeps running behind the user.
-      if (attempts > 40) {
-        console.log('[Tinder Login] "Create account" not found in time — leaving the page to the user.');
-        clearInterval(createAccountTimer);
-        return;
+    const cleanup = () => {
+      if (checkInterval) {
+        clearInterval(checkInterval);
+        checkInterval = null;
       }
+      if (observer) {
+        try { observer.disconnect(); } catch (_) {}
+        observer = null;
+      }
+    };
 
+    const attemptTrigger = () => {
       try {
         if (isLoggedIn() || isLoginSheetOpen()) {
-          console.log('[Tinder Login] Login sheet is open — helper done, handing over to the user.');
-          clearInterval(createAccountTimer);
-          return;
+          console.log('[Tinder Login] 3-button login sheet visible — helper complete, handing over to user.');
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_LOGIN_SHEET_READY'
+              }));
+            }
+          } catch (_) {}
+          cleanup();
+          return true;
         }
 
-        // A couple of retries in case React had not hydrated on the first click.
-        if (clicks >= 3) {
-          clearInterval(createAccountTimer);
-          return;
+        // Safety timeout: after 15 seconds, reveal page anyway so user isn't stuck
+        if (Date.now() - startTime > 15000) {
+          console.log('[Tinder Login] Max trigger wait reached (15s) — leaving page to user.');
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_LOGIN_SHEET_READY'
+              }));
+            }
+          } catch (_) {}
+          cleanup();
+          return true;
         }
 
-        const btn = findCreateAccount();
-        if (btn) {
-          clicks++;
-          console.log(`[Tinder Login] Clicking "Create account" (attempt ${clicks})...`);
-          clickElement(btn);
+        // Click login trigger button up to 4 times with a 1.2s debounce
+        const now = Date.now();
+        if (clicks < 4 && now - lastClickTime > 1200) {
+          const btn = findLoginTrigger();
+          if (btn) {
+            clicks++;
+            lastClickTime = now;
+            console.log(`[Tinder Login] Fast-clicking login trigger (attempt ${clicks})...`);
+            clickElement(btn);
+          }
         }
       } catch (_) {
-        clearInterval(createAccountTimer);
+        // Transient DOM error; allow observer/interval to retry
       }
-    }, 500);
+      return false;
+    };
+
+    // 1. Immediate synchronous check
+    attemptTrigger();
+
+    // 2. React DOM MutationObserver for sub-100ms trigger as soon as buttons mount
+    try {
+      observer = new MutationObserver(() => {
+        if (attemptTrigger()) {
+          cleanup();
+        }
+      });
+      observer.observe(document.documentElement || document.body, {
+        childList: true,
+        subtree: true,
+      });
+    } catch (_) {}
+
+    // 3. High-frequency polling fallback (every 80ms)
+    checkInterval = setInterval(() => {
+      if (attemptTrigger()) {
+        cleanup();
+      }
+    }, 80);
   }
 }
 
@@ -4583,13 +4705,50 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
 
   var _extractTinderAuthToken = function() {
     try {
+      if (window.__tinderAuthToken && typeof window.__tinderAuthToken === 'string' && window.__tinderAuthToken.length > 15) {
+        return window.__tinderAuthToken;
+      }
       var t = localStorage.getItem('TinderWeb/APIToken');
       if (t) return String(t).replace(/^["'](.*)["']$/, '$1').trim();
+
       var s = localStorage.getItem('TinderWeb/APIStore');
       if (s) {
         var p = JSON.parse(s);
         var tok = p && (p.token || p.auth_token || (p.user && p.user.api_token));
         if (tok) return String(tok).replace(/^["'](.*)["']$/, '$1').trim();
+      }
+
+      var persistRoot = localStorage.getItem('persist:root');
+      if (persistRoot) {
+        try {
+          var rootObj = JSON.parse(persistRoot);
+          if (rootObj && rootObj.auth) {
+            var authObj = typeof rootObj.auth === 'string' ? JSON.parse(rootObj.auth) : rootObj.auth;
+            var rTok = authObj && (authObj.apiToken || authObj.token || authObj.authToken || authObj.api_token);
+            if (rTok) return String(rTok).replace(/^["'](.*)["']$/, '$1').trim();
+          }
+        } catch (_) {}
+      }
+
+      var persistAuth = localStorage.getItem('persist:auth');
+      if (persistAuth) {
+        try {
+          var authObj2 = typeof persistAuth === 'string' ? JSON.parse(persistAuth) : persistAuth;
+          var rTok2 = authObj2 && (authObj2.apiToken || authObj2.token || authObj2.authToken || authObj2.api_token);
+          if (rTok2) return String(rTok2).replace(/^["'](.*)["']$/, '$1').trim();
+        } catch (_) {}
+      }
+
+      var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k) continue;
+        var val = localStorage.getItem(k);
+        if (!val) continue;
+        var cleanVal = val.replace(/^["'](.*)["']$/, '$1').trim();
+        if (uuidRegex.test(cleanVal)) {
+          return cleanVal;
+        }
       }
     } catch (_) {}
     return null;

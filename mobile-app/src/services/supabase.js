@@ -45,10 +45,14 @@ async function saveLocalAccount(user) {
 }
 
 // Base HTTP Request Wrapper for Supabase REST API
-async function apiRequest(endpoint, method = 'GET', body = null) {
+async function apiRequest(endpoint, method = 'GET', body = null, configOptions = {}) {
   const url = `${SUPABASE_URL}/rest/v1${endpoint}`;
   // PUBLISHABLE_KEY is verified registered and active (HTTP 200) for REST queries
   const key = PUBLISHABLE_KEY;
+
+  const maxRetries = typeof configOptions === 'number'
+    ? configOptions
+    : (configOptions?.retries ?? 1);
 
   const headers = {
     'apikey': key,
@@ -57,58 +61,72 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     'Prefer': 'return=representation',
   };
 
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timeoutId = controller ? setTimeout(() => controller.abort(), 10000) : null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 10000) : null;
 
-  try {
-    const options = {
-      method,
-      headers,
-    };
-    if (controller) {
-      options.signal = controller.signal;
-    }
-    if (body) {
-      options.body = JSON.stringify(body);
-    }
-
-    const response = await fetch(url, options);
-    if (timeoutId) clearTimeout(timeoutId);
-
-    const text = await response.text();
-    let data;
     try {
-      data = JSON.parse(text);
-    } catch (_) {
-      data = text;
+      const options = {
+        method,
+        headers,
+      };
+      if (controller) {
+        options.signal = controller.signal;
+      }
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(url, options);
+      if (timeoutId) clearTimeout(timeoutId);
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (_) {
+        data = text;
+      }
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        data,
+      };
+    } catch (error) {
+      if (timeoutId) clearTimeout(timeoutId);
+
+      const errorMsg = error?.message || String(error);
+      const isTransient =
+        error?.name === 'AbortError' ||
+        /network\s*(connection|request)\s*(failed|was\s*lost|is\s*offline)/i.test(errorMsg) ||
+        /the\s*network\s*connection\s*was\s*lost/i.test(errorMsg) ||
+        /fetch\s*failed/i.test(errorMsg) ||
+        /failed\s*to\s*fetch/i.test(errorMsg) ||
+        /connection\s*was\s*lost/i.test(errorMsg) ||
+        /socket\s*(closed|hang\s*up)/i.test(errorMsg) ||
+        /offline/i.test(errorMsg);
+
+      // On iOS, recycled keep-alive sockets dropped by the edge proxy throw NSURLErrorNetworkConnectionLost (-1005).
+      // A quick retry over a fresh connection resolves this seamlessly.
+      if (attempt < maxRetries && isTransient) {
+        await new Promise(res => setTimeout(res, 500));
+        continue;
+      }
+
+      if (isTransient) {
+        console.warn(`[Supabase Offline] ${method} ${endpoint}: Network unreachable or timed out (${errorMsg}).`);
+      } else {
+        console.error(`[Supabase Error] ${method} ${endpoint}:`, error);
+      }
+
+      return {
+        ok: false,
+        isOffline: isTransient,
+        status: isTransient ? 0 : 500,
+        error: errorMsg || 'Network request failed',
+      };
     }
-
-    return {
-      ok: response.ok,
-      status: response.status,
-      data,
-    };
-  } catch (error) {
-    if (timeoutId) clearTimeout(timeoutId);
-
-    const isNetworkOffline =
-      error?.name === 'AbortError' ||
-      /network\s*request\s*failed/i.test(error?.message || '') ||
-      /failed\s*to\s*fetch/i.test(error?.message || '') ||
-      /offline/i.test(error?.message || '');
-
-    if (isNetworkOffline) {
-      console.warn(`[Supabase Offline] ${method} ${endpoint}: Network unreachable or timed out (${error.message || 'offline'}).`);
-    } else {
-      console.error(`[Supabase Error] ${method} ${endpoint}:`, error);
-    }
-
-    return {
-      ok: false,
-      isOffline: isNetworkOffline,
-      status: isNetworkOffline ? 0 : 500,
-      error: error.message || 'Network request failed',
-    };
   }
 }
 
@@ -347,6 +365,59 @@ export const SupabaseService = {
     } catch (_) {}
 
     return { success: false, error: 'User account not found' };
+  },
+
+  /**
+   * Get current authenticated Flint user from local storage or persistent registry
+   */
+  async getCurrentUser() {
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEY_CURRENT_USER);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.email) {
+          return {
+            ...parsed,
+            fullName: parsed.fullName || parsed.full_name || parsed.name || parsed.email.split('@')[0],
+            name: parsed.fullName || parsed.full_name || parsed.name || parsed.email.split('@')[0],
+          };
+        }
+      }
+      const accounts = await getLocalAccounts();
+      const emails = Object.keys(accounts);
+      if (emails.length > 0) {
+        const lastUser = accounts[emails[emails.length - 1]];
+        await AsyncStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(lastUser));
+        return {
+          ...lastUser,
+          fullName: lastUser.fullName || lastUser.full_name || lastUser.name || lastUser.email.split('@')[0],
+          name: lastUser.fullName || lastUser.full_name || lastUser.name || lastUser.email.split('@')[0],
+        };
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  /**
+   * Update current authenticated Flint user profile details
+   */
+  async updateCurrentUser(updates = {}) {
+    try {
+      const current = await this.getCurrentUser();
+      if (!current) return null;
+      const cleanName = (updates.fullName || updates.full_name || updates.name || '').trim();
+      const updated = {
+        ...current,
+        ...updates,
+        ...(cleanName ? { fullName: cleanName, full_name: cleanName, name: cleanName } : {}),
+      };
+      await saveLocalAccount(updated);
+      return updated;
+    } catch (_) {
+      return null;
+    }
   },
 
   /**

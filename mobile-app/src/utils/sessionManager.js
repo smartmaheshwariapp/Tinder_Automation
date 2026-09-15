@@ -373,8 +373,8 @@ try {
       try {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed.isLoggedIn === 'boolean') {
-          // Cleanse phantom logins that lack a token or captured the landing page heading ("Swipe Right®")
-          if (parsed.isLoggedIn && (!parsed.token || parsed.accountName === 'Swipe Right®')) {
+          // Cleanse phantom logins that lack a token, captured the landing page heading ("Swipe Right®"), or captured a fake device ID ("Tinder Account" with no email)
+          if (parsed.isLoggedIn && (!parsed.token || parsed.accountName === 'Swipe Right®' || (parsed.accountName === 'Tinder Account' && !parsed.accountEmail))) {
             parsed.isLoggedIn = false;
             parsed.accountName = null;
             parsed.token = null;
@@ -400,6 +400,19 @@ export const setTinderAuthState = (data) => {
     pendingWebViewPurge = false;
     AsyncStorage.removeItem(STORAGE_KEY_PENDING_PURGE).catch(() => {});
   }
+
+  // Guard: Deduplicate identical auth updates within 30 seconds to prevent re-render loops and terminal spam
+  const isIdentical = data &&
+    data.isLoggedIn === tinderAuthState.isLoggedIn &&
+    data.token === tinderAuthState.token &&
+    (data.accountName === undefined || data.accountName === tinderAuthState.accountName) &&
+    (data.tinderPlan === undefined || data.tinderPlan === tinderAuthState.tinderPlan) &&
+    (data.likesRemaining === undefined || data.likesRemaining === tinderAuthState.likesRemaining);
+
+  if (isIdentical && (Date.now() - (tinderAuthState.lastUpdated || 0) < 30000)) {
+    return;
+  }
+
   tinderAuthState = {
     ...tinderAuthState,
     ...data,
@@ -530,9 +543,192 @@ export const parseTinderPlan = (profileData) => {
 };
 
 /**
+ * Production-grade parser for Tinder user profile payloads.
+ * Handles both v2/profile REST responses and DOM/CDP extracted payloads.
+ * Accurately extracts all 20+ consumer and AI profile attributes.
+ */
+export const parseTinderUserProfile = (user, planInfo = {}) => {
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+
+  // 1. Name
+  const name = user.name || user.full_name || null;
+
+  // 2. Age (from explicit age or birth_date)
+  let age = null;
+  if (typeof user.age === 'number') {
+    age = user.age;
+  } else if (typeof user.age === 'string' && !isNaN(Number(user.age))) {
+    age = Number(user.age);
+  } else if (user.birth_date) {
+    try {
+      const bday = new Date(user.birth_date);
+      const now = new Date();
+      let calculated = now.getFullYear() - bday.getFullYear();
+      const m = now.getMonth() - bday.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < bday.getDate())) {
+        calculated--;
+      }
+      if (calculated >= 18 && calculated <= 120) {
+        age = calculated;
+      }
+    } catch (_) {}
+  }
+
+  // 3. Bio
+  const bio = (user.bio || user.bioContext || user.about || '').trim();
+
+  // 4. Photos (highest quality CDN URLs)
+  let photos = [];
+  if (Array.isArray(user.photos)) {
+    photos = user.photos.map((p) => {
+      if (typeof p === 'string' && p.startsWith('http')) return p;
+      if (p && typeof p === 'object') {
+        if (p.url && typeof p.url === 'string') return p.url;
+        if (Array.isArray(p.processedFiles) && p.processedFiles.length > 0) {
+          const sorted = [...p.processedFiles].sort((a, b) => (b.width || 0) - (a.width || 0));
+          return sorted[0]?.url || p.processedFiles[0]?.url || null;
+        }
+        if (Array.isArray(p.processedVideos) && p.processedVideos.length > 0) {
+          return p.processedVideos[0]?.url || null;
+        }
+      }
+      return null;
+    }).filter(Boolean);
+  }
+
+  // 5. Profession / Job
+  let job = null;
+  if (Array.isArray(user.jobs) && user.jobs.length > 0) {
+    const parts = user.jobs.map((j) => {
+      if (typeof j === 'string') return j;
+      const title = (typeof j?.title === 'object' ? j.title?.name : j?.title) || '';
+      const company = (typeof j?.company === 'object' ? j.company?.name : j?.company) || '';
+      if (title && company) return `${title} at ${company}`;
+      return title || company || '';
+    }).filter(Boolean);
+    if (parts.length > 0) job = parts.join(', ');
+  } else if (typeof user.job === 'string') {
+    job = user.job;
+  } else if (typeof user.profession === 'string') {
+    job = user.profession;
+  }
+
+  // 6. Education / School
+  let school = null;
+  if (Array.isArray(user.schools) && user.schools.length > 0) {
+    school = user.schools.map((s) => (typeof s === 'string' ? s : s?.name)).filter(Boolean).join(', ');
+  } else if (typeof user.school === 'string') {
+    school = user.school;
+  } else if (typeof user.education === 'string') {
+    school = user.education;
+  }
+
+  // 7. Passions & Interests
+  let interests = [];
+  const rawInterests = user.user_interests || user.interests || user.passions || user.common_interests || [];
+  if (Array.isArray(rawInterests)) {
+    interests = rawInterests
+      .map((i) => (typeof i === 'string' ? i : (i?.name || i?.title || i?.id)))
+      .filter(Boolean);
+  }
+
+  // 8. Gender
+  let gender = null;
+  if (user.custom_gender) {
+    gender = user.custom_gender;
+  } else if (user.gender === 0) {
+    gender = 'Man';
+  } else if (user.gender === 1) {
+    gender = 'Woman';
+  } else if (user.gender === -1) {
+    gender = 'Non-binary';
+  } else if (typeof user.gender === 'string') {
+    gender = user.gender;
+  }
+
+  // 9. City / Location
+  const city = (typeof user.city === 'object' ? user.city?.name : user.city) ||
+               (typeof user.pos_info === 'object' ? user.pos_info?.city?.name : null) ||
+               (user.locationCity || null);
+
+  // 10. Descriptors & Lifestyle Attributes
+  const descriptors = [
+    ...(Array.isArray(user.selected_descriptors) ? user.selected_descriptors : []),
+    ...(Array.isArray(user.descriptors) ? user.descriptors : []),
+    ...(Array.isArray(user.lifestyle) ? user.lifestyle : []),
+  ];
+
+  const getDesc = (...terms) => {
+    if (descriptors.length === 0) return null;
+    const match = descriptors.find((d) => {
+      const title = (d.prompt_title || d.name || d.id || d.prompt_id || '').toLowerCase();
+      return terms.some((term) => title.includes(term.toLowerCase()));
+    });
+    if (!match) return null;
+    if (Array.isArray(match.choice_selections) && match.choice_selections.length > 0) {
+      return match.choice_selections.map((c) => (typeof c === 'object' ? (c.name || c.id) : c)).filter(Boolean).join(', ');
+    }
+    return match.name || match.choice_name || null;
+  };
+
+  const height = user.height || getDesc('height');
+  const lookingFor = user.lookingFor || user.relationship_intent || getDesc('looking for', 'relationship intent', 'intent', 'seeking');
+  const relationshipType = user.relationshipType || getDesc('relationship type', 'type of relationship', 'monogamy', 'open to');
+  const zodiac = user.zodiac || getDesc('zodiac', 'star sign', 'astrology');
+  const drinking = user.drinking || getDesc('drinking', 'drink', 'alcohol');
+  const smoking = user.smoking || getDesc('smoking', 'smoke', 'tobacco');
+  const workout = user.workout || getDesc('workout', 'exercise', 'fitness', 'gym');
+  const pets = user.pets || getDesc('pet', 'pets', 'dog', 'cat');
+  const communicationStyle = user.communicationStyle || getDesc('communication style', 'communication', 'texting');
+  const loveStyle = user.loveStyle || getDesc('love style', 'love language');
+  const educationLevel = school || getDesc('education', 'degree');
+
+  // 11. Languages
+  let languages = [];
+  const rawLangs = user.languages || user.spoken_languages || [];
+  if (Array.isArray(rawLangs) && rawLangs.length > 0) {
+    languages = rawLangs.map((l) => (typeof l === 'string' ? l : (l?.name || l?.title))).filter(Boolean);
+  } else {
+    const descLang = getDesc('language', 'languages');
+    if (descLang) languages = descLang.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+
+  return {
+    name,
+    age,
+    bio,
+    photos,
+    job,
+    school,
+    interests,
+    gender,
+    city,
+    height,
+    lookingFor,
+    relationshipType,
+    zodiac,
+    drinking,
+    smoking,
+    workout,
+    pets,
+    communicationStyle,
+    loveStyle,
+    education: educationLevel,
+    languages,
+    tinderPlan: planInfo?.plan || user.tinderPlan || 'free',
+    isTinderPro: typeof planInfo?.isPro === 'boolean' ? planInfo.isPro : Boolean(user.isTinderPro),
+    likesRemaining: planInfo?.likesRemaining !== undefined ? planInfo.likesRemaining : user.likesRemaining,
+    rateLimitedUntil: planInfo?.rateLimitedUntil !== undefined ? planInfo.rateLimitedUntil : user.rateLimitedUntil,
+    lastSyncedAt: Date.now(),
+  };
+};
+
+/**
  * Fast direct REST probe to test if an existing Tinder auth token is valid.
  * Confirms session in ~200ms without mounting a visible browser.
- * Also extracts Tinder subscription tier (Platinum, Gold, Plus, Free).
+ * Also extracts Tinder subscription tier (Platinum, Gold, Plus, Free) and full profile.
  */
 export const probeTinderSession = async (tokenToTest) => {
   const token = tokenToTest || tinderAuthState?.token;
@@ -557,11 +753,12 @@ export const probeTinderSession = async (tokenToTest) => {
       const email = account?.account_email || null;
 
       const planInfo = parseTinderPlan(data);
+      const parsedProfile = parseTinderUserProfile(user, planInfo);
 
       setTinderAuthState({
         isLoggedIn: true,
         token: cleanToken,
-        accountName: name || tinderAuthState.accountName || 'Tinder Account',
+        accountName: parsedProfile?.name || name || tinderAuthState.accountName || 'Tinder Account',
         accountEmail: email || tinderAuthState.accountEmail,
         tinderPlan: planInfo.plan,
         isTinderPro: planInfo.isPro,
@@ -571,9 +768,10 @@ export const probeTinderSession = async (tokenToTest) => {
 
       return {
         ok: true,
-        name,
+        name: parsedProfile?.name || name,
         email,
         user,
+        profile: parsedProfile,
         plan: planInfo.plan,
         isPro: planInfo.isPro,
         likesRemaining: planInfo.likesRemaining,

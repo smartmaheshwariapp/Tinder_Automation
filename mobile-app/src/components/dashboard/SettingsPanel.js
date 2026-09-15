@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../../utils/network';
+import TinderProfileCard from './TinderProfileCard';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -1623,58 +1624,16 @@ export default function SettingsPanel({
               </TouchableOpacity>
             </View>
 
-            {/* Profile Status Badge */}
-            {(() => {
-              const isProfileSynced = Boolean(
-                form?.userProfile &&
-                (form.userProfile.name || (form.userProfile.bio && form.userProfile.bio.length > 3) || (form.userProfile.interests && form.userProfile.interests.length > 0))
-              );
-              return (
-                <View style={styles.modalProfileStatusBadge}>
-                  <View style={[styles.syncStatusDot, { backgroundColor: isProfileSynced ? uiTheme.colors.success : uiTheme.colors.warning }]} />
-                  <Text style={styles.modalProfileStatusText} numberOfLines={1}>
-                    {isProfileSynced
-                      ? `Connected as ${form.userProfile.name || 'Tinder Profile'} · Synced ${lastSyncTime}`
-                      : 'Profile not yet synced from Tinder'}
-                  </Text>
-                  <TouchableOpacity accessibilityRole="button"
-                    style={styles.modalQuickSyncBtn}
-                    onPress={handleSyncNow}
-                    disabled={syncing}
-                    activeOpacity={0.8}
-                  >
-                    {syncing ? (
-                      <ActivityIndicator size="small" color={uiTheme.colors.primary} />
-                    ) : (
-                      <Text style={styles.modalQuickSyncBtnText}>
-                        {isProfileSynced ? 'Re-sync' : 'Sync Now'}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              );
-            })()}
-
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {PROFILE_FIELDS.map((field) => {
-                const rawVal = form?.userProfile?.[field.key] || (field.key === 'bio' ? form?.manualBio : null);
-                const hasRealVal = rawVal !== null && rawVal !== undefined && rawVal !== '' && (!Array.isArray(rawVal) || rawVal.length > 0);
-                const displayVal = hasRealVal
-                  ? (Array.isArray(rawVal) ? rawVal.join(', ') : String(rawVal))
-                  : field.default;
-
-                return (
-                  <View key={field.key} style={styles.previewField}>
-                    <View style={styles.previewFieldHeader}>
-                      <Ionicons name={field.icon} size={13} color={uiTheme.colors.primary} />
-                      <Text style={styles.previewLabel}>{field.label}</Text>
-                    </View>
-                    <Text style={[styles.previewValue, !hasRealVal && styles.previewValueEmpty]}>
-                      {displayVal}
-                    </Text>
-                  </View>
-                );
-              })}
+              <TinderProfileCard
+                profile={form?.userProfile}
+                settings={form}
+                stats={stats}
+                isLoggedIn={Boolean(form?.userProfile?.name || form?.userProfile?.bio)}
+                syncing={syncing}
+                onSync={handleSyncNow}
+                compact
+              />
             </ScrollView>
           </View>
         </View>

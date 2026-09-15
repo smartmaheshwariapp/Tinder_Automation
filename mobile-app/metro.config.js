@@ -9,5 +9,13 @@ config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, 'node_modules'),
 ];
 
+// Explicitly block any lookup into parent-level node_modules
+if (Array.isArray(config.resolver.blockList)) {
+  config.resolver.blockList.push(/[Ff]:[\\/]node_modules[\\/].*/);
+} else {
+  config.resolver.blockList = [/[Ff]:[\\/]node_modules[\\/].*/];
+}
+
 module.exports = config;
+
 

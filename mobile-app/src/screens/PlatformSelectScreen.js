@@ -22,6 +22,7 @@ import ActivityIndicator from "../components/common/SafeActivityIndicator";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   getAutoDetectedLocalIp,
   resolveLocalUrl,
@@ -46,6 +47,7 @@ import {
   getPendingWebViewPurge,
   setPendingWebViewPurge,
   probeTinderSession,
+  parseTinderUserProfile,
   saveOnDeviceSessionState,
   pushProgressFeedEvent,
   getOnDeviceWorker,
@@ -64,6 +66,7 @@ import NotificationCenterModal from "../components/NotificationCenterModal";
 import PermissionPrePromptModal from "../components/common/PermissionPrePromptModal";
 import LocationNoticeModal from "../components/common/LocationNoticeModal";
 import LocationService from "../services/locationService";
+import trackingService from "../services/trackingService";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -99,17 +102,16 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
   const handleLocationAcquired = useCallback((res) => {
     if (res && res.cityName && res.latitude && res.longitude) {
-      setLocalSettings((prev) => {
-        const updated = {
-          ...(prev || {}),
-          useDeviceLocation: true,
-          locationCity: res.cityName,
-          locationLatitude: res.latitude,
-          locationLongitude: res.longitude,
-        };
-        setSharedExtensionSettings(updated);
-        return updated;
-      });
+      const current = getSharedExtensionSettings();
+      const updated = {
+        ...(current || {}),
+        useDeviceLocation: true,
+        locationCity: res.cityName,
+        locationLatitude: res.latitude,
+        locationLongitude: res.longitude,
+      };
+      setSharedExtensionSettings(updated);
+      setLocalSettings(updated);
     }
   }, []);
 
@@ -180,6 +182,26 @@ export default function PlatformSelectScreen({ navigation, route }) {
     getSharedExtensionSettings(),
   );
 
+  // ── Authenticated Flint User (Hydrated from route params or persistent local account) ──
+  const [currentUser, setCurrentUser] = useState(() => route?.params?.user || null);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        if (!currentUser) {
+          const u = await SupabaseService.getCurrentUser();
+          if (u && isMounted) {
+            setCurrentUser(u);
+          }
+        }
+      } catch (_) {}
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]);
+
   useEffect(() => {
     const unsubAgent = subscribeSharedAgentState(setAgentState);
     const unsubSettings = subscribeSharedExtensionSettings(setLocalSettings);
@@ -244,24 +266,23 @@ export default function PlatformSelectScreen({ navigation, route }) {
         }
       } catch (_) { }
 
-      setLocalSettings((prev) => {
-        const merged = {
-          ...(prev || {}),
-          ...(personality
-            ? { personalityStyle: personality, chattingStyle: personality }
-            : {}),
-          ...(frequency
-            ? { replyFrequencyMinutes: frequency, scheduleInterval: frequency }
-            : {}),
-          ...(safeMode !== undefined ? { safeModeEnabled: safeMode } : {}),
-          ...(goals ? { primaryGoals: goals } : {}),
-          ...(country ? { targetCountry: country } : {}),
-          ...(languages ? { targetLanguages: languages } : {}),
-          ...(fullPhone ? { whatsappNumber: fullPhone } : {}),
-        };
-        setSharedExtensionSettings(merged);
-        return merged;
-      });
+      const current = getSharedExtensionSettings();
+      const merged = {
+        ...(current || {}),
+        ...(personality
+          ? { personalityStyle: personality, chattingStyle: personality }
+          : {}),
+        ...(frequency
+          ? { replyFrequencyMinutes: frequency, scheduleInterval: frequency }
+          : {}),
+        ...(safeMode !== undefined ? { safeModeEnabled: safeMode } : {}),
+        ...(goals ? { primaryGoals: goals } : {}),
+        ...(country ? { targetCountry: country } : {}),
+        ...(languages ? { targetLanguages: languages } : {}),
+        ...(fullPhone ? { whatsappNumber: fullPhone } : {}),
+      };
+      setSharedExtensionSettings(merged);
+      setLocalSettings(merged);
     }
   }, [route?.params?.onboardingData]);
 
@@ -270,7 +291,16 @@ export default function PlatformSelectScreen({ navigation, route }) {
       const merged = { ...localSettings, ...updatedSettings };
       setLocalSettings(merged);
       setSharedExtensionSettings(merged);
-      const userId = route?.params?.userId;
+      if (updatedSettings?.accountProfile?.name) {
+        const newName = updatedSettings.accountProfile.name.trim();
+        try {
+          const updated = await SupabaseService.updateCurrentUser({ fullName: newName, name: newName });
+          if (updated) {
+            setCurrentUser(updated);
+          }
+        } catch (_) {}
+      }
+      const userId = route?.params?.userId || currentUser?.id;
       if (userId) {
         SupabaseService.saveUserSnapshot(userId, {
           platform: "tinder",
@@ -279,50 +309,50 @@ export default function PlatformSelectScreen({ navigation, route }) {
       }
       return true;
     },
-    [localSettings, route?.params?.userId],
+    [localSettings, route?.params?.userId, currentUser?.id],
   );
 
   const handleSyncProfileFromHome = useCallback(async () => {
-    const auth = getTinderAuthState();
+    let auth = getTinderAuthState();
+    if (!auth?.token) {
+      try {
+        const raw = await AsyncStorage.getItem('@linksy_tinder_auth_state');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.token) {
+            auth = parsed;
+            setTinderAuthState(parsed);
+          }
+        }
+      } catch (_) {}
+    }
+
     if (!auth?.token) {
       return {
         success: false,
         error: "Please connect your Tinder account first.",
       };
     }
+
     const res = await probeTinderSession(auth.token);
-    if (res?.ok && res.user) {
-      const u = res.user;
-      const profile = {
-        name: u.name || null,
-        bio: u.bio || "",
-        interests: (u.user_interests || u.interests || [])
-          .map((i) => i.name || i)
-          .filter(Boolean),
-        job:
-          (u.jobs || [])
-            .map(
-              (j) =>
-                (j.title && j.title.name) ||
-                (j.company && j.company.name) ||
-                "",
-            )
-            .filter(Boolean)
-            .join(", ") || null,
-        school:
-          (u.schools || [])
-            .map((s) => s.name)
-            .filter(Boolean)
-            .join(", ") || null,
-        photos: (u.photos || []).map((p) => p.url).filter(Boolean),
-        tinderPlan: res.plan || 'free',
-        isTinderPro: Boolean(res.isPro),
+    if (res?.ok && (res.profile || res.user)) {
+      const profile = res.profile || parseTinderUserProfile(res.user, {
+        plan: res.plan,
+        isPro: res.isPro,
         likesRemaining: res.likesRemaining,
         rateLimitedUntil: res.rateLimitedUntil,
-      };
+      });
       await handleSaveSettings({ userProfile: profile });
       return { success: true, profile };
     }
+
+    if (res?.expired) {
+      return {
+        success: false,
+        error: "Your Tinder session has expired. Please open Tinder to reconnect.",
+      };
+    }
+
     return {
       success: false,
       error: "Could not sync profile. Please open the Tinder browser session.",
@@ -420,8 +450,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
     refresh: refreshStats,
   } = useExtensionStats(orchestratorUrl, environment !== "on_device");
 
+  const lastAuthProbeTimeRef = useRef(0);
+
   // Auth detection & login status refresh
-  const checkAuthStatus = useCallback(async () => {
+  const checkAuthStatus = useCallback(async (force = false) => {
     // 1. If an explicit logout was performed or purge is pending, force logged-out state
     if (getPendingWebViewPurge()) {
       setIsLoggedIn(false);
@@ -429,44 +461,76 @@ export default function PlatformSelectScreen({ navigation, route }) {
       return;
     }
 
-    const auth = getTinderAuthState();
+    let auth = getTinderAuthState();
+    if (environment === "on_device" && !auth?.token) {
+      try {
+        const raw = await AsyncStorage.getItem('@linksy_tinder_auth_state');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.token) {
+            auth = parsed;
+            setTinderAuthState(parsed);
+          }
+        }
+      } catch (_) {}
+    }
 
     // 2. For On-Device mode: strictly validate using real Tinder API token
     if (environment === "on_device") {
       setDeviceLatencyMs(null);
       if (auth?.token) {
+        setIsLoggedIn(Boolean(auth?.isLoggedIn));
+        const now = Date.now();
+        // Throttle probe to once every 60 seconds unless forced, preventing render thrashing
+        if (!force && now - lastAuthProbeTimeRef.current < 60000) {
+          setCheckingAuth(false);
+          return;
+        }
+        lastAuthProbeTimeRef.current = now;
+
         const requestStarted = Date.now();
         probeTinderSession(auth.token)
           .then((res) => {
             if (res?.ok) {
               setDeviceLatencyMs(Math.max(0, Date.now() - requestStarted));
               setIsLoggedIn(true);
-              if (res.plan) {
-                setLocalSettings((prev) => {
-                  const prevProfile = prev?.userProfile || {};
-                  if (prevProfile.tinderPlan !== res.plan) {
+              if (res.profile || res.user || res.plan) {
+                const profile = res.profile || parseTinderUserProfile(res.user, {
+                  plan: res.plan,
+                  isPro: res.isPro,
+                  likesRemaining: res.likesRemaining,
+                  rateLimitedUntil: res.rateLimitedUntil,
+                });
+                if (profile) {
+                  const current = getSharedExtensionSettings();
+                  const prevProfile = current?.userProfile || {};
+                  // Only dispatch state updates if meaningful fields actually changed
+                  const hasChanged =
+                    !prevProfile.lastSyncedAt ||
+                    prevProfile.name !== profile.name ||
+                    prevProfile.bio !== profile.bio ||
+                    prevProfile.age !== profile.age ||
+                    prevProfile.tinderPlan !== profile.tinderPlan ||
+                    (profile.photos && profile.photos.length !== (prevProfile.photos || []).length);
+
+                  if (hasChanged) {
                     const updated = {
-                      ...(prev || {}),
+                      ...(current || {}),
                       userProfile: {
                         ...prevProfile,
-                        tinderPlan: res.plan,
-                        isTinderPro: Boolean(res.isPro),
-                        likesRemaining: res.likesRemaining,
-                        rateLimitedUntil: res.rateLimitedUntil,
-                      }
+                        ...profile,
+                      },
                     };
                     setSharedExtensionSettings(updated);
-                    return updated;
+                    setLocalSettings(updated);
                   }
-                  return prev;
-                });
+                }
               }
             } else if (res?.expired) {
               setIsLoggedIn(false);
             }
           })
           .catch(() => { });
-        setIsLoggedIn(Boolean(auth?.isLoggedIn));
       } else {
         // Unauthenticated or closed without logging in — no valid token exists.
         // Cleanse any dirty/corrupted auth state.
@@ -490,7 +554,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
       if (auth.isLoggedIn) return;
     }
 
-    const cachedProfile = localSettings?.userProfile;
+    const cachedProfile = getSharedExtensionSettings()?.userProfile;
 
     // 4. Remote/VPS mode: Check live status from orchestrator if explicitly logged in
     if (stats && stats.tinderAccount?.isLoggedIn) {
@@ -544,7 +608,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
     // Default to false if no live verification confirms logged in
     setIsLoggedIn(false);
     setCheckingAuth(false);
-  }, [stats, localSettings, orchestratorUrl, environment]);
+  }, [orchestratorUrl, environment, stats]);
 
   useFocusEffect(
     useCallback(() => {
@@ -569,11 +633,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
               data.settings?.userProfile &&
               (data.settings.userProfile.name || data.settings.userProfile.bio)
             ) {
-              setLocalSettings((prev) => {
-                const merged = { ...(prev || {}), ...data.settings };
-                setSharedExtensionSettings(merged);
-                return merged;
-              });
+              const current = getSharedExtensionSettings();
+              const merged = { ...(current || {}), ...data.settings };
+              setSharedExtensionSettings(merged);
+              setLocalSettings(merged);
               // NOTE: Do NOT call setTinderAuthState/setIsLoggedIn here.
               // The extension-settings profile is stale context — it doesn't prove
               // the user is currently logged in (profile persists after logout).
@@ -968,12 +1031,22 @@ export default function PlatformSelectScreen({ navigation, route }) {
       ) : homeTab === "profile" ? (
         <ProfileDetails
           settings={localSettings}
-          user={route?.params?.user}
+          user={currentUser || route?.params?.user}
           isLoggedIn={isLoggedIn}
+          stats={environment === "on_device" ? agentState : stats}
           onBack={() => setHomeTab("home")}
           onOpenTinder={() => handleOpenLiveFeed("Tinder")}
           onSync={handleSyncProfileFromHome}
           onSave={handleSaveSettings}
+          onLogout={handleLogout}
+          onDeleteData={async () => {
+            await handleLogout();
+            try {
+              const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+              await AsyncStorage.clear();
+            } catch (_) {}
+            navigation.replace("Auth");
+          }}
         />
       ) : homeTab === "appSettings" ? (
         <AppSettings
