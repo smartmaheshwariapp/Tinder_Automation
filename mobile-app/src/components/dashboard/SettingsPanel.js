@@ -27,17 +27,13 @@ const TINDER_ICON = require('../../../assets/flirteasy/tinder.jpg');
 
 const SWIPE_PRESETS = [0, 10, 50, 100, 150];
 const MSG_PRESETS = [0, 10, 50, 100, 150];
-const SCHEDULE_PRESETS = [
-  { label: '30min', value: 30 },
-  { label: '60min', value: 60 },
-  { label: '120min', value: 120 },
-];
 
 export { REGION_FILTERS, CITY_PRESETS } from '../../utils/locationHubs';
 import { REGION_FILTERS, CITY_PRESETS } from '../../utils/locationHubs';
 import LocationService from '../../services/locationService';
 import LocationNoticeModal from '../common/LocationNoticeModal';
-import { getTinderAuthState, subscribeTinderAuthState } from '../../utils/sessionManager';
+// ─── Feature Flags (Hidden in On-Device mode for clean UX, preserved for future cloud mode) ───
+const SHOW_LOCATION_FEATURE = false;
 
 const BIO_MODES = [
   { id: 'tinder', label: 'Sync' },
@@ -651,10 +647,9 @@ export default function SettingsPanel({
 
   const isSafetyOn = form.safetyMode !== false;
 
-  // In Safety Mode ON, V2 enforces exact defaults: 50 swipes, 50 msgs, 120min schedule
+  // In Safety Mode ON, V2 enforces exact defaults: 50 swipes, 50 msgs
   const activeSwipes = isSafetyOn ? 50 : (form.likesPerCycle ?? 50);
   const activeMsgs = isSafetyOn ? 50 : (form.messagesPerCycle ?? 50);
-  const activeInterval = isSafetyOn ? 120 : (form.scheduleInterval ?? 120);
 
   return (
     <View style={styles.container}>
@@ -821,34 +816,6 @@ export default function SettingsPanel({
                   </View>
                 </View>
 
-                {/* Schedule Preset Row */}
-                <View style={styles.presetRow}>
-                  <Text style={styles.presetLabel}>Schedule AI agent every</Text>
-                  <View style={styles.presetButtonGroup}>
-                    {SCHEDULE_PRESETS.map(item => (
-                      <TouchableOpacity accessibilityRole="button"
-                        key={item.value}
-                        disabled={isSafetyOn}
-                        style={[
-                          styles.presetBtn,
-                          activeInterval === item.value && styles.presetBtnActive,
-                        ]}
-                        onPress={() => updateField('scheduleInterval', item.value)}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={[
-                            styles.presetBtnText,
-                            activeInterval === item.value && styles.presetBtnTextActive,
-                          ]}
-                        >
-                          {item.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
                 {isSafetyOn && (
                   <View style={styles.lockedNoteRow}>
                     <Ionicons name="lock-closed" size={12} color={uiTheme.colors.muted} style={{ marginRight: 6 }} />
@@ -863,369 +830,373 @@ export default function SettingsPanel({
         </View>
 
         {/* ════════════════════ CATEGORY: MATCHING LOCATION ════════════════════ */}
-        <Text style={styles.categoryLabel}>MATCHING LOCATION</Text>
+        {SHOW_LOCATION_FEATURE && (
+          <>
+            <Text style={styles.categoryLabel}>MATCHING LOCATION</Text>
 
-        <View style={styles.card}>
-          <TouchableOpacity accessibilityRole="button"
-            style={styles.cardHeaderRow}
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setLocationCollapsed(!locationCollapsed);
-            }}
-            activeOpacity={0.85}
-          >
-            <View style={styles.locationHeaderLeft}>
-              <View style={styles.locationIconWrap}>
-                <Ionicons name="navigate-circle" size={18} color={uiTheme.colors.primary} />
-              </View>
-              <Text style={styles.cardTitle}>Matching Location</Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={[styles.locationActiveBadge, form?.useDeviceLocation && styles.locationActiveBadgeLive]}>
-                <View style={[styles.locationActiveDot, form?.useDeviceLocation && styles.locationActiveDotLive]} />
-                <Text style={[styles.locationActiveText, form?.useDeviceLocation && styles.locationActiveTextLive]} numberOfLines={1}>
-                  {form?.useDeviceLocation ? 'Current Location' : (form?.locationCity || 'New York, NY')}
-                </Text>
-              </View>
-              <Ionicons
-                name={locationCollapsed ? 'chevron-down' : 'chevron-up'}
-                size={16}
-                color={uiTheme.colors.muted}
-              />
-            </View>
-          </TouchableOpacity>
-
-          {!locationCollapsed && (
-            <View style={{ marginTop: 10 }}>
-              {/* Segmented Mode Selector: Live Near Me | Pick a City */}
-              <View style={styles.segmentedSelector}>
-                <TouchableOpacity accessibilityRole="button"
-                  style={[
-                    styles.segBtn,
-                    form?.useDeviceLocation && styles.segBtnActive,
-                  ]}
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    if (!form?.useDeviceLocation) {
-                      handleToggleDeviceLocation(true);
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <Ionicons
-                      name="navigate"
-                      size={13}
-                      color={form?.useDeviceLocation ? uiTheme.colors.success : uiTheme.colors.muted}
-                    />
-                    <Text
-                      style={[
-                        styles.segBtnText,
-                        form?.useDeviceLocation && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' },
-                      ]}
-                    >
-                      Live Near Me
-                    </Text>
+            <View style={styles.card}>
+              <TouchableOpacity accessibilityRole="button"
+                style={styles.cardHeaderRow}
+                onPress={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setLocationCollapsed(!locationCollapsed);
+                }}
+                activeOpacity={0.85}
+              >
+                <View style={styles.locationHeaderLeft}>
+                  <View style={styles.locationIconWrap}>
+                    <Ionicons name="navigate-circle" size={18} color={uiTheme.colors.primary} />
                   </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity accessibilityRole="button"
-                  style={[
-                    styles.segBtn,
-                    !form?.useDeviceLocation && styles.segBtnActive,
-                  ]}
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    if (form?.useDeviceLocation) {
-                      updateField('useDeviceLocation', false);
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <Ionicons
-                      name="globe-outline"
-                      size={13}
-                      color={!form?.useDeviceLocation ? uiTheme.colors.primary : uiTheme.colors.muted}
-                    />
-                    <Text
-                      style={[
-                        styles.segBtnText,
-                        !form?.useDeviceLocation && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' },
-                      ]}
-                    >
-                      Pick a City
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-              {/* ─── Mode 1: Live Near Me (Phone GPS) ─── */}
-              {form?.useDeviceLocation ? (
-                <View style={{ marginTop: 10 }}>
-                  <View style={styles.liveGpsCard}>
-                    <View style={styles.liveGpsTopRow}>
-                      <View style={{ flex: 1, paddingRight: 12 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <View style={styles.liveGpsDot} />
-                          <Text style={styles.liveGpsCity} numberOfLines={1}>
-                            {form?.locationCity || 'Current Location'}
-                          </Text>
-                        </View>
-                        <Text style={styles.liveGpsSub}>
-                          {fetchingGps
-                            ? 'Detecting live phone GPS…'
-                            : 'Live Phone GPS Connected • Matching nearby'}
-                        </Text>
-                      </View>
-
-                      <TouchableOpacity accessibilityRole="button"
-                        style={styles.refreshGpsBtn}
-                        onPress={() => handleToggleDeviceLocation(true)}
-                        disabled={fetchingGps}
-                        activeOpacity={0.8}
-                      >
-                        {fetchingGps ? (
-                          <ActivityIndicator size="small" color={uiTheme.colors.success} />
-                        ) : (
-                          <>
-                            <Ionicons name="refresh" size={13} color={uiTheme.colors.success} />
-                            <Text style={styles.refreshGpsBtnText}>Update</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                  <Text style={styles.cardTitle}>Matching Location</Text>
                 </View>
-              ) : (
-                /* ─── Mode 2: Pick a City (Passport) ─── */
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[styles.locationActiveBadge, form?.useDeviceLocation && styles.locationActiveBadgeLive]}>
+                    <View style={[styles.locationActiveDot, form?.useDeviceLocation && styles.locationActiveDotLive]} />
+                    <Text style={[styles.locationActiveText, form?.useDeviceLocation && styles.locationActiveTextLive]} numberOfLines={1}>
+                      {form?.useDeviceLocation ? 'Current Location' : (form?.locationCity || 'New York, NY')}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={locationCollapsed ? 'chevron-down' : 'chevron-up'}
+                    size={16}
+                    color={uiTheme.colors.muted}
+                  />
+                </View>
+              </TouchableOpacity>
+
+              {!locationCollapsed && (
                 <View style={{ marginTop: 10 }}>
-                  {/* Current Selected City Banner */}
-                  <View style={styles.selectedCityBanner}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                      {CITY_PRESETS.find(p => (form?.locationCity || '').includes(p.short))?.flag ? (
-                        <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 22 }}>
-                          {CITY_PRESETS.find(p => (form?.locationCity || '').includes(p.short)).flag}
+                  {/* Segmented Mode Selector: Live Near Me | Pick a City */}
+                  <View style={styles.segmentedSelector}>
+                    <TouchableOpacity accessibilityRole="button"
+                      style={[
+                        styles.segBtn,
+                        form?.useDeviceLocation && styles.segBtnActive,
+                      ]}
+                      onPress={() => {
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        if (!form?.useDeviceLocation) {
+                          handleToggleDeviceLocation(true);
+                        }
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <Ionicons
+                          name="navigate"
+                          size={13}
+                          color={form?.useDeviceLocation ? uiTheme.colors.success : uiTheme.colors.muted}
+                        />
+                        <Text
+                          style={[
+                            styles.segBtnText,
+                            form?.useDeviceLocation && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' },
+                          ]}
+                        >
+                          Live Near Me
                         </Text>
-                      ) : (
-                        <View style={styles.selectedCityIconWrap}>
-                          <Ionicons name="globe-outline" size={20} color={uiTheme.colors.primary} />
-                        </View>
-                      )}
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.selectedCityTitle} numberOfLines={1}>
-                          {form?.locationCity || 'New York, USA'}
-                        </Text>
-                        <Text style={styles.selectedCitySub}>Active Dating Location</Text>
                       </View>
-                    </View>
-                    <View style={styles.passportActivePill}>
-                      <Text style={styles.passportActiveText}>PASSPORT</Text>
-                    </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity accessibilityRole="button"
+                      style={[
+                        styles.segBtn,
+                        !form?.useDeviceLocation && styles.segBtnActive,
+                      ]}
+                      onPress={() => {
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        if (form?.useDeviceLocation) {
+                          updateField('useDeviceLocation', false);
+                        }
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <Ionicons
+                          name="globe-outline"
+                          size={13}
+                          color={!form?.useDeviceLocation ? uiTheme.colors.primary : uiTheme.colors.muted}
+                        />
+                        <Text
+                          style={[
+                            styles.segBtnText,
+                            !form?.useDeviceLocation && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' },
+                          ]}
+                        >
+                          Pick a City
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
                   </View>
 
-                  {/* Quick Popular Destinations Chips */}
-                  <View style={{ marginTop: 10 }}>
-                    <Text style={styles.quickLabel}>POPULAR DESTINATIONS</Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.quickChipsScroll}
-                    >
-                      {popularPresets.map(preset => {
-                        const isSelected = (form?.locationCity || '').includes(preset.short) ||
-                          (Math.abs((form?.locationLatitude || 0) - preset.latitude) < 0.05 &&
-                           Math.abs((form?.locationLongitude || 0) - preset.longitude) < 0.05);
-                        return (
+                  {/* ─── Mode 1: Live Near Me (Phone GPS) ─── */}
+                  {form?.useDeviceLocation ? (
+                    <View style={{ marginTop: 10 }}>
+                      <View style={styles.liveGpsCard}>
+                        <View style={styles.liveGpsTopRow}>
+                          <View style={{ flex: 1, paddingRight: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <View style={styles.liveGpsDot} />
+                              <Text style={styles.liveGpsCity} numberOfLines={1}>
+                                {form?.locationCity || 'Current Location'}
+                              </Text>
+                            </View>
+                            <Text style={styles.liveGpsSub}>
+                              {fetchingGps
+                                ? 'Detecting live phone GPS…'
+                                : 'Live Phone GPS Connected • Matching nearby'}
+                            </Text>
+                          </View>
+
                           <TouchableOpacity accessibilityRole="button"
-                            key={preset.id}
-                            style={[styles.quickChip, isSelected && styles.quickChipActive]}
-                            onPress={() => handleSelectCity(preset)}
+                            style={styles.refreshGpsBtn}
+                            onPress={() => handleToggleDeviceLocation(true)}
+                            disabled={fetchingGps}
                             activeOpacity={0.8}
                           >
-                            <Text style={styles.quickChipFlag}>{preset.flag}</Text>
-                            <Text style={[styles.quickChipText, isSelected && styles.quickChipTextActive]}>
-                              {preset.short}
-                            </Text>
-                            {isSelected && (
-                              <Ionicons name="checkmark-circle" size={12} color={uiTheme.colors.primary} style={{ marginLeft: 2 }} />
+                            {fetchingGps ? (
+                              <ActivityIndicator size="small" color={uiTheme.colors.success} />
+                            ) : (
+                              <>
+                                <Ionicons name="refresh" size={13} color={uiTheme.colors.success} />
+                                <Text style={styles.refreshGpsBtnText}>Update</Text>
+                              </>
                             )}
                           </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                    /* ─── Mode 2: Pick a City (Passport) ─── */
+                    <View style={{ marginTop: 10 }}>
+                      {/* Current Selected City Banner */}
+                      <View style={styles.selectedCityBanner}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                          {CITY_PRESETS.find(p => (form?.locationCity || '').includes(p.short))?.flag ? (
+                            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 22 }}>
+                              {CITY_PRESETS.find(p => (form?.locationCity || '').includes(p.short)).flag}
+                            </Text>
+                          ) : (
+                            <View style={styles.selectedCityIconWrap}>
+                              <Ionicons name="globe-outline" size={20} color={uiTheme.colors.primary} />
+                            </View>
+                          )}
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.selectedCityTitle} numberOfLines={1}>
+                              {form?.locationCity || 'New York, USA'}
+                            </Text>
+                            <Text style={styles.selectedCitySub}>Active Dating Location</Text>
+                          </View>
+                        </View>
+                        <View style={styles.passportActivePill}>
+                          <Text style={styles.passportActiveText}>PASSPORT</Text>
+                        </View>
+                      </View>
 
-                  {/* Search Bar for Cities */}
-                  <View style={styles.hubSearchWrap}>
-                    <Ionicons name="search-outline" size={15} color={uiTheme.colors.muted} style={{ marginRight: 8 }} />
-                    <TextInput
-                      style={styles.hubSearchInput}
-                      placeholder="Search city or country (e.g. London, Tokyo, Miami)..."
-                      placeholderTextColor="#555268"
-                      value={citySearchQuery}
-                      onChangeText={setCitySearchQuery}
-                      autoCapitalize="none"
-                    />
-                    {citySearchQuery.length > 0 && (
-                      <TouchableOpacity accessibilityRole="button"
-                        onPress={() => setCitySearchQuery('')}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      {/* Quick Popular Destinations Chips */}
+                      <View style={{ marginTop: 10 }}>
+                        <Text style={styles.quickLabel}>POPULAR DESTINATIONS</Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.quickChipsScroll}
+                        >
+                          {popularPresets.map(preset => {
+                            const isSelected = (form?.locationCity || '').includes(preset.short) ||
+                              (Math.abs((form?.locationLatitude || 0) - preset.latitude) < 0.05 &&
+                               Math.abs((form?.locationLongitude || 0) - preset.longitude) < 0.05);
+                            return (
+                              <TouchableOpacity accessibilityRole="button"
+                                key={preset.id}
+                                style={[styles.quickChip, isSelected && styles.quickChipActive]}
+                                onPress={() => handleSelectCity(preset)}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.quickChipFlag}>{preset.flag}</Text>
+                                <Text style={[styles.quickChipText, isSelected && styles.quickChipTextActive]}>
+                                  {preset.short}
+                                </Text>
+                                {isSelected && (
+                                  <Ionicons name="checkmark-circle" size={12} color={uiTheme.colors.primary} style={{ marginLeft: 2 }} />
+                                )}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+
+                      {/* Search Bar for Cities */}
+                      <View style={styles.hubSearchWrap}>
+                        <Ionicons name="search-outline" size={15} color={uiTheme.colors.muted} style={{ marginRight: 8 }} />
+                        <TextInput
+                          style={styles.hubSearchInput}
+                          placeholder="Search city or country (e.g. London, Tokyo, Miami)..."
+                          placeholderTextColor="#555268"
+                          value={citySearchQuery}
+                          onChangeText={setCitySearchQuery}
+                          autoCapitalize="none"
+                        />
+                        {citySearchQuery.length > 0 && (
+                          <TouchableOpacity accessibilityRole="button"
+                            onPress={() => setCitySearchQuery('')}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="close-circle" size={16} color={uiTheme.colors.muted} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Region Filter Tabs */}
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.regionFilterScroll}
+                        contentContainerStyle={styles.regionFilterContainer}
                       >
-                        <Ionicons name="close-circle" size={16} color={uiTheme.colors.muted} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                        {REGION_FILTERS.map(region => (
+                          <TouchableOpacity accessibilityRole="button"
+                            key={region}
+                            style={[styles.regionTab, selectedRegion === region && styles.regionTabActive]}
+                            onPress={() => {
+                              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                              setSelectedRegion(region);
+                            }}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={[styles.regionTabText, selectedRegion === region && styles.regionTabTextActive]}>
+                              {region}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
 
-                  {/* Region Filter Tabs */}
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.regionFilterScroll}
-                    contentContainerStyle={styles.regionFilterContainer}
-                  >
-                    {REGION_FILTERS.map(region => (
+                      {/* Height-Constrained Scrollable City List */}
+                      <ScrollView
+                        style={styles.cityListScroll}
+                        nestedScrollEnabled={true}
+                        showsVerticalScrollIndicator={true}
+                        contentContainerStyle={styles.hubGrid}
+                      >
+                        {filteredPresets.map((preset) => {
+                          const isActive = (form?.locationCity || '').includes(preset.short) ||
+                            (Math.abs((form?.locationLatitude || 0) - preset.latitude) < 0.05 &&
+                             Math.abs((form?.locationLongitude || 0) - preset.longitude) < 0.05);
+                          return (
+                            <TouchableOpacity accessibilityRole="button"
+                              key={preset.id}
+                              style={[styles.hubCard, isActive && styles.hubCardActive]}
+                              onPress={() => handleSelectCity(preset)}
+                              activeOpacity={0.75}
+                            >
+                              <View style={styles.hubCardTop}>
+                                <Text style={styles.hubCardFlag}>{preset.flag}</Text>
+                                {isActive ? (
+                                  <Ionicons name="checkmark-circle" size={15} color={uiTheme.colors.primary} />
+                                ) : (
+                                  <Text style={styles.hubCountryCode}>{preset.langCode.toUpperCase()}</Text>
+                                )}
+                              </View>
+                              <Text style={[styles.hubCardCity, isActive && styles.hubCardCityActive]} numberOfLines={1}>
+                                {preset.short}
+                              </Text>
+                              <Text style={styles.hubCardCountry} numberOfLines={1}>
+                                {preset.country}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+
+                      {filteredPresets.length === 0 && (
+                        <View style={styles.noHubsFoundWrap}>
+                          <Ionicons name="search-outline" size={22} color="#555268" />
+                          <Text style={styles.noHubsFoundText}>No cities matching "{citySearchQuery}"</Text>
+                          <TouchableOpacity accessibilityRole="button" onPress={() => setCitySearchQuery('')} style={{ marginTop: 4 }}>
+                            <Text style={styles.resetFilterText}>Clear search</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      {/* Custom Location Accordion Toggle */}
                       <TouchableOpacity accessibilityRole="button"
-                        key={region}
-                        style={[styles.regionTab, selectedRegion === region && styles.regionTabActive]}
+                        style={styles.customAccordionToggle}
                         onPress={() => {
                           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                          setSelectedRegion(region);
+                          setShowCustomCoords(!showCustomCoords);
                         }}
-                        activeOpacity={0.75}
+                        activeOpacity={0.8}
                       >
-                        <Text style={[styles.regionTabText, selectedRegion === region && styles.regionTabTextActive]}>
-                          {region}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons
+                            name={showCustomCoords ? "chevron-up" : "add-circle-outline"}
+                            size={14}
+                            color={uiTheme.colors.muted}
+                          />
+                          <Text style={styles.customAccordionText}>
+                            {showCustomCoords ? "Hide custom place" : "Can't find your city? Set a custom place"}
+                          </Text>
+                        </View>
                       </TouchableOpacity>
-                    ))}
-                  </ScrollView>
 
-                  {/* Height-Constrained Scrollable City List */}
-                  <ScrollView
-                    style={styles.cityListScroll}
-                    nestedScrollEnabled={true}
-                    showsVerticalScrollIndicator={true}
-                    contentContainerStyle={styles.hubGrid}
-                  >
-                    {filteredPresets.map((preset) => {
-                      const isActive = (form?.locationCity || '').includes(preset.short) ||
-                        (Math.abs((form?.locationLatitude || 0) - preset.latitude) < 0.05 &&
-                         Math.abs((form?.locationLongitude || 0) - preset.longitude) < 0.05);
-                      return (
-                        <TouchableOpacity accessibilityRole="button"
-                          key={preset.id}
-                          style={[styles.hubCard, isActive && styles.hubCardActive]}
-                          onPress={() => handleSelectCity(preset)}
-                          activeOpacity={0.75}
-                        >
-                          <View style={styles.hubCardTop}>
-                            <Text style={styles.hubCardFlag}>{preset.flag}</Text>
-                            {isActive ? (
-                              <Ionicons name="checkmark-circle" size={15} color={uiTheme.colors.primary} />
-                            ) : (
-                              <Text style={styles.hubCountryCode}>{preset.langCode.toUpperCase()}</Text>
-                            )}
+                      {/* Custom Location Card (Collapsible) */}
+                      {showCustomCoords && (
+                        <View style={styles.customCoordsCard}>
+                          <View>
+                            <Text style={styles.customInputLabel}>City or Region Name</Text>
+                            <TextInput
+                              style={styles.customTextInput}
+                              value={form?.locationCity || ''}
+                              onChangeText={(v) => {
+                                updateField('locationCity', v);
+                                updateField('useDeviceLocation', false);
+                              }}
+                              placeholder="e.g. Austin, TX or Berlin, Germany"
+                              placeholderTextColor="#555268"
+                            />
                           </View>
-                          <Text style={[styles.hubCardCity, isActive && styles.hubCardCityActive]} numberOfLines={1}>
-                            {preset.short}
-                          </Text>
-                          <Text style={styles.hubCardCountry} numberOfLines={1}>
-                            {preset.country}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
 
-                  {filteredPresets.length === 0 && (
-                    <View style={styles.noHubsFoundWrap}>
-                      <Ionicons name="search-outline" size={22} color="#555268" />
-                      <Text style={styles.noHubsFoundText}>No cities matching "{citySearchQuery}"</Text>
-                      <TouchableOpacity accessibilityRole="button" onPress={() => setCitySearchQuery('')} style={{ marginTop: 4 }}>
-                        <Text style={styles.resetFilterText}>Clear search</Text>
-                      </TouchableOpacity>
+                          <View style={styles.customInputRow}>
+                            <View style={styles.customInputHalf}>
+                              <Text style={styles.customInputLabel}>Latitude (Optional)</Text>
+                              <TextInput
+                                style={styles.customTextInput}
+                                value={form?.locationLatitude !== undefined ? String(form.locationLatitude) : '40.7128'}
+                                onChangeText={(v) => updateField('locationLatitude', parseFloat(v) || 0)}
+                                keyboardType="numeric"
+                                placeholder="40.7128"
+                                placeholderTextColor="#555268"
+                              />
+                            </View>
+                            <View style={styles.customInputHalf}>
+                              <Text style={styles.customInputLabel}>Longitude (Optional)</Text>
+                              <TextInput
+                                style={styles.customTextInput}
+                                value={form?.locationLongitude !== undefined ? String(form.locationLongitude) : '-74.0060'}
+                                onChangeText={(v) => updateField('locationLongitude', parseFloat(v) || 0)}
+                                keyboardType="numeric"
+                                placeholder="-74.0060"
+                                placeholderTextColor="#555268"
+                              />
+                            </View>
+                          </View>
+                        </View>
+                      )}
                     </View>
                   )}
 
-                  {/* Custom Location Accordion Toggle */}
-                  <TouchableOpacity accessibilityRole="button"
-                    style={styles.customAccordionToggle}
-                    onPress={() => {
-                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                      setShowCustomCoords(!showCustomCoords);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons
-                        name={showCustomCoords ? "chevron-up" : "add-circle-outline"}
-                        size={14}
-                        color={uiTheme.colors.muted}
-                      />
-                      <Text style={styles.customAccordionText}>
-                        {showCustomCoords ? "Hide custom place" : "Can't find your city? Set a custom place"}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  {/* Custom Location Card (Collapsible) */}
-                  {showCustomCoords && (
-                    <View style={styles.customCoordsCard}>
-                      <View>
-                        <Text style={styles.customInputLabel}>City or Region Name</Text>
-                        <TextInput
-                          style={styles.customTextInput}
-                          value={form?.locationCity || ''}
-                          onChangeText={(v) => {
-                            updateField('locationCity', v);
-                            updateField('useDeviceLocation', false);
-                          }}
-                          placeholder="e.g. Austin, TX or Berlin, Germany"
-                          placeholderTextColor="#555268"
-                        />
-                      </View>
-
-                      <View style={styles.customInputRow}>
-                        <View style={styles.customInputHalf}>
-                          <Text style={styles.customInputLabel}>Latitude (Optional)</Text>
-                          <TextInput
-                            style={styles.customTextInput}
-                            value={form?.locationLatitude !== undefined ? String(form.locationLatitude) : '40.7128'}
-                            onChangeText={(v) => updateField('locationLatitude', parseFloat(v) || 0)}
-                            keyboardType="numeric"
-                            placeholder="40.7128"
-                            placeholderTextColor="#555268"
-                          />
-                        </View>
-                        <View style={styles.customInputHalf}>
-                          <Text style={styles.customInputLabel}>Longitude (Optional)</Text>
-                          <TextInput
-                            style={styles.customTextInput}
-                            value={form?.locationLongitude !== undefined ? String(form.locationLongitude) : '-74.0060'}
-                            onChangeText={(v) => updateField('locationLongitude', parseFloat(v) || 0)}
-                            keyboardType="numeric"
-                            placeholder="-74.0060"
-                            placeholderTextColor="#555268"
-                          />
-                        </View>
-                      </View>
-                    </View>
-                  )}
+                  {/* Information Footnote */}
+                  <View style={styles.locationNoteRow}>
+                    <Ionicons name="sparkles" size={13} color={uiTheme.colors.primary} />
+                    <Text style={styles.locationNoteText}>
+                      Linksy synchronizes your dating location automatically so you can meet people anywhere.
+                    </Text>
+                  </View>
                 </View>
               )}
-
-              {/* Information Footnote */}
-              <View style={styles.locationNoteRow}>
-                <Ionicons name="sparkles" size={13} color={uiTheme.colors.primary} />
-                <Text style={styles.locationNoteText}>
-                  Linksy synchronizes your dating location automatically so you can meet people anywhere.
-                </Text>
-              </View>
             </View>
-          )}
-        </View>
+          </>
+        )}
 
         {/* ════════════════════ CATEGORY 2: AI PROFILE ════════════════════ */}
         <Text style={styles.categoryLabel}>AI PROFILE</Text>
@@ -1678,6 +1649,7 @@ export default function SettingsPanel({
       </Modal>
 
       {/* ─── Universal Synced Location Notice Modal ─── */}
+      {SHOW_LOCATION_FEATURE && (
       <LocationNoticeModal
         visible={Boolean(locationNoticeModal?.visible)}
         type={locationNoticeModal?.type || 'connected'}
@@ -1688,6 +1660,7 @@ export default function SettingsPanel({
         onChooseCityManually={handleChooseCityManually}
         onLocationAcquired={handleLocationAcquired}
       />
+      )}
     </View>
   );
 }

@@ -40,6 +40,12 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// ─── Feature Flags (Hidden in On-Device mode for clean UX, preserved for future cloud mode) ───
+const SHOW_CHAT_STYLE_TRAINING = false;
+const SHOW_AI_ACTIVE_TIME = false;
+const SHOW_LOCATION_FEATURE = false;
+const SHOW_DEFAULT_LANGUAGE = false;
+
 // ─── Goal Options ───
 const GOAL_OPTIONS = [
   {
@@ -2345,2231 +2351,2231 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
         {/* ════════════════════ CARD 2: SWIPING & SAFETY LIMITS ════════════════════ */}
         {
-        // <View style={[styles.v2Card, openCards.swiping && styles.v2CardOpen]}>
-        //           <TouchableOpacity
-        //             accessibilityRole="button"
-        //             style={styles.v2CardHeader}
-        //             onPress={() => toggleCard("swiping")}
-        //             activeOpacity={0.85}
-        //           >
-        //             <View style={styles.cardTitleWrap}>
-        //               <Ionicons
-        //                 name="heart-outline"
-        //                 size={17}
-        //                 color={uiTheme.colors.primary}
-        //               />
-        //               <Text style={styles.v2CardTitle}>Swiping</Text>
-        //             </View>
-        //             <Ionicons
-        //               name={openCards.swiping ? "chevron-up" : "chevron-down"}
-        //               size={18}
-        //               color={uiTheme.colors.muted}
-        //             />
-        //           </TouchableOpacity>
-        //
-        //           {/* Collapsed Summary Chips */}
-        //           {!openCards.swiping && (
-        //             <View style={styles.collapsedRow}>
-        //               <View style={styles.v2Chip}>
-        //                 <Ionicons
-        //                   name="flash"
-        //                   size={11}
-        //                   color={uiTheme.colors.primary}
-        //                 />
-        //                 <Text style={styles.v2ChipText}>
-        //                   {getSwipingSummary().likes}
-        //                 </Text>
-        //               </View>
-        //               <View style={styles.v2Chip}>
-        //                 <Ionicons
-        //                   name="time-outline"
-        //                   size={11}
-        //                   color={uiTheme.colors.info}
-        //                 />
-        //                 <Text style={styles.v2ChipText}>
-        //                   {getSwipingSummary().pacing}
-        //                 </Text>
-        //               </View>
-        //               <View style={styles.v2Chip}>
-        //                 <Text style={styles.v2ChipText}>{getSwipingSummary().age}</Text>
-        //               </View>
-        //             </View>
-        //           )}
-        //
-        //           {/* Expanded Body */}
-        //           {openCards.swiping && (
-        //             <View style={styles.v2CardBody}>
-        //               <Text style={styles.fieldDesc}>
-        //                 Control swipe batches, cooldown pacing & profile filters:
-        //               </Text>
-        //
-        //               {/* Core Swiping Controls (Auto Swipe & Activity Speed) */}
-        //               <View
-        //                 style={[
-        //                   styles.subBox,
-        //                   isSafetyOn && { borderColor: "rgba(254, 60, 114, 0.2)" },
-        //                 ]}
-        //               >
-        //                 {/* Auto Swipe Toggle */}
-        //                 <View style={styles.rowBetween}>
-        //                   <View style={{ flex: 1, paddingRight: 10 }}>
-        //                     <View
-        //                       style={{
-        //                         flexDirection: "row",
-        //                         alignItems: "center",
-        //                         gap: 6,
-        //                       }}
-        //                     >
-        //                       <Text style={styles.toggleTitle}>Auto Swipe</Text>
-        //                       {isSafetyOn && (
-        //                         <View style={styles.safetyChipBadge}>
-        //                           <Ionicons
-        //                             name="shield-checkmark"
-        //                             size={10}
-        //                             color={uiTheme.colors.success}
-        //                           />
-        //                           <Text style={styles.safetyChipBadgeText}>
-        //                             Safety Mode
-        //                           </Text>
-        //                         </View>
-        //                       )}
-        //                     </View>
-        //                     <Text style={styles.labelMuted}>
-        //                       {isSafetyOn
-        //                         ? "Locked ON by Safety Mode for safe batches"
-        //                         : "Automatically swipe profiles on schedule"}
-        //                     </Text>
-        //                   </View>
-        //                   <Switch
-        //                     disabled={isSafetyOn}
-        //                     value={isSafetyOn ? true : (form.likesPerCycle ?? 50) > 0}
-        //                     onValueChange={(v) => {
-        //                       if (v) {
-        //                         updateField("likesPerCycle", 50);
-        //                       } else {
-        //                         updateField("likesPerCycle", 0);
-        //                       }
-        //                     }}
-        //                     trackColor={{
-        //                       false: uiTheme.colors.elevated,
-        //                       true: uiTheme.colors.primary,
-        //                     }}
-        //                     thumbColor={
-        //                       isSafetyOn || (form.likesPerCycle ?? 50) > 0
-        //                         ? "#FFF"
-        //                         : uiTheme.colors.muted
-        //                     }
-        //                   />
-        //                 </View>
-        //
-        //                 <View style={styles.subBoxDivider} />
-        //
-        //                 {/* Activity Speed Dropdown (V2 UI Parity) */}
-        //                 <V2Dropdown
-        //                   label="Activity Speed"
-        //                   disabled={isSafetyOn}
-        //                   options={[
-        //                     {
-        //                       value: 30,
-        //                       label: "Every 30 min",
-        //                       desc: "Active cadence (Safe limit)",
-        //                     },
-        //                     {
-        //                       value: 60,
-        //                       label: "Every Hour",
-        //                       desc: "Balanced background pacing",
-        //                     },
-        //                     {
-        //                       value: 120,
-        //                       label: "Every 2 Hours",
-        //                       desc: "Relaxed slow pacing",
-        //                     },
-        //                   ]}
-        //                   selectedValue={form.scheduleInterval ?? 30}
-        //                   onSelect={(val) => updateField("scheduleInterval", val)}
-        //                 />
-        //
-        //                 {isSafetyOn && (
-        //                   <View
-        //                     style={{
-        //                       flexDirection: "row",
-        //                       alignItems: "center",
-        //                       marginTop: 10,
-        //                     }}
-        //                   >
-        //                     <Ionicons
-        //                       name="lock-closed"
-        //                       size={11}
-        //                       color={uiTheme.colors.muted}
-        //                       style={{ marginRight: 5 }}
-        //                     />
-        //                     <Text
-        //                       style={{
-        //                         fontFamily: "Inter_400Regular",
-        //                         color: uiTheme.colors.muted,
-        //                         fontSize: 11,
-        //                         fontStyle: "italic",
-        //                         flex: 1,
-        //                       }}
-        //                     >
-        //                       Auto Swipe & Speed are locked to safe defaults. Toggle
-        //                       Safety Mode OFF in Settings to customize.
-        //                     </Text>
-        //                   </View>
-        //                 )}
-        //               </View>
-        //
-        //               {/* ─── Age Range Filter (V2 Desktop Parity) ─── */}
-        //               <View style={styles.subBox}>
-        //                 <View style={styles.rowBetween}>
-        //                   <View style={{ flex: 1, paddingRight: 10 }}>
-        //                     <Text style={styles.toggleTitle}>Age Range</Text>
-        //                     <Text style={styles.labelMuted}>
-        //                       Filter profiles by age bracket
-        //                     </Text>
-        //                   </View>
-        //                   <View
-        //                     style={{
-        //                       flexDirection: "row",
-        //                       alignItems: "center",
-        //                       gap: 10,
-        //                     }}
-        //                   >
-        //                     <View style={styles.v2ValueBadge}>
-        //                       <Text style={styles.v2ValueBadgeText}>
-        //                         {form.ageFilter?.enabled
-        //                           ? `${form.ageFilter?.min ?? 20}–${form.ageFilter?.max ?? 35}`
-        //                           : "18–99 (Off)"}
-        //                       </Text>
-        //                     </View>
-        //                     <Switch
-        //                       value={form.ageFilter?.enabled === true}
-        //                       onValueChange={(v) => updateField("ageFilter.enabled", v)}
-        //                       trackColor={{
-        //                         false: uiTheme.colors.elevated,
-        //                         true: uiTheme.colors.primary,
-        //                       }}
-        //                       thumbColor={
-        //                         form.ageFilter?.enabled ? "#FFF" : uiTheme.colors.muted
-        //                       }
-        //                     />
-        //                   </View>
-        //                 </View>
-        //
-        //                 {form.ageFilter?.enabled && (
-        //                   <View style={{ marginTop: 12 }}>
-        //                     {/* Dual-Thumb Range Slider (Desktop V2 100% Parity) */}
-        //                     <MultiRangeSlider
-        //                       min={18}
-        //                       max={99}
-        //                       minValue={form.ageFilter?.min ?? 20}
-        //                       maxValue={form.ageFilter?.max ?? 35}
-        //                       unit="yrs"
-        //                       onValuesChange={(newMin, newMax) => {
-        //                         updateField("ageFilter.min", newMin);
-        //                         updateField("ageFilter.max", newMax);
-        //                       }}
-        //                     />
-        //
-        //                     <Text
-        //                       style={[
-        //                         styles.inputLabel,
-        //                         { marginTop: 6, marginBottom: 6 },
-        //                       ]}
-        //                     >
-        //                       Quick Brackets
-        //                     </Text>
-        //                     <View style={styles.chipRow}>
-        //                       {[
-        //                         { min: 18, max: 25, label: "18–25" },
-        //                         { min: 21, max: 30, label: "21–30" },
-        //                         { min: 25, max: 35, label: "25–35" },
-        //                         { min: 30, max: 45, label: "30–45" },
-        //                         { min: 18, max: 99, label: "All Ages" },
-        //                       ].map((b) => {
-        //                         const isActive =
-        //                           (form.ageFilter?.min ?? 20) === b.min &&
-        //                           (form.ageFilter?.max ?? 35) === b.max;
-        //                         return (
-        //                           <TouchableOpacity
-        //                             accessibilityRole="button"
-        //                             key={b.label}
-        //                             style={[styles.chip, isActive && styles.chipActive]}
-        //                             onPress={() => {
-        //                               updateField("ageFilter.min", b.min);
-        //                               updateField("ageFilter.max", b.max);
-        //                             }}
-        //                             activeOpacity={0.8}
-        //                           >
-        //                             <Text
-        //                               style={[
-        //                                 styles.chipText,
-        //                                 isActive && styles.chipTextActive,
-        //                               ]}
-        //                             >
-        //                               {b.label}
-        //                             </Text>
-        //                           </TouchableOpacity>
-        //                         );
-        //                       })}
-        //                     </View>
-        //                   </View>
-        //                 )}
-        //               </View>
-        //
-        //               {/* ─── Distance Range Filter (V2 Desktop Parity) ─── */}
-        //               <View style={styles.subBox}>
-        //                 <View style={styles.rowBetween}>
-        //                   <View style={{ flex: 1, paddingRight: 10 }}>
-        //                     <Text style={styles.toggleTitle}>Distance Range</Text>
-        //                     <Text style={styles.labelMuted}>
-        //                       Maximum location distance radius
-        //                     </Text>
-        //                   </View>
-        //                   <View
-        //                     style={{
-        //                       flexDirection: "row",
-        //                       alignItems: "center",
-        //                       gap: 10,
-        //                     }}
-        //                   >
-        //                     <View style={styles.v2ValueBadge}>
-        //                       <Text style={styles.v2ValueBadgeText}>
-        //                         {form.distanceFilter?.enabled
-        //                           ? `Up to ${form.distanceFilter?.maxDistance ?? 50} km`
-        //                           : "No Limit (Off)"}
-        //                       </Text>
-        //                     </View>
-        //                     <Switch
-        //                       value={form.distanceFilter?.enabled === true}
-        //                       onValueChange={(v) =>
-        //                         updateField("distanceFilter.enabled", v)
-        //                       }
-        //                       trackColor={{
-        //                         false: uiTheme.colors.elevated,
-        //                         true: uiTheme.colors.primary,
-        //                       }}
-        //                       thumbColor={
-        //                         form.distanceFilter?.enabled
-        //                           ? "#FFF"
-        //                           : uiTheme.colors.muted
-        //                       }
-        //                     />
-        //                   </View>
-        //                 </View>
-        //
-        //                 {form.distanceFilter?.enabled && (
-        //                   <View style={{ marginTop: 12 }}>
-        //                     {/* Interactive Touch Slider (Desktop V2 Parity) */}
-        //                     <RangeSlider
-        //                       min={2}
-        //                       max={150}
-        //                       value={form.distanceFilter?.maxDistance ?? 50}
-        //                       unit="km"
-        //                       prefix="Up to "
-        //                       onValueChange={(val) =>
-        //                         updateField("distanceFilter.maxDistance", val)
-        //                       }
-        //                     />
-        //
-        //                     <Text
-        //                       style={[
-        //                         styles.inputLabel,
-        //                         { marginTop: 6, marginBottom: 6 },
-        //                       ]}
-        //                     >
-        //                       Radius Presets
-        //                     </Text>
-        //                     <View style={styles.chipRow}>
-        //                       {[
-        //                         { dist: 10, label: "10 km" },
-        //                         { dist: 25, label: "25 km" },
-        //                         { dist: 50, label: "50 km" },
-        //                         { dist: 100, label: "100 km" },
-        //                         { dist: 150, label: "150 km" },
-        //                       ].map((d) => {
-        //                         const isActive =
-        //                           (form.distanceFilter?.maxDistance ?? 50) === d.dist;
-        //                         return (
-        //                           <TouchableOpacity
-        //                             accessibilityRole="button"
-        //                             key={d.label}
-        //                             style={[styles.chip, isActive && styles.chipActive]}
-        //                             onPress={() =>
-        //                               updateField("distanceFilter.maxDistance", d.dist)
-        //                             }
-        //                             activeOpacity={0.8}
-        //                           >
-        //                             <Text
-        //                               style={[
-        //                                 styles.chipText,
-        //                                 isActive && styles.chipTextActive,
-        //                               ]}
-        //                             >
-        //                               {d.label}
-        //                             </Text>
-        //                           </TouchableOpacity>
-        //                         );
-        //                       })}
-        //                     </View>
-        //                   </View>
-        //                 )}
-        //               </View>
-        //
-        //               {/* ─── Active Dating Location Capsule (Single Source of Truth in Settings) ─── */}
-        //               <View style={styles.swipingLocationCapsule}>
-        //                 <View style={styles.swipingLocationLeft}>
-        //                   <View style={styles.swipingLocationTopRow}>
-        //                     <Text style={styles.swipingLocationTitle}>
-        //                       Dating Location
-        //                     </Text>
-        //                     <View
-        //                       style={[
-        //                         styles.swipingLocationBadge,
-        //                         form?.useDeviceLocation
-        //                           ? styles.swipingLocationBadgeGps
-        //                           : styles.swipingLocationBadgePassport,
-        //                       ]}
-        //                     >
-        //                       <Ionicons
-        //                         name={form?.useDeviceLocation ? "navigate" : "airplane"}
-        //                         size={10}
-        //                         color={
-        //                           form?.useDeviceLocation
-        //                             ? uiTheme.colors.success
-        //                             : uiTheme.colors.primary
-        //                         }
-        //                       />
-        //                       <Text
-        //                         style={[
-        //                           styles.swipingLocationBadgeText,
-        //                           form?.useDeviceLocation
-        //                             ? { color: uiTheme.colors.success }
-        //                             : { color: uiTheme.colors.primary },
-        //                         ]}
-        //                       >
-        //                         {form?.useDeviceLocation ? "LIVE GPS" : "PASSPORT"}
-        //                       </Text>
-        //                     </View>
-        //                   </View>
-        //
-        //                   <View style={styles.swipingLocationCityRow}>
-        //                     <Text
-        //                       style={styles.swipingLocationCityText}
-        //                       numberOfLines={1}
-        //                     >
-        //                       {CITY_PRESETS.find((p) =>
-        //                         (form?.locationCity || "").includes(p.short),
-        //                       )?.flag || "📍"}{" "}
-        //                       {form?.locationCity || "New York, USA"}
-        //                     </Text>
-        //                     <Text style={styles.swipingLocationSub}>
-        //                       {form?.useDeviceLocation
-        //                         ? "Matching near your physical phone location"
-        //                         : "Matching in selected passport destination"}
-        //                     </Text>
-        //                   </View>
-        //                 </View>
-        //
-        //                 <TouchableOpacity
-        //                   accessibilityRole="button"
-        //                   style={styles.swipingLocationActionBtn}
-        //                   onPress={() => {
-        //                     if (onNavigateToSettings) {
-        //                       onNavigateToSettings("location");
-        //                     }
-        //                   }}
-        //                   activeOpacity={0.8}
-        //                 >
-        //                   <Text style={styles.swipingLocationActionText}>Change</Text>
-        //                   <Ionicons
-        //                     name="arrow-forward"
-        //                     size={12}
-        //                     color={uiTheme.colors.primary}
-        //                   />
-        //                 </TouchableOpacity>
-        //               </View>
-        //             </View>
-        //           )}
-        //         </View>
+          // <View style={[styles.v2Card, openCards.swiping && styles.v2CardOpen]}>
+          //           <TouchableOpacity
+          //             accessibilityRole="button"
+          //             style={styles.v2CardHeader}
+          //             onPress={() => toggleCard("swiping")}
+          //             activeOpacity={0.85}
+          //           >
+          //             <View style={styles.cardTitleWrap}>
+          //               <Ionicons
+          //                 name="heart-outline"
+          //                 size={17}
+          //                 color={uiTheme.colors.primary}
+          //               />
+          //               <Text style={styles.v2CardTitle}>Swiping</Text>
+          //             </View>
+          //             <Ionicons
+          //               name={openCards.swiping ? "chevron-up" : "chevron-down"}
+          //               size={18}
+          //               color={uiTheme.colors.muted}
+          //             />
+          //           </TouchableOpacity>
+          //
+          //           {/* Collapsed Summary Chips */}
+          //           {!openCards.swiping && (
+          //             <View style={styles.collapsedRow}>
+          //               <View style={styles.v2Chip}>
+          //                 <Ionicons
+          //                   name="flash"
+          //                   size={11}
+          //                   color={uiTheme.colors.primary}
+          //                 />
+          //                 <Text style={styles.v2ChipText}>
+          //                   {getSwipingSummary().likes}
+          //                 </Text>
+          //               </View>
+          //               <View style={styles.v2Chip}>
+          //                 <Ionicons
+          //                   name="time-outline"
+          //                   size={11}
+          //                   color={uiTheme.colors.info}
+          //                 />
+          //                 <Text style={styles.v2ChipText}>
+          //                   {getSwipingSummary().pacing}
+          //                 </Text>
+          //               </View>
+          //               <View style={styles.v2Chip}>
+          //                 <Text style={styles.v2ChipText}>{getSwipingSummary().age}</Text>
+          //               </View>
+          //             </View>
+          //           )}
+          //
+          //           {/* Expanded Body */}
+          //           {openCards.swiping && (
+          //             <View style={styles.v2CardBody}>
+          //               <Text style={styles.fieldDesc}>
+          //                 Control swipe batches, cooldown pacing & profile filters:
+          //               </Text>
+          //
+          //               {/* Core Swiping Controls (Auto Swipe & Activity Speed) */}
+          //               <View
+          //                 style={[
+          //                   styles.subBox,
+          //                   isSafetyOn && { borderColor: "rgba(254, 60, 114, 0.2)" },
+          //                 ]}
+          //               >
+          //                 {/* Auto Swipe Toggle */}
+          //                 <View style={styles.rowBetween}>
+          //                   <View style={{ flex: 1, paddingRight: 10 }}>
+          //                     <View
+          //                       style={{
+          //                         flexDirection: "row",
+          //                         alignItems: "center",
+          //                         gap: 6,
+          //                       }}
+          //                     >
+          //                       <Text style={styles.toggleTitle}>Auto Swipe</Text>
+          //                       {isSafetyOn && (
+          //                         <View style={styles.safetyChipBadge}>
+          //                           <Ionicons
+          //                             name="shield-checkmark"
+          //                             size={10}
+          //                             color={uiTheme.colors.success}
+          //                           />
+          //                           <Text style={styles.safetyChipBadgeText}>
+          //                             Safety Mode
+          //                           </Text>
+          //                         </View>
+          //                       )}
+          //                     </View>
+          //                     <Text style={styles.labelMuted}>
+          //                       {isSafetyOn
+          //                         ? "Locked ON by Safety Mode for safe batches"
+          //                         : "Automatically swipe profiles on schedule"}
+          //                     </Text>
+          //                   </View>
+          //                   <Switch
+          //                     disabled={isSafetyOn}
+          //                     value={isSafetyOn ? true : (form.likesPerCycle ?? 50) > 0}
+          //                     onValueChange={(v) => {
+          //                       if (v) {
+          //                         updateField("likesPerCycle", 50);
+          //                       } else {
+          //                         updateField("likesPerCycle", 0);
+          //                       }
+          //                     }}
+          //                     trackColor={{
+          //                       false: uiTheme.colors.elevated,
+          //                       true: uiTheme.colors.primary,
+          //                     }}
+          //                     thumbColor={
+          //                       isSafetyOn || (form.likesPerCycle ?? 50) > 0
+          //                         ? "#FFF"
+          //                         : uiTheme.colors.muted
+          //                     }
+          //                   />
+          //                 </View>
+          //
+          //                 <View style={styles.subBoxDivider} />
+          //
+          //                 {/* Activity Speed Dropdown (V2 UI Parity) */}
+          //                 <V2Dropdown
+          //                   label="Activity Speed"
+          //                   disabled={isSafetyOn}
+          //                   options={[
+          //                     {
+          //                       value: 30,
+          //                       label: "Every 30 min",
+          //                       desc: "Active cadence (Safe limit)",
+          //                     },
+          //                     {
+          //                       value: 60,
+          //                       label: "Every Hour",
+          //                       desc: "Balanced background pacing",
+          //                     },
+          //                     {
+          //                       value: 120,
+          //                       label: "Every 2 Hours",
+          //                       desc: "Relaxed slow pacing",
+          //                     },
+          //                   ]}
+          //                   selectedValue={form.scheduleInterval ?? 30}
+          //                   onSelect={(val) => updateField("scheduleInterval", val)}
+          //                 />
+          //
+          //                 {isSafetyOn && (
+          //                   <View
+          //                     style={{
+          //                       flexDirection: "row",
+          //                       alignItems: "center",
+          //                       marginTop: 10,
+          //                     }}
+          //                   >
+          //                     <Ionicons
+          //                       name="lock-closed"
+          //                       size={11}
+          //                       color={uiTheme.colors.muted}
+          //                       style={{ marginRight: 5 }}
+          //                     />
+          //                     <Text
+          //                       style={{
+          //                         fontFamily: "Inter_400Regular",
+          //                         color: uiTheme.colors.muted,
+          //                         fontSize: 11,
+          //                         fontStyle: "italic",
+          //                         flex: 1,
+          //                       }}
+          //                     >
+          //                       Auto Swipe & Speed are locked to safe defaults. Toggle
+          //                       Safety Mode OFF in Settings to customize.
+          //                     </Text>
+          //                   </View>
+          //                 )}
+          //               </View>
+          //
+          //               {/* ─── Age Range Filter (V2 Desktop Parity) ─── */}
+          //               <View style={styles.subBox}>
+          //                 <View style={styles.rowBetween}>
+          //                   <View style={{ flex: 1, paddingRight: 10 }}>
+          //                     <Text style={styles.toggleTitle}>Age Range</Text>
+          //                     <Text style={styles.labelMuted}>
+          //                       Filter profiles by age bracket
+          //                     </Text>
+          //                   </View>
+          //                   <View
+          //                     style={{
+          //                       flexDirection: "row",
+          //                       alignItems: "center",
+          //                       gap: 10,
+          //                     }}
+          //                   >
+          //                     <View style={styles.v2ValueBadge}>
+          //                       <Text style={styles.v2ValueBadgeText}>
+          //                         {form.ageFilter?.enabled
+          //                           ? `${form.ageFilter?.min ?? 20}–${form.ageFilter?.max ?? 35}`
+          //                           : "18–99 (Off)"}
+          //                       </Text>
+          //                     </View>
+          //                     <Switch
+          //                       value={form.ageFilter?.enabled === true}
+          //                       onValueChange={(v) => updateField("ageFilter.enabled", v)}
+          //                       trackColor={{
+          //                         false: uiTheme.colors.elevated,
+          //                         true: uiTheme.colors.primary,
+          //                       }}
+          //                       thumbColor={
+          //                         form.ageFilter?.enabled ? "#FFF" : uiTheme.colors.muted
+          //                       }
+          //                     />
+          //                   </View>
+          //                 </View>
+          //
+          //                 {form.ageFilter?.enabled && (
+          //                   <View style={{ marginTop: 12 }}>
+          //                     {/* Dual-Thumb Range Slider (Desktop V2 100% Parity) */}
+          //                     <MultiRangeSlider
+          //                       min={18}
+          //                       max={99}
+          //                       minValue={form.ageFilter?.min ?? 20}
+          //                       maxValue={form.ageFilter?.max ?? 35}
+          //                       unit="yrs"
+          //                       onValuesChange={(newMin, newMax) => {
+          //                         updateField("ageFilter.min", newMin);
+          //                         updateField("ageFilter.max", newMax);
+          //                       }}
+          //                     />
+          //
+          //                     <Text
+          //                       style={[
+          //                         styles.inputLabel,
+          //                         { marginTop: 6, marginBottom: 6 },
+          //                       ]}
+          //                     >
+          //                       Quick Brackets
+          //                     </Text>
+          //                     <View style={styles.chipRow}>
+          //                       {[
+          //                         { min: 18, max: 25, label: "18–25" },
+          //                         { min: 21, max: 30, label: "21–30" },
+          //                         { min: 25, max: 35, label: "25–35" },
+          //                         { min: 30, max: 45, label: "30–45" },
+          //                         { min: 18, max: 99, label: "All Ages" },
+          //                       ].map((b) => {
+          //                         const isActive =
+          //                           (form.ageFilter?.min ?? 20) === b.min &&
+          //                           (form.ageFilter?.max ?? 35) === b.max;
+          //                         return (
+          //                           <TouchableOpacity
+          //                             accessibilityRole="button"
+          //                             key={b.label}
+          //                             style={[styles.chip, isActive && styles.chipActive]}
+          //                             onPress={() => {
+          //                               updateField("ageFilter.min", b.min);
+          //                               updateField("ageFilter.max", b.max);
+          //                             }}
+          //                             activeOpacity={0.8}
+          //                           >
+          //                             <Text
+          //                               style={[
+          //                                 styles.chipText,
+          //                                 isActive && styles.chipTextActive,
+          //                               ]}
+          //                             >
+          //                               {b.label}
+          //                             </Text>
+          //                           </TouchableOpacity>
+          //                         );
+          //                       })}
+          //                     </View>
+          //                   </View>
+          //                 )}
+          //               </View>
+          //
+          //               {/* ─── Distance Range Filter (V2 Desktop Parity) ─── */}
+          //               <View style={styles.subBox}>
+          //                 <View style={styles.rowBetween}>
+          //                   <View style={{ flex: 1, paddingRight: 10 }}>
+          //                     <Text style={styles.toggleTitle}>Distance Range</Text>
+          //                     <Text style={styles.labelMuted}>
+          //                       Maximum location distance radius
+          //                     </Text>
+          //                   </View>
+          //                   <View
+          //                     style={{
+          //                       flexDirection: "row",
+          //                       alignItems: "center",
+          //                       gap: 10,
+          //                     }}
+          //                   >
+          //                     <View style={styles.v2ValueBadge}>
+          //                       <Text style={styles.v2ValueBadgeText}>
+          //                         {form.distanceFilter?.enabled
+          //                           ? `Up to ${form.distanceFilter?.maxDistance ?? 50} km`
+          //                           : "No Limit (Off)"}
+          //                       </Text>
+          //                     </View>
+          //                     <Switch
+          //                       value={form.distanceFilter?.enabled === true}
+          //                       onValueChange={(v) =>
+          //                         updateField("distanceFilter.enabled", v)
+          //                       }
+          //                       trackColor={{
+          //                         false: uiTheme.colors.elevated,
+          //                         true: uiTheme.colors.primary,
+          //                       }}
+          //                       thumbColor={
+          //                         form.distanceFilter?.enabled
+          //                           ? "#FFF"
+          //                           : uiTheme.colors.muted
+          //                       }
+          //                     />
+          //                   </View>
+          //                 </View>
+          //
+          //                 {form.distanceFilter?.enabled && (
+          //                   <View style={{ marginTop: 12 }}>
+          //                     {/* Interactive Touch Slider (Desktop V2 Parity) */}
+          //                     <RangeSlider
+          //                       min={2}
+          //                       max={150}
+          //                       value={form.distanceFilter?.maxDistance ?? 50}
+          //                       unit="km"
+          //                       prefix="Up to "
+          //                       onValueChange={(val) =>
+          //                         updateField("distanceFilter.maxDistance", val)
+          //                       }
+          //                     />
+          //
+          //                     <Text
+          //                       style={[
+          //                         styles.inputLabel,
+          //                         { marginTop: 6, marginBottom: 6 },
+          //                       ]}
+          //                     >
+          //                       Radius Presets
+          //                     </Text>
+          //                     <View style={styles.chipRow}>
+          //                       {[
+          //                         { dist: 10, label: "10 km" },
+          //                         { dist: 25, label: "25 km" },
+          //                         { dist: 50, label: "50 km" },
+          //                         { dist: 100, label: "100 km" },
+          //                         { dist: 150, label: "150 km" },
+          //                       ].map((d) => {
+          //                         const isActive =
+          //                           (form.distanceFilter?.maxDistance ?? 50) === d.dist;
+          //                         return (
+          //                           <TouchableOpacity
+          //                             accessibilityRole="button"
+          //                             key={d.label}
+          //                             style={[styles.chip, isActive && styles.chipActive]}
+          //                             onPress={() =>
+          //                               updateField("distanceFilter.maxDistance", d.dist)
+          //                             }
+          //                             activeOpacity={0.8}
+          //                           >
+          //                             <Text
+          //                               style={[
+          //                                 styles.chipText,
+          //                                 isActive && styles.chipTextActive,
+          //                               ]}
+          //                             >
+          //                               {d.label}
+          //                             </Text>
+          //                           </TouchableOpacity>
+          //                         );
+          //                       })}
+          //                     </View>
+          //                   </View>
+          //                 )}
+          //               </View>
+          //
+          //               {/* ─── Active Dating Location Capsule (Single Source of Truth in Settings) ─── */}
+          //               <View style={styles.swipingLocationCapsule}>
+          //                 <View style={styles.swipingLocationLeft}>
+          //                   <View style={styles.swipingLocationTopRow}>
+          //                     <Text style={styles.swipingLocationTitle}>
+          //                       Dating Location
+          //                     </Text>
+          //                     <View
+          //                       style={[
+          //                         styles.swipingLocationBadge,
+          //                         form?.useDeviceLocation
+          //                           ? styles.swipingLocationBadgeGps
+          //                           : styles.swipingLocationBadgePassport,
+          //                       ]}
+          //                     >
+          //                       <Ionicons
+          //                         name={form?.useDeviceLocation ? "navigate" : "airplane"}
+          //                         size={10}
+          //                         color={
+          //                           form?.useDeviceLocation
+          //                             ? uiTheme.colors.success
+          //                             : uiTheme.colors.primary
+          //                         }
+          //                       />
+          //                       <Text
+          //                         style={[
+          //                           styles.swipingLocationBadgeText,
+          //                           form?.useDeviceLocation
+          //                             ? { color: uiTheme.colors.success }
+          //                             : { color: uiTheme.colors.primary },
+          //                         ]}
+          //                       >
+          //                         {form?.useDeviceLocation ? "LIVE GPS" : "PASSPORT"}
+          //                       </Text>
+          //                     </View>
+          //                   </View>
+          //
+          //                   <View style={styles.swipingLocationCityRow}>
+          //                     <Text
+          //                       style={styles.swipingLocationCityText}
+          //                       numberOfLines={1}
+          //                     >
+          //                       {CITY_PRESETS.find((p) =>
+          //                         (form?.locationCity || "").includes(p.short),
+          //                       )?.flag || "📍"}{" "}
+          //                       {form?.locationCity || "New York, USA"}
+          //                     </Text>
+          //                     <Text style={styles.swipingLocationSub}>
+          //                       {form?.useDeviceLocation
+          //                         ? "Matching near your physical phone location"
+          //                         : "Matching in selected passport destination"}
+          //                     </Text>
+          //                   </View>
+          //                 </View>
+          //
+          //                 <TouchableOpacity
+          //                   accessibilityRole="button"
+          //                   style={styles.swipingLocationActionBtn}
+          //                   onPress={() => {
+          //                     if (onNavigateToSettings) {
+          //                       onNavigateToSettings("location");
+          //                     }
+          //                   }}
+          //                   activeOpacity={0.8}
+          //                 >
+          //                   <Text style={styles.swipingLocationActionText}>Change</Text>
+          //                   <Ionicons
+          //                     name="arrow-forward"
+          //                     size={12}
+          //                     color={uiTheme.colors.primary}
+          //                   />
+          //                 </TouchableOpacity>
+          //               </View>
+          //             </View>
+          //           )}
+          //         </View>
         }
 
         {/* ════════════════════ CARD 3: MESSAGING (V2 DESKTOP PARITY) ════════════════════ */}
         {
-        // <View style={[styles.v2Card, openCards.messaging && styles.v2CardOpen]}>
-        //           <TouchableOpacity
-        //             accessibilityRole="button"
-        //             style={styles.v2CardHeader}
-        //             onPress={() => toggleCard("messaging")}
-        //             activeOpacity={0.85}
-        //           >
-        //             <View style={styles.cardTitleWrap}>
-        //               <Ionicons name="chatbubbles-outline" size={17} color="#EC4899" />
-        //               <Text style={styles.v2CardTitle}>Messaging</Text>
-        //             </View>
-        //             <Ionicons
-        //               name={openCards.messaging ? "chevron-up" : "chevron-down"}
-        //               size={18}
-        //               color={uiTheme.colors.muted}
-        //             />
-        //           </TouchableOpacity>
-        //
-        //           {/* Collapsed Summary Chips */}
-        //           {!openCards.messaging && (
-        //             <View style={styles.collapsedRow}>
-        //               <View style={styles.v2Chip}>
-        //                 <Ionicons name="sparkles" size={11} color="#EC4899" />
-        //                 <Text style={styles.v2ChipText}>
-        //                   {getMessagingSummary().intention}
-        //                 </Text>
-        //               </View>
-        //               <View style={styles.v2Chip}>
-        //                 <Ionicons
-        //                   name="swap-horizontal"
-        //                   size={11}
-        //                   color={uiTheme.colors.info}
-        //                 />
-        //                 <Text style={styles.v2ChipText}>
-        //                   {getMessagingSummary().priority}
-        //                 </Text>
-        //               </View>
-        //               <View style={styles.v2Chip}>
-        //                 <Ionicons
-        //                   name="color-wand"
-        //                   size={11}
-        //                   color={uiTheme.colors.success}
-        //                 />
-        //                 <Text style={styles.v2ChipText}>
-        //                   {getMessagingSummary().tone}
-        //                 </Text>
-        //               </View>
-        //               <View style={styles.v2Chip}>
-        //                 <Ionicons
-        //                   name="globe-outline"
-        //                   size={11}
-        //                   color={uiTheme.colors.warning}
-        //                 />
-        //                 <Text style={styles.v2ChipText}>
-        //                   {getMessagingSummary().lang}
-        //                 </Text>
-        //               </View>
-        //               <View style={styles.v2Chip}>
-        //                 <Text style={styles.v2ChipText}>
-        //                   {getMessagingSummary().emojis}
-        //                 </Text>
-        //               </View>
-        //               {getMessagingSummary().consecutive && (
-        //                 <View style={styles.v2Chip}>
-        //                   <Text style={styles.v2ChipText}>Multi-text</Text>
-        //                 </View>
-        //               )}
-        //             </View>
-        //           )}
-        //
-        //           {/* Expanded Body */}
-        //           {openCards.messaging && (
-        //             <View style={styles.v2CardBody}>
-        //               <Text style={styles.fieldDesc}>
-        //                 Configure conversation style, intentions, language & priority
-        //                 balancing:
-        //               </Text>
-        //
-        //               {/* ─── Core Toggles (Smart Reactions, Use Emojis, Consecutive Messages) ─── */}
-        //               <View style={styles.subBox}>
-        //                 {/* Smart Reactions */}
-        //                 <View style={styles.rowBetween}>
-        //                   <View style={{ flex: 1, paddingRight: 10 }}>
-        //                     <View
-        //                       style={{
-        //                         flexDirection: "row",
-        //                         alignItems: "center",
-        //                         gap: 6,
-        //                       }}
-        //                     >
-        //                       <Text style={styles.toggleTitle}>Smart Reactions</Text>
-        //                       <TouchableOpacity
-        //                         accessibilityRole="button"
-        //                         onPress={() =>
-        //                           setTooltipModal({
-        //                             title: "Smart Reactions",
-        //                             lines: [
-        //                               "① AI randomly likes (❤️) messages from matches",
-        //                               "② Pushes your chat to the top of their inbox",
-        //                               "③ Increases the chance they reply to you",
-        //                             ],
-        //                           })
-        //                         }
-        //                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        //                       >
-        //                         <Ionicons
-        //                           name="information-circle-outline"
-        //                           size={14}
-        //                           color={uiTheme.colors.muted}
-        //                         />
-        //                       </TouchableOpacity>
-        //                     </View>
-        //                     <Text style={styles.labelMuted}>
-        //                       AI randomly likes (❤️) received messages to push chat to
-        //                       top
-        //                     </Text>
-        //                   </View>
-        //                   <Switch
-        //                     value={
-        //                       (form.randomHearts ?? form.smartReactionsEnabled) === true
-        //                     }
-        //                     onValueChange={(v) => {
-        //                       updateField("randomHearts", v);
-        //                       updateField("smartReactionsEnabled", v);
-        //                     }}
-        //                     trackColor={{
-        //                       false: uiTheme.colors.elevated,
-        //                       true: "#EC4899",
-        //                     }}
-        //                     thumbColor={
-        //                       (form.randomHearts ?? form.smartReactionsEnabled)
-        //                         ? "#FFF"
-        //                         : uiTheme.colors.muted
-        //                     }
-        //                   />
-        //                 </View>
-        //
-        //                 <View style={styles.subBoxDivider} />
-        //
-        //                 {/* Use Emoji's */}
-        //                 <View style={styles.rowBetween}>
-        //                   <View style={{ flex: 1, paddingRight: 10 }}>
-        //                     <Text style={styles.toggleTitle}>Use Emoji's</Text>
-        //                     <Text style={styles.labelMuted}>
-        //                       Include expressive emojis in generated AI responses
-        //                     </Text>
-        //                   </View>
-        //                   <Switch
-        //                     value={form.useEmojis !== false}
-        //                     onValueChange={(v) => updateField("useEmojis", v)}
-        //                     trackColor={{
-        //                       false: uiTheme.colors.elevated,
-        //                       true: "#EC4899",
-        //                     }}
-        //                     thumbColor={
-        //                       form.useEmojis !== false ? "#FFF" : uiTheme.colors.muted
-        //                     }
-        //                   />
-        //                 </View>
-        //
-        //                 <View style={styles.subBoxDivider} />
-        //
-        //                 {/* Consecutive Messages (Double Texting) */}
-        //                 <View style={styles.rowBetween}>
-        //                   <View style={{ flex: 1, paddingRight: 10 }}>
-        //                     <View
-        //                       style={{
-        //                         flexDirection: "row",
-        //                         alignItems: "center",
-        //                         gap: 6,
-        //                       }}
-        //                     >
-        //                       <Text style={styles.toggleTitle}>
-        //                         Consecutive Messages
-        //                       </Text>
-        //                       <TouchableOpacity
-        //                         accessibilityRole="button"
-        //                         onPress={() =>
-        //                           setTooltipModal({
-        //                             title: "Consecutive Messages",
-        //                             lines: [
-        //                               "① Match sends multiple messages in a row",
-        //                               "② AI mirrors their energy with 2–3 replies back",
-        //                               "③ Each part uses 1 message credit",
-        //                             ],
-        //                           })
-        //                         }
-        //                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        //                       >
-        //                         <Ionicons
-        //                           name="information-circle-outline"
-        //                           size={14}
-        //                           color={uiTheme.colors.muted}
-        //                         />
-        //                       </TouchableOpacity>
-        //                     </View>
-        //                     <Text style={styles.labelMuted}>
-        //                       AI mirrors match energy with 2–3 message replies when they
-        //                       text in bursts
-        //                     </Text>
-        //                   </View>
-        //                   <Switch
-        //                     value={form.consecutiveMessagesEnabled === true}
-        //                     onValueChange={(v) =>
-        //                       updateField("consecutiveMessagesEnabled", v)
-        //                     }
-        //                     trackColor={{
-        //                       false: uiTheme.colors.elevated,
-        //                       true: "#EC4899",
-        //                     }}
-        //                     thumbColor={
-        //                       form.consecutiveMessagesEnabled
-        //                         ? "#FFF"
-        //                         : uiTheme.colors.muted
-        //                     }
-        //                   />
-        //                 </View>
-        //               </View>
-        //
-        //               {/* ─── Your Intentions Dropdown (V2 UI Parity) ─── */}
-        //               <View style={styles.subBox}>
-        //                 <V2Dropdown
-        //                   label="Your Intentions"
-        //                   options={INTENTIONS_OPTIONS.map((item) => ({
-        //                     id: item.id,
-        //                     value: item.id,
-        //                     label: item.label,
-        //                   }))}
-        //                   selectedValue={form.intentions || "short_term"}
-        //                   onSelect={(val) => updateField("intentions", val)}
-        //                 />
-        //               </View>
-        //
-        //               {/* ─── Conversation Tone Dropdown (V2 UI Parity) ─── */}
-        //               <View style={styles.subBox}>
-        //                 <V2Dropdown
-        //                   label="Conversation Tone"
-        //                   options={TONE_OPTIONS.map((t) => ({
-        //                     id: t.toLowerCase(),
-        //                     value: t.toLowerCase(),
-        //                     label: t,
-        //                   }))}
-        //                   selectedValue={(
-        //                     form.tone ||
-        //                     form.chattingStyle ||
-        //                     "freestyle"
-        //                   ).toLowerCase()}
-        //                   onSelect={(val) => {
-        //                     const titleCased =
-        //                       val.charAt(0).toUpperCase() + val.slice(1);
-        //                     updateField("tone", titleCased);
-        //                     updateField("chattingStyle", val);
-        //                   }}
-        //                 />
-        //               </View>
-        //
-        //               {/* ─── Default Language Dropdown (V2 UI Parity) ─── */}
-        //               <View style={styles.subBox}>
-        //                 <V2Dropdown
-        //                   label="Default Language"
-        //                   sublabel="(Editable per match)"
-        //                   options={LANGUAGE_OPTIONS.map((lang) => ({
-        //                     id: lang.code,
-        //                     value: lang.code,
-        //                     label: lang.label,
-        //                     flag: lang.flag,
-        //                   }))}
-        //                   selectedValue={form.conversationLanguage || "en"}
-        //                   onSelect={(val) => updateField("conversationLanguage", val)}
-        //                 />
-        //               </View>
-        //
-        //               {/* ─── Messaging Priority (Replies vs New Matches) ─── */}
-        //               <View style={styles.subBox}>
-        //                 <View
-        //                   style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-        //                 >
-        //                   <Text style={styles.subBoxTitle}>
-        //                     Messaging Priority{" "}
-        //                     <Text
-        //                       style={{
-        //                         fontFamily: "Inter_400Regular",
-        //                         color: uiTheme.colors.muted,
-        //                         fontSize: 11,
-        //                         fontWeight: "normal",
-        //                       }}
-        //                     >
-        //                       (Replies : New Matches)
-        //                     </Text>
-        //                   </Text>
-        //                   <TouchableOpacity
-        //                     accessibilityRole="button"
-        //                     onPress={() =>
-        //                       setTooltipModal({
-        //                         title: "Messaging Priority",
-        //                         lines: [
-        //                           "Splits AI time between replies & new outreach",
-        //                           "⬅ 70:30 → mostly replies to current chats",
-        //                           "⬛ 50:50 → balanced (recommended)",
-        //                           "➡ 30:70 → aggressively messages new matches",
-        //                         ],
-        //                       })
-        //                     }
-        //                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        //                   >
-        //                     <Ionicons
-        //                       name="information-circle-outline"
-        //                       size={14}
-        //                       color={uiTheme.colors.muted}
-        //                     />
-        //                   </TouchableOpacity>
-        //                 </View>
-        //                 <Text style={[styles.labelMuted, { marginBottom: 8 }]}>
-        //                   Splits AI time between ongoing conversation replies & new
-        //                   match outreach:
-        //                 </Text>
-        //
-        //                 <View style={styles.speedButtonGroup}>
-        //                   {PRIORITY_PRESETS.map((preset) => {
-        //                     const currentVal =
-        //                       form.prioritySlider ?? form.minReplySlots ?? 50;
-        //                     const isSelected = currentVal === preset.value;
-        //                     return (
-        //                       <TouchableOpacity
-        //                         accessibilityRole="button"
-        //                         key={preset.value}
-        //                         style={[
-        //                           styles.speedBtn,
-        //                           isSelected && styles.speedBtnActive,
-        //                         ]}
-        //                         onPress={() => {
-        //                           updateField("prioritySlider", preset.value);
-        //                           updateField(
-        //                             "minReplySlots",
-        //                             preset.value === 30
-        //                               ? 70
-        //                               : preset.value === 70
-        //                                 ? 30
-        //                                 : 50,
-        //                           );
-        //                           updateField(
-        //                             "maxNewMatchSlots",
-        //                             preset.value === 30
-        //                               ? 30
-        //                               : preset.value === 70
-        //                                 ? 70
-        //                                 : 50,
-        //                           );
-        //                         }}
-        //                         activeOpacity={0.8}
-        //                       >
-        //                         <Text
-        //                           style={[
-        //                             styles.speedBtnText,
-        //                             isSelected && styles.speedBtnTextActive,
-        //                           ]}
-        //                         >
-        //                           {preset.ratio}
-        //                         </Text>
-        //                       </TouchableOpacity>
-        //                     );
-        //                   })}
-        //                 </View>
-        //
-        //                 <View style={{ marginTop: 8 }}>
-        //                   <Text
-        //                     style={{
-        //                       fontFamily: "Inter_600SemiBold",
-        //                       color: uiTheme.colors.primary,
-        //                       fontSize: 11,
-        //                       fontWeight: "normal",
-        //                     }}
-        //                   >
-        //                     {PRIORITY_PRESETS.find(
-        //                       (p) =>
-        //                         p.value ===
-        //                         (form.prioritySlider ?? form.minReplySlots ?? 50),
-        //                     )?.desc || "Balanced outreach & replies (Recommended)"}
-        //                   </Text>
-        //                 </View>
-        //               </View>
-        //             </View>
-        //           )}
-        //         </View>
+          // <View style={[styles.v2Card, openCards.messaging && styles.v2CardOpen]}>
+          //           <TouchableOpacity
+          //             accessibilityRole="button"
+          //             style={styles.v2CardHeader}
+          //             onPress={() => toggleCard("messaging")}
+          //             activeOpacity={0.85}
+          //           >
+          //             <View style={styles.cardTitleWrap}>
+          //               <Ionicons name="chatbubbles-outline" size={17} color="#EC4899" />
+          //               <Text style={styles.v2CardTitle}>Messaging</Text>
+          //             </View>
+          //             <Ionicons
+          //               name={openCards.messaging ? "chevron-up" : "chevron-down"}
+          //               size={18}
+          //               color={uiTheme.colors.muted}
+          //             />
+          //           </TouchableOpacity>
+          //
+          //           {/* Collapsed Summary Chips */}
+          //           {!openCards.messaging && (
+          //             <View style={styles.collapsedRow}>
+          //               <View style={styles.v2Chip}>
+          //                 <Ionicons name="sparkles" size={11} color="#EC4899" />
+          //                 <Text style={styles.v2ChipText}>
+          //                   {getMessagingSummary().intention}
+          //                 </Text>
+          //               </View>
+          //               <View style={styles.v2Chip}>
+          //                 <Ionicons
+          //                   name="swap-horizontal"
+          //                   size={11}
+          //                   color={uiTheme.colors.info}
+          //                 />
+          //                 <Text style={styles.v2ChipText}>
+          //                   {getMessagingSummary().priority}
+          //                 </Text>
+          //               </View>
+          //               <View style={styles.v2Chip}>
+          //                 <Ionicons
+          //                   name="color-wand"
+          //                   size={11}
+          //                   color={uiTheme.colors.success}
+          //                 />
+          //                 <Text style={styles.v2ChipText}>
+          //                   {getMessagingSummary().tone}
+          //                 </Text>
+          //               </View>
+          //               <View style={styles.v2Chip}>
+          //                 <Ionicons
+          //                   name="globe-outline"
+          //                   size={11}
+          //                   color={uiTheme.colors.warning}
+          //                 />
+          //                 <Text style={styles.v2ChipText}>
+          //                   {getMessagingSummary().lang}
+          //                 </Text>
+          //               </View>
+          //               <View style={styles.v2Chip}>
+          //                 <Text style={styles.v2ChipText}>
+          //                   {getMessagingSummary().emojis}
+          //                 </Text>
+          //               </View>
+          //               {getMessagingSummary().consecutive && (
+          //                 <View style={styles.v2Chip}>
+          //                   <Text style={styles.v2ChipText}>Multi-text</Text>
+          //                 </View>
+          //               )}
+          //             </View>
+          //           )}
+          //
+          //           {/* Expanded Body */}
+          //           {openCards.messaging && (
+          //             <View style={styles.v2CardBody}>
+          //               <Text style={styles.fieldDesc}>
+          //                 Configure conversation style, intentions, language & priority
+          //                 balancing:
+          //               </Text>
+          //
+          //               {/* ─── Core Toggles (Smart Reactions, Use Emojis, Consecutive Messages) ─── */}
+          //               <View style={styles.subBox}>
+          //                 {/* Smart Reactions */}
+          //                 <View style={styles.rowBetween}>
+          //                   <View style={{ flex: 1, paddingRight: 10 }}>
+          //                     <View
+          //                       style={{
+          //                         flexDirection: "row",
+          //                         alignItems: "center",
+          //                         gap: 6,
+          //                       }}
+          //                     >
+          //                       <Text style={styles.toggleTitle}>Smart Reactions</Text>
+          //                       <TouchableOpacity
+          //                         accessibilityRole="button"
+          //                         onPress={() =>
+          //                           setTooltipModal({
+          //                             title: "Smart Reactions",
+          //                             lines: [
+          //                               "① AI randomly likes (❤️) messages from matches",
+          //                               "② Pushes your chat to the top of their inbox",
+          //                               "③ Increases the chance they reply to you",
+          //                             ],
+          //                           })
+          //                         }
+          //                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          //                       >
+          //                         <Ionicons
+          //                           name="information-circle-outline"
+          //                           size={14}
+          //                           color={uiTheme.colors.muted}
+          //                         />
+          //                       </TouchableOpacity>
+          //                     </View>
+          //                     <Text style={styles.labelMuted}>
+          //                       AI randomly likes (❤️) received messages to push chat to
+          //                       top
+          //                     </Text>
+          //                   </View>
+          //                   <Switch
+          //                     value={
+          //                       (form.randomHearts ?? form.smartReactionsEnabled) === true
+          //                     }
+          //                     onValueChange={(v) => {
+          //                       updateField("randomHearts", v);
+          //                       updateField("smartReactionsEnabled", v);
+          //                     }}
+          //                     trackColor={{
+          //                       false: uiTheme.colors.elevated,
+          //                       true: "#EC4899",
+          //                     }}
+          //                     thumbColor={
+          //                       (form.randomHearts ?? form.smartReactionsEnabled)
+          //                         ? "#FFF"
+          //                         : uiTheme.colors.muted
+          //                     }
+          //                   />
+          //                 </View>
+          //
+          //                 <View style={styles.subBoxDivider} />
+          //
+          //                 {/* Use Emoji's */}
+          //                 <View style={styles.rowBetween}>
+          //                   <View style={{ flex: 1, paddingRight: 10 }}>
+          //                     <Text style={styles.toggleTitle}>Use Emoji's</Text>
+          //                     <Text style={styles.labelMuted}>
+          //                       Include expressive emojis in generated AI responses
+          //                     </Text>
+          //                   </View>
+          //                   <Switch
+          //                     value={form.useEmojis !== false}
+          //                     onValueChange={(v) => updateField("useEmojis", v)}
+          //                     trackColor={{
+          //                       false: uiTheme.colors.elevated,
+          //                       true: "#EC4899",
+          //                     }}
+          //                     thumbColor={
+          //                       form.useEmojis !== false ? "#FFF" : uiTheme.colors.muted
+          //                     }
+          //                   />
+          //                 </View>
+          //
+          //                 <View style={styles.subBoxDivider} />
+          //
+          //                 {/* Consecutive Messages (Double Texting) */}
+          //                 <View style={styles.rowBetween}>
+          //                   <View style={{ flex: 1, paddingRight: 10 }}>
+          //                     <View
+          //                       style={{
+          //                         flexDirection: "row",
+          //                         alignItems: "center",
+          //                         gap: 6,
+          //                       }}
+          //                     >
+          //                       <Text style={styles.toggleTitle}>
+          //                         Consecutive Messages
+          //                       </Text>
+          //                       <TouchableOpacity
+          //                         accessibilityRole="button"
+          //                         onPress={() =>
+          //                           setTooltipModal({
+          //                             title: "Consecutive Messages",
+          //                             lines: [
+          //                               "① Match sends multiple messages in a row",
+          //                               "② AI mirrors their energy with 2–3 replies back",
+          //                               "③ Each part uses 1 message credit",
+          //                             ],
+          //                           })
+          //                         }
+          //                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          //                       >
+          //                         <Ionicons
+          //                           name="information-circle-outline"
+          //                           size={14}
+          //                           color={uiTheme.colors.muted}
+          //                         />
+          //                       </TouchableOpacity>
+          //                     </View>
+          //                     <Text style={styles.labelMuted}>
+          //                       AI mirrors match energy with 2–3 message replies when they
+          //                       text in bursts
+          //                     </Text>
+          //                   </View>
+          //                   <Switch
+          //                     value={form.consecutiveMessagesEnabled === true}
+          //                     onValueChange={(v) =>
+          //                       updateField("consecutiveMessagesEnabled", v)
+          //                     }
+          //                     trackColor={{
+          //                       false: uiTheme.colors.elevated,
+          //                       true: "#EC4899",
+          //                     }}
+          //                     thumbColor={
+          //                       form.consecutiveMessagesEnabled
+          //                         ? "#FFF"
+          //                         : uiTheme.colors.muted
+          //                     }
+          //                   />
+          //                 </View>
+          //               </View>
+          //
+          //               {/* ─── Your Intentions Dropdown (V2 UI Parity) ─── */}
+          //               <View style={styles.subBox}>
+          //                 <V2Dropdown
+          //                   label="Your Intentions"
+          //                   options={INTENTIONS_OPTIONS.map((item) => ({
+          //                     id: item.id,
+          //                     value: item.id,
+          //                     label: item.label,
+          //                   }))}
+          //                   selectedValue={form.intentions || "short_term"}
+          //                   onSelect={(val) => updateField("intentions", val)}
+          //                 />
+          //               </View>
+          //
+          //               {/* ─── Conversation Tone Dropdown (V2 UI Parity) ─── */}
+          //               <View style={styles.subBox}>
+          //                 <V2Dropdown
+          //                   label="Conversation Tone"
+          //                   options={TONE_OPTIONS.map((t) => ({
+          //                     id: t.toLowerCase(),
+          //                     value: t.toLowerCase(),
+          //                     label: t,
+          //                   }))}
+          //                   selectedValue={(
+          //                     form.tone ||
+          //                     form.chattingStyle ||
+          //                     "freestyle"
+          //                   ).toLowerCase()}
+          //                   onSelect={(val) => {
+          //                     const titleCased =
+          //                       val.charAt(0).toUpperCase() + val.slice(1);
+          //                     updateField("tone", titleCased);
+          //                     updateField("chattingStyle", val);
+          //                   }}
+          //                 />
+          //               </View>
+          //
+          //               {/* ─── Default Language Dropdown (V2 UI Parity) ─── */}
+          //               <View style={styles.subBox}>
+          //                 <V2Dropdown
+          //                   label="Default Language"
+          //                   sublabel="(Editable per match)"
+          //                   options={LANGUAGE_OPTIONS.map((lang) => ({
+          //                     id: lang.code,
+          //                     value: lang.code,
+          //                     label: lang.label,
+          //                     flag: lang.flag,
+          //                   }))}
+          //                   selectedValue={form.conversationLanguage || "en"}
+          //                   onSelect={(val) => updateField("conversationLanguage", val)}
+          //                 />
+          //               </View>
+          //
+          //               {/* ─── Messaging Priority (Replies vs New Matches) ─── */}
+          //               <View style={styles.subBox}>
+          //                 <View
+          //                   style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+          //                 >
+          //                   <Text style={styles.subBoxTitle}>
+          //                     Messaging Priority{" "}
+          //                     <Text
+          //                       style={{
+          //                         fontFamily: "Inter_400Regular",
+          //                         color: uiTheme.colors.muted,
+          //                         fontSize: 11,
+          //                         fontWeight: "normal",
+          //                       }}
+          //                     >
+          //                       (Replies : New Matches)
+          //                     </Text>
+          //                   </Text>
+          //                   <TouchableOpacity
+          //                     accessibilityRole="button"
+          //                     onPress={() =>
+          //                       setTooltipModal({
+          //                         title: "Messaging Priority",
+          //                         lines: [
+          //                           "Splits AI time between replies & new outreach",
+          //                           "⬅ 70:30 → mostly replies to current chats",
+          //                           "⬛ 50:50 → balanced (recommended)",
+          //                           "➡ 30:70 → aggressively messages new matches",
+          //                         ],
+          //                       })
+          //                     }
+          //                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          //                   >
+          //                     <Ionicons
+          //                       name="information-circle-outline"
+          //                       size={14}
+          //                       color={uiTheme.colors.muted}
+          //                     />
+          //                   </TouchableOpacity>
+          //                 </View>
+          //                 <Text style={[styles.labelMuted, { marginBottom: 8 }]}>
+          //                   Splits AI time between ongoing conversation replies & new
+          //                   match outreach:
+          //                 </Text>
+          //
+          //                 <View style={styles.speedButtonGroup}>
+          //                   {PRIORITY_PRESETS.map((preset) => {
+          //                     const currentVal =
+          //                       form.prioritySlider ?? form.minReplySlots ?? 50;
+          //                     const isSelected = currentVal === preset.value;
+          //                     return (
+          //                       <TouchableOpacity
+          //                         accessibilityRole="button"
+          //                         key={preset.value}
+          //                         style={[
+          //                           styles.speedBtn,
+          //                           isSelected && styles.speedBtnActive,
+          //                         ]}
+          //                         onPress={() => {
+          //                           updateField("prioritySlider", preset.value);
+          //                           updateField(
+          //                             "minReplySlots",
+          //                             preset.value === 30
+          //                               ? 70
+          //                               : preset.value === 70
+          //                                 ? 30
+          //                                 : 50,
+          //                           );
+          //                           updateField(
+          //                             "maxNewMatchSlots",
+          //                             preset.value === 30
+          //                               ? 30
+          //                               : preset.value === 70
+          //                                 ? 70
+          //                                 : 50,
+          //                           );
+          //                         }}
+          //                         activeOpacity={0.8}
+          //                       >
+          //                         <Text
+          //                           style={[
+          //                             styles.speedBtnText,
+          //                             isSelected && styles.speedBtnTextActive,
+          //                           ]}
+          //                         >
+          //                           {preset.ratio}
+          //                         </Text>
+          //                       </TouchableOpacity>
+          //                     );
+          //                   })}
+          //                 </View>
+          //
+          //                 <View style={{ marginTop: 8 }}>
+          //                   <Text
+          //                     style={{
+          //                       fontFamily: "Inter_600SemiBold",
+          //                       color: uiTheme.colors.primary,
+          //                       fontSize: 11,
+          //                       fontWeight: "normal",
+          //                     }}
+          //                   >
+          //                     {PRIORITY_PRESETS.find(
+          //                       (p) =>
+          //                         p.value ===
+          //                         (form.prioritySlider ?? form.minReplySlots ?? 50),
+          //                     )?.desc || "Balanced outreach & replies (Recommended)"}
+          //                   </Text>
+          //                 </View>
+          //               </View>
+          //             </View>
+          //           )}
+          //         </View>
         }
 
         {/* ════════════════════ CARD 4: YOUR CHAT STYLE & AI TRAINING (V2 DESKTOP PARITY) ════════════════════ */}
         {
-        // <View style={[styles.v2Card, openCards.style && styles.v2CardOpen]}>
-        //           <TouchableOpacity
-        //             accessibilityRole="button"
-        //             style={styles.v2CardHeader}
-        //             onPress={() => toggleCard("style")}
-        //             activeOpacity={0.85}
-        //           >
-        //             <View style={styles.cardTitleWrap}>
-        //               <Ionicons name="sparkles-outline" size={17} color="#C026D3" />
-        //               <Text style={styles.v2CardTitle}>Your Chat Style</Text>
-        //             </View>
-        //             <Ionicons
-        //               name={openCards.style ? "chevron-up" : "chevron-down"}
-        //               size={18}
-        //               color={uiTheme.colors.muted}
-        //             />
-        //           </TouchableOpacity>
-        //
-        //           {/* Collapsed Summary Chips */}
-        //           {!openCards.style && (
-        //             <View style={styles.collapsedRow}>
-        //               {getStyleSummary().map((item, idx) => (
-        //                 <View
-        //                   key={idx}
-        //                   style={[
-        //                     styles.v2Chip,
-        //                     item.full && { borderColor: "rgba(192, 38, 211, 0.4)" },
-        //                   ]}
-        //                 >
-        //                   <Ionicons name="sparkles" size={11} color="#C026D3" />
-        //                   <Text
-        //                     style={[
-        //                       styles.v2ChipText,
-        //                       item.full && { color: uiTheme.colors.text },
-        //                     ]}
-        //                   >
-        //                     {item.label}
-        //                   </Text>
-        //                 </View>
-        //               ))}
-        //             </View>
-        //           )}
-        //
-        //           {/* Expanded Body */}
-        //           {openCards.style && (
-        //             <View style={styles.v2CardBody}>
-        //               {/* ─── SCREEN 1: INTRO / OVERVIEW ─── */}
-        //               {styleView === "intro" &&
-        //                 (() => {
-        //                   const profiles = form?.chatStyleProfiles || {};
-        //                   const legacy = form?.chatStyleProfile;
-        //                   if (
-        //                     legacy?.trained &&
-        //                     !profiles[legacy.trainingLanguage || "en"]
-        //                   ) {
-        //                     profiles[legacy.trainingLanguage || "en"] = legacy;
-        //                   }
-        //                   const activeProfile = profiles[trainingLang];
-        //                   const isTrained = !!activeProfile?.trained;
-        //                   const isFull = isTrained && !activeProfile?.partial;
-        //                   const currentLangObj = LANGUAGE_OPTIONS.find(
-        //                     (l) => l.code === trainingLang,
-        //                   ) || { label: "English", flag: "🇺🇸" };
-        //                   const trainedCodes = Object.keys(profiles).filter(
-        //                     (k) => profiles[k]?.trained,
-        //                   );
-        //
-        //                   const maxProfiles =
-        //                     form?.remoteStyleTrainingConfig?.maxProfiles ?? 3;
-        //                   const atCap =
-        //                     !isTrained && trainedCodes.length >= maxProfiles;
-        //
-        //                   return (
-        //                     <View style={styles.cstIntroContainer}>
-        //                       <View style={styles.cstIntroIconWrap}>
-        //                         <Ionicons
-        //                           name="chatbubbles"
-        //                           size={24}
-        //                           color="#C026D3"
-        //                         />
-        //                       </View>
-        //
-        //                       <Text style={styles.cstIntroTitle}>
-        //                         {atCap
-        //                           ? "Profile Limit Reached"
-        //                           : isFull
-        //                             ? `Retrain for ${currentLangObj.label}`
-        //                             : isTrained
-        //                               ? `Continue training ${currentLangObj.label}`
-        //                               : "Train Your Chat Style"}
-        //                       </Text>
-        //
-        //                       <Text style={styles.cstIntroDesc}>
-        //                         {atCap
-        //                           ? `You have ${trainedCodes.length} trained profiles (the maximum). Delete one from your existing profiles to train a new language.`
-        //                           : isFull
-        //                             ? `You have a complete style profile for ${currentLangObj.label}. Start a new session to update your texting rhythm.`
-        //                             : isTrained
-        //                               ? `Your ${currentLangObj.label} profile has ${activeProfile.messageCount || 0} messages — 12 messages gives the highest AI accuracy.`
-        //                               : "Reply to a few messages from a practice match. The AI learns how you write so when it messages your matches, it uses your tone, your words and your rhythm."}
-        //                       </Text>
-        //
-        //                       {/* Trained Languages Bar */}
-        //                       {trainedCodes.length > 0 && (
-        //                         <View style={styles.cstTrainedBar}>
-        //                           <Text style={styles.cstTrainedBarLabel}>
-        //                             Trained Languages ({trainedCodes.length}/
-        //                             {maxProfiles}):
-        //                           </Text>
-        //                           <View style={styles.cstTrainedChipsRow}>
-        //                             {trainedCodes.map((code) => {
-        //                               const p = profiles[code];
-        //                               const lObj = LANGUAGE_OPTIONS.find(
-        //                                 (l) => l.code === code,
-        //                               ) || { label: code, flag: "🌐" };
-        //                               const isActive = code === trainingLang;
-        //                               return (
-        //                                 <TouchableOpacity
-        //                                   accessibilityRole="button"
-        //                                   key={code}
-        //                                   style={[
-        //                                     styles.cstTrainedPill,
-        //                                     isActive && styles.cstTrainedPillActive,
-        //                                   ]}
-        //                                   onPress={() => {
-        //                                     setViewingLang(code);
-        //                                     setStyleView("insights");
-        //                                   }}
-        //                                   activeOpacity={0.8}
-        //                                 >
-        //                                   <Text
-        //                                     style={[
-        //                                       styles.cstTrainedPillText,
-        //                                       isActive &&
-        //                                         styles.cstTrainedPillTextActive,
-        //                                     ]}
-        //                                   >
-        //                                     {p.partial
-        //                                       ? `${lObj.flag} ${lObj.label} ${p.messageCount || 0}/12`
-        //                                       : `✓ ${lObj.flag} ${lObj.label}`}
-        //                                   </Text>
-        //                                 </TouchableOpacity>
-        //                               );
-        //                             })}
-        //                           </View>
-        //                         </View>
-        //                       )}
-        //
-        //                       {/* Training Language Dropdown */}
-        //                       <View style={{ marginTop: 12 }}>
-        //                         <V2Dropdown
-        //                           label="Training language"
-        //                           options={LANGUAGE_OPTIONS.map((l) => ({
-        //                             id: l.code,
-        //                             value: l.code,
-        //                             label: l.label,
-        //                             flag: l.flag,
-        //                           }))}
-        //                           selectedValue={trainingLang}
-        //                           onSelect={(val) => setTrainingLang(val)}
-        //                         />
-        //                       </View>
-        //
-        //                       {/* Start / Continue Button */}
-        //                       <TouchableOpacity
-        //                         accessibilityRole="button"
-        //                         style={[
-        //                           styles.cstStartBtn,
-        //                           atCap && { opacity: 0.5, backgroundColor: "#332E4A" },
-        //                         ]}
-        //                         onPress={() =>
-        //                           !atCap && startTrainingSession(trainingLang, isFull)
-        //                         }
-        //                         disabled={atCap}
-        //                         activeOpacity={0.85}
-        //                       >
-        //                         <Ionicons
-        //                           name={atCap ? "alert-circle" : "sparkles"}
-        //                           size={15}
-        //                           color="#FFF"
-        //                         />
-        //                         <Text style={styles.cstStartBtnText}>
-        //                           {atCap
-        //                             ? `Profile Limit Reached (Max ${maxProfiles})`
-        //                             : isFull
-        //                               ? `Retrain ${currentLangObj.label}`
-        //                               : isTrained
-        //                                 ? `Continue Training ${currentLangObj.label}`
-        //                                 : `Start Training (${currentLangObj.label})`}
-        //                         </Text>
-        //                       </TouchableOpacity>
-        //
-        //                       {/* View Trained Style Button */}
-        //                       {isTrained && (
-        //                         <TouchableOpacity
-        //                           accessibilityRole="button"
-        //                           style={styles.cstViewTrainedBtn}
-        //                           onPress={() => {
-        //                             setViewingLang(trainingLang);
-        //                             setStyleView("insights");
-        //                           }}
-        //                           activeOpacity={0.8}
-        //                         >
-        //                           <Text style={styles.cstViewTrainedBtnText}>
-        //                             View trained style profile
-        //                           </Text>
-        //                         </TouchableOpacity>
-        //                       )}
-        //                     </View>
-        //                   );
-        //                 })()}
-        //
-        //               {/* ─── SCREEN 2: SIMULATOR CHAT (V2 DESKTOP PARITY) ─── */}
-        //               {styleView === "chat" &&
-        //                 (() => {
-        //                   const validCount = chatMessages.filter(
-        //                     (m) => m.sender === "user" && !m.garbage,
-        //                   ).length;
-        //                   const progressPct = Math.min((validCount / 12) * 100, 100);
-        //                   const currentLangObj = LANGUAGE_OPTIONS.find(
-        //                     (l) => l.code === trainingLang,
-        //                   ) || { label: "English", flag: "🇺🇸" };
-        //                   const persona = getPersonaForLang(trainingLang);
-        //                   const profiles = form?.chatStyleProfiles || {};
-        //                   const trainedCodes = Object.keys(profiles).filter(
-        //                     (k) => profiles[k]?.trained,
-        //                   );
-        //
-        //                   return (
-        //                     <View style={styles.cstSimContainer}>
-        //                       {/* Top Simulator Header */}
-        //                       <View style={styles.cstSimTopBar}>
-        //                         <View
-        //                           style={{
-        //                             flexDirection: "row",
-        //                             alignItems: "center",
-        //                             gap: 10,
-        //                           }}
-        //                         >
-        //                           <View style={styles.simAvatarWrapper}>
-        //                             <View style={styles.simAvatar}>
-        //                               <Text
-        //                                 style={{
-        //                                   fontFamily: "Inter_700Bold",
-        //                                   color: "#FFF",
-        //                                   fontWeight: "normal",
-        //                                   fontSize: 12,
-        //                                 }}
-        //                               >
-        //                                 {persona.name.charAt(0)}
-        //                               </Text>
-        //                             </View>
-        //                             <View style={styles.simAvatarOnlineDot} />
-        //                           </View>
-        //                           <View>
-        //                             <Text style={styles.simMatchName}>
-        //                               {persona.name}
-        //                             </Text>
-        //                             <Text
-        //                               style={{
-        //                                 fontFamily: "Inter_600SemiBold",
-        //                                 color: uiTheme.colors.success,
-        //                                 fontSize: 11,
-        //                                 fontWeight: "normal",
-        //                               }}
-        //                             >
-        //                               Online now
-        //                             </Text>
-        //                           </View>
-        //                         </View>
-        //
-        //                         <View
-        //                           style={{
-        //                             flexDirection: "row",
-        //                             alignItems: "center",
-        //                             gap: 8,
-        //                           }}
-        //                         >
-        //                           <View
-        //                             style={{
-        //                               width: 60,
-        //                               height: 4,
-        //                               backgroundColor: "#221E33",
-        //                               borderRadius: 2,
-        //                               overflow: "hidden",
-        //                             }}
-        //                           >
-        //                             <View
-        //                               style={{
-        //                                 width: `${progressPct}%`,
-        //                                 height: "100%",
-        //                                 backgroundColor: uiTheme.colors.primary,
-        //                                 borderRadius: 2,
-        //                               }}
-        //                             />
-        //                           </View>
-        //                           <Text
-        //                             style={{
-        //                               fontFamily: "Inter_700Bold",
-        //                               color: uiTheme.colors.muted,
-        //                               fontSize: 11,
-        //                               fontWeight: "normal",
-        //                             }}
-        //                           >
-        //                             {validCount} / 12
-        //                           </Text>
-        //                           <TouchableOpacity
-        //                             accessibilityRole="button"
-        //                             style={styles.cstRestartBtn}
-        //                             onPress={restartTrainingSession}
-        //                             activeOpacity={0.8}
-        //                             accessibilityLabel="Restart"
-        //                           >
-        //                             <Ionicons
-        //                               name="refresh"
-        //                               size={13}
-        //                               color={uiTheme.colors.muted}
-        //                             />
-        //                           </TouchableOpacity>
-        //                           <TouchableOpacity
-        //                             accessibilityRole="button"
-        //                             style={styles.cstCancelBtn}
-        //                             onPress={() => setStyleView("intro")}
-        //                             activeOpacity={0.8}
-        //                           >
-        //                             <Ionicons
-        //                               name="close"
-        //                               size={15}
-        //                               color={uiTheme.colors.muted}
-        //                             />
-        //                           </TouchableOpacity>
-        //                         </View>
-        //                       </View>
-        //
-        //                       {/* Messages Container */}
-        //                       <ScrollView
-        //                         style={styles.cstMessagesScroll}
-        //                         contentContainerStyle={{ gap: 10, paddingVertical: 8 }}
-        //                         showsVerticalScrollIndicator={false}
-        //                       >
-        //                         {/* Date Separator */}
-        //                         <View style={styles.simDateSeparator}>
-        //                           <Text style={styles.simDateSeparatorText}>TODAY</Text>
-        //                         </View>
-        //
-        //                         {chatMessages.map((msg) => {
-        //                           if (msg.sender === "system") {
-        //                             return (
-        //                               <View key={msg.id} style={styles.simSystemHint}>
-        //                                 <Ionicons
-        //                                   name="information-circle-outline"
-        //                                   size={13}
-        //                                   color={uiTheme.colors.warning}
-        //                                 />
-        //                                 <Text style={styles.simSystemHintText}>
-        //                                   {msg.text}
-        //                                 </Text>
-        //                               </View>
-        //                             );
-        //                           }
-        //                           if (msg.sender === "match") {
-        //                             return (
-        //                               <View key={msg.id} style={styles.simMatchRow}>
-        //                                 <View style={styles.simMatchAvatarTiny}>
-        //                                   <Text
-        //                                     style={{
-        //                                       fontFamily: "Inter_800ExtraBold",
-        //                                       color: "#FFF",
-        //                                       fontSize: 10,
-        //                                       fontWeight: "normal",
-        //                                     }}
-        //                                   >
-        //                                     {persona.name.charAt(0)}
-        //                                   </Text>
-        //                                 </View>
-        //                                 <View
-        //                                   style={[
-        //                                     styles.simBubble,
-        //                                     styles.simBubbleMatch,
-        //                                   ]}
-        //                                 >
-        //                                   <Text style={styles.simBubbleTextMatch}>
-        //                                     {msg.text}
-        //                                   </Text>
-        //                                 </View>
-        //                               </View>
-        //                             );
-        //                           }
-        //                           return (
-        //                             <View
-        //                               key={msg.id}
-        //                               style={[
-        //                                 styles.simBubble,
-        //                                 styles.simBubbleUser,
-        //                                 msg.garbage && {
-        //                                   backgroundColor: "rgba(239, 68, 68, 0.2)",
-        //                                   borderWidth: 1,
-        //                                   borderColor: "rgba(239, 68, 68, 0.4)",
-        //                                 },
-        //                               ]}
-        //                             >
-        //                               <Text style={styles.simBubbleTextUser}>
-        //                                 {msg.text}
-        //                               </Text>
-        //                             </View>
-        //                           );
-        //                         })}
-        //                         {calibrating && (
-        //                           <View style={styles.simMatchRow}>
-        //                             <View style={styles.simMatchAvatarTiny}>
-        //                               <Text
-        //                                 style={{
-        //                                   fontFamily: "Inter_800ExtraBold",
-        //                                   color: "#FFF",
-        //                                   fontSize: 10,
-        //                                   fontWeight: "normal",
-        //                                 }}
-        //                               >
-        //                                 {persona.name.charAt(0)}
-        //                               </Text>
-        //                             </View>
-        //                             <View
-        //                               style={[styles.simBubble, styles.simBubbleMatch]}
-        //                             >
-        //                               <Text
-        //                                 style={{
-        //                                   fontFamily: "Inter_400Regular",
-        //                                   color: uiTheme.colors.muted,
-        //                                   fontSize: 11,
-        //                                   fontStyle: "italic",
-        //                                 }}
-        //                               >
-        //                                 {persona.name} is typing…
-        //                               </Text>
-        //                             </View>
-        //                           </View>
-        //                         )}
-        //
-        //                         {/* Desktop V2 Finish Banner */}
-        //                         {sessionCompleted && (
-        //                           <View style={styles.cstFinishBanner}>
-        //                             <Text
-        //                               style={{
-        //                                 fontFamily: "Inter_400Regular",
-        //                                 fontSize: 22,
-        //                                 textAlign: "center",
-        //                                 marginBottom: 4,
-        //                               }}
-        //                             >
-        //                               🎉
-        //                             </Text>
-        //                             <Text style={styles.cstFinishTitle}>
-        //                               Training complete!
-        //                             </Text>
-        //                             <Text style={styles.cstFinishSub}>
-        //                               Your style has been captured. Tap below to see
-        //                               what the AI learned.
-        //                             </Text>
-        //                             <TouchableOpacity
-        //                               accessibilityRole="button"
-        //                               style={styles.cstFinishBtn}
-        //                               onPress={finishAndSaveSession}
-        //                               activeOpacity={0.85}
-        //                             >
-        //                               <Text style={styles.cstFinishBtnText}>
-        //                                 See Results
-        //                               </Text>
-        //                             </TouchableOpacity>
-        //                           </View>
-        //                         )}
-        //                       </ScrollView>
-        //
-        //                       {/* Footer Action Row with Globe Pill */}
-        //                       <View style={styles.simActionRow}>
-        //                         {validCount > 0 && !sessionCompleted && (
-        //                           <TouchableOpacity
-        //                             accessibilityRole="button"
-        //                             style={[
-        //                               styles.cstSaveInlinePill,
-        //                               inlineSaved && {
-        //                                 borderColor: uiTheme.colors.success,
-        //                                 backgroundColor: "rgba(16, 185, 129, 0.12)",
-        //                               },
-        //                             ]}
-        //                             onPress={saveStyleInline}
-        //                             activeOpacity={0.8}
-        //                           >
-        //                             <Text
-        //                               style={[
-        //                                 styles.cstSaveInlinePillText,
-        //                                 inlineSaved && {
-        //                                   color: uiTheme.colors.success,
-        //                                 },
-        //                               ]}
-        //                             >
-        //                               {inlineSaved ? "✓ Saved" : "Save style"}
-        //                             </Text>
-        //                           </TouchableOpacity>
-        //                         )}
-        //                         <View style={{ flex: 1 }} />
-        //                         {trainedCodes.length > 0 && (
-        //                           <TouchableOpacity
-        //                             accessibilityRole="button"
-        //                             style={styles.cstProfilesBtn}
-        //                             onPress={() => setSimLangModalOpen(true)}
-        //                             activeOpacity={0.8}
-        //                           >
-        //                             <Ionicons
-        //                               name="person-circle-outline"
-        //                               size={13}
-        //                               color="#C026D3"
-        //                             />
-        //                             <Text style={styles.cstProfilesBtnText}>
-        //                               Profiles {trainedCodes.length}
-        //                             </Text>
-        //                           </TouchableOpacity>
-        //                         )}
-        //                         <TouchableOpacity
-        //                           accessibilityRole="button"
-        //                           style={styles.simLangPill}
-        //                           onPress={() => setSimLangModalOpen(true)}
-        //                           activeOpacity={0.8}
-        //                         >
-        //                           <Ionicons
-        //                             name="globe-outline"
-        //                             size={12}
-        //                             color={uiTheme.colors.primary}
-        //                           />
-        //                           <Text style={styles.simLangPillText}>
-        //                             {currentLangObj.label}
-        //                           </Text>
-        //                           <Ionicons
-        //                             name="chevron-down"
-        //                             size={12}
-        //                             color={uiTheme.colors.primary}
-        //                           />
-        //                         </TouchableOpacity>
-        //                       </View>
-        //
-        //                       {/* Simulator Language Selection Modal */}
-        //                       <Modal
-        //                         visible={simLangModalOpen}
-        //                         transparent
-        //                         animationType="fade"
-        //                         onRequestClose={() => setSimLangModalOpen(false)}
-        //                       >
-        //                         <TouchableOpacity
-        //                           accessibilityRole="button"
-        //                           style={styles.modalOverlay}
-        //                           activeOpacity={1}
-        //                           onPress={() => setSimLangModalOpen(false)}
-        //                         >
-        //                           <View
-        //                             style={styles.simLangModalContent}
-        //                             onStartShouldSetResponder={() => true}
-        //                           >
-        //                             <View style={styles.simLangModalHeader}>
-        //                               <Text style={styles.simLangModalTitle}>
-        //                                 Training Language
-        //                               </Text>
-        //                               <TouchableOpacity
-        //                                 accessibilityRole="button"
-        //                                 onPress={() => setSimLangModalOpen(false)}
-        //                                 hitSlop={{
-        //                                   top: 8,
-        //                                   bottom: 8,
-        //                                   left: 8,
-        //                                   right: 8,
-        //                                 }}
-        //                               >
-        //                                 <Ionicons
-        //                                   name="close"
-        //                                   size={18}
-        //                                   color={uiTheme.colors.muted}
-        //                                 />
-        //                               </TouchableOpacity>
-        //                             </View>
-        //
-        //                             <ScrollView
-        //                               style={{ maxHeight: 320 }}
-        //                               showsVerticalScrollIndicator={false}
-        //                             >
-        //                               {LANGUAGE_OPTIONS.map((lang) => {
-        //                                 const isSelected = lang.code === trainingLang;
-        //                                 const isTrained =
-        //                                   !!form?.chatStyleProfiles?.[lang.code]
-        //                                     ?.trained;
-        //                                 const isPartial =
-        //                                   !!form?.chatStyleProfiles?.[lang.code]
-        //                                     ?.partial;
-        //                                 const count =
-        //                                   form?.chatStyleProfiles?.[lang.code]
-        //                                     ?.messageCount || 0;
-        //
-        //                                 return (
-        //                                   <TouchableOpacity
-        //                                     accessibilityRole="button"
-        //                                     key={lang.code}
-        //                                     style={[
-        //                                       styles.simLangModalOption,
-        //                                       isSelected &&
-        //                                         styles.simLangModalOptionSelected,
-        //                                     ]}
-        //                                     onPress={() =>
-        //                                       handleSwitchSimLanguage(lang.code)
-        //                                     }
-        //                                     activeOpacity={0.7}
-        //                                   >
-        //                                     <View
-        //                                       style={{
-        //                                         flexDirection: "row",
-        //                                         alignItems: "center",
-        //                                         gap: 10,
-        //                                       }}
-        //                                     >
-        //                                       <Text
-        //                                         style={{
-        //                                           fontFamily: "Inter_400Regular",
-        //                                           fontSize: 18,
-        //                                         }}
-        //                                       >
-        //                                         {lang.flag}
-        //                                       </Text>
-        //                                       <View>
-        //                                         <Text
-        //                                           style={[
-        //                                             styles.simLangModalOptionText,
-        //                                             isSelected && {
-        //                                               fontFamily: "Inter_800ExtraBold",
-        //                                               color: uiTheme.colors.primary,
-        //                                               fontWeight: "normal",
-        //                                             },
-        //                                           ]}
-        //                                         >
-        //                                           {lang.label}
-        //                                         </Text>
-        //                                         {isTrained && (
-        //                                           <Text
-        //                                             style={{
-        //                                               fontFamily: "Inter_600SemiBold",
-        //                                               color: isPartial
-        //                                                 ? uiTheme.colors.warning
-        //                                                 : uiTheme.colors.success,
-        //                                               fontSize: 10,
-        //                                               fontWeight: "normal",
-        //                                             }}
-        //                                           >
-        //                                             {isPartial
-        //                                               ? `Partial session (${count}/12)`
-        //                                               : "✓ Style trained"}
-        //                                           </Text>
-        //                                         )}
-        //                                       </View>
-        //                                     </View>
-        //
-        //                                     {isSelected && (
-        //                                       <Ionicons
-        //                                         name="checkmark-circle"
-        //                                         size={18}
-        //                                         color={uiTheme.colors.primary}
-        //                                       />
-        //                                     )}
-        //                                   </TouchableOpacity>
-        //                                 );
-        //                               })}
-        //                             </ScrollView>
-        //                           </View>
-        //                         </TouchableOpacity>
-        //                       </Modal>
-        //
-        //                       {/* Practice Input Bar */}
-        //                       <View style={{ marginTop: 4 }}>
-        //                         <View style={styles.simInputRow}>
-        //                           <TextInput
-        //                             style={[
-        //                               styles.simTextInput,
-        //                               inputShaking && styles.simTextInputShaking,
-        //                               sessionCompleted && { opacity: 0.5 },
-        //                             ]}
-        //                             placeholder={
-        //                               sessionCompleted
-        //                                 ? "Training complete"
-        //                                 : "Type your reply..."
-        //                             }
-        //                             placeholderTextColor="#55526B"
-        //                             value={inputPracticeMsg}
-        //                             onChangeText={(text) => {
-        //                               setInputPracticeMsg(text);
-        //                               if (inputWarning) setInputWarning("");
-        //                               if (inputShaking) setInputShaking(false);
-        //                             }}
-        //                             onSubmitEditing={sendPracticeMessage}
-        //                             editable={!sessionCompleted}
-        //                           />
-        //                           <TouchableOpacity
-        //                             accessibilityRole="button"
-        //                             style={[
-        //                               styles.simSendBtn,
-        //                               sessionCompleted && { opacity: 0.4 },
-        //                             ]}
-        //                             onPress={sendPracticeMessage}
-        //                             activeOpacity={0.8}
-        //                             disabled={sessionCompleted}
-        //                           >
-        //                             <Ionicons
-        //                               name="arrow-forward"
-        //                               size={16}
-        //                               color="#FFF"
-        //                             />
-        //                           </TouchableOpacity>
-        //                         </View>
-        //
-        //                         {/* Desktop V2 Bottom Orange Warning Message */}
-        //                         {!!inputWarning && (
-        //                           <Text style={styles.simInputWarningText}>
-        //                             {inputWarning}
-        //                           </Text>
-        //                         )}
-        //                       </View>
-        //                     </View>
-        //                   );
-        //                 })()}
-        //
-        //               {/* ─── SCREEN 3: TRAINED STYLE INSIGHTS & COMPLETION (V2 DESKTOP PARITY) ─── */}
-        //               {styleView === "insights" &&
-        //                 (() => {
-        //                   const profiles = form?.chatStyleProfiles || {};
-        //                   const profile =
-        //                     profiles[viewingLang] || form?.chatStyleProfile || {};
-        //                   const langObj = LANGUAGE_OPTIONS.find(
-        //                     (l) => l.code === viewingLang,
-        //                   ) || { label: "English", flag: "🇺🇸" };
-        //                   const isPartial = !!profile.partial;
-        //                   const hasSavedChat =
-        //                     (profile.savedMessages &&
-        //                       profile.savedMessages.length > 0) ||
-        //                     chatMessages.length > 1;
-        //
-        //                   return (
-        //                     <View style={styles.cstInsightsContainer}>
-        //                       <View style={styles.cstInsightsHeader}>
-        //                         <View
-        //                           style={[
-        //                             styles.cstBadgeSuccess,
-        //                             isPartial && {
-        //                               backgroundColor: "rgba(245, 158, 11, 0.15)",
-        //                               borderColor: "rgba(245, 158, 11, 0.3)",
-        //                             },
-        //                           ]}
-        //                         >
-        //                           <Ionicons
-        //                             name={
-        //                               isPartial ? "time-outline" : "checkmark-circle"
-        //                             }
-        //                             size={14}
-        //                             color={
-        //                               isPartial
-        //                                 ? uiTheme.colors.warning
-        //                                 : uiTheme.colors.success
-        //                             }
-        //                           />
-        //                           <Text
-        //                             style={[
-        //                               styles.cstBadgeSuccessText,
-        //                               isPartial && { color: uiTheme.colors.warning },
-        //                             ]}
-        //                           >
-        //                             {isPartial
-        //                               ? "Partial Style Saved"
-        //                               : "Style Captured"}
-        //                           </Text>
-        //                         </View>
-        //                         <Text style={styles.cstInsightsTitle}>
-        //                           {langObj.flag} {langObj.label} Style Profile
-        //                         </Text>
-        //                         <Text style={styles.cstInsightsSub}>
-        //                           {isPartial
-        //                             ? `${profile.messageCount || 0} of 12 messages trained · more training improves accuracy.`
-        //                             : `Trained on ${profile.messageCount || 12} messages. Your AI Wingman writes in this style in ${langObj.label}.`}
-        //                         </Text>
-        //                       </View>
-        //
-        //                       {/* Trait Chips Bar (Desktop V2 .cst-traits) */}
-        //                       <View style={styles.cstTraitsRow}>
-        //                         <View style={styles.cstTraitChip}>
-        //                           <Text style={styles.cstTraitChipText}>
-        //                             {profile.aiSummary?.lengthTrait ||
-        //                               (profile.aiSummary?.avgWords <= 6
-        //                                 ? "Short messages"
-        //                                 : profile.aiSummary?.avgWords >= 14
-        //                                   ? "Detailed messages"
-        //                                   : "Medium messages")}
-        //                           </Text>
-        //                         </View>
-        //                         <View style={styles.cstTraitChip}>
-        //                           <Text style={styles.cstTraitChipText}>
-        //                             {profile.aiSummary?.emojiTrait ||
-        //                               (profile.aiSummary?.emojiPct === 0
-        //                                 ? "No emoji"
-        //                                 : profile.aiSummary?.emojiPct > 45
-        //                                   ? "Heavy emoji"
-        //                                   : "Light emoji")}
-        //                           </Text>
-        //                         </View>
-        //                         <View style={styles.cstTraitChip}>
-        //                           <Text style={styles.cstTraitChipText}>
-        //                             {profile.aiSummary?.toneTrait ||
-        //                               (profile.aiSummary?.isLowercase
-        //                                 ? "Playful & casual"
-        //                                 : "Casual tone")}
-        //                           </Text>
-        //                         </View>
-        //                         <View style={styles.cstTraitChip}>
-        //                           <Text style={styles.cstTraitChipText}>
-        //                             {profile.aiSummary?.followUpTrait || "Natural flow"}
-        //                           </Text>
-        //                         </View>
-        //                       </View>
-        //
-        //                       {/* What the AI Noticed Summary Box (Desktop V2 .cst-ai-summary-wrap) */}
-        //                       {profile.aiSummary?.whatAiNoticed && (
-        //                         <View style={styles.cstAiSummaryWrap}>
-        //                           <Text style={styles.cstAiSummaryLabel}>
-        //                             What the AI noticed
-        //                           </Text>
-        //                           <Text style={styles.cstAiSummaryText}>
-        //                             {profile.aiSummary.whatAiNoticed}
-        //                           </Text>
-        //                         </View>
-        //                       )}
-        //
-        //                       {/* Metric Cards Breakdown */}
-        //                       <View style={styles.cstMetricGrid}>
-        //                         <View style={styles.cstMetricCard}>
-        //                           <View
-        //                             style={{
-        //                               flexDirection: "row",
-        //                               alignItems: "center",
-        //                               gap: 6,
-        //                             }}
-        //                           >
-        //                             <Ionicons
-        //                               name="speedometer-outline"
-        //                               size={14}
-        //                               color={uiTheme.colors.primary}
-        //                             />
-        //                             <Text style={styles.cstMetricTitle}>
-        //                               Texting Tempo & Length
-        //                             </Text>
-        //                           </View>
-        //                           <Text style={styles.cstMetricValue}>
-        //                             {profile.aiSummary?.tempoDesc ||
-        //                               "Balanced & Natural (avg 7–12 words)"}
-        //                           </Text>
-        //                         </View>
-        //
-        //                         <View style={styles.cstMetricCard}>
-        //                           <View
-        //                             style={{
-        //                               flexDirection: "row",
-        //                               alignItems: "center",
-        //                               gap: 6,
-        //                             }}
-        //                           >
-        //                             <Ionicons
-        //                               name="happy-outline"
-        //                               size={14}
-        //                               color="#EC4899"
-        //                             />
-        //                             <Text style={styles.cstMetricTitle}>
-        //                               Emoji Placement
-        //                             </Text>
-        //                           </View>
-        //                           <Text style={styles.cstMetricValue}>
-        //                             {profile.aiSummary?.emojiDesc ||
-        //                               "Expressive contextual placement (~30%)"}
-        //                           </Text>
-        //                         </View>
-        //
-        //                         <View style={styles.cstMetricCard}>
-        //                           <View
-        //                             style={{
-        //                               flexDirection: "row",
-        //                               alignItems: "center",
-        //                               gap: 6,
-        //                             }}
-        //                           >
-        //                             <Ionicons
-        //                               name="text-outline"
-        //                               size={14}
-        //                               color={uiTheme.colors.info}
-        //                             />
-        //                             <Text style={styles.cstMetricTitle}>
-        //                               Punctuation & Flow
-        //                             </Text>
-        //                           </View>
-        //                           <Text style={styles.cstMetricValue}>
-        //                             {profile.aiSummary?.punctuationDesc ||
-        //                               "Modern lowercase casual rhythm"}
-        //                           </Text>
-        //                         </View>
-        //
-        //                         <View style={styles.cstMetricCard}>
-        //                           <View
-        //                             style={{
-        //                               flexDirection: "row",
-        //                               alignItems: "center",
-        //                               gap: 6,
-        //                             }}
-        //                           >
-        //                             <Ionicons
-        //                               name="flash-outline"
-        //                               size={14}
-        //                               color={uiTheme.colors.success}
-        //                             />
-        //                             <Text style={styles.cstMetricTitle}>
-        //                               AI Mirroring Status
-        //                             </Text>
-        //                           </View>
-        //                           <Text
-        //                             style={[
-        //                               styles.cstMetricValue,
-        //                               {
-        //                                 fontFamily: "Inter_700Bold",
-        //                                 color: uiTheme.colors.success,
-        //                                 fontWeight: "normal",
-        //                               },
-        //                             ]}
-        //                           >
-        //                             Active in Live Chats
-        //                           </Text>
-        //                         </View>
-        //                       </View>
-        //
-        //                       {/* Action Buttons (100% Desktop V2 Complete Actions) */}
-        //                       <View style={{ marginTop: 14, gap: 8 }}>
-        //                         <TouchableOpacity
-        //                           accessibilityRole="button"
-        //                           style={styles.cstStartBtn}
-        //                           onPress={() =>
-        //                             startTrainingSession(viewingLang, !isPartial)
-        //                           }
-        //                           activeOpacity={0.85}
-        //                         >
-        //                           <Ionicons name="refresh" size={14} color="#FFF" />
-        //                           <Text style={styles.cstStartBtnText}>
-        //                             {isPartial
-        //                               ? `Continue Training ${langObj.label}`
-        //                               : `Retrain ${langObj.label} Style`}
-        //                           </Text>
-        //                         </TouchableOpacity>
-        //
-        //                         <TouchableOpacity
-        //                           accessibilityRole="button"
-        //                           style={styles.cstTrainAnotherBtn}
-        //                           onPress={trainAnotherLanguage}
-        //                           activeOpacity={0.8}
-        //                         >
-        //                           <Ionicons name="add" size={15} color="#FFF" />
-        //                           <Text style={styles.cstTrainAnotherBtnText}>
-        //                             + Train Another Language
-        //                           </Text>
-        //                         </TouchableOpacity>
-        //
-        //                         {hasSavedChat && (
-        //                           <TouchableOpacity
-        //                             accessibilityRole="button"
-        //                             style={styles.cstSecondaryBtn}
-        //                             onPress={() => setStyleView("replay")}
-        //                             activeOpacity={0.8}
-        //                           >
-        //                             <Ionicons
-        //                               name="chatbox-ellipses-outline"
-        //                               size={14}
-        //                               color={uiTheme.colors.text}
-        //                             />
-        //                             <Text style={styles.cstSecondaryBtnText}>
-        //                               View training chat
-        //                             </Text>
-        //                           </TouchableOpacity>
-        //                         )}
-        //
-        //                         <TouchableOpacity
-        //                           accessibilityRole="button"
-        //                           style={styles.cstSecondaryBtn}
-        //                           onPress={() => setStyleView("intro")}
-        //                           activeOpacity={0.8}
-        //                         >
-        //                           <Text style={styles.cstSecondaryBtnText}>
-        //                             Back to Overview
-        //                           </Text>
-        //                         </TouchableOpacity>
-        //
-        //                         <TouchableOpacity
-        //                           accessibilityRole="button"
-        //                           style={styles.cstDeleteBtn}
-        //                           onPress={() => deleteProfile(viewingLang)}
-        //                           activeOpacity={0.8}
-        //                         >
-        //                           <Ionicons
-        //                             name="trash-outline"
-        //                             size={13}
-        //                             color={uiTheme.colors.error}
-        //                           />
-        //                           <Text style={styles.cstDeleteBtnText}>
-        //                             Delete {langObj.label} Profile
-        //                           </Text>
-        //                         </TouchableOpacity>
-        //                       </View>
-        //                     </View>
-        //                   );
-        //                 })()}
-        //
-        //               {/* ─── SCREEN 4: CHAT REPLAY (DESKTOP V2 _renderChatReplay PARITY) ─── */}
-        //               {styleView === "replay" &&
-        //                 (() => {
-        //                   const profiles = form?.chatStyleProfiles || {};
-        //                   const profile =
-        //                     profiles[viewingLang] || form?.chatStyleProfile || {};
-        //                   const langObj = LANGUAGE_OPTIONS.find(
-        //                     (l) => l.code === viewingLang,
-        //                   ) || { label: "English", flag: "🇺🇸" };
-        //                   const replayMsgs =
-        //                     profile.savedMessages && profile.savedMessages.length > 0
-        //                       ? profile.savedMessages
-        //                       : chatMessages;
-        //
-        //                   return (
-        //                     <View style={styles.cstSimContainer}>
-        //                       <View style={styles.cstSimTopBar}>
-        //                         <TouchableOpacity
-        //                           accessibilityRole="button"
-        //                           style={{
-        //                             flexDirection: "row",
-        //                             alignItems: "center",
-        //                             gap: 4,
-        //                           }}
-        //                           onPress={() => setStyleView("insights")}
-        //                           activeOpacity={0.8}
-        //                         >
-        //                           <Ionicons
-        //                             name="arrow-back"
-        //                             size={16}
-        //                             color="#C026D3"
-        //                           />
-        //                           <Text
-        //                             style={{
-        //                               fontFamily: "Inter_700Bold",
-        //                               color: "#C026D3",
-        //                               fontSize: 12,
-        //                               fontWeight: "normal",
-        //                             }}
-        //                           >
-        //                             Back
-        //                           </Text>
-        //                         </TouchableOpacity>
-        //                         <Text style={styles.simMatchName}>
-        //                           {langObj.flag} Training Transcript
-        //                         </Text>
-        //                         <View style={{ width: 40 }} />
-        //                       </View>
-        //
-        //                       <ScrollView
-        //                         style={[
-        //                           styles.cstMessagesScroll,
-        //                           { maxHeight: 300, minHeight: 200 },
-        //                         ]}
-        //                         contentContainerStyle={{ gap: 8, paddingVertical: 8 }}
-        //                         showsVerticalScrollIndicator={false}
-        //                       >
-        //                         {replayMsgs.map((msg) => (
-        //                           <View
-        //                             key={msg.id}
-        //                             style={[
-        //                               styles.simBubble,
-        //                               msg.sender === "user"
-        //                                 ? styles.simBubbleUser
-        //                                 : styles.simBubbleMatch,
-        //                             ]}
-        //                           >
-        //                             <Text
-        //                               style={[
-        //                                 styles.simBubbleText,
-        //                                 msg.sender === "user" && { color: "#FFF" },
-        //                               ]}
-        //                             >
-        //                               {msg.text}
-        //                             </Text>
-        //                           </View>
-        //                         ))}
-        //                       </ScrollView>
-        //                     </View>
-        //                   );
-        //                 })()}
-        //
-        //               {/* ─── SCREEN 5: LOW QUALITY NOTIFICATION (DESKTOP V2 _renderLowQualityScreen PARITY) ─── */}
-        //               {styleView === "lowQuality" &&
-        //                 (() => {
-        //                   const langObj = LANGUAGE_OPTIONS.find(
-        //                     (l) => l.code === trainingLang,
-        //                   ) || { label: "English", flag: "🇺🇸" };
-        //                   return (
-        //                     <View style={styles.cstInsightsContainer}>
-        //                       <View style={styles.cstInsightsHeader}>
-        //                         <View
-        //                           style={[
-        //                             styles.cstBadgeSuccess,
-        //                             {
-        //                               backgroundColor: "rgba(239, 68, 68, 0.15)",
-        //                               borderColor: "rgba(239, 68, 68, 0.3)",
-        //                             },
-        //                           ]}
-        //                         >
-        //                           <Ionicons
-        //                             name="warning-outline"
-        //                             size={14}
-        //                             color={uiTheme.colors.error}
-        //                           />
-        //                           <Text
-        //                             style={[
-        //                               styles.cstBadgeSuccessText,
-        //                               { color: uiTheme.colors.error },
-        //                             ]}
-        //                           >
-        //                             Replies Too Short
-        //                           </Text>
-        //                         </View>
-        //                         <Text style={styles.cstInsightsTitle}>
-        //                           Replies too short to learn from
-        //                         </Text>
-        //                         <Text style={styles.cstInsightsSub}>
-        //                           The AI needs real sentences to pick up your style.
-        //                           Single words or random characters don't give it enough
-        //                           to work with. Try again and reply the way you'd
-        //                           actually text someone.
-        //                         </Text>
-        //                       </View>
-        //
-        //                       <TouchableOpacity
-        //                         accessibilityRole="button"
-        //                         style={styles.cstStartBtn}
-        //                         onPress={() => startTrainingSession(trainingLang, true)}
-        //                         activeOpacity={0.85}
-        //                       >
-        //                         <Ionicons name="refresh" size={14} color="#FFF" />
-        //                         <Text style={styles.cstStartBtnText}>
-        //                           Try Again ({langObj.label})
-        //                         </Text>
-        //                       </TouchableOpacity>
-        //
-        //                       <TouchableOpacity
-        //                         accessibilityRole="button"
-        //                         style={[styles.cstSecondaryBtn, { marginTop: 8 }]}
-        //                         onPress={() => setStyleView("intro")}
-        //                         activeOpacity={0.8}
-        //                       >
-        //                         <Text style={styles.cstSecondaryBtnText}>
-        //                           Back to Overview
-        //                         </Text>
-        //                       </TouchableOpacity>
-        //                     </View>
-        //                   );
-        //                 })()}
-        //             </View>
-        //           )}
-        //         </View>
+          // <View style={[styles.v2Card, openCards.style && styles.v2CardOpen]}>
+          //           <TouchableOpacity
+          //             accessibilityRole="button"
+          //             style={styles.v2CardHeader}
+          //             onPress={() => toggleCard("style")}
+          //             activeOpacity={0.85}
+          //           >
+          //             <View style={styles.cardTitleWrap}>
+          //               <Ionicons name="sparkles-outline" size={17} color="#C026D3" />
+          //               <Text style={styles.v2CardTitle}>Your Chat Style</Text>
+          //             </View>
+          //             <Ionicons
+          //               name={openCards.style ? "chevron-up" : "chevron-down"}
+          //               size={18}
+          //               color={uiTheme.colors.muted}
+          //             />
+          //           </TouchableOpacity>
+          //
+          //           {/* Collapsed Summary Chips */}
+          //           {!openCards.style && (
+          //             <View style={styles.collapsedRow}>
+          //               {getStyleSummary().map((item, idx) => (
+          //                 <View
+          //                   key={idx}
+          //                   style={[
+          //                     styles.v2Chip,
+          //                     item.full && { borderColor: "rgba(192, 38, 211, 0.4)" },
+          //                   ]}
+          //                 >
+          //                   <Ionicons name="sparkles" size={11} color="#C026D3" />
+          //                   <Text
+          //                     style={[
+          //                       styles.v2ChipText,
+          //                       item.full && { color: uiTheme.colors.text },
+          //                     ]}
+          //                   >
+          //                     {item.label}
+          //                   </Text>
+          //                 </View>
+          //               ))}
+          //             </View>
+          //           )}
+          //
+          //           {/* Expanded Body */}
+          //           {openCards.style && (
+          //             <View style={styles.v2CardBody}>
+          //               {/* ─── SCREEN 1: INTRO / OVERVIEW ─── */}
+          //               {styleView === "intro" &&
+          //                 (() => {
+          //                   const profiles = form?.chatStyleProfiles || {};
+          //                   const legacy = form?.chatStyleProfile;
+          //                   if (
+          //                     legacy?.trained &&
+          //                     !profiles[legacy.trainingLanguage || "en"]
+          //                   ) {
+          //                     profiles[legacy.trainingLanguage || "en"] = legacy;
+          //                   }
+          //                   const activeProfile = profiles[trainingLang];
+          //                   const isTrained = !!activeProfile?.trained;
+          //                   const isFull = isTrained && !activeProfile?.partial;
+          //                   const currentLangObj = LANGUAGE_OPTIONS.find(
+          //                     (l) => l.code === trainingLang,
+          //                   ) || { label: "English", flag: "🇺🇸" };
+          //                   const trainedCodes = Object.keys(profiles).filter(
+          //                     (k) => profiles[k]?.trained,
+          //                   );
+          //
+          //                   const maxProfiles =
+          //                     form?.remoteStyleTrainingConfig?.maxProfiles ?? 3;
+          //                   const atCap =
+          //                     !isTrained && trainedCodes.length >= maxProfiles;
+          //
+          //                   return (
+          //                     <View style={styles.cstIntroContainer}>
+          //                       <View style={styles.cstIntroIconWrap}>
+          //                         <Ionicons
+          //                           name="chatbubbles"
+          //                           size={24}
+          //                           color="#C026D3"
+          //                         />
+          //                       </View>
+          //
+          //                       <Text style={styles.cstIntroTitle}>
+          //                         {atCap
+          //                           ? "Profile Limit Reached"
+          //                           : isFull
+          //                             ? `Retrain for ${currentLangObj.label}`
+          //                             : isTrained
+          //                               ? `Continue training ${currentLangObj.label}`
+          //                               : "Train Your Chat Style"}
+          //                       </Text>
+          //
+          //                       <Text style={styles.cstIntroDesc}>
+          //                         {atCap
+          //                           ? `You have ${trainedCodes.length} trained profiles (the maximum). Delete one from your existing profiles to train a new language.`
+          //                           : isFull
+          //                             ? `You have a complete style profile for ${currentLangObj.label}. Start a new session to update your texting rhythm.`
+          //                             : isTrained
+          //                               ? `Your ${currentLangObj.label} profile has ${activeProfile.messageCount || 0} messages — 12 messages gives the highest AI accuracy.`
+          //                               : "Reply to a few messages from a practice match. The AI learns how you write so when it messages your matches, it uses your tone, your words and your rhythm."}
+          //                       </Text>
+          //
+          //                       {/* Trained Languages Bar */}
+          //                       {trainedCodes.length > 0 && (
+          //                         <View style={styles.cstTrainedBar}>
+          //                           <Text style={styles.cstTrainedBarLabel}>
+          //                             Trained Languages ({trainedCodes.length}/
+          //                             {maxProfiles}):
+          //                           </Text>
+          //                           <View style={styles.cstTrainedChipsRow}>
+          //                             {trainedCodes.map((code) => {
+          //                               const p = profiles[code];
+          //                               const lObj = LANGUAGE_OPTIONS.find(
+          //                                 (l) => l.code === code,
+          //                               ) || { label: code, flag: "🌐" };
+          //                               const isActive = code === trainingLang;
+          //                               return (
+          //                                 <TouchableOpacity
+          //                                   accessibilityRole="button"
+          //                                   key={code}
+          //                                   style={[
+          //                                     styles.cstTrainedPill,
+          //                                     isActive && styles.cstTrainedPillActive,
+          //                                   ]}
+          //                                   onPress={() => {
+          //                                     setViewingLang(code);
+          //                                     setStyleView("insights");
+          //                                   }}
+          //                                   activeOpacity={0.8}
+          //                                 >
+          //                                   <Text
+          //                                     style={[
+          //                                       styles.cstTrainedPillText,
+          //                                       isActive &&
+          //                                         styles.cstTrainedPillTextActive,
+          //                                     ]}
+          //                                   >
+          //                                     {p.partial
+          //                                       ? `${lObj.flag} ${lObj.label} ${p.messageCount || 0}/12`
+          //                                       : `✓ ${lObj.flag} ${lObj.label}`}
+          //                                   </Text>
+          //                                 </TouchableOpacity>
+          //                               );
+          //                             })}
+          //                           </View>
+          //                         </View>
+          //                       )}
+          //
+          //                       {/* Training Language Dropdown */}
+          //                       <View style={{ marginTop: 12 }}>
+          //                         <V2Dropdown
+          //                           label="Training language"
+          //                           options={LANGUAGE_OPTIONS.map((l) => ({
+          //                             id: l.code,
+          //                             value: l.code,
+          //                             label: l.label,
+          //                             flag: l.flag,
+          //                           }))}
+          //                           selectedValue={trainingLang}
+          //                           onSelect={(val) => setTrainingLang(val)}
+          //                         />
+          //                       </View>
+          //
+          //                       {/* Start / Continue Button */}
+          //                       <TouchableOpacity
+          //                         accessibilityRole="button"
+          //                         style={[
+          //                           styles.cstStartBtn,
+          //                           atCap && { opacity: 0.5, backgroundColor: "#332E4A" },
+          //                         ]}
+          //                         onPress={() =>
+          //                           !atCap && startTrainingSession(trainingLang, isFull)
+          //                         }
+          //                         disabled={atCap}
+          //                         activeOpacity={0.85}
+          //                       >
+          //                         <Ionicons
+          //                           name={atCap ? "alert-circle" : "sparkles"}
+          //                           size={15}
+          //                           color="#FFF"
+          //                         />
+          //                         <Text style={styles.cstStartBtnText}>
+          //                           {atCap
+          //                             ? `Profile Limit Reached (Max ${maxProfiles})`
+          //                             : isFull
+          //                               ? `Retrain ${currentLangObj.label}`
+          //                               : isTrained
+          //                                 ? `Continue Training ${currentLangObj.label}`
+          //                                 : `Start Training (${currentLangObj.label})`}
+          //                         </Text>
+          //                       </TouchableOpacity>
+          //
+          //                       {/* View Trained Style Button */}
+          //                       {isTrained && (
+          //                         <TouchableOpacity
+          //                           accessibilityRole="button"
+          //                           style={styles.cstViewTrainedBtn}
+          //                           onPress={() => {
+          //                             setViewingLang(trainingLang);
+          //                             setStyleView("insights");
+          //                           }}
+          //                           activeOpacity={0.8}
+          //                         >
+          //                           <Text style={styles.cstViewTrainedBtnText}>
+          //                             View trained style profile
+          //                           </Text>
+          //                         </TouchableOpacity>
+          //                       )}
+          //                     </View>
+          //                   );
+          //                 })()}
+          //
+          //               {/* ─── SCREEN 2: SIMULATOR CHAT (V2 DESKTOP PARITY) ─── */}
+          //               {styleView === "chat" &&
+          //                 (() => {
+          //                   const validCount = chatMessages.filter(
+          //                     (m) => m.sender === "user" && !m.garbage,
+          //                   ).length;
+          //                   const progressPct = Math.min((validCount / 12) * 100, 100);
+          //                   const currentLangObj = LANGUAGE_OPTIONS.find(
+          //                     (l) => l.code === trainingLang,
+          //                   ) || { label: "English", flag: "🇺🇸" };
+          //                   const persona = getPersonaForLang(trainingLang);
+          //                   const profiles = form?.chatStyleProfiles || {};
+          //                   const trainedCodes = Object.keys(profiles).filter(
+          //                     (k) => profiles[k]?.trained,
+          //                   );
+          //
+          //                   return (
+          //                     <View style={styles.cstSimContainer}>
+          //                       {/* Top Simulator Header */}
+          //                       <View style={styles.cstSimTopBar}>
+          //                         <View
+          //                           style={{
+          //                             flexDirection: "row",
+          //                             alignItems: "center",
+          //                             gap: 10,
+          //                           }}
+          //                         >
+          //                           <View style={styles.simAvatarWrapper}>
+          //                             <View style={styles.simAvatar}>
+          //                               <Text
+          //                                 style={{
+          //                                   fontFamily: "Inter_700Bold",
+          //                                   color: "#FFF",
+          //                                   fontWeight: "normal",
+          //                                   fontSize: 12,
+          //                                 }}
+          //                               >
+          //                                 {persona.name.charAt(0)}
+          //                               </Text>
+          //                             </View>
+          //                             <View style={styles.simAvatarOnlineDot} />
+          //                           </View>
+          //                           <View>
+          //                             <Text style={styles.simMatchName}>
+          //                               {persona.name}
+          //                             </Text>
+          //                             <Text
+          //                               style={{
+          //                                 fontFamily: "Inter_600SemiBold",
+          //                                 color: uiTheme.colors.success,
+          //                                 fontSize: 11,
+          //                                 fontWeight: "normal",
+          //                               }}
+          //                             >
+          //                               Online now
+          //                             </Text>
+          //                           </View>
+          //                         </View>
+          //
+          //                         <View
+          //                           style={{
+          //                             flexDirection: "row",
+          //                             alignItems: "center",
+          //                             gap: 8,
+          //                           }}
+          //                         >
+          //                           <View
+          //                             style={{
+          //                               width: 60,
+          //                               height: 4,
+          //                               backgroundColor: "#221E33",
+          //                               borderRadius: 2,
+          //                               overflow: "hidden",
+          //                             }}
+          //                           >
+          //                             <View
+          //                               style={{
+          //                                 width: `${progressPct}%`,
+          //                                 height: "100%",
+          //                                 backgroundColor: uiTheme.colors.primary,
+          //                                 borderRadius: 2,
+          //                               }}
+          //                             />
+          //                           </View>
+          //                           <Text
+          //                             style={{
+          //                               fontFamily: "Inter_700Bold",
+          //                               color: uiTheme.colors.muted,
+          //                               fontSize: 11,
+          //                               fontWeight: "normal",
+          //                             }}
+          //                           >
+          //                             {validCount} / 12
+          //                           </Text>
+          //                           <TouchableOpacity
+          //                             accessibilityRole="button"
+          //                             style={styles.cstRestartBtn}
+          //                             onPress={restartTrainingSession}
+          //                             activeOpacity={0.8}
+          //                             accessibilityLabel="Restart"
+          //                           >
+          //                             <Ionicons
+          //                               name="refresh"
+          //                               size={13}
+          //                               color={uiTheme.colors.muted}
+          //                             />
+          //                           </TouchableOpacity>
+          //                           <TouchableOpacity
+          //                             accessibilityRole="button"
+          //                             style={styles.cstCancelBtn}
+          //                             onPress={() => setStyleView("intro")}
+          //                             activeOpacity={0.8}
+          //                           >
+          //                             <Ionicons
+          //                               name="close"
+          //                               size={15}
+          //                               color={uiTheme.colors.muted}
+          //                             />
+          //                           </TouchableOpacity>
+          //                         </View>
+          //                       </View>
+          //
+          //                       {/* Messages Container */}
+          //                       <ScrollView
+          //                         style={styles.cstMessagesScroll}
+          //                         contentContainerStyle={{ gap: 10, paddingVertical: 8 }}
+          //                         showsVerticalScrollIndicator={false}
+          //                       >
+          //                         {/* Date Separator */}
+          //                         <View style={styles.simDateSeparator}>
+          //                           <Text style={styles.simDateSeparatorText}>TODAY</Text>
+          //                         </View>
+          //
+          //                         {chatMessages.map((msg) => {
+          //                           if (msg.sender === "system") {
+          //                             return (
+          //                               <View key={msg.id} style={styles.simSystemHint}>
+          //                                 <Ionicons
+          //                                   name="information-circle-outline"
+          //                                   size={13}
+          //                                   color={uiTheme.colors.warning}
+          //                                 />
+          //                                 <Text style={styles.simSystemHintText}>
+          //                                   {msg.text}
+          //                                 </Text>
+          //                               </View>
+          //                             );
+          //                           }
+          //                           if (msg.sender === "match") {
+          //                             return (
+          //                               <View key={msg.id} style={styles.simMatchRow}>
+          //                                 <View style={styles.simMatchAvatarTiny}>
+          //                                   <Text
+          //                                     style={{
+          //                                       fontFamily: "Inter_800ExtraBold",
+          //                                       color: "#FFF",
+          //                                       fontSize: 10,
+          //                                       fontWeight: "normal",
+          //                                     }}
+          //                                   >
+          //                                     {persona.name.charAt(0)}
+          //                                   </Text>
+          //                                 </View>
+          //                                 <View
+          //                                   style={[
+          //                                     styles.simBubble,
+          //                                     styles.simBubbleMatch,
+          //                                   ]}
+          //                                 >
+          //                                   <Text style={styles.simBubbleTextMatch}>
+          //                                     {msg.text}
+          //                                   </Text>
+          //                                 </View>
+          //                               </View>
+          //                             );
+          //                           }
+          //                           return (
+          //                             <View
+          //                               key={msg.id}
+          //                               style={[
+          //                                 styles.simBubble,
+          //                                 styles.simBubbleUser,
+          //                                 msg.garbage && {
+          //                                   backgroundColor: "rgba(239, 68, 68, 0.2)",
+          //                                   borderWidth: 1,
+          //                                   borderColor: "rgba(239, 68, 68, 0.4)",
+          //                                 },
+          //                               ]}
+          //                             >
+          //                               <Text style={styles.simBubbleTextUser}>
+          //                                 {msg.text}
+          //                               </Text>
+          //                             </View>
+          //                           );
+          //                         })}
+          //                         {calibrating && (
+          //                           <View style={styles.simMatchRow}>
+          //                             <View style={styles.simMatchAvatarTiny}>
+          //                               <Text
+          //                                 style={{
+          //                                   fontFamily: "Inter_800ExtraBold",
+          //                                   color: "#FFF",
+          //                                   fontSize: 10,
+          //                                   fontWeight: "normal",
+          //                                 }}
+          //                               >
+          //                                 {persona.name.charAt(0)}
+          //                               </Text>
+          //                             </View>
+          //                             <View
+          //                               style={[styles.simBubble, styles.simBubbleMatch]}
+          //                             >
+          //                               <Text
+          //                                 style={{
+          //                                   fontFamily: "Inter_400Regular",
+          //                                   color: uiTheme.colors.muted,
+          //                                   fontSize: 11,
+          //                                   fontStyle: "italic",
+          //                                 }}
+          //                               >
+          //                                 {persona.name} is typing…
+          //                               </Text>
+          //                             </View>
+          //                           </View>
+          //                         )}
+          //
+          //                         {/* Desktop V2 Finish Banner */}
+          //                         {sessionCompleted && (
+          //                           <View style={styles.cstFinishBanner}>
+          //                             <Text
+          //                               style={{
+          //                                 fontFamily: "Inter_400Regular",
+          //                                 fontSize: 22,
+          //                                 textAlign: "center",
+          //                                 marginBottom: 4,
+          //                               }}
+          //                             >
+          //                               🎉
+          //                             </Text>
+          //                             <Text style={styles.cstFinishTitle}>
+          //                               Training complete!
+          //                             </Text>
+          //                             <Text style={styles.cstFinishSub}>
+          //                               Your style has been captured. Tap below to see
+          //                               what the AI learned.
+          //                             </Text>
+          //                             <TouchableOpacity
+          //                               accessibilityRole="button"
+          //                               style={styles.cstFinishBtn}
+          //                               onPress={finishAndSaveSession}
+          //                               activeOpacity={0.85}
+          //                             >
+          //                               <Text style={styles.cstFinishBtnText}>
+          //                                 See Results
+          //                               </Text>
+          //                             </TouchableOpacity>
+          //                           </View>
+          //                         )}
+          //                       </ScrollView>
+          //
+          //                       {/* Footer Action Row with Globe Pill */}
+          //                       <View style={styles.simActionRow}>
+          //                         {validCount > 0 && !sessionCompleted && (
+          //                           <TouchableOpacity
+          //                             accessibilityRole="button"
+          //                             style={[
+          //                               styles.cstSaveInlinePill,
+          //                               inlineSaved && {
+          //                                 borderColor: uiTheme.colors.success,
+          //                                 backgroundColor: "rgba(16, 185, 129, 0.12)",
+          //                               },
+          //                             ]}
+          //                             onPress={saveStyleInline}
+          //                             activeOpacity={0.8}
+          //                           >
+          //                             <Text
+          //                               style={[
+          //                                 styles.cstSaveInlinePillText,
+          //                                 inlineSaved && {
+          //                                   color: uiTheme.colors.success,
+          //                                 },
+          //                               ]}
+          //                             >
+          //                               {inlineSaved ? "✓ Saved" : "Save style"}
+          //                             </Text>
+          //                           </TouchableOpacity>
+          //                         )}
+          //                         <View style={{ flex: 1 }} />
+          //                         {trainedCodes.length > 0 && (
+          //                           <TouchableOpacity
+          //                             accessibilityRole="button"
+          //                             style={styles.cstProfilesBtn}
+          //                             onPress={() => setSimLangModalOpen(true)}
+          //                             activeOpacity={0.8}
+          //                           >
+          //                             <Ionicons
+          //                               name="person-circle-outline"
+          //                               size={13}
+          //                               color="#C026D3"
+          //                             />
+          //                             <Text style={styles.cstProfilesBtnText}>
+          //                               Profiles {trainedCodes.length}
+          //                             </Text>
+          //                           </TouchableOpacity>
+          //                         )}
+          //                         <TouchableOpacity
+          //                           accessibilityRole="button"
+          //                           style={styles.simLangPill}
+          //                           onPress={() => setSimLangModalOpen(true)}
+          //                           activeOpacity={0.8}
+          //                         >
+          //                           <Ionicons
+          //                             name="globe-outline"
+          //                             size={12}
+          //                             color={uiTheme.colors.primary}
+          //                           />
+          //                           <Text style={styles.simLangPillText}>
+          //                             {currentLangObj.label}
+          //                           </Text>
+          //                           <Ionicons
+          //                             name="chevron-down"
+          //                             size={12}
+          //                             color={uiTheme.colors.primary}
+          //                           />
+          //                         </TouchableOpacity>
+          //                       </View>
+          //
+          //                       {/* Simulator Language Selection Modal */}
+          //                       <Modal
+          //                         visible={simLangModalOpen}
+          //                         transparent
+          //                         animationType="fade"
+          //                         onRequestClose={() => setSimLangModalOpen(false)}
+          //                       >
+          //                         <TouchableOpacity
+          //                           accessibilityRole="button"
+          //                           style={styles.modalOverlay}
+          //                           activeOpacity={1}
+          //                           onPress={() => setSimLangModalOpen(false)}
+          //                         >
+          //                           <View
+          //                             style={styles.simLangModalContent}
+          //                             onStartShouldSetResponder={() => true}
+          //                           >
+          //                             <View style={styles.simLangModalHeader}>
+          //                               <Text style={styles.simLangModalTitle}>
+          //                                 Training Language
+          //                               </Text>
+          //                               <TouchableOpacity
+          //                                 accessibilityRole="button"
+          //                                 onPress={() => setSimLangModalOpen(false)}
+          //                                 hitSlop={{
+          //                                   top: 8,
+          //                                   bottom: 8,
+          //                                   left: 8,
+          //                                   right: 8,
+          //                                 }}
+          //                               >
+          //                                 <Ionicons
+          //                                   name="close"
+          //                                   size={18}
+          //                                   color={uiTheme.colors.muted}
+          //                                 />
+          //                               </TouchableOpacity>
+          //                             </View>
+          //
+          //                             <ScrollView
+          //                               style={{ maxHeight: 320 }}
+          //                               showsVerticalScrollIndicator={false}
+          //                             >
+          //                               {LANGUAGE_OPTIONS.map((lang) => {
+          //                                 const isSelected = lang.code === trainingLang;
+          //                                 const isTrained =
+          //                                   !!form?.chatStyleProfiles?.[lang.code]
+          //                                     ?.trained;
+          //                                 const isPartial =
+          //                                   !!form?.chatStyleProfiles?.[lang.code]
+          //                                     ?.partial;
+          //                                 const count =
+          //                                   form?.chatStyleProfiles?.[lang.code]
+          //                                     ?.messageCount || 0;
+          //
+          //                                 return (
+          //                                   <TouchableOpacity
+          //                                     accessibilityRole="button"
+          //                                     key={lang.code}
+          //                                     style={[
+          //                                       styles.simLangModalOption,
+          //                                       isSelected &&
+          //                                         styles.simLangModalOptionSelected,
+          //                                     ]}
+          //                                     onPress={() =>
+          //                                       handleSwitchSimLanguage(lang.code)
+          //                                     }
+          //                                     activeOpacity={0.7}
+          //                                   >
+          //                                     <View
+          //                                       style={{
+          //                                         flexDirection: "row",
+          //                                         alignItems: "center",
+          //                                         gap: 10,
+          //                                       }}
+          //                                     >
+          //                                       <Text
+          //                                         style={{
+          //                                           fontFamily: "Inter_400Regular",
+          //                                           fontSize: 18,
+          //                                         }}
+          //                                       >
+          //                                         {lang.flag}
+          //                                       </Text>
+          //                                       <View>
+          //                                         <Text
+          //                                           style={[
+          //                                             styles.simLangModalOptionText,
+          //                                             isSelected && {
+          //                                               fontFamily: "Inter_800ExtraBold",
+          //                                               color: uiTheme.colors.primary,
+          //                                               fontWeight: "normal",
+          //                                             },
+          //                                           ]}
+          //                                         >
+          //                                           {lang.label}
+          //                                         </Text>
+          //                                         {isTrained && (
+          //                                           <Text
+          //                                             style={{
+          //                                               fontFamily: "Inter_600SemiBold",
+          //                                               color: isPartial
+          //                                                 ? uiTheme.colors.warning
+          //                                                 : uiTheme.colors.success,
+          //                                               fontSize: 10,
+          //                                               fontWeight: "normal",
+          //                                             }}
+          //                                           >
+          //                                             {isPartial
+          //                                               ? `Partial session (${count}/12)`
+          //                                               : "✓ Style trained"}
+          //                                           </Text>
+          //                                         )}
+          //                                       </View>
+          //                                     </View>
+          //
+          //                                     {isSelected && (
+          //                                       <Ionicons
+          //                                         name="checkmark-circle"
+          //                                         size={18}
+          //                                         color={uiTheme.colors.primary}
+          //                                       />
+          //                                     )}
+          //                                   </TouchableOpacity>
+          //                                 );
+          //                               })}
+          //                             </ScrollView>
+          //                           </View>
+          //                         </TouchableOpacity>
+          //                       </Modal>
+          //
+          //                       {/* Practice Input Bar */}
+          //                       <View style={{ marginTop: 4 }}>
+          //                         <View style={styles.simInputRow}>
+          //                           <TextInput
+          //                             style={[
+          //                               styles.simTextInput,
+          //                               inputShaking && styles.simTextInputShaking,
+          //                               sessionCompleted && { opacity: 0.5 },
+          //                             ]}
+          //                             placeholder={
+          //                               sessionCompleted
+          //                                 ? "Training complete"
+          //                                 : "Type your reply..."
+          //                             }
+          //                             placeholderTextColor="#55526B"
+          //                             value={inputPracticeMsg}
+          //                             onChangeText={(text) => {
+          //                               setInputPracticeMsg(text);
+          //                               if (inputWarning) setInputWarning("");
+          //                               if (inputShaking) setInputShaking(false);
+          //                             }}
+          //                             onSubmitEditing={sendPracticeMessage}
+          //                             editable={!sessionCompleted}
+          //                           />
+          //                           <TouchableOpacity
+          //                             accessibilityRole="button"
+          //                             style={[
+          //                               styles.simSendBtn,
+          //                               sessionCompleted && { opacity: 0.4 },
+          //                             ]}
+          //                             onPress={sendPracticeMessage}
+          //                             activeOpacity={0.8}
+          //                             disabled={sessionCompleted}
+          //                           >
+          //                             <Ionicons
+          //                               name="arrow-forward"
+          //                               size={16}
+          //                               color="#FFF"
+          //                             />
+          //                           </TouchableOpacity>
+          //                         </View>
+          //
+          //                         {/* Desktop V2 Bottom Orange Warning Message */}
+          //                         {!!inputWarning && (
+          //                           <Text style={styles.simInputWarningText}>
+          //                             {inputWarning}
+          //                           </Text>
+          //                         )}
+          //                       </View>
+          //                     </View>
+          //                   );
+          //                 })()}
+          //
+          //               {/* ─── SCREEN 3: TRAINED STYLE INSIGHTS & COMPLETION (V2 DESKTOP PARITY) ─── */}
+          //               {styleView === "insights" &&
+          //                 (() => {
+          //                   const profiles = form?.chatStyleProfiles || {};
+          //                   const profile =
+          //                     profiles[viewingLang] || form?.chatStyleProfile || {};
+          //                   const langObj = LANGUAGE_OPTIONS.find(
+          //                     (l) => l.code === viewingLang,
+          //                   ) || { label: "English", flag: "🇺🇸" };
+          //                   const isPartial = !!profile.partial;
+          //                   const hasSavedChat =
+          //                     (profile.savedMessages &&
+          //                       profile.savedMessages.length > 0) ||
+          //                     chatMessages.length > 1;
+          //
+          //                   return (
+          //                     <View style={styles.cstInsightsContainer}>
+          //                       <View style={styles.cstInsightsHeader}>
+          //                         <View
+          //                           style={[
+          //                             styles.cstBadgeSuccess,
+          //                             isPartial && {
+          //                               backgroundColor: "rgba(245, 158, 11, 0.15)",
+          //                               borderColor: "rgba(245, 158, 11, 0.3)",
+          //                             },
+          //                           ]}
+          //                         >
+          //                           <Ionicons
+          //                             name={
+          //                               isPartial ? "time-outline" : "checkmark-circle"
+          //                             }
+          //                             size={14}
+          //                             color={
+          //                               isPartial
+          //                                 ? uiTheme.colors.warning
+          //                                 : uiTheme.colors.success
+          //                             }
+          //                           />
+          //                           <Text
+          //                             style={[
+          //                               styles.cstBadgeSuccessText,
+          //                               isPartial && { color: uiTheme.colors.warning },
+          //                             ]}
+          //                           >
+          //                             {isPartial
+          //                               ? "Partial Style Saved"
+          //                               : "Style Captured"}
+          //                           </Text>
+          //                         </View>
+          //                         <Text style={styles.cstInsightsTitle}>
+          //                           {langObj.flag} {langObj.label} Style Profile
+          //                         </Text>
+          //                         <Text style={styles.cstInsightsSub}>
+          //                           {isPartial
+          //                             ? `${profile.messageCount || 0} of 12 messages trained · more training improves accuracy.`
+          //                             : `Trained on ${profile.messageCount || 12} messages. Your AI Wingman writes in this style in ${langObj.label}.`}
+          //                         </Text>
+          //                       </View>
+          //
+          //                       {/* Trait Chips Bar (Desktop V2 .cst-traits) */}
+          //                       <View style={styles.cstTraitsRow}>
+          //                         <View style={styles.cstTraitChip}>
+          //                           <Text style={styles.cstTraitChipText}>
+          //                             {profile.aiSummary?.lengthTrait ||
+          //                               (profile.aiSummary?.avgWords <= 6
+          //                                 ? "Short messages"
+          //                                 : profile.aiSummary?.avgWords >= 14
+          //                                   ? "Detailed messages"
+          //                                   : "Medium messages")}
+          //                           </Text>
+          //                         </View>
+          //                         <View style={styles.cstTraitChip}>
+          //                           <Text style={styles.cstTraitChipText}>
+          //                             {profile.aiSummary?.emojiTrait ||
+          //                               (profile.aiSummary?.emojiPct === 0
+          //                                 ? "No emoji"
+          //                                 : profile.aiSummary?.emojiPct > 45
+          //                                   ? "Heavy emoji"
+          //                                   : "Light emoji")}
+          //                           </Text>
+          //                         </View>
+          //                         <View style={styles.cstTraitChip}>
+          //                           <Text style={styles.cstTraitChipText}>
+          //                             {profile.aiSummary?.toneTrait ||
+          //                               (profile.aiSummary?.isLowercase
+          //                                 ? "Playful & casual"
+          //                                 : "Casual tone")}
+          //                           </Text>
+          //                         </View>
+          //                         <View style={styles.cstTraitChip}>
+          //                           <Text style={styles.cstTraitChipText}>
+          //                             {profile.aiSummary?.followUpTrait || "Natural flow"}
+          //                           </Text>
+          //                         </View>
+          //                       </View>
+          //
+          //                       {/* What the AI Noticed Summary Box (Desktop V2 .cst-ai-summary-wrap) */}
+          //                       {profile.aiSummary?.whatAiNoticed && (
+          //                         <View style={styles.cstAiSummaryWrap}>
+          //                           <Text style={styles.cstAiSummaryLabel}>
+          //                             What the AI noticed
+          //                           </Text>
+          //                           <Text style={styles.cstAiSummaryText}>
+          //                             {profile.aiSummary.whatAiNoticed}
+          //                           </Text>
+          //                         </View>
+          //                       )}
+          //
+          //                       {/* Metric Cards Breakdown */}
+          //                       <View style={styles.cstMetricGrid}>
+          //                         <View style={styles.cstMetricCard}>
+          //                           <View
+          //                             style={{
+          //                               flexDirection: "row",
+          //                               alignItems: "center",
+          //                               gap: 6,
+          //                             }}
+          //                           >
+          //                             <Ionicons
+          //                               name="speedometer-outline"
+          //                               size={14}
+          //                               color={uiTheme.colors.primary}
+          //                             />
+          //                             <Text style={styles.cstMetricTitle}>
+          //                               Texting Tempo & Length
+          //                             </Text>
+          //                           </View>
+          //                           <Text style={styles.cstMetricValue}>
+          //                             {profile.aiSummary?.tempoDesc ||
+          //                               "Balanced & Natural (avg 7–12 words)"}
+          //                           </Text>
+          //                         </View>
+          //
+          //                         <View style={styles.cstMetricCard}>
+          //                           <View
+          //                             style={{
+          //                               flexDirection: "row",
+          //                               alignItems: "center",
+          //                               gap: 6,
+          //                             }}
+          //                           >
+          //                             <Ionicons
+          //                               name="happy-outline"
+          //                               size={14}
+          //                               color="#EC4899"
+          //                             />
+          //                             <Text style={styles.cstMetricTitle}>
+          //                               Emoji Placement
+          //                             </Text>
+          //                           </View>
+          //                           <Text style={styles.cstMetricValue}>
+          //                             {profile.aiSummary?.emojiDesc ||
+          //                               "Expressive contextual placement (~30%)"}
+          //                           </Text>
+          //                         </View>
+          //
+          //                         <View style={styles.cstMetricCard}>
+          //                           <View
+          //                             style={{
+          //                               flexDirection: "row",
+          //                               alignItems: "center",
+          //                               gap: 6,
+          //                             }}
+          //                           >
+          //                             <Ionicons
+          //                               name="text-outline"
+          //                               size={14}
+          //                               color={uiTheme.colors.info}
+          //                             />
+          //                             <Text style={styles.cstMetricTitle}>
+          //                               Punctuation & Flow
+          //                             </Text>
+          //                           </View>
+          //                           <Text style={styles.cstMetricValue}>
+          //                             {profile.aiSummary?.punctuationDesc ||
+          //                               "Modern lowercase casual rhythm"}
+          //                           </Text>
+          //                         </View>
+          //
+          //                         <View style={styles.cstMetricCard}>
+          //                           <View
+          //                             style={{
+          //                               flexDirection: "row",
+          //                               alignItems: "center",
+          //                               gap: 6,
+          //                             }}
+          //                           >
+          //                             <Ionicons
+          //                               name="flash-outline"
+          //                               size={14}
+          //                               color={uiTheme.colors.success}
+          //                             />
+          //                             <Text style={styles.cstMetricTitle}>
+          //                               AI Mirroring Status
+          //                             </Text>
+          //                           </View>
+          //                           <Text
+          //                             style={[
+          //                               styles.cstMetricValue,
+          //                               {
+          //                                 fontFamily: "Inter_700Bold",
+          //                                 color: uiTheme.colors.success,
+          //                                 fontWeight: "normal",
+          //                               },
+          //                             ]}
+          //                           >
+          //                             Active in Live Chats
+          //                           </Text>
+          //                         </View>
+          //                       </View>
+          //
+          //                       {/* Action Buttons (100% Desktop V2 Complete Actions) */}
+          //                       <View style={{ marginTop: 14, gap: 8 }}>
+          //                         <TouchableOpacity
+          //                           accessibilityRole="button"
+          //                           style={styles.cstStartBtn}
+          //                           onPress={() =>
+          //                             startTrainingSession(viewingLang, !isPartial)
+          //                           }
+          //                           activeOpacity={0.85}
+          //                         >
+          //                           <Ionicons name="refresh" size={14} color="#FFF" />
+          //                           <Text style={styles.cstStartBtnText}>
+          //                             {isPartial
+          //                               ? `Continue Training ${langObj.label}`
+          //                               : `Retrain ${langObj.label} Style`}
+          //                           </Text>
+          //                         </TouchableOpacity>
+          //
+          //                         <TouchableOpacity
+          //                           accessibilityRole="button"
+          //                           style={styles.cstTrainAnotherBtn}
+          //                           onPress={trainAnotherLanguage}
+          //                           activeOpacity={0.8}
+          //                         >
+          //                           <Ionicons name="add" size={15} color="#FFF" />
+          //                           <Text style={styles.cstTrainAnotherBtnText}>
+          //                             + Train Another Language
+          //                           </Text>
+          //                         </TouchableOpacity>
+          //
+          //                         {hasSavedChat && (
+          //                           <TouchableOpacity
+          //                             accessibilityRole="button"
+          //                             style={styles.cstSecondaryBtn}
+          //                             onPress={() => setStyleView("replay")}
+          //                             activeOpacity={0.8}
+          //                           >
+          //                             <Ionicons
+          //                               name="chatbox-ellipses-outline"
+          //                               size={14}
+          //                               color={uiTheme.colors.text}
+          //                             />
+          //                             <Text style={styles.cstSecondaryBtnText}>
+          //                               View training chat
+          //                             </Text>
+          //                           </TouchableOpacity>
+          //                         )}
+          //
+          //                         <TouchableOpacity
+          //                           accessibilityRole="button"
+          //                           style={styles.cstSecondaryBtn}
+          //                           onPress={() => setStyleView("intro")}
+          //                           activeOpacity={0.8}
+          //                         >
+          //                           <Text style={styles.cstSecondaryBtnText}>
+          //                             Back to Overview
+          //                           </Text>
+          //                         </TouchableOpacity>
+          //
+          //                         <TouchableOpacity
+          //                           accessibilityRole="button"
+          //                           style={styles.cstDeleteBtn}
+          //                           onPress={() => deleteProfile(viewingLang)}
+          //                           activeOpacity={0.8}
+          //                         >
+          //                           <Ionicons
+          //                             name="trash-outline"
+          //                             size={13}
+          //                             color={uiTheme.colors.error}
+          //                           />
+          //                           <Text style={styles.cstDeleteBtnText}>
+          //                             Delete {langObj.label} Profile
+          //                           </Text>
+          //                         </TouchableOpacity>
+          //                       </View>
+          //                     </View>
+          //                   );
+          //                 })()}
+          //
+          //               {/* ─── SCREEN 4: CHAT REPLAY (DESKTOP V2 _renderChatReplay PARITY) ─── */}
+          //               {styleView === "replay" &&
+          //                 (() => {
+          //                   const profiles = form?.chatStyleProfiles || {};
+          //                   const profile =
+          //                     profiles[viewingLang] || form?.chatStyleProfile || {};
+          //                   const langObj = LANGUAGE_OPTIONS.find(
+          //                     (l) => l.code === viewingLang,
+          //                   ) || { label: "English", flag: "🇺🇸" };
+          //                   const replayMsgs =
+          //                     profile.savedMessages && profile.savedMessages.length > 0
+          //                       ? profile.savedMessages
+          //                       : chatMessages;
+          //
+          //                   return (
+          //                     <View style={styles.cstSimContainer}>
+          //                       <View style={styles.cstSimTopBar}>
+          //                         <TouchableOpacity
+          //                           accessibilityRole="button"
+          //                           style={{
+          //                             flexDirection: "row",
+          //                             alignItems: "center",
+          //                             gap: 4,
+          //                           }}
+          //                           onPress={() => setStyleView("insights")}
+          //                           activeOpacity={0.8}
+          //                         >
+          //                           <Ionicons
+          //                             name="arrow-back"
+          //                             size={16}
+          //                             color="#C026D3"
+          //                           />
+          //                           <Text
+          //                             style={{
+          //                               fontFamily: "Inter_700Bold",
+          //                               color: "#C026D3",
+          //                               fontSize: 12,
+          //                               fontWeight: "normal",
+          //                             }}
+          //                           >
+          //                             Back
+          //                           </Text>
+          //                         </TouchableOpacity>
+          //                         <Text style={styles.simMatchName}>
+          //                           {langObj.flag} Training Transcript
+          //                         </Text>
+          //                         <View style={{ width: 40 }} />
+          //                       </View>
+          //
+          //                       <ScrollView
+          //                         style={[
+          //                           styles.cstMessagesScroll,
+          //                           { maxHeight: 300, minHeight: 200 },
+          //                         ]}
+          //                         contentContainerStyle={{ gap: 8, paddingVertical: 8 }}
+          //                         showsVerticalScrollIndicator={false}
+          //                       >
+          //                         {replayMsgs.map((msg) => (
+          //                           <View
+          //                             key={msg.id}
+          //                             style={[
+          //                               styles.simBubble,
+          //                               msg.sender === "user"
+          //                                 ? styles.simBubbleUser
+          //                                 : styles.simBubbleMatch,
+          //                             ]}
+          //                           >
+          //                             <Text
+          //                               style={[
+          //                                 styles.simBubbleText,
+          //                                 msg.sender === "user" && { color: "#FFF" },
+          //                               ]}
+          //                             >
+          //                               {msg.text}
+          //                             </Text>
+          //                           </View>
+          //                         ))}
+          //                       </ScrollView>
+          //                     </View>
+          //                   );
+          //                 })()}
+          //
+          //               {/* ─── SCREEN 5: LOW QUALITY NOTIFICATION (DESKTOP V2 _renderLowQualityScreen PARITY) ─── */}
+          //               {styleView === "lowQuality" &&
+          //                 (() => {
+          //                   const langObj = LANGUAGE_OPTIONS.find(
+          //                     (l) => l.code === trainingLang,
+          //                   ) || { label: "English", flag: "🇺🇸" };
+          //                   return (
+          //                     <View style={styles.cstInsightsContainer}>
+          //                       <View style={styles.cstInsightsHeader}>
+          //                         <View
+          //                           style={[
+          //                             styles.cstBadgeSuccess,
+          //                             {
+          //                               backgroundColor: "rgba(239, 68, 68, 0.15)",
+          //                               borderColor: "rgba(239, 68, 68, 0.3)",
+          //                             },
+          //                           ]}
+          //                         >
+          //                           <Ionicons
+          //                             name="warning-outline"
+          //                             size={14}
+          //                             color={uiTheme.colors.error}
+          //                           />
+          //                           <Text
+          //                             style={[
+          //                               styles.cstBadgeSuccessText,
+          //                               { color: uiTheme.colors.error },
+          //                             ]}
+          //                           >
+          //                             Replies Too Short
+          //                           </Text>
+          //                         </View>
+          //                         <Text style={styles.cstInsightsTitle}>
+          //                           Replies too short to learn from
+          //                         </Text>
+          //                         <Text style={styles.cstInsightsSub}>
+          //                           The AI needs real sentences to pick up your style.
+          //                           Single words or random characters don't give it enough
+          //                           to work with. Try again and reply the way you'd
+          //                           actually text someone.
+          //                         </Text>
+          //                       </View>
+          //
+          //                       <TouchableOpacity
+          //                         accessibilityRole="button"
+          //                         style={styles.cstStartBtn}
+          //                         onPress={() => startTrainingSession(trainingLang, true)}
+          //                         activeOpacity={0.85}
+          //                       >
+          //                         <Ionicons name="refresh" size={14} color="#FFF" />
+          //                         <Text style={styles.cstStartBtnText}>
+          //                           Try Again ({langObj.label})
+          //                         </Text>
+          //                       </TouchableOpacity>
+          //
+          //                       <TouchableOpacity
+          //                         accessibilityRole="button"
+          //                         style={[styles.cstSecondaryBtn, { marginTop: 8 }]}
+          //                         onPress={() => setStyleView("intro")}
+          //                         activeOpacity={0.8}
+          //                       >
+          //                         <Text style={styles.cstSecondaryBtnText}>
+          //                           Back to Overview
+          //                         </Text>
+          //                       </TouchableOpacity>
+          //                     </View>
+          //                   );
+          //                 })()}
+          //             </View>
+          //           )}
+          //         </View>
         }
 
         {/* ════════════════════ CARD 5: AI ACTIVE TIME & SAFETY (DESKTOP V2 PARITY) ════════════════════ */}
         {
-        // <View
-        //           style={[styles.v2Card, openCards.activeTime && styles.v2CardOpen]}
-        //         >
-        //           <View style={styles.v2CardHeader}>
-        //             <TouchableOpacity
-        //               accessibilityRole="button"
-        //               style={[styles.cardTitleWrap, { flex: 1 }]}
-        //               onPress={() => toggleCard("activeTime")}
-        //               activeOpacity={0.85}
-        //             >
-        //               <Ionicons
-        //                 name="time-outline"
-        //                 size={17}
-        //                 color={uiTheme.colors.success}
-        //               />
-        //               <Text style={styles.v2CardTitle}>AI Active Time</Text>
-        //             </TouchableOpacity>
-        //
-        //             <View
-        //               style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-        //             >
-        //               {/* Range summary in header */}
-        //               <Text style={styles.atHeaderRangeText}>
-        //                 {form.activeHours?.enabled !== false
-        //                   ? `${minsToDisplay(timeToMins(form.activeHours?.startTime || "09:00"))} – ${minsToDisplay(timeToMins(form.activeHours?.endTime || "22:00"))}`
-        //                   : "24/7 (All Day)"}
-        //               </Text>
-        //
-        //               {/* Master Active Hours Toggle matching Desktop V2 #atToggleInput */}
-        //               <Switch
-        //                 value={form.activeHours?.enabled !== false}
-        //                 onValueChange={(val) => {
-        //                   updateField("activeHours.enabled", val);
-        //                   if (val && !openCards.activeTime) {
-        //                     toggleCard("activeTime");
-        //                   }
-        //                 }}
-        //                 trackColor={{
-        //                   false: uiTheme.colors.elevated,
-        //                   true: uiTheme.colors.success,
-        //                 }}
-        //                 thumbColor={
-        //                   form.activeHours?.enabled !== false
-        //                     ? "#FFF"
-        //                     : uiTheme.colors.muted
-        //                 }
-        //               />
-        //
-        //               <TouchableOpacity
-        //                 accessibilityRole="button"
-        //                 onPress={() => toggleCard("activeTime")}
-        //                 activeOpacity={0.85}
-        //               >
-        //                 <Ionicons
-        //                   name={openCards.activeTime ? "chevron-up" : "chevron-down"}
-        //                   size={18}
-        //                   color={uiTheme.colors.muted}
-        //                 />
-        //               </TouchableOpacity>
-        //             </View>
-        //           </View>
-        //
-        //           {/* Collapsed Summary Chips */}
-        //           {!openCards.activeTime && (
-        //             <View style={styles.collapsedRow}>
-        //               <View style={styles.v2Chip}>
-        //                 <Ionicons
-        //                   name="calendar"
-        //                   size={11}
-        //                   color={uiTheme.colors.success}
-        //                 />
-        //                 <Text style={styles.v2ChipText}>{getActiveTimeSummary()}</Text>
-        //               </View>
-        //             </View>
-        //           )}
-        //
-        //           {/* Expanded Body */}
-        //           {openCards.activeTime && (
-        //             <View style={styles.v2CardBody}>
-        //               <Text style={styles.fieldDesc}>
-        //                 Set the active operating window during which your AI Wingman
-        //                 operates on Tinder:
-        //               </Text>
-        //
-        //               {/* 24-Hour Range Slider Track (Desktop V2 .at-track-row Parity) */}
-        //               <View style={styles.subBox}>
-        //                 <View style={styles.rowBetween}>
-        //                   <Text style={styles.subBoxTitle}>Operating Hours Window</Text>
-        //                   <Text
-        //                     style={{
-        //                       fontFamily: "Inter_700Bold",
-        //                       color: uiTheme.colors.success,
-        //                       fontSize: 11.5,
-        //                       fontWeight: "normal",
-        //                     }}
-        //                   >
-        //                     {form.activeHours?.enabled !== false
-        //                       ? "Scheduled Active"
-        //                       : "24/7 Always On"}
-        //                   </Text>
-        //                 </View>
-        //
-        //                 <TimeRangeSlider
-        //                   startVal={form.activeHours?.startTime || "09:00"}
-        //                   endVal={form.activeHours?.endTime || "22:00"}
-        //                   disabled={form.activeHours?.enabled === false}
-        //                   onValuesChange={(s, e) => {
-        //                     updateField("activeHours.startTime", s);
-        //                     updateField("activeHours.endTime", e);
-        //                     updateField("activeHours.preset", "Custom");
-        //                     if (form.activeHours?.enabled === false) {
-        //                       updateField("activeHours.enabled", true);
-        //                     }
-        //                   }}
-        //                 />
-        //
-        //                 {/* 24-Hour Schedule Timeline Visualizer Bar */}
-        //                 <View style={styles.timelineWrap}>
-        //                   <View style={styles.timelineBg}>
-        //                     {form.activeHours?.enabled !== false &&
-        //                       (() => {
-        //                         const sMins = timeToMins(
-        //                           form.activeHours?.startTime || "09:00",
-        //                         );
-        //                         const eMins = timeToMins(
-        //                           form.activeHours?.endTime || "22:00",
-        //                         );
-        //                         const leftPct = (sMins / 1440) * 100;
-        //                         const widthPct = Math.max(
-        //                           ((eMins - sMins) / 1440) * 100,
-        //                           2,
-        //                         );
-        //                         return (
-        //                           <View
-        //                             style={[
-        //                               styles.timelineActiveFill,
-        //                               { left: `${leftPct}%`, width: `${widthPct}%` },
-        //                             ]}
-        //                           />
-        //                         );
-        //                       })()}
-        //                   </View>
-        //                   <View style={styles.timelineMarkers}>
-        //                     <Text style={styles.timelineMarkerText}>12 AM</Text>
-        //                     <Text style={styles.timelineMarkerText}>6 AM</Text>
-        //                     <Text style={styles.timelineMarkerText}>12 PM</Text>
-        //                     <Text style={styles.timelineMarkerText}>6 PM</Text>
-        //                     <Text style={styles.timelineMarkerText}>12 AM</Text>
-        //                   </View>
-        //                 </View>
-        //
-        //                 {/* Schedule Presets (24/7, Day, Evening, Custom) */}
-        //                 <Text style={[styles.inputLabel, { marginTop: 14 }]}>
-        //                   Quick Presets
-        //                 </Text>
-        //                 <View style={styles.chipRow}>
-        //                   {ACTIVE_HOUR_PRESETS.map((p) => {
-        //                     const isActive =
-        //                       form.activeHours?.preset === p ||
-        //                       (p === "24/7" && form.activeHours?.enabled === false) ||
-        //                       (p === "Day (9am-10pm)" &&
-        //                         form.activeHours?.enabled !== false &&
-        //                         form.activeHours?.startTime === "09:00" &&
-        //                         form.activeHours?.endTime === "22:00") ||
-        //                       (p === "Evening (6pm-12am)" &&
-        //                         form.activeHours?.enabled !== false &&
-        //                         form.activeHours?.startTime === "18:00" &&
-        //                         form.activeHours?.endTime === "23:59");
-        //
-        //                     return (
-        //                       <TouchableOpacity
-        //                         accessibilityRole="button"
-        //                         key={p}
-        //                         style={[styles.chip, isActive && styles.chipActive]}
-        //                         onPress={() => {
-        //                           if (p === "24/7") {
-        //                             updateField("activeHours.enabled", false);
-        //                             updateField("activeHours.preset", "24/7");
-        //                             updateField("activeHours.startTime", "00:00");
-        //                             updateField("activeHours.endTime", "23:59");
-        //                           } else if (p === "Day (9am-10pm)") {
-        //                             updateField("activeHours.enabled", true);
-        //                             updateField("activeHours.preset", "Day (9am-10pm)");
-        //                             updateField("activeHours.startTime", "09:00");
-        //                             updateField("activeHours.endTime", "22:00");
-        //                           } else if (p === "Evening (6pm-12am)") {
-        //                             updateField("activeHours.enabled", true);
-        //                             updateField(
-        //                               "activeHours.preset",
-        //                               "Evening (6pm-12am)",
-        //                             );
-        //                             updateField("activeHours.startTime", "18:00");
-        //                             updateField("activeHours.endTime", "23:59");
-        //                           } else {
-        //                             updateField("activeHours.enabled", true);
-        //                             updateField("activeHours.preset", "Custom");
-        //                           }
-        //                         }}
-        //                         activeOpacity={0.8}
-        //                       >
-        //                         <Text
-        //                           style={[
-        //                             styles.chipText,
-        //                             isActive && styles.chipTextActive,
-        //                           ]}
-        //                         >
-        //                           {p}
-        //                         </Text>
-        //                       </TouchableOpacity>
-        //                     );
-        //                   })}
-        //                 </View>
-        //               </View>
-        //             </View>
-        //           )}
-        //         </View>
+          // <View
+          //           style={[styles.v2Card, openCards.activeTime && styles.v2CardOpen]}
+          //         >
+          //           <View style={styles.v2CardHeader}>
+          //             <TouchableOpacity
+          //               accessibilityRole="button"
+          //               style={[styles.cardTitleWrap, { flex: 1 }]}
+          //               onPress={() => toggleCard("activeTime")}
+          //               activeOpacity={0.85}
+          //             >
+          //               <Ionicons
+          //                 name="time-outline"
+          //                 size={17}
+          //                 color={uiTheme.colors.success}
+          //               />
+          //               <Text style={styles.v2CardTitle}>AI Active Time</Text>
+          //             </TouchableOpacity>
+          //
+          //             <View
+          //               style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+          //             >
+          //               {/* Range summary in header */}
+          //               <Text style={styles.atHeaderRangeText}>
+          //                 {form.activeHours?.enabled !== false
+          //                   ? `${minsToDisplay(timeToMins(form.activeHours?.startTime || "09:00"))} – ${minsToDisplay(timeToMins(form.activeHours?.endTime || "22:00"))}`
+          //                   : "24/7 (All Day)"}
+          //               </Text>
+          //
+          //               {/* Master Active Hours Toggle matching Desktop V2 #atToggleInput */}
+          //               <Switch
+          //                 value={form.activeHours?.enabled !== false}
+          //                 onValueChange={(val) => {
+          //                   updateField("activeHours.enabled", val);
+          //                   if (val && !openCards.activeTime) {
+          //                     toggleCard("activeTime");
+          //                   }
+          //                 }}
+          //                 trackColor={{
+          //                   false: uiTheme.colors.elevated,
+          //                   true: uiTheme.colors.success,
+          //                 }}
+          //                 thumbColor={
+          //                   form.activeHours?.enabled !== false
+          //                     ? "#FFF"
+          //                     : uiTheme.colors.muted
+          //                 }
+          //               />
+          //
+          //               <TouchableOpacity
+          //                 accessibilityRole="button"
+          //                 onPress={() => toggleCard("activeTime")}
+          //                 activeOpacity={0.85}
+          //               >
+          //                 <Ionicons
+          //                   name={openCards.activeTime ? "chevron-up" : "chevron-down"}
+          //                   size={18}
+          //                   color={uiTheme.colors.muted}
+          //                 />
+          //               </TouchableOpacity>
+          //             </View>
+          //           </View>
+          //
+          //           {/* Collapsed Summary Chips */}
+          //           {!openCards.activeTime && (
+          //             <View style={styles.collapsedRow}>
+          //               <View style={styles.v2Chip}>
+          //                 <Ionicons
+          //                   name="calendar"
+          //                   size={11}
+          //                   color={uiTheme.colors.success}
+          //                 />
+          //                 <Text style={styles.v2ChipText}>{getActiveTimeSummary()}</Text>
+          //               </View>
+          //             </View>
+          //           )}
+          //
+          //           {/* Expanded Body */}
+          //           {openCards.activeTime && (
+          //             <View style={styles.v2CardBody}>
+          //               <Text style={styles.fieldDesc}>
+          //                 Set the active operating window during which your AI Wingman
+          //                 operates on Tinder:
+          //               </Text>
+          //
+          //               {/* 24-Hour Range Slider Track (Desktop V2 .at-track-row Parity) */}
+          //               <View style={styles.subBox}>
+          //                 <View style={styles.rowBetween}>
+          //                   <Text style={styles.subBoxTitle}>Operating Hours Window</Text>
+          //                   <Text
+          //                     style={{
+          //                       fontFamily: "Inter_700Bold",
+          //                       color: uiTheme.colors.success,
+          //                       fontSize: 11.5,
+          //                       fontWeight: "normal",
+          //                     }}
+          //                   >
+          //                     {form.activeHours?.enabled !== false
+          //                       ? "Scheduled Active"
+          //                       : "24/7 Always On"}
+          //                   </Text>
+          //                 </View>
+          //
+          //                 <TimeRangeSlider
+          //                   startVal={form.activeHours?.startTime || "09:00"}
+          //                   endVal={form.activeHours?.endTime || "22:00"}
+          //                   disabled={form.activeHours?.enabled === false}
+          //                   onValuesChange={(s, e) => {
+          //                     updateField("activeHours.startTime", s);
+          //                     updateField("activeHours.endTime", e);
+          //                     updateField("activeHours.preset", "Custom");
+          //                     if (form.activeHours?.enabled === false) {
+          //                       updateField("activeHours.enabled", true);
+          //                     }
+          //                   }}
+          //                 />
+          //
+          //                 {/* 24-Hour Schedule Timeline Visualizer Bar */}
+          //                 <View style={styles.timelineWrap}>
+          //                   <View style={styles.timelineBg}>
+          //                     {form.activeHours?.enabled !== false &&
+          //                       (() => {
+          //                         const sMins = timeToMins(
+          //                           form.activeHours?.startTime || "09:00",
+          //                         );
+          //                         const eMins = timeToMins(
+          //                           form.activeHours?.endTime || "22:00",
+          //                         );
+          //                         const leftPct = (sMins / 1440) * 100;
+          //                         const widthPct = Math.max(
+          //                           ((eMins - sMins) / 1440) * 100,
+          //                           2,
+          //                         );
+          //                         return (
+          //                           <View
+          //                             style={[
+          //                               styles.timelineActiveFill,
+          //                               { left: `${leftPct}%`, width: `${widthPct}%` },
+          //                             ]}
+          //                           />
+          //                         );
+          //                       })()}
+          //                   </View>
+          //                   <View style={styles.timelineMarkers}>
+          //                     <Text style={styles.timelineMarkerText}>12 AM</Text>
+          //                     <Text style={styles.timelineMarkerText}>6 AM</Text>
+          //                     <Text style={styles.timelineMarkerText}>12 PM</Text>
+          //                     <Text style={styles.timelineMarkerText}>6 PM</Text>
+          //                     <Text style={styles.timelineMarkerText}>12 AM</Text>
+          //                   </View>
+          //                 </View>
+          //
+          //                 {/* Schedule Presets (24/7, Day, Evening, Custom) */}
+          //                 <Text style={[styles.inputLabel, { marginTop: 14 }]}>
+          //                   Quick Presets
+          //                 </Text>
+          //                 <View style={styles.chipRow}>
+          //                   {ACTIVE_HOUR_PRESETS.map((p) => {
+          //                     const isActive =
+          //                       form.activeHours?.preset === p ||
+          //                       (p === "24/7" && form.activeHours?.enabled === false) ||
+          //                       (p === "Day (9am-10pm)" &&
+          //                         form.activeHours?.enabled !== false &&
+          //                         form.activeHours?.startTime === "09:00" &&
+          //                         form.activeHours?.endTime === "22:00") ||
+          //                       (p === "Evening (6pm-12am)" &&
+          //                         form.activeHours?.enabled !== false &&
+          //                         form.activeHours?.startTime === "18:00" &&
+          //                         form.activeHours?.endTime === "23:59");
+          //
+          //                     return (
+          //                       <TouchableOpacity
+          //                         accessibilityRole="button"
+          //                         key={p}
+          //                         style={[styles.chip, isActive && styles.chipActive]}
+          //                         onPress={() => {
+          //                           if (p === "24/7") {
+          //                             updateField("activeHours.enabled", false);
+          //                             updateField("activeHours.preset", "24/7");
+          //                             updateField("activeHours.startTime", "00:00");
+          //                             updateField("activeHours.endTime", "23:59");
+          //                           } else if (p === "Day (9am-10pm)") {
+          //                             updateField("activeHours.enabled", true);
+          //                             updateField("activeHours.preset", "Day (9am-10pm)");
+          //                             updateField("activeHours.startTime", "09:00");
+          //                             updateField("activeHours.endTime", "22:00");
+          //                           } else if (p === "Evening (6pm-12am)") {
+          //                             updateField("activeHours.enabled", true);
+          //                             updateField(
+          //                               "activeHours.preset",
+          //                               "Evening (6pm-12am)",
+          //                             );
+          //                             updateField("activeHours.startTime", "18:00");
+          //                             updateField("activeHours.endTime", "23:59");
+          //                           } else {
+          //                             updateField("activeHours.enabled", true);
+          //                             updateField("activeHours.preset", "Custom");
+          //                           }
+          //                         }}
+          //                         activeOpacity={0.8}
+          //                       >
+          //                         <Text
+          //                           style={[
+          //                             styles.chipText,
+          //                             isActive && styles.chipTextActive,
+          //                           ]}
+          //                         >
+          //                           {p}
+          //                         </Text>
+          //                       </TouchableOpacity>
+          //                     );
+          //                   })}
+          //                 </View>
+          //               </View>
+          //             </View>
+          //           )}
+          //         </View>
         }
       </View>
 

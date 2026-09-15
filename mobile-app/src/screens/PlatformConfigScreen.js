@@ -10,6 +10,9 @@ import { resolveLocalUrl } from '../utils/network';
 import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession, getSharedExtensionSettings } from '../utils/sessionManager';
 import NotificationService from '../services/notifications';
 
+// ─── Feature Flags (Hidden to avoid duplicating V2 Automation Panel) ───
+const SHOW_DUPLICATE_AUTOMATION_SECTIONS = false;
+
 const V2_GOALS = [
   { id: 'date', label: 'Set up a Date', icon: 'calendar-outline' },
   { id: 'phone', label: 'WhatsApp / Phone', icon: 'logo-whatsapp' },
@@ -95,12 +98,14 @@ export default function PlatformConfigScreen({ route, navigation }) {
         environment: 'on_device',
         extensionSettings: {
           ...getSharedExtensionSettings(),
-          likesPerCycle,
-          messagesPerCycle,
-          selectedGoal,
-          contactHandle,
-          customIntroPrompt,
-          useCustomIntro,
+          ...(SHOW_DUPLICATE_AUTOMATION_SECTIONS ? {
+            likesPerCycle,
+            messagesPerCycle,
+            selectedGoal,
+            contactHandle,
+            customIntroPrompt,
+            useCustomIntro,
+          } : {})
         }
       });
       return;
@@ -217,167 +222,170 @@ export default function PlatformConfigScreen({ route, navigation }) {
             <Text style={styles.backBtnText}>Back</Text>
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
-            <Text style={styles.title}>{platform} Launch Setup</Text>
-            <Text style={[styles.headerSubtitle, { color: themeColor }]}>Flint V2 Engine</Text>
+            <Text style={styles.title}>{platform} Preferences</Text>
+            <Text style={[styles.headerSubtitle, { color: themeColor }]}>Alerts & App Shortcuts</Text>
           </View>
           <View style={{ width: 50 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-          {/* Section 1: Dating Goal Selection (V2) */}
-          <View style={styles.sectionCard}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="flag-outline" size={16} color={themeColor} />
-                <Text style={styles.sectionHeader}>Primary Dating Goal</Text>
-              </View>
-            </View>
-            <Text style={styles.sectionDesc}>Select how the AI Wingman steers and closes conversations:</Text>
+          {SHOW_DUPLICATE_AUTOMATION_SECTIONS && (
+            <>
+              {/* Section 1: Dating Goal Selection (V2) */}
+              <View style={styles.sectionCard}>
+                <View style={styles.cardHeaderRow}>
+                  <View style={styles.cardTitleRow}>
+                    <Ionicons name="flag-outline" size={16} color={themeColor} />
+                    <Text style={styles.sectionHeader}>Primary Dating Goal</Text>
+                  </View>
+                </View>
+                <Text style={styles.sectionDesc}>Select how the AI Wingman steers and closes conversations:</Text>
 
-            <View style={styles.goalGrid}>
-              {V2_GOALS.map(goal => (
-                <TouchableOpacity accessibilityRole="button"
-                  key={goal.id}
-                  style={[styles.goalPill, selectedGoal === goal.id && { borderColor: themeColor, backgroundColor: themeColor + '12' }]}
-                  onPress={() => setSelectedGoal(goal.id)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={goal.icon}
-                    size={14}
-                    color={selectedGoal === goal.id ? themeColor : uiTheme.colors.muted}
+                <View style={styles.goalGrid}>
+                  {V2_GOALS.map(goal => (
+                    <TouchableOpacity accessibilityRole="button"
+                      key={goal.id}
+                      style={[styles.goalPill, selectedGoal === goal.id && { borderColor: themeColor, backgroundColor: themeColor + '12' }]}
+                      onPress={() => setSelectedGoal(goal.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={goal.icon}
+                        size={14}
+                        color={selectedGoal === goal.id ? themeColor : uiTheme.colors.muted}
+                      />
+                      <Text style={[styles.goalPillText, selectedGoal === goal.id && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' }]}>
+                        {goal.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {selectedGoal !== 'never' && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={styles.inputLabel}>
+                      {selectedGoal === 'phone' ? 'WhatsApp / Phone Number' : selectedGoal === 'instagram' ? 'Instagram Username' : selectedGoal === 'move_to_telegram' ? 'Telegram Handle' : 'Contact Handle for Date Logistics'}
+                    </Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder={selectedGoal === 'phone' ? '+1 (234) 567-8900' : '@username'}
+                      placeholderTextColor={uiTheme.colors.muted}
+                      value={contactHandle}
+                      onChangeText={setContactHandle}
+                      autoCapitalize="none"
+                    />
+                  </View>
+                )}
+              </View>
+
+              {/* Section 2: Daily Pacing */}
+              <View style={styles.sectionCard}>
+                <View style={styles.cardHeaderRow}>
+                  <View style={styles.cardTitleRow}>
+                    <Ionicons name="speedometer-outline" size={16} color={themeColor} />
+                    <Text style={styles.sectionHeader}>Daily Pacing & Safety</Text>
+                  </View>
+                  <View style={[styles.activePill, { backgroundColor: themeColor + '18', borderColor: themeColor + '40' }]}>
+                    <Text style={[styles.activePillText, { color: themeColor }]}>Safe Pacing</Text>
+                  </View>
+                </View>
+                <Text style={styles.sectionDesc}>Set how many profiles to like and message each session to keep your profile active and natural.</Text>
+
+                {/* Likes Stepper */}
+                <View style={styles.stepperContainer}>
+                  <View style={styles.stepperTextContainer}>
+                    <Text style={styles.stepperLabel}>Likes per Session</Text>
+                    <Text style={styles.stepperHelper}>Target profiles to like</Text>
+                  </View>
+                  <View style={styles.stepperControls}>
+                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(likesPerCycle, setLikesPerCycle, 10, 0)}>
+                      <Feather name="minus" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.stepperValue}>{likesPerCycle}</Text>
+                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(likesPerCycle, setLikesPerCycle, 10, 200)}>
+                      <Feather name="plus" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.divider} />
+
+                {/* Messages Stepper */}
+                <View style={styles.stepperContainer}>
+                  <View style={styles.stepperTextContainer}>
+                    <Text style={styles.stepperLabel}>Intro Messages per Session</Text>
+                    <Text style={styles.stepperHelper}>First messages to new matches</Text>
+                  </View>
+                  <View style={styles.stepperControls}>
+                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(messagesPerCycle, setMessagesPerCycle, 5, 0)}>
+                      <Feather name="minus" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.stepperValue}>{messagesPerCycle}</Text>
+                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(messagesPerCycle, setMessagesPerCycle, 5, 100)}>
+                      <Feather name="plus" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.divider} />
+
+                {/* Interval Stepper */}
+                <View style={styles.stepperContainer}>
+                  <View style={styles.stepperTextContainer}>
+                    <Text style={styles.stepperLabel}>Break Between Sessions</Text>
+                    <Text style={styles.stepperHelper}>Rest time before next session</Text>
+                  </View>
+                  <View style={styles.stepperControls}>
+                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(scheduleInterval, setScheduleInterval, 5, 5)}>
+                      <Feather name="minus" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                    <View style={styles.stepperValueWrapper}>
+                      <Text style={styles.stepperValue}>{scheduleInterval}</Text>
+                      <Text style={styles.stepperUnit}>min</Text>
+                    </View>
+                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(scheduleInterval, setScheduleInterval, 5, 1440)}>
+                      <Feather name="plus" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              {/* Section 3: Custom First Message */}
+              <View style={styles.sectionCard}>
+                <View style={styles.toggleHeaderRow}>
+                  <View style={styles.stepperTextContainer}>
+                    <View style={styles.cardTitleRow}>
+                      <Ionicons name="chatbubbles-outline" size={16} color={themeColor} />
+                      <Text style={styles.sectionHeader}>Custom First Message</Text>
+                    </View>
+                    <Text style={styles.sectionDesc}>Personalize how your assistant breaks the ice.</Text>
+                  </View>
+                  <Switch
+                    value={useCustomIntro}
+                    onValueChange={setUseCustomIntro}
+                    trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
+                    thumbColor={useCustomIntro ? '#FFF' : uiTheme.colors.muted}
                   />
-                  <Text style={[styles.goalPillText, selectedGoal === goal.id && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' }]}>
-                    {goal.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {selectedGoal !== 'never' && (
-              <View style={{ marginTop: 12 }}>
-                <Text style={styles.inputLabel}>
-                  {selectedGoal === 'phone' ? 'WhatsApp / Phone Number' : selectedGoal === 'instagram' ? 'Instagram Username' : selectedGoal === 'move_to_telegram' ? 'Telegram Handle' : 'Contact Handle for Date Logistics'}
-                </Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder={selectedGoal === 'phone' ? '+1 (234) 567-8900' : '@username'}
-                  placeholderTextColor={uiTheme.colors.muted}
-                  value={contactHandle}
-                  onChangeText={setContactHandle}
-                  autoCapitalize="none"
-                />
-              </View>
-            )}
-          </View>
-
-
-          {/* Section 2: Daily Pacing */}
-          <View style={styles.sectionCard}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="speedometer-outline" size={16} color={themeColor} />
-                <Text style={styles.sectionHeader}>Daily Pacing & Safety</Text>
-              </View>
-              <View style={[styles.activePill, { backgroundColor: themeColor + '18', borderColor: themeColor + '40' }]}>
-                <Text style={[styles.activePillText, { color: themeColor }]}>Safe Pacing</Text>
-              </View>
-            </View>
-            <Text style={styles.sectionDesc}>Set how many profiles to like and message each session to keep your profile active and natural.</Text>
-
-            {/* Likes Stepper */}
-            <View style={styles.stepperContainer}>
-              <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Likes per Session</Text>
-                <Text style={styles.stepperHelper}>Target profiles to like</Text>
-              </View>
-              <View style={styles.stepperControls}>
-                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(likesPerCycle, setLikesPerCycle, 10, 0)}>
-                  <Feather name="minus" size={14} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.stepperValue}>{likesPerCycle}</Text>
-                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(likesPerCycle, setLikesPerCycle, 10, 200)}>
-                  <Feather name="plus" size={14} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Messages Stepper */}
-            <View style={styles.stepperContainer}>
-              <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Intro Messages per Session</Text>
-                <Text style={styles.stepperHelper}>First messages to new matches</Text>
-              </View>
-              <View style={styles.stepperControls}>
-                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(messagesPerCycle, setMessagesPerCycle, 5, 0)}>
-                  <Feather name="minus" size={14} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.stepperValue}>{messagesPerCycle}</Text>
-                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(messagesPerCycle, setMessagesPerCycle, 5, 100)}>
-                  <Feather name="plus" size={14} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Interval Stepper */}
-            <View style={styles.stepperContainer}>
-              <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Break Between Sessions</Text>
-                <Text style={styles.stepperHelper}>Rest time before next session</Text>
-              </View>
-              <View style={styles.stepperControls}>
-                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(scheduleInterval, setScheduleInterval, 5, 5)}>
-                  <Feather name="minus" size={14} color="#FFF" />
-                </TouchableOpacity>
-                <View style={styles.stepperValueWrapper}>
-                  <Text style={styles.stepperValue}>{scheduleInterval}</Text>
-                  <Text style={styles.stepperUnit}>min</Text>
                 </View>
-                <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(scheduleInterval, setScheduleInterval, 5, 1440)}>
-                  <Feather name="plus" size={14} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
 
-          {/* Section 3: Custom First Message */}
-          <View style={styles.sectionCard}>
-            <View style={styles.toggleHeaderRow}>
-              <View style={styles.stepperTextContainer}>
-                <View style={styles.cardTitleRow}>
-                  <Ionicons name="chatbubbles-outline" size={16} color={themeColor} />
-                  <Text style={styles.sectionHeader}>Custom First Message</Text>
-                </View>
-                <Text style={styles.sectionDesc}>Personalize how your assistant breaks the ice.</Text>
+                {useCustomIntro && (
+                  <View style={styles.expandableContent}>
+                    <Text style={styles.inputLabel}>Intro Message Instructions</Text>
+                    <TextInput
+                      style={styles.textArea}
+                      value={customIntroPrompt}
+                      onChangeText={setCustomIntroPrompt}
+                      multiline={true}
+                      placeholder="Tell your assistant how you like to start conversations..."
+                      placeholderTextColor={uiTheme.colors.muted}
+                      numberOfLines={3}
+                    />
+                  </View>
+                )}
               </View>
-              <Switch
-                value={useCustomIntro}
-                onValueChange={setUseCustomIntro}
-                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
-                thumbColor={useCustomIntro ? '#FFF' : uiTheme.colors.muted}
-              />
-            </View>
-
-            {useCustomIntro && (
-              <View style={styles.expandableContent}>
-                <Text style={styles.inputLabel}>Intro Message Instructions</Text>
-                <TextInput
-                  style={styles.textArea}
-                  value={customIntroPrompt}
-                  onChangeText={setCustomIntroPrompt}
-                  multiline={true}
-                  placeholder="Tell your assistant how you like to start conversations..."
-                  placeholderTextColor={uiTheme.colors.muted}
-                  numberOfLines={3}
-                />
-              </View>
-            )}
-          </View>
+            </>
+          )}
 
           {/* Section 4: Push Notification Preferences */}
           <View style={styles.sectionCard}>
