@@ -233,70 +233,74 @@ export default function HomeOverview({
           onOpenBrowser={onOpenBrowser}
         />
 
-        <View style={styles.tiles}>
-          {[
-            {
-              label: "GOAL",
-              value: GOALS[goal] || titleCase(goal),
-              icon: "flag-outline",
-              action: onAutomation,
-            },
-            {
-              label: "TONE",
-              value: titleCase(tone),
-              icon: "mic-outline",
-              action: onAutomation,
-            },
-            {
-              label: "SPEED",
-              value: safe ? "Human" : "Fast",
-              icon: "timer-outline",
-              action: onSettings,
-            },
-          ].map((tile) => (
-            <TouchableOpacity
-              key={tile.label}
-              style={styles.tile}
-              onPress={tile.action}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`Edit ${tile.label.toLowerCase()}: ${tile.value}`}
-            >
-              <View style={styles.tileHeader}>
-                <Ionicons
-                  name={tile.icon}
-                  size={18}
-                  color={uiTheme.colors.textSecondary}
-                />
-                <Text style={styles.tileLabel}>{tile.label}</Text>
-              </View>
-              <Text style={styles.tileValue} numberOfLines={1}>
-                {tile.value}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {
+        // <View style={styles.tiles}>
+        //           {[
+        //             {
+        //               label: "GOAL",
+        //               value: GOALS[goal] || titleCase(goal),
+        //               icon: "flag-outline",
+        //               action: onAutomation,
+        //             },
+        //             {
+        //               label: "TONE",
+        //               value: titleCase(tone),
+        //               icon: "mic-outline",
+        //               action: onAutomation,
+        //             },
+        //             {
+        //               label: "SPEED",
+        //               value: safe ? "Human" : "Fast",
+        //               icon: "timer-outline",
+        //               action: onSettings,
+        //             },
+        //           ].map((tile) => (
+        //             <TouchableOpacity
+        //               key={tile.label}
+        //               style={styles.tile}
+        //               onPress={tile.action}
+        //               activeOpacity={0.7}
+        //               accessibilityRole="button"
+        //               accessibilityLabel={`Edit ${tile.label.toLowerCase()}: ${tile.value}`}
+        //             >
+        //               <View style={styles.tileHeader}>
+        //                 <Ionicons
+        //                   name={tile.icon}
+        //                   size={18}
+        //                   color={uiTheme.colors.textSecondary}
+        //                 />
+        //                 <Text style={styles.tileLabel}>{tile.label}</Text>
+        //               </View>
+        //               <Text style={styles.tileValue} numberOfLines={1}>
+        //                 {tile.value}
+        //               </Text>
+        //             </TouchableOpacity>
+        //           ))}
+        //         </View>
+        }
       </View>
 
-      <View style={styles.metrics}>
-        {metrics.map((metric) => (
-          <TouchableOpacity
-            key={metric.label}
-            style={styles.metric}
-            onPress={onActivity}
-            accessibilityRole="button"
-            accessibilityLabel={`${metric.value} ${metric.label.toLowerCase()}, view activity`}
-          >
-            <Text style={styles.metricLabel}>{metric.label}</Text>
-            <View style={styles.metricValueRow}>
-              <Text style={styles.metricValue}>
-                {Number(metric.value).toLocaleString()}
-              </Text>
-              <Ionicons name={metric.icon} size={17} color={metric.color} />
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {
+        // <View style={styles.metrics}>
+        //         {metrics.map((metric) => (
+        //           <TouchableOpacity
+        //             key={metric.label}
+        //             style={styles.metric}
+        //             onPress={onActivity}
+        //             accessibilityRole="button"
+        //             accessibilityLabel={`${metric.value} ${metric.label.toLowerCase()}, view activity`}
+        //           >
+        //             <Text style={styles.metricLabel}>{metric.label}</Text>
+        //             <View style={styles.metricValueRow}>
+        //               <Text style={styles.metricValue}>
+        //                 {Number(metric.value).toLocaleString()}
+        //               </Text>
+        //               <Ionicons name={metric.icon} size={17} color={metric.color} />
+        //             </View>
+        //           </TouchableOpacity>
+        //         ))}
+        //       </View>
+        }
       {/* <TouchableOpacity
         style={styles.activityLink}
         onPress={onActivity}
