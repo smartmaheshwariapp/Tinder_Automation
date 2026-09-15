@@ -1,5 +1,5 @@
-import { collectionCaptureScript } from '../utils/tinderCollectionCapture';
-import { activateCollections, ingestCollectionEvent, configureCollectionBackend } from '../services/tinderCollections';
+import { collectionCaptureScript, createSwipeEventFromDomMessage } from '../utils/tinderCollectionCapture';
+import { activateCollections, ingestCollectionEvent } from '../services/tinderCollections';
 import { theme as uiTheme } from '../theme';
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View, Dimensions, AppState, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
@@ -2604,7 +2604,6 @@ export default function BrowserScreen({ route, navigation }) {
                   if (msg.type === 'FE_COLLECTION_EVENT') {
                     const sessionToken = getTinderAuthState()?.token;
                     if (sessionToken && msg.sessionToken === sessionToken) {
-                      configureCollectionBackend(orchestratorUrl);
                       activateCollections(sessionToken).then(() => ingestCollectionEvent(msg.event, sessionToken)).catch(() => {});
                     }
                     return;
@@ -2735,6 +2734,13 @@ export default function BrowserScreen({ route, navigation }) {
                     addLog(`❤️ Swiped profile: ${targetName} (${msg.swipeCount || updated}/${msg.total || 50})`, 'action');
                     trackingService.trackLike(1);
                     pushProgressFeedEvent('profile_liked', detail, targetName, 5);
+                    const collectionToken = getTinderAuthState()?.token;
+                    if (collectionToken) {
+                      const swipeEvent = createSwipeEventFromDomMessage(msg);
+                      activateCollections(collectionToken)
+                        .then(() => ingestCollectionEvent(swipeEvent, collectionToken))
+                        .catch(() => addLog('Swipe counted, but its profile could not be saved locally.', 'warn'));
+                    }
                   }
                   if (msg.type === 'FE_MATCH') {
                     const prev = onDeviceMatchesRef.current || 0;

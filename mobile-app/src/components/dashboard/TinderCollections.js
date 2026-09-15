@@ -8,8 +8,8 @@ import { theme } from '../../theme';
 import { getTinderAuthState, subscribeTinderAuthState } from '../../utils/sessionManager';
 import { collectionLists } from '../../utils/tinderCollectionsModel';
 import {
-  activateCollections, configureCollectionBackend, disconnectCollections,
-  getCollections, refreshConversations, subscribeCollections, syncCollections,
+  activateCollections, disconnectCollections,
+  getCollections, refreshConversations, subscribeCollections,
 } from '../../services/tinderCollections';
 
 const TABS = {
@@ -96,23 +96,23 @@ function Empty({ tab, loading }) {
   </View>;
 }
 
-export default function TinderCollections({ backendUrl, settings, onConnect }) {
+export default function TinderCollections({ settings, onConnect }) {
   const [state, setState] = useState(getCollections);
   const [tab, setTab] = useState('swiped');
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const insets = useSafeAreaInsets();
   useEffect(() => {
-    configureCollectionBackend(backendUrl);
     const update = auth => auth?.isLoggedIn && auth?.token ? activateCollections(auth.token) : disconnectCollections();
     const stop = subscribeCollections(setState);
     update(getTinderAuthState());
     const stopAuth = subscribeTinderAuthState(update);
     return () => { stop(); stopAuth(); };
-  }, [backendUrl]);
+  }, []);
   const lists = useMemo(() => collectionLists(state.data, state.own, settings), [state.data, state.own, settings]);
   const entries = lists[tab];
   const active = TABS[tab];
+  const previewLimit = tab === 'swiped' ? 10 : 3;
   const close = () => { setOpen(false); setSelected(null); };
   const openItem = item => { setSelected(item); setOpen(true); };
 
@@ -145,11 +145,11 @@ export default function TinderCollections({ backendUrl, settings, onConnect }) {
         </Button>)}</View>
         <ContentTransition transitionKey={tab} style={styles.content}>
           <View style={styles.listHeader}><View><Text style={styles.listTitle}>{fullLabel(tab)}</Text><Text style={styles.listCount}>{entries.length} {entries.length === 1 ? 'profile' : 'profiles'}</Text></View>
-            {entries.length > 3 && <Button style={styles.viewAll} onPress={() => { setSelected(null); setOpen(true); }}><Text style={[styles.viewAllText, { color: active.color }]}>View all</Text><Ionicons name="arrow-forward" size={14} color={active.color} /></Button>}
+            {entries.length > previewLimit && <Button style={styles.viewAll} onPress={() => { setSelected(null); setOpen(true); }}><Text style={[styles.viewAllText, { color: active.color }]}>View all</Text><Ionicons name="arrow-forward" size={14} color={active.color} /></Button>}
           </View>
           {tab === 'strong' && <View style={styles.note}><Ionicons name="information-circle-outline" size={15} color={theme.colors.info} /><Text style={styles.noteText}>Estimated from shared profile details. This is not a Tinder score.</Text></View>}
           {!!state.error && <Text style={styles.error}>{state.error}</Text>}
-          {entries.slice(0, 3).map((item, index) => <ProfileRow key={item.id || item.profileId || item.profile?.id || index} item={item} tab={tab} ownerId={state.data?.ownerId} onPress={() => openItem(item)} />)}
+          {entries.slice(0, previewLimit).map((item, index) => <ProfileRow key={item.id || item.profileId || item.profile?.id || index} item={item} tab={tab} ownerId={state.data?.ownerId} onPress={() => openItem(item)} />)}
           {!entries.length && <Empty tab={tab} loading={state.loading} />}
         </ContentTransition>
         <Button style={styles.refresh} disabled={state.loading} onPress={refreshConversations}>
@@ -157,9 +157,8 @@ export default function TinderCollections({ backendUrl, settings, onConnect }) {
           <Text style={styles.refreshText}>{state.loading ? 'Refreshing data…' : 'Refresh Tinder data'}</Text>
         </Button>
       </View>
-      <View style={styles.sync}><Ionicons name={state.syncError ? 'phone-portrait-outline' : state.lastSyncedAt ? 'cloud-done-outline' : 'shield-checkmark-outline'} size={14} color={state.syncError ? theme.colors.warning : theme.colors.success} />
-        <Text style={styles.syncText}>{state.syncing ? 'Syncing securely…' : state.lastSyncedAt ? `Synced ${formatTime(state.lastSyncedAt)} ago` : 'Private and saved on this device'}</Text>
-        {!!state.syncError && <Button onPress={syncCollections} style={styles.retry}><Text style={styles.retryText}>Retry</Text></Button>}
+      <View style={styles.sync}><Ionicons name="shield-checkmark-outline" size={14} color={theme.colors.success} />
+        <Text style={styles.syncText}>Private and saved on this device</Text>
       </View>
     </>}
 

@@ -2,7 +2,6 @@
 'use strict';
 
 const http = require('http');
-const { handleSessionCollections } = require('./routes/session-collections');
 const { handleStartSession, handleStopSession, handleLogout, handleAuthStatus } = require('./session');
 const { handleNavStatus, handleCheckPageState } = require('./pageState');
 const { handleTypeText, handleSubmitOtp, handleResendCode, handleSubmitPhone } = require('./routes/auth');
@@ -21,7 +20,7 @@ const server = http.createServer((req, res) => {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-tinder-token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -29,9 +28,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.url === '/session-collections') {
-    handleSessionCollections(req, res).catch(() => { if (!res.headersSent) res.writeHead(500); res.end(); });
-  } else if (req.method === 'POST' && req.url === '/start-session') {
+  if (req.method === 'POST' && req.url === '/start-session') {
     handleStartSession(req, res);
   } else if (req.method === 'POST' && req.url === '/stop-session') {
     handleStopSession(req, res);

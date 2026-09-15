@@ -23,3 +23,30 @@ export function installCollectionCapture() {
   XMLHttpRequest.prototype.send=function(){const sessionToken=window.__tinderAuthToken;this.addEventListener('load',()=>{try{if(this.status>=200&&this.status<300){const data=this.responseType==='json'?this.response:JSON.parse(this.responseText);inspect(this.__flintCollectionRequest?.url,this.__flintCollectionRequest?.method,data,sessionToken);}}catch{}});return send.apply(this,arguments);};
 }
 export const collectionCaptureScript='('+installCollectionCapture.toString()+')();true;';
+
+// DOM automation confirms successful clicks through FE_SWIPE. Tinder's web
+// client does not always expose the related request to the network interceptor,
+// so convert that confirmed UI event into the local collection event shape.
+export function createSwipeEventFromDomMessage(message, timestamp = Date.now()) {
+  const name = typeof message?.name === 'string' && message.name.trim()
+    ? message.name.trim().slice(0, 100)
+    : 'Tinder profile';
+  const explicitId = message?.profileId || message?.id;
+  const fallbackId = `dom_${timestamp}_${Number(message?.swipeCount) || 0}`;
+  const photoUrl = typeof message?.photoUrl === 'string' && message.photoUrl.startsWith('https://')
+    ? message.photoUrl
+    : null;
+  return {
+    kind: 'swipe',
+    action: message?.action === 'pass' ? 'pass' : 'like',
+    timestamp,
+    matched: Boolean(message?.matched),
+    profile: {
+      _id: String(explicitId || fallbackId).slice(0, 100),
+      name,
+      bio: typeof message?.bio === 'string' ? message.bio : (message?.detail || ''),
+      photos: photoUrl ? [{ url: photoUrl }] : [],
+      interests: Array.isArray(message?.interests) ? message.interests : [],
+    },
+  };
+}

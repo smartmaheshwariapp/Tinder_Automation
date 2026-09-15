@@ -33,7 +33,6 @@ export default function HomeOverview({
   onAutomation,
   onSettings,
   onActivity,
-  collectionBackendUrl,
 }) {
   const state = stats?.agentState || {};
   const running = Boolean(
@@ -321,7 +320,7 @@ export default function HomeOverview({
         </View>
         <Ionicons name="arrow-forward" size={18} color={uiTheme.colors.muted} />
       </TouchableOpacity> */}
-      <TinderCollections backendUrl={collectionBackendUrl} settings={settings} onConnect={onOpenBrowser} />
+      <TinderCollections settings={settings} onConnect={onOpenBrowser} />
     </ScrollView>
   );
 }

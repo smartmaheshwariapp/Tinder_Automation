@@ -63,6 +63,28 @@ export function collectionLists(state, own, preferences) {
   return {swiped,strong,chatting};
 }
 
+export function mergeProgressFeedSwipes(state, feed) {
+  let next = state;
+  const events = (Array.isArray(feed) ? feed : [])
+    .filter(event => event?.type === 'profile_liked' && typeof event.name === 'string' && event.name.trim())
+    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  for (const event of events) {
+    const timestamp = Number(event.timestamp) || Date.now();
+    const normalizedName = event.name.trim().toLowerCase();
+    const duplicate = Object.values(next.swipes || {}).some(swipe => {
+      const profile = next.profiles?.[swipe.profileId];
+      return profile?.name?.trim().toLowerCase() === normalizedName
+        && Math.abs((swipe.swipedAt || 0) - timestamp) < 20000;
+    });
+    if (duplicate) continue;
+    next = mergeCollectionEvent(next, {
+      kind: 'swipe', action: 'like', timestamp,
+      profile: { _id: `feed_${event.id || timestamp}`, name: event.name.trim(), bio: event.detail || '' },
+    }, timestamp);
+  }
+  return next;
+}
+
 export function mergeCollectionSnapshots(local, remote) {
   if(!remote || remote.ownerId !== local.ownerId || remote.version !== 1) return local;
   const result={...local,updatedAt:Math.max(local.updatedAt||0,remote.updatedAt||0)};
