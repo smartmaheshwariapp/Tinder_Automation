@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { emptyCollections, mergeCollectionEvent, mergeProgressFeedSwipes, normalizeProfile } from '../utils/tinderCollectionsModel';
 import { getProgressFeed } from '../utils/sessionManager';
-let current = { data:null, own:null, loading:false, error:null };
+let current = { data:null, own:null, loading:false, error:null, conversationError:null };
 let token=null, generation=0, serial=Promise.resolve(), activation=null;
 const listeners=new Set();
 const publish=patch=>{current={...current,...patch};listeners.forEach(fn=>fn(current));};
@@ -12,12 +12,12 @@ async function request(url, sessionToken, options={}) {
 }
 export const getCollections=()=>current;
 export const subscribeCollections=fn=>{listeners.add(fn);return()=>listeners.delete(fn);};
-export function disconnectCollections(){generation++;token=null;activation=null;publish({data:null,own:null,loading:false,error:null});}
+export function disconnectCollections(){generation++;token=null;activation=null;publish({data:null,own:null,loading:false,error:null,conversationError:null});}
 export async function activateCollections(sessionToken) {
   if(!sessionToken){disconnectCollections();return;}
   if(token===sessionToken&&activation)return activation;
   if(token===sessionToken&&current.data)return;
-  token=sessionToken;const run=++generation;publish({data:null,own:null,loading:true,error:null});
+  token=sessionToken;const run=++generation;publish({data:null,own:null,loading:true,error:null,conversationError:null});
   activation=(async()=>{
     try {
       const payload=await request('https://api.gotinder.com/v2/profile?include=user',sessionToken);
@@ -44,7 +44,7 @@ export function ingestCollectionEvent(event, sessionToken=token) {
 }
 export async function refreshConversations() {
   const run=generation, t=token;if(!current.data||!t)return;
-  publish({loading:true,error:null});
+  publish({loading:true,conversationError:null});
   try {
     let pageToken=null,pages=0;const activeIds=[];
     do {
@@ -57,7 +57,7 @@ export async function refreshConversations() {
       pageToken=result?.data?.next_page_token;pages++;
     }while(pageToken&&pages<5);
     if(!pageToken&&run===generation)await ingestCollectionEvent({kind:'match_index',ids:activeIds},t);
-    if(run===generation)publish({error:pageToken?'Showing the first 300 matches. Open additional Tinder conversations to capture their recent messages.':null});
-  }catch{if(run===generation)publish({error:'Could not refresh Tinder conversations. Saved data is still available; try again after reconnecting.'});}
+    if(run===generation)publish({conversationError:pageToken?'Showing the first 300 matches. Open additional Tinder conversations to capture their recent messages.':null});
+  }catch{if(run===generation)publish({conversationError:'Could not refresh Tinder conversations. Saved data is still available; try again after reconnecting.'});}
   finally{if(run===generation)publish({loading:false});}
 }

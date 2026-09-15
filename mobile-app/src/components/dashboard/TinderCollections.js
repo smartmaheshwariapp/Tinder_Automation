@@ -149,13 +149,14 @@ export default function TinderCollections({ settings, onConnect }) {
           </View>
           {tab === 'strong' && <View style={styles.note}><Ionicons name="information-circle-outline" size={15} color={theme.colors.info} /><Text style={styles.noteText}>Estimated from shared profile details. This is not a Tinder score.</Text></View>}
           {!!state.error && <Text style={styles.error}>{state.error}</Text>}
+          {tab === 'chatting' && !!state.conversationError && <Text style={styles.error}>{state.conversationError}</Text>}
           {entries.slice(0, previewLimit).map((item, index) => <ProfileRow key={item.id || item.profileId || item.profile?.id || index} item={item} tab={tab} ownerId={state.data?.ownerId} onPress={() => openItem(item)} />)}
           {!entries.length && <Empty tab={tab} loading={state.loading} />}
         </ContentTransition>
-        <Button style={styles.refresh} disabled={state.loading} onPress={refreshConversations}>
+        {tab === 'chatting' && <Button style={styles.refresh} disabled={state.loading} onPress={refreshConversations}>
           {state.loading ? <ActivityIndicator size="small" color={theme.colors.text} /> : <Ionicons name="refresh" size={17} color={theme.colors.text} />}
-          <Text style={styles.refreshText}>{state.loading ? 'Refreshing data…' : 'Refresh Tinder data'}</Text>
-        </Button>
+          <Text style={styles.refreshText}>{state.loading ? 'Refreshing conversations…' : 'Refresh conversations'}</Text>
+        </Button>}
       </View>
       <View style={styles.sync}><Ionicons name="shield-checkmark-outline" size={14} color={theme.colors.success} />
         <Text style={styles.syncText}>Private and saved on this device</Text>
