@@ -2,16 +2,8 @@ import { theme as uiTheme } from '../../theme';
 // src/components/common/V2Dropdown.js
 // Custom animated Dropdown component matching Desktop Plugin V2 UI trigger and options list (5 items visible + scroll)
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from './Motion';
 import { Ionicons } from '@expo/vector-icons';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {

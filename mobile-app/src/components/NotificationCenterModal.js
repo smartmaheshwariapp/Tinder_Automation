@@ -3,20 +3,8 @@ import { theme as uiTheme } from '../theme';
 // Production-Grade Top-Down Notification Center Shade (iOS 17 / Native Notification Drawer)
 
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Modal,
-  FlatList,
-  Dimensions,
-  Clipboard,
-  Platform,
-  Animated,
-  PanResponder,
-  StatusBar,
-} from 'react-native';
+import { StyleSheet, Text, View, Modal, FlatList, Dimensions, Clipboard, Platform, Animated, PanResponder, StatusBar } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from './common/Motion';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';

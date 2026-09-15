@@ -1,16 +1,6 @@
 import React, { useState } from 'react';
-import {
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FocusInput as TextInput, MotionTouchable as TouchableOpacity } from '../common/Motion';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -565,7 +555,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.label,
     color: theme.colors.muted,
     letterSpacing: 1.5,
-    fontSize: 10,
+    fontSize: theme.type.caption.fontSize,
     fontWeight: 'normal',
   },
   pageTitle: {
@@ -756,7 +746,7 @@ const styles = StyleSheet.create({
     ...theme.type.caption,
     fontFamily: theme.fonts.label,
     color: theme.colors.muted,
-    fontSize: 11,
+    fontSize: theme.type.caption.fontSize,
     fontWeight: 'normal',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
@@ -822,7 +812,7 @@ const styles = StyleSheet.create({
   statLabel: {
     ...theme.type.caption,
     color: theme.colors.muted,
-    fontSize: 10,
+    fontSize: theme.type.caption.fontSize,
     letterSpacing: 1.2,
   },
   tierBadge: {
@@ -848,7 +838,7 @@ const styles = StyleSheet.create({
   tierText: {
     ...theme.type.caption,
     fontFamily: theme.fonts.label,
-    fontSize: 10,
+    fontSize: theme.type.caption.fontSize,
     fontWeight: 'normal',
     color: theme.colors.muted,
     textTransform: 'uppercase',

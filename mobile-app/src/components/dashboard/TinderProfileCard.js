@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
-import {
-  Image,
-  LayoutAnimation,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Image, LayoutAnimation, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from '../common/Motion';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../theme';
@@ -708,7 +701,7 @@ const styles = StyleSheet.create({
   collapsedSubtitle: {
     ...theme.type.caption,
     color: theme.colors.muted,
-    fontSize: 11,
+    fontSize: theme.type.caption.fontSize,
   },
   collapsedRightAction: {
     flexDirection: 'row',
@@ -738,7 +731,7 @@ const styles = StyleSheet.create({
   },
   telemetryText: {
     fontFamily: theme.fonts.body,
-    fontSize: 11,
+    fontSize: theme.type.caption.fontSize,
     color: theme.colors.muted,
   },
   telemetryValue: {
@@ -772,21 +765,26 @@ const styles = StyleSheet.create({
   },
   emptyHeaderTextWrap: {
     flex: 1,
+    minWidth: 0,
     gap: 3,
   },
   emptyTitleRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 6,
   },
   emptyTitle: {
+    flexShrink: 1,
     fontFamily: theme.fonts.heading,
     color: theme.colors.text,
     fontSize: 16,
     fontWeight: 'normal',
   },
   emptyStatusBadge: {
+    maxWidth: '100%',
+    flexShrink: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -798,8 +796,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(254, 60, 114, 0.28)',
   },
   emptyStatusBadgeText: {
+    flexShrink: 1,
     fontFamily: theme.fonts.label,
-    fontSize: 9.5,
+    fontSize: theme.type.caption.fontSize,
     fontWeight: 'normal',
     color: '#FE3C72',
     letterSpacing: 0.5,
@@ -807,7 +806,7 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     ...theme.type.caption,
     color: theme.colors.muted,
-    fontSize: 11.5,
+    fontSize: theme.type.caption.fontSize,
     lineHeight: 16,
   },
   cardDivider: {
@@ -842,7 +841,7 @@ const styles = StyleSheet.create({
   },
   benefitDesc: {
     fontFamily: theme.fonts.body,
-    fontSize: 11,
+    fontSize: theme.type.caption.fontSize,
     color: theme.colors.muted,
     lineHeight: 15,
   },
@@ -874,7 +873,7 @@ const styles = StyleSheet.create({
   },
   trustText: {
     fontFamily: theme.fonts.body,
-    fontSize: 11,
+    fontSize: theme.type.caption.fontSize,
     color: theme.colors.muted,
     opacity: 0.8,
   },
@@ -901,7 +900,7 @@ const styles = StyleSheet.create({
     ...theme.type.caption,
     fontFamily: theme.fonts.label,
     color: '#FF655B',
-    fontSize: 11,
+    fontSize: theme.type.caption.fontSize,
     fontWeight: 'normal',
     letterSpacing: 1,
   },
@@ -929,7 +928,7 @@ const styles = StyleSheet.create({
   },
   sessionText: {
     fontFamily: theme.fonts.label,
-    fontSize: 10,
+    fontSize: theme.type.caption.fontSize,
     fontWeight: 'normal',
     color: '#61D6A3',
   },
@@ -957,7 +956,7 @@ const styles = StyleSheet.create({
   },
   tierText: {
     fontFamily: theme.fonts.label,
-    fontSize: 10,
+    fontSize: theme.type.caption.fontSize,
     fontWeight: 'normal',
     color: theme.colors.text,
   },
@@ -1045,14 +1044,14 @@ const styles = StyleSheet.create({
   },
   sectionMiniTitle: {
     fontFamily: theme.fonts.heading,
-    fontSize: 11,
+    fontSize: theme.type.caption.fontSize,
     fontWeight: 'normal',
     color: theme.colors.muted,
     letterSpacing: 0.8,
   },
   sectionCounter: {
     fontFamily: theme.fonts.body,
-    fontSize: 11,
+    fontSize: theme.type.caption.fontSize,
     color: theme.colors.muted,
   },
   photoStripContainer: {
@@ -1151,7 +1150,7 @@ const styles = StyleSheet.create({
   },
   vitalLabel: {
     fontFamily: theme.fonts.label,
-    fontSize: 10,
+    fontSize: theme.type.caption.fontSize,
     color: theme.colors.muted,
     textTransform: 'uppercase',
     fontWeight: 'normal',

@@ -1127,3 +1127,4 @@ Do not commit or push any changes unless explicitly instructed.
 - Standard profile refinement completed: personal-details editor and conventional profile hierarchy added; device visual checks remain pending.
 - Modern profile visual refinement completed: compact identity card, grouped settings rows and expandable synced details. Device review remains pending.
 - Activity layout refinement completed: grouped timeline, filters, expandable details and history summary. Compilation/regression checks passed; device review remains pending.
+- App-wide shared visual/motion pass (2026-09-15) implemented across seven screens and 26 UI files: press feedback, input focus, tab transitions, reduced-motion handling for new animations, typography and layout refinements. Android/iOS exports and 110 tests passed. Full device visual/motion audit remains pending.

@@ -1,13 +1,7 @@
+import useReducedMotion from '../../hooks/useReducedMotion';
 import React, { useEffect, useRef } from 'react';
-import {
-  Animated,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from './Motion';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../theme';
 import DialogContent from './DialogContent';
@@ -27,10 +21,12 @@ export default function AppConfirmModal({
   onConfirm,
   onCancel,
 }) {
+  const reducedMotion = useReducedMotion();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.92)).current;
 
   useEffect(() => {
+    if (visible && reducedMotion) { fadeAnim.setValue(1); scaleAnim.setValue(1); return; }
     if (visible) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -49,7 +45,7 @@ export default function AppConfirmModal({
       fadeAnim.setValue(0);
       scaleAnim.setValue(0.92);
     }
-  }, [visible, fadeAnim, scaleAnim]);
+  }, [visible, reducedMotion, fadeAnim, scaleAnim]);
 
   if (!visible) return null;
 

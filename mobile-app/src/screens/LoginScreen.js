@@ -2,24 +2,8 @@ import { theme as uiTheme } from '../theme';
 // src/screens/LoginScreen.js — Upgraded Luxury Dark Dating App Login Screen
 // Featuring Cinematic Background Carousel, Luminous Aura Emblem, and Modern Glassmorphic Inputs
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StatusBar,
-  Image,
-  Animated,
-  Easing,
-  Dimensions,
-  Modal,
-  Linking,
-  Pressable,
-} from 'react-native';
+import { StyleSheet, Text, View, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Image, Animated, Easing, Dimensions, Modal, Linking, Pressable } from 'react-native';
+import { FocusInput as TextInput, MotionTouchable as TouchableOpacity } from '../components/common/Motion';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';

@@ -1,14 +1,8 @@
 import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/MasterHeroController.js — Desktop V2 Master Control Center
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Animated,
-  StyleSheet,
-  Easing,
-} from 'react-native';
+import { View, Text, Animated, StyleSheet, Easing } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from '../common/Motion';
 import ActivityIndicator from '../common/SafeActivityIndicator';
 import { Ionicons } from '@expo/vector-icons';
 

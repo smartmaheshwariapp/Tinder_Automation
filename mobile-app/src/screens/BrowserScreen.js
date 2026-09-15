@@ -1,6 +1,7 @@
 import { theme as uiTheme } from '../theme';
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
+import { StyleSheet, Text, View, Dimensions, AppState, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
+import { MotionTouchable as TouchableOpacity, FocusInput as TextInput } from '../components/common/Motion';
 import { LinearGradient } from 'expo-linear-gradient';
 import ActivityIndicator from '../components/common/SafeActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';

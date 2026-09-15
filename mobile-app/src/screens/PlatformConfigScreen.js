@@ -1,19 +1,7 @@
 import { theme as uiTheme } from '../theme';
 import React, { useState, useEffect } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  Switch,
-  StatusBar,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  Dimensions,
-} from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Switch, StatusBar, KeyboardAvoidingView, Platform, Alert, Dimensions } from 'react-native';
+import { MotionTouchable as TouchableOpacity, FocusInput as TextInput } from '../components/common/Motion';
 import ActivityIndicator from '../components/common/SafeActivityIndicator';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -534,7 +522,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiTheme.colors.background,
   },
   header: {
-    height: 54,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -544,6 +532,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiTheme.colors.surface,
   },
   backBtn: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiTheme.spacing.xs,
@@ -576,9 +565,9 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     backgroundColor: uiTheme.colors.surface,
-    borderRadius: 16,
-    padding: uiTheme.spacing.lg,
-    marginBottom: uiTheme.spacing.lg,
+    borderRadius: uiTheme.radius.card,
+    padding: uiTheme.spacing.xl,
+    marginBottom: uiTheme.spacing.xl,
     borderWidth: 1,
     borderColor: uiTheme.colors.elevated,
   },
@@ -619,6 +608,7 @@ const styles = StyleSheet.create({
     gap: uiTheme.spacing.sm,
   },
   goalPill: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,

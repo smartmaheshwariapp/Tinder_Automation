@@ -1,30 +1,8 @@
 import { theme as uiTheme } from '../theme';
 // src/screens/OnboardingScreen.js — 6-Step Onboarding matching Desktop Plugin
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Pressable,
-  AccessibilityInfo,
-  ScrollView,
-  TextInput,
-  Switch,
-  Animated,
-  Easing,
-  Dimensions,
-  Image,
-  StatusBar,
-  Modal,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Keyboard,
-  LayoutAnimation,
-  UIManager,
-  PanResponder,
-} from 'react-native';
+import { StyleSheet, Text, View, Pressable, AccessibilityInfo, ScrollView, Switch, Animated, Easing, Dimensions, Image, StatusBar, Modal, FlatList, KeyboardAvoidingView, Platform, Keyboard, LayoutAnimation, UIManager, PanResponder } from 'react-native';
+import { MotionTouchable as TouchableOpacity, FocusInput as TextInput } from '../components/common/Motion';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -4315,14 +4293,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 18,
   },
-  stepTitle: {
+  stepTitle: { fontFamily: uiTheme.fonts.heading,
     color: '#FFFFFF',
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: -0.6,
     marginBottom: uiTheme.spacing.sm,
   },
-  stepSubtitle: {
+  stepSubtitle: { fontFamily: uiTheme.fonts.heading,
     color: '#ac888b',
     fontSize: 14.5,
     lineHeight: 21,
@@ -4856,7 +4834,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 16,
   },
-  step3Title: {
+  step3Title: { fontFamily: uiTheme.fonts.heading,
     color: '#FFFFFF',
     fontSize: 27,
     fontWeight: '900',
@@ -5600,9 +5578,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.18)',
   },
-  deckBackBadgeText: {
+  deckBackBadgeText: { fontFamily: uiTheme.fonts.label,
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: uiTheme.type.caption.fontSize,
     fontWeight: '700',
   },
   heroMatchCard: {
@@ -5661,7 +5639,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Manrope_800ExtraBold',
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: 'normal',
   },
   heroSwipeHintBadge: {
     flexDirection: 'row',
@@ -5674,9 +5652,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
-  heroSwipeHintText: {
+  heroSwipeHintText: { fontFamily: uiTheme.fonts.label,
     color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 10.5,
+    fontSize: uiTheme.type.caption.fontSize,
     fontWeight: '600',
   },
   heroFrostedDock: {
@@ -5702,15 +5680,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  heroNameText: {
+  heroNameText: { fontFamily: uiTheme.fonts.heading,
     color: '#FFFFFF',
     fontSize: 19,
     fontWeight: '800',
     letterSpacing: -0.4,
   },
-  heroLocationText: {
+  heroLocationText: { fontFamily: uiTheme.fonts.body,
     color: 'rgba(245, 230, 240, 0.75)',
-    fontSize: 11,
+    fontSize: uiTheme.type.caption.fontSize,
     fontWeight: '500',
     marginTop: 1,
   },
@@ -5739,14 +5717,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  icebreakerTag: {
-    fontSize: 9.5,
+  icebreakerTag: { fontFamily: uiTheme.fonts.label,
+    fontSize: uiTheme.type.caption.fontSize,
     fontWeight: '700',
     letterSpacing: 0.1,
   },
-  icebreakerQuoteText: {
+  icebreakerQuoteText: { fontFamily: uiTheme.fonts.body,
     color: '#FFF8F4',
-    fontSize: 11,
+    fontSize: uiTheme.type.caption.fontSize,
     lineHeight: 14,
     fontStyle: 'italic',
     fontWeight: '400',
@@ -5770,7 +5748,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_800ExtraBold',
     color: '#00E676',
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: 'normal',
     letterSpacing: 1.5,
   },
   stampNopeWrap: {
@@ -5788,7 +5766,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     backgroundColor: 'rgba(255, 51, 102, 0.15)',
   },
-  stampNopeText: {
+  stampNopeText: { fontFamily: uiTheme.fonts.label,
     color: '#FF3366',
     fontSize: 24,
     fontWeight: '900',
@@ -5814,7 +5792,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  blueprintDeckTitle: {
+  blueprintDeckTitle: { fontFamily: uiTheme.fonts.heading,
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '800',
@@ -5825,9 +5803,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
   },
-  blueprintCycleHintText: {
+  blueprintCycleHintText: { fontFamily: uiTheme.fonts.label,
     color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 10.5,
+    fontSize: uiTheme.type.caption.fontSize,
     fontWeight: '600',
   },
   blueprintPipsRow: {
@@ -5885,8 +5863,8 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 8,
   },
-  blueprintCardBadgeText: {
-    fontSize: 9.5,
+  blueprintCardBadgeText: { fontFamily: uiTheme.fonts.label,
+    fontSize: uiTheme.type.caption.fontSize,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
@@ -5895,22 +5873,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
   },
-  blueprintSuitPill: {
+  blueprintSuitPill: { fontFamily: uiTheme.fonts.label,
     color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 10.5,
+    fontSize: uiTheme.type.caption.fontSize,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-  blueprintCardTitle: {
+  blueprintCardTitle: { fontFamily: uiTheme.fonts.heading,
     color: '#FFFFFF',
     fontSize: 13.5,
     fontWeight: '800',
     letterSpacing: -0.2,
     marginTop: 1,
   },
-  blueprintCardDetail: {
+  blueprintCardDetail: { fontFamily: uiTheme.fonts.body,
     color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 10.5,
+    fontSize: uiTheme.type.caption.fontSize,
     fontWeight: '400',
     marginBottom: 1,
   },
@@ -5972,7 +5950,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 4,
   },
-  signInFooterText: {
+  signInFooterText: { fontFamily: uiTheme.fonts.body,
     color: 'rgba(245, 230, 240, 0.75)',
     fontSize: 13.5,
     fontWeight: '500',

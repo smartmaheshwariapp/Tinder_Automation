@@ -1,13 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Animated,
-  StyleSheet,
-  Easing,
-  Platform,
-} from 'react-native';
+import { View, Text, Animated, StyleSheet, Easing, Platform } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from '../common/Motion';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme as uiTheme } from '../../theme';

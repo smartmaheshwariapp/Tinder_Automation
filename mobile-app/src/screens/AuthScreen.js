@@ -2,27 +2,8 @@ import { theme as uiTheme } from '../theme';
 // src/screens/AuthScreen.js — Upgraded Luxury Dark Dating App Auth Flow
 // Ken-Burns Crossfade Carousel, Luminous Emblem Aura & Seamless Multi-Phase Auth
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  Animated,
-  Easing,
-  KeyboardAvoidingView,
-  Platform,
-  Dimensions,
-  Image,
-  StatusBar,
-  Keyboard,
-  ScrollView,
-  Modal,
-  Linking,
-  Pressable,
-  LayoutAnimation,
-  UIManager,
-} from 'react-native';
+import { StyleSheet, Text, View, Animated, Easing, KeyboardAvoidingView, Platform, Dimensions, Image, StatusBar, Keyboard, ScrollView, Modal, Linking, Pressable, LayoutAnimation, UIManager } from 'react-native';
+import { FocusInput as TextInput, MotionTouchable as TouchableOpacity } from '../components/common/Motion';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -2521,7 +2502,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Companion Greeting Typography ──
-  greetingSalutation: {
+  greetingSalutation: { fontFamily: uiTheme.fonts.label,
     color: '#FFFFFF',
     fontSize: 30,
     fontWeight: '700',
@@ -2532,7 +2513,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
-  greetingName: {
+  greetingName: { fontFamily: uiTheme.fonts.heading,
     color: '#FFFFFF',
     fontSize: 38,
     fontWeight: '900',
@@ -2545,7 +2526,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 14,
   },
-  greetingSub: {
+  greetingSub: { fontFamily: uiTheme.fonts.body,
     color: 'rgba(255, 240, 245, 0.92)',
     fontSize: 16,
     fontWeight: 'normal',
@@ -2742,12 +2723,12 @@ const styles = StyleSheet.create({
   formTitle: {
     color: '#FFFFFF',
     fontSize: 26,
-    fontWeight: '800',
+    fontWeight: 'normal',
     letterSpacing: -0.5,
     marginBottom: 6,
     fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
-  formSubtitle: {
+  formSubtitle: { fontFamily: uiTheme.fonts.heading,
     color: 'rgba(255, 255, 255, 0.62)',
     fontSize: 14,
     lineHeight: 20,

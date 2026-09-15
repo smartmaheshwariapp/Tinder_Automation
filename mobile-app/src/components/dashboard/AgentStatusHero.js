@@ -1,13 +1,8 @@
 import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/AgentStatusHero.js — Sleek Live Status Hero with Native Vector Icons
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Animated,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, Animated, StyleSheet } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from '../common/Motion';
 import { Ionicons } from '@expo/vector-icons';
 
 // ─── Phase metadata with clean vector icons ─────────────────────────────────

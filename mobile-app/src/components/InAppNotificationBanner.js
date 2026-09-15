@@ -2,17 +2,8 @@ import { theme as uiTheme } from '../theme';
 // mobile-app/src/components/InAppNotificationBanner.js
 // Modern iOS Dynamic Island / Glassmorphism Floating In-App Push Banner HUD
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Animated,
-  PanResponder,
-  Dimensions,
-  Platform,
-  Clipboard,
-} from 'react-native';
+import { StyleSheet, Text, View, Animated, PanResponder, Dimensions, Platform, Clipboard } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from './common/Motion';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';

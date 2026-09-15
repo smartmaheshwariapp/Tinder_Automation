@@ -1,12 +1,7 @@
 import { theme as uiTheme } from "../../theme";
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from '../common/Motion';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -490,7 +485,7 @@ const styles = StyleSheet.create({
   },
   planBadgeText: {
     fontFamily: "Inter_700Bold",
-    fontSize: 10,
+    fontSize: uiTheme.type.caption.fontSize,
     color: uiTheme.colors.muted,
     textTransform: "uppercase",
   },

@@ -5,17 +5,8 @@ import { theme as uiTheme } from '../../theme';
 // Uses React Native native <Modal> portal to ensure viewport-centered, unclipped presentation over all ScrollViews
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  Pressable,
-  StyleSheet,
-  AppState,
-  Animated,
-  Keyboard,
-} from 'react-native';
+import { Modal, View, Text, Pressable, StyleSheet, AppState, Animated, Keyboard } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from './Motion';
 import ActivityIndicator from './SafeActivityIndicator';
 import { Ionicons } from '@expo/vector-icons';
 import LocationService from '../../services/locationService';

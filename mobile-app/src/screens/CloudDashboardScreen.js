@@ -1,13 +1,7 @@
 import { theme as uiTheme } from '../theme';
 import React from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  StatusBar,
-  Image,
-} from 'react-native';
+import { StyleSheet, Text, View, StatusBar, Image } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from '../components/common/Motion';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import useExtensionStats from '../hooks/useExtensionStats';
@@ -176,6 +170,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   streamBtn: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -213,8 +208,8 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     backgroundColor: uiTheme.colors.surface,
-    borderRadius: 16,
-    borderWidth: 1.5,
+    borderRadius: uiTheme.radius.card,
+    borderWidth: 1,
     borderColor: uiTheme.colors.elevated,
     padding: uiTheme.spacing.lg,
     margin: 14,
@@ -236,6 +231,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   openStreamBtn: {
+    minHeight: 48,
     marginTop: uiTheme.spacing.lg,
     backgroundColor: uiTheme.colors.primary,
     borderRadius: 10,

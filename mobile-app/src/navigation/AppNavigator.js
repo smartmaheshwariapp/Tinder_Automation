@@ -1,5 +1,7 @@
 import { theme as uiTheme } from '../theme';
 import React from 'react';
+import { MotionProvider } from '../components/common/Motion';
+import useReducedMotion from '../hooks/useReducedMotion';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AuthScreen from '../screens/AuthScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -12,13 +14,15 @@ import CloudDashboardScreen from '../screens/CloudDashboardScreen';
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
+  const reducedMotion = useReducedMotion();
   return (
+    <MotionProvider>
     <Stack.Navigator
       initialRouteName="Auth"
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#08050B', overflow: 'hidden' },
-        animation: 'slide_from_right',
+        contentStyle: { backgroundColor: uiTheme.colors.background, overflow: 'hidden' },
+        animation: reducedMotion ? 'none' : 'slide_from_right',
       }}
     >
       <Stack.Screen name="Auth" component={AuthScreen} />
@@ -29,5 +33,6 @@ export default function AppNavigator() {
       <Stack.Screen name="PlatformConfig" component={PlatformConfigScreen} />
       <Stack.Screen name="Browser" component={BrowserScreen} />
     </Stack.Navigator>
+    </MotionProvider>
   );
 }

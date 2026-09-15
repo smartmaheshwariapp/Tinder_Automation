@@ -1,15 +1,8 @@
 import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/SettingsPanel.js — Exact 1:1 FlirtEasy V2 Settings Architecture
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Switch,
-  ScrollView,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, Switch, ScrollView, StyleSheet } from 'react-native';
+import { FocusInput as TextInput, MotionTouchable as TouchableOpacity } from '../common/Motion';
 import ActivityIndicator from '../common/SafeActivityIndicator';
 import {
   LayoutAnimation,

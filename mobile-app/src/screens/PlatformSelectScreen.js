@@ -1,22 +1,9 @@
+import { ContentTransition } from '../components/common/Motion';
 import { theme as uiTheme } from "../theme";
 // PlatformSelectScreen.js — FlirtEasy AI Cockpit (Root Home Screen)
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  StatusBar,
-  TextInput,
-  Animated,
-  Modal,
-  Dimensions,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
-} from "react-native";
+import { StyleSheet, Text, View, StatusBar, Animated, Modal, Dimensions, Pressable, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
+import { MotionTouchable as TouchableOpacity, FocusInput as TextInput } from '../components/common/Motion';
 import ActivityIndicator from "../components/common/SafeActivityIndicator";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -1012,6 +999,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
         </View>
       </View>
 
+      <ContentTransition transitionKey={homeTab} style={{ flex: 1 }}>
       {homeTab === "home" ? (
         <HomeOverview
           stats={environment === "on_device" ? agentState : stats}
@@ -1156,6 +1144,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
           />
         </View>
       )}
+      </ContentTransition>
       <HomeBottomNavigation
         activeTab={homeTab}
         onSelect={(tab) => {

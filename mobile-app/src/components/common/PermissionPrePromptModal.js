@@ -4,15 +4,8 @@ import { theme as uiTheme } from '../../theme';
 // Consumer-grade, high-converting permission pre-prompt modal with live feedback & GPS sync
 
 import React, { useState, useEffect } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-  AppState,
-} from 'react-native';
+import { Modal, View, Text, StyleSheet, Platform, AppState } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from './Motion';
 import ActivityIndicator from './SafeActivityIndicator';
 import { Ionicons } from '@expo/vector-icons';
 import LocationService from '../../services/locationService';

@@ -1,7 +1,8 @@
 import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/SegmentedTabControl.js — Apple iOS Segmented Control
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from '../common/Motion';
 import { Ionicons } from '@expo/vector-icons';
 
 const TABS = [

@@ -143,3 +143,10 @@ Copy this template only after the full phase satisfies its requirements. Replace
 - Removed the nested short scroll region and automatic scroll jumps. Kept lifetime telemetry; the large session controller remains available outside the activity tab.
 - Handles numeric and ISO event dates; unknown event types use neutral labels. Removed unsupported verification/compatibility claims and keyword-based milestone inference.
 - Android/iOS export and 83 regression tests passed. Device interaction and visual checks remain pending.
+
+### App-wide visual and interaction pass (2026-09-15)
+- Added shared MotionTouchable and FocusInput primitives across 26 native UI files covering all seven screens. Press feedback uses native-driven 90ms/160ms scale transitions while preserving existing callbacks, refs, transforms, disabled states and opacity feedback. Inputs use shared app typography and focus accent borders.
+- Added a single motion context for shared controls and animated home-tab content changes. Navigation and confirmation dialogs honor reduced-motion preferences; existing decorative animation loops still require a separate device/motion audit.
+- Improved session configuration and cloud card spacing, corner consistency and touch targets. Filled remaining typography gaps and raised undersized captions in authentication, onboarding, home and profile components.
+- Validation: Android and iOS exports passed. All 10 existing suites / 110 tests passed. No connected-device rendering, gesture, keyboard, screen-reader or performance validation performed in this pass.
+- This is a completed shared implementation pass, not completion of all 35 master phases. Per-screen visual review and the remaining master audit items remain open.

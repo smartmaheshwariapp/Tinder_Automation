@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform } from 'react-native';
+import { View, Text, Animated, StyleSheet, Platform } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from '../common/Motion';
 import { theme as uiTheme } from '../../theme';
 import ActivityIndicator from '../common/SafeActivityIndicator';
 import useReducedMotion from '../../hooks/useReducedMotion';

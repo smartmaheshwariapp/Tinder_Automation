@@ -4,16 +4,8 @@ import { theme as uiTheme } from '../theme';
 // Production-Grade External App Redirect Confirmation Modal with "Remember Preference"
 
 import React, { useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Modal,
-  Clipboard,
-  Dimensions,
-  Animated,
-} from 'react-native';
+import { StyleSheet, Text, View, Modal, Clipboard, Dimensions, Animated } from 'react-native';
+import { MotionTouchable as TouchableOpacity } from './common/Motion';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import NotificationService from '../services/notifications';
