@@ -31,6 +31,12 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// ─── Feature Flags (Hidden in On-Device mode for clean UX, preserved for future cloud mode) ───
+const SHOW_CHAT_STYLE_TRAINING = false;
+const SHOW_AI_ACTIVE_TIME = false;
+const SHOW_LOCATION_FEATURE = false;
+const SHOW_DEFAULT_LANGUAGE = false;
+
 // ─── Goal Options ───
 const GOAL_OPTIONS = [
   { id: 'date', label: 'Set up a Date', desc: 'Propose coffee, drinks, dinner or activity', icon: 'calendar-outline' },
@@ -2108,6 +2114,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               </View>
 
               {/* ─── Active Dating Location Capsule (Single Source of Truth in Settings) ─── */}
+              {SHOW_LOCATION_FEATURE && (
               <View style={styles.swipingLocationCapsule}>
                 <View style={styles.swipingLocationLeft}>
                   <View style={styles.swipingLocationTopRow}>
@@ -2156,6 +2163,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   <Ionicons name="arrow-forward" size={12} color={uiTheme.colors.primary} />
                 </TouchableOpacity>
               </View>
+              )}
             </View>
           )}
         </View>
@@ -2193,10 +2201,12 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 <Ionicons name="color-wand" size={11} color={uiTheme.colors.success} />
                 <Text style={styles.v2ChipText}>{getMessagingSummary().tone}</Text>
               </View>
-              <View style={styles.v2Chip}>
-                <Ionicons name="globe-outline" size={11} color={uiTheme.colors.warning} />
-                <Text style={styles.v2ChipText}>{getMessagingSummary().lang}</Text>
-              </View>
+              {SHOW_DEFAULT_LANGUAGE && (
+                <View style={styles.v2Chip}>
+                  <Ionicons name="globe-outline" size={11} color={uiTheme.colors.warning} />
+                  <Text style={styles.v2ChipText}>{getMessagingSummary().lang}</Text>
+                </View>
+              )}
               <View style={styles.v2Chip}>
                 <Text style={styles.v2ChipText}>{getMessagingSummary().emojis}</Text>
               </View>
@@ -2211,7 +2221,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           {/* Expanded Body */}
           {openCards.messaging && (
             <View style={styles.v2CardBody}>
-              <Text style={styles.fieldDesc}>Configure conversation style, intentions, language & priority balancing:</Text>
+              <Text style={styles.fieldDesc}>Configure conversation style, intentions & priority balancing:</Text>
 
               {/* ─── Core Toggles (Smart Reactions, Use Emojis, Consecutive Messages) ─── */}
               <View style={styles.subBox}>
@@ -2328,20 +2338,22 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               </View>
 
               {/* ─── Default Language Dropdown (V2 UI Parity) ─── */}
-              <View style={styles.subBox}>
-                <V2Dropdown
-                  label="Default Language"
-                  sublabel="(Editable per match)"
-                  options={LANGUAGE_OPTIONS.map(lang => ({
-                    id: lang.code,
-                    value: lang.code,
-                    label: lang.label,
-                    flag: lang.flag,
-                  }))}
-                  selectedValue={form.conversationLanguage || 'en'}
-                  onSelect={val => updateField('conversationLanguage', val)}
-                />
-              </View>
+              {SHOW_DEFAULT_LANGUAGE && (
+                <View style={styles.subBox}>
+                  <V2Dropdown
+                    label="Default Language"
+                    sublabel="(Editable per match)"
+                    options={LANGUAGE_OPTIONS.map(lang => ({
+                      id: lang.code,
+                      value: lang.code,
+                      label: lang.label,
+                      flag: lang.flag,
+                    }))}
+                    selectedValue={form.conversationLanguage || 'en'}
+                    onSelect={val => updateField('conversationLanguage', val)}
+                  />
+                </View>
+              )}
 
               {/* ─── Messaging Priority (Replies vs New Matches) ─── */}
               <View style={styles.subBox}>
@@ -2400,6 +2412,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
         </View>
 
         {/* ════════════════════ CARD 4: YOUR CHAT STYLE & AI TRAINING (V2 DESKTOP PARITY) ════════════════════ */}
+        {SHOW_CHAT_STYLE_TRAINING && (
         <View style={[styles.v2Card, openCards.style && styles.v2CardOpen]}>
           <TouchableOpacity accessibilityRole="button"
             style={styles.v2CardHeader}
@@ -3064,8 +3077,10 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             </View>
           )}
         </View>
+        )}
 
         {/* ════════════════════ CARD 5: AI ACTIVE TIME & SAFETY (DESKTOP V2 PARITY) ════════════════════ */}
+        {SHOW_AI_ACTIVE_TIME && (
         <View style={[styles.v2Card, openCards.activeTime && styles.v2CardOpen]}>
           <View style={styles.v2CardHeader}>
             <TouchableOpacity accessibilityRole="button"
@@ -3225,6 +3240,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             </View>
           )}
         </View>
+        )}
 
       </ScrollView>
 

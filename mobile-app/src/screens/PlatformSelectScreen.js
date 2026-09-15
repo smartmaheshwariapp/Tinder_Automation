@@ -70,6 +70,10 @@ import trackingService from "../services/trackingService";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
+// ─── Feature Flags (Hidden in On-Device mode for clean UX) ───
+const SHOW_LOCATION_PREFERENCE = false;
+const SHOW_ASSISTANT_STATUS_CARD = false;
+
 export default function PlatformSelectScreen({ navigation, route }) {
   const [homeTab, setHomeTab] = useState("home");
   const [deviceLatencyMs, setDeviceLatencyMs] = useState(null);
@@ -96,7 +100,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
     `http://${autoIp}:8080/?usr=User&pwd=admin`,
   );
   const [localProxy, setLocalProxy] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(true);
   const [updatingGpsLocation, setUpdatingGpsLocation] = useState(false);
   const [locationNoticeModal, setLocationNoticeModal] = useState(null);
 
@@ -1204,96 +1208,100 @@ export default function PlatformSelectScreen({ navigation, route }) {
                   showsVerticalScrollIndicator={false}
                 >
                   {/* ─── 1. Your Dating Location ─── */}
-                  <View style={styles.consumerSectionCard}>
-                    <View style={styles.consumerSectionHeader}>
-                      <View style={styles.consumerIconWrap}>
-                        <Ionicons
-                          name="location"
-                          size={18}
-                          color={uiTheme.colors.primary}
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.consumerCardTitle}>
-                          Your Location
-                        </Text>
-                        <Text style={styles.consumerCardSub}>
-                          {localSettings?.useDeviceLocation
-                            ? "📍 Current Location"
-                            : "🌐 Selected City"}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.consumerCityBox}>
-                      <Text style={styles.consumerCityName}>
-                        {localSettings?.locationCity || "New York, NY"}
-                      </Text>
-                      <Text style={styles.consumerCityCoords}>
-                        Personalized profiles in this area
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      style={styles.consumerRefreshGpsBtn}
-                      onPress={handleRefreshDeviceLocation}
-                      disabled={updatingGpsLocation}
-                      activeOpacity={0.85}
-                    >
-                      {updatingGpsLocation ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={uiTheme.colors.success}
-                        />
-                      ) : (
-                        <>
+                  {SHOW_LOCATION_PREFERENCE && (
+                    <View style={styles.consumerSectionCard}>
+                      <View style={styles.consumerSectionHeader}>
+                        <View style={styles.consumerIconWrap}>
                           <Ionicons
-                            name="locate"
-                            size={14}
+                            name="location"
+                            size={18}
+                            color={uiTheme.colors.primary}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.consumerCardTitle}>
+                            Your Location
+                          </Text>
+                          <Text style={styles.consumerCardSub}>
+                            {localSettings?.useDeviceLocation
+                              ? "📍 Current Location"
+                              : "🌐 Selected City"}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.consumerCityBox}>
+                        <Text style={styles.consumerCityName}>
+                          {localSettings?.locationCity || "New York, NY"}
+                        </Text>
+                        <Text style={styles.consumerCityCoords}>
+                          Personalized profiles in this area
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        style={styles.consumerRefreshGpsBtn}
+                        onPress={handleRefreshDeviceLocation}
+                        disabled={updatingGpsLocation}
+                        activeOpacity={0.85}
+                      >
+                        {updatingGpsLocation ? (
+                          <ActivityIndicator
+                            size="small"
                             color={uiTheme.colors.success}
                           />
-                          <Text style={styles.consumerRefreshGpsText}>
-                            Update to Current Location
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
+                        ) : (
+                          <>
+                            <Ionicons
+                              name="locate"
+                              size={14}
+                              color={uiTheme.colors.success}
+                            />
+                            <Text style={styles.consumerRefreshGpsText}>
+                              Update to Current Location
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
 
                   {/* ─── 2. Dating Assistant ─── */}
-                  <View style={styles.consumerSectionCard}>
-                    <View style={styles.consumerSectionHeader}>
-                      <View
-                        style={[
-                          styles.consumerIconWrap,
-                          { backgroundColor: "rgba(16, 185, 129, 0.12)" },
-                        ]}
-                      >
-                        <Ionicons
-                          name="sparkles"
-                          size={18}
-                          color={uiTheme.colors.success}
-                        />
+                  {SHOW_ASSISTANT_STATUS_CARD && (
+                    <View style={styles.consumerSectionCard}>
+                      <View style={styles.consumerSectionHeader}>
+                        <View
+                          style={[
+                            styles.consumerIconWrap,
+                            { backgroundColor: "rgba(16, 185, 129, 0.12)" },
+                          ]}
+                        >
+                          <Ionicons
+                            name="sparkles"
+                            size={18}
+                            color={uiTheme.colors.success}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.consumerCardTitle}>
+                            Dating Assistant
+                          </Text>
+                          <Text style={styles.consumerCardSub}>
+                            Finding matches & starting conversations
+                          </Text>
+                        </View>
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.consumerCardTitle}>
-                          Dating Assistant
+                      <View style={styles.consumerStatusRow}>
+                        <Text style={styles.consumerStatusLabel}>
+                          Matching Pace
                         </Text>
-                        <Text style={styles.consumerCardSub}>
-                          Finding matches & starting conversations
+                        <Text style={styles.consumerStatusVal}>
+                          Natural & Active
                         </Text>
                       </View>
                     </View>
-                    <View style={styles.consumerStatusRow}>
-                      <Text style={styles.consumerStatusLabel}>
-                        Matching Pace
-                      </Text>
-                      <Text style={styles.consumerStatusVal}>
-                        Natural & Active
-                      </Text>
-                    </View>
-                  </View>
+                  )}
 
                   {/* ─── 3. Developer / Advanced Network (Tucked Away Behind Toggle) ─── */}
                   <TouchableOpacity
