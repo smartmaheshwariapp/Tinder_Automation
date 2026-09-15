@@ -910,6 +910,9 @@ export const pushProgressFeedEvent = (typeOrEvent, detail, name, xp = 0) => {
   const isDuplicate = progressFeedEvents.slice(0, 8).some((prev) => {
     const timeDelta = Math.abs(now - (prev.timestamp || 0));
     if (timeDelta > 15000) return false;
+    if (event.type === 'cycle_complete' && prev.type === 'cycle_complete') {
+      return true;
+    }
     if (event.name && prev.name && event.type === prev.type) {
       return event.name.toLowerCase().trim() === prev.name.toLowerCase().trim();
     }
@@ -961,12 +964,19 @@ export const pushProgressFeedEvent = (typeOrEvent, detail, name, xp = 0) => {
           data: { matchName, phone, instagram, detail: event.detail, type: 'goal_unlocked' },
         }).catch(() => {});
       } else if (event.type === 'cycle_complete') {
-        NotificationService.triggerLocalNotification({
-          type: 'cycle_complete',
-          title: 'Swiping Session Complete',
-          body: event.detail || 'Session target reached. AI Wingman is taking a break.',
-          data: { detail: event.detail, type: 'cycle_complete' },
-        }).catch(() => {});
+        const isZeroLikesPause = event.detail && (
+          event.detail.includes('· 0 total') ||
+          event.detail.includes('· 0 swiped') ||
+          event.detail.includes('from Home Screen')
+        );
+        if (!isZeroLikesPause) {
+          NotificationService.triggerLocalNotification({
+            type: 'cycle_complete',
+            title: 'Swiping Session Complete',
+            body: event.detail || 'Session target reached. AI Wingman is taking a break.',
+            data: { detail: event.detail, type: 'cycle_complete' },
+          }).catch(() => {});
+        }
       } else if (event.type === 'safety_cooldown') {
         NotificationService.triggerLocalNotification({
           type: 'safety_cooldown',
@@ -1187,7 +1197,7 @@ try {
           onDeviceSessionState = {
             ...ON_DEVICE_SESSION_DEFAULTS,
             ...parsed,
-            ...(activeIsRunning ? { isRunning: true } : {})
+            isRunning: Boolean(activeIsRunning)
           };
           syncOnDeviceSessionToShared();
           console.log('[SessionManager] Restored on-device session state:', onDeviceSessionState);

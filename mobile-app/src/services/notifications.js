@@ -146,7 +146,19 @@ export const NotificationService = {
         if (savedInbox) {
           const parsed = JSON.parse(savedInbox);
           if (Array.isArray(parsed)) {
-            _notificationInbox = parsed;
+            // Clean up past duplicate entries (e.g. repeated cycle_complete or identical double-ingested notifications)
+            const seen = new Set();
+            const cleaned = [];
+            for (const item of parsed) {
+              if (!item) continue;
+              const timeKey = Math.round(new Date(item.created_at || 0).getTime() / 60000);
+              const key = `${item.type}:${item.title}:${item.type === 'cycle_complete' ? timeKey : item.id}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                cleaned.push(item);
+              }
+            }
+            _notificationInbox = cleaned;
           }
         }
 
@@ -273,6 +285,17 @@ export const NotificationService = {
       const { title, body, data } = notification.request.content;
       const type = (data?.type || 'new_match').toLowerCase();
 
+      // Guard: deduplicate notifications that were already added to the inbox by triggerLocalNotification
+      const isDuplicate = _notificationInbox.some(
+        (existing) =>
+          (data?.internalId && existing.id === data.internalId) ||
+          (existing.title === title && existing.body === body && Math.abs(Date.now() - new Date(existing.created_at).getTime()) < 10000)
+      );
+      if (isDuplicate) {
+        if (onReceived) onReceived(notification);
+        return;
+      }
+
       const notifItem = {
         id: notification.request.identifier || `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type,
@@ -325,11 +348,12 @@ export const NotificationService = {
     const finalTitle = title || category.title;
     const finalBody = body || 'Your AI Wingman has a new update for you.';
 
-    // Rapid duplicate suppression window (8 seconds)
+    // Rapid duplicate suppression window (8 seconds general, 60 seconds for cycle_complete)
     const now = Date.now();
+    const cooldown = normalizedType === 'cycle_complete' ? 60000 : 8000;
     const dedupeKey = `${normalizedType}:${finalTitle}:${data.matchName || ''}:${data.phone || ''}`;
     const lastTime = _lastTriggeredMap.get(dedupeKey);
-    if (lastTime && (now - lastTime) < 8000) {
+    if (lastTime && (now - lastTime) < cooldown) {
       return null;
     }
     _lastTriggeredMap.set(dedupeKey, now);
@@ -368,7 +392,7 @@ export const NotificationService = {
           content: {
             title: finalTitle,
             body: finalBody,
-            data: { ...data, type: normalizedType },
+            data: { ...data, type: normalizedType, internalId: notifItem.id },
             sound: true,
             badge: 1,
             channelId: isUrgent ? 'matches_and_goals' : 'default',

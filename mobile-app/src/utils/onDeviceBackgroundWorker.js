@@ -525,8 +525,9 @@ export class OnDeviceBackgroundWorker {
         this.agentState.isPaused = true;
         this.agentState.currentPhase = 'idle';
         this._currentRunLikes = 0;
-        this._currentRunMessages = 0;
-        pushProgressFeedEvent('cycle_complete', `Automation paused · ${this.agentState.stats.swipes || 0} total swiped`, null, 0);
+        if ((this.agentState.stats.swipes || 0) > 0) {
+          pushProgressFeedEvent('cycle_complete', `Automation paused · ${this.agentState.stats.swipes} total swiped`, null, 0);
+        }
         saveOnDeviceSessionState({ isRunning: false });
         this.notifyStateChange();
         trackingService.trackAgentStop('manual');

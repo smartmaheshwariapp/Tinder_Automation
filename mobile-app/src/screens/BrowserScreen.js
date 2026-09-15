@@ -515,7 +515,7 @@ export default function BrowserScreen({ route, navigation }) {
   const [emailErrorText, setEmailErrorText] = useState('');
   const [submittedEmail, setSubmittedEmail] = useState('');
   const [submittedPhone, setSubmittedPhone] = useState('');
-  const initialSwiping = Boolean(route.params?.autoStartAgent || getOnDeviceSessionState().isRunning);
+  const initialSwiping = Boolean(route.params?.autoStartAgent);
   const [onDeviceSwiping, setOnDeviceSwiping] = useState(initialSwiping);
   const [onDeviceSwipes, setOnDeviceSwipes] = useState(() => getOnDeviceSessionState().swipes);
   const [onDeviceMatches, setOnDeviceMatches] = useState(() => getOnDeviceSessionState().matches);
@@ -530,9 +530,6 @@ export default function BrowserScreen({ route, navigation }) {
   const [canGoBackWeb, setCanGoBackWeb] = canGoBackWebState;
 
   // Handle Android hardware back press: navigate back inside WebView instead of kicking to home screen
-  // ── Session Duration Countdown Timer (Alarm Clock Span) ──
-  const sessionDuration = route.params?.sessionDuration !== undefined ? route.params.sessionDuration : 30;
-  const [timeLeft, setTimeLeft] = useState(sessionDuration > 0 ? sessionDuration * 60 : null);
   const [dummyText, setDummyText] = useState('');
   const [showDashboard, setShowDashboard] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -608,19 +605,19 @@ export default function BrowserScreen({ route, navigation }) {
         addLog(logText, 'info');
       }
     );
-    if (initialSwiping || route.params?.autoStartAgent) {
+    if (route.params?.autoStartAgent) {
       backgroundWorkerRef.current.handleMessage({ action: 'startAgent' });
     }
   }
 
-  // Ensure worker agentState is running if launched with autoStartAgent
+  // Ensure worker agentState is running ONLY if explicitly launched with autoStartAgent
   useEffect(() => {
-    if (isOnDevice && (route.params?.autoStartAgent || initialSwiping)) {
+    if (isOnDevice && route.params?.autoStartAgent) {
       if (backgroundWorkerRef.current) {
         backgroundWorkerRef.current.handleMessage({ action: 'startAgent' });
       }
     }
-  }, [isOnDevice, route.params?.autoStartAgent, initialSwiping]);
+  }, [isOnDevice, route.params?.autoStartAgent]);
 
   // Keep the worker's callbacks pointing at the live component after any
   // re-render that doesn't re-create the worker (normal React operation).
@@ -648,31 +645,6 @@ export default function BrowserScreen({ route, navigation }) {
 
   const lastSwipeTime = useRef(0);
 
-  // ── Session Countdown Interval ──
-  useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) return;
-    const interval = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          if (webViewRef.current) {
-            webViewRef.current.injectJavaScript('window.__linksyStopSwiping && window.__linksyStopSwiping(); true;');
-          }
-          Alert.alert(
-            '⏱️ Automation Session Complete',
-            `Your ${sessionDuration}-minute automation span has completed. Swiping has paused to keep your profile safe.`,
-            [
-              { text: 'Add 15 Mins', onPress: () => setTimeLeft(15 * 60) },
-              { text: 'Done', style: 'cancel' }
-            ]
-          );
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [timeLeft, sessionDuration]);
 
   // Safety timeout to dismiss loading overlay after 3 seconds max (Neko VPS only)
   // For on-device disconnected sessions, loading stays active until FE_LOGIN_SHEET_READY arrives (or 15s failsafe in onLoadEnd)
@@ -911,8 +883,10 @@ export default function BrowserScreen({ route, navigation }) {
 
   const triggerAutoStartIfReady = useCallback(() => {
     if (!isOnDevice) return;
-    hasAutoStartedRef.current = true;
+    // CRITICAL: Only auto-start if the user explicitly launched via autoStartAgent from Home Screen!
+    if (!pendingAutoStartRef.current) return;
     pendingAutoStartRef.current = false;
+    hasAutoStartedRef.current = true;
     onDeviceSwipingRef.current = true;
     setOnDeviceSwiping(true);
     saveOnDeviceSessionState({ isRunning: true });
@@ -2247,18 +2221,6 @@ export default function BrowserScreen({ route, navigation }) {
               <Text style={styles.headerTitle} numberOfLines={1}>
                 {isOnDevice ? 'Tinder' : `${platform} Session`}
               </Text>
-              {/* On-device intentionally has no state badge here: it would repeat
-                  what the AI Controls button already shows, and the header has no
-                  horizontal room to spare. The Neko countdown is not a duplicate,
-                  so it stays. */}
-              {!isOnDevice && timeLeft !== null && (
-                <View style={styles.countdownBadge}>
-                  <Ionicons name="timer-outline" size={11} color={uiTheme.colors.success} />
-                  <Text style={styles.countdownBadgeText}>
-                    {Math.floor(timeLeft / 60)}:{(timeLeft % 60) < 10 ? '0' : ''}{timeLeft % 60}
-                  </Text>
-                </View>
-              )}
             </View>
             <Text style={styles.subtitle} numberOfLines={1}>
               {isOnDevice
@@ -2625,15 +2587,9 @@ export default function BrowserScreen({ route, navigation }) {
                 // content script bundle (injectedJavaScript), so there is
                 // nothing to inject from here.
 
-                // Auto-start or re-engage automation once DOM finishes loading
-                if (isOnDevice && (route.params?.autoStartAgent || onDeviceSwipingRef.current)) {
-                  const worker = backgroundWorkerRef.current;
-                  if (worker) {
-                    worker.handleMessage({ action: 'startAgent' });
-                  }
-                  setTimeout(() => {
-                    dispatchStartToDOM();
-                  }, 600);
+                // Auto-start only if explicitly requested from Home Screen via autoStartAgent
+                if (isOnDevice && route.params?.autoStartAgent && pendingAutoStartRef.current) {
+                  triggerAutoStartIfReady();
                 }
               }}
               onNavigationStateChange={(navState) => {
@@ -2976,7 +2932,7 @@ export default function BrowserScreen({ route, navigation }) {
                       latitude: extensionSettings?.locationLatitude || 40.7128,
                       longitude: extensionSettings?.locationLongitude || -74.0060,
                     })}
-                    window.__flirteasyAutoStartRequested = ${Boolean(route.params?.autoStartAgent || onDeviceSwiping)};
+                    window.__flirteasyAutoStartRequested = ${Boolean(route.params?.autoStartAgent)};
                     window.__flirteasyAutoStartCount = ${Number(extensionSettings?.likesPerCycle || 50)};
                     true;`
                   : undefined
@@ -4590,23 +4546,6 @@ const styles = StyleSheet.create({
     fontSize: uiTheme.type.caption.fontSize,
     fontWeight: 'normal',
     letterSpacing: 0.4,
-  },
-  countdownBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    backgroundColor: '#10B98118',
-    borderWidth: 1,
-    borderColor: '#10B98140',
-    paddingVertical: 2,
-    paddingHorizontal: 7,
-    borderRadius: uiTheme.radius.input,
-    marginLeft: 6,
-  },
-  countdownBadgeText: { fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.success,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
   },
 
   // ── On-Device Header Controls ──

@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ActivityIndicator from "../common/SafeActivityIndicator";
+import MasterControlOrb from "./MasterControlOrb";
 
 const titleCase = (value) =>
   String(value || "")
@@ -179,22 +180,46 @@ export default function HomeOverview({
           <View style={styles.stateCopy}>
             <Text style={styles.eyebrow}>SYSTEM STATE</Text>
             <Text style={styles.stateTitle}>
-              {busy ? "Connecting" : running ? "Agent Active" : "Agent Standby"}
+              {busy
+                ? "Connecting"
+                : !isLoggedIn
+                  ? "Not Connected"
+                  : state?.waitingReason === "safety_lock"
+                    ? "Safety Lock"
+                    : running
+                      ? (state?.currentPhase === "messaging"
+                          ? "Agent Messaging"
+                          : state?.currentPhase === "transitioning"
+                            ? "Agent Cooldown"
+                            : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
+                              ? "Awaiting Replies"
+                              : "Agent Active")
+                      : "Agent Standby"}
             </Text>
           </View>
           <View style={styles.readyBadge}>
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: running ? "#48CB8D" : uiTheme.colors.muted },
+                { backgroundColor: running ? "#48CB8D" : (!isLoggedIn ? uiTheme.colors.muted : "#FE3C72") },
               ]}
             />
             <Text style={styles.readyText}>
-              {running
-                ? "Running"
-                : isLoggedIn
-                  ? "Ready for Batch"
-                  : "Connect to Start"}
+              {busy
+                ? "Starting"
+                : !isLoggedIn
+                  ? "Connect to Start"
+                  : state?.waitingReason === "safety_lock"
+                    ? "Pacing"
+                    : running
+                      ? (state?.currentPhase === "messaging"
+                          ? "Replying"
+                          : state?.currentPhase === "transitioning"
+                            ? "Resting"
+                            : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
+                              ? "Watchdog"
+                              : "Swiping")
+                      : "Ready for Batch"}
             </Text>
           </View>
         </View>
@@ -202,63 +227,14 @@ export default function HomeOverview({
           <Ionicons name="hardware-chip-outline" size={94} color="#28182F" />
         </View>
 
-        <View style={styles.launchArea}>
-          <View style={styles.launchGlow}>
-            <View style={styles.launchRing}>
-              <View style={styles.innerRing}>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    busy
-                      ? "Connecting to Tinder"
-                      : running
-                        ? "Pause agent"
-                        : isLoggedIn
-                          ? "Launch agent"
-                          : "Connect Tinder to launch agent"
-                  }
-                  accessibilityState={{ disabled: busy }}
-                  disabled={busy}
-                  onPress={isLoggedIn ? onToggleAgent : onOpenBrowser}
-                  activeOpacity={0.8}
-                  style={styles.launchButton}
-                >
-                  <LinearGradient
-                    colors={[
-                      uiTheme.colors.primary,
-                      uiTheme.colors.accent,
-                      uiTheme.colors.secondary,
-                    ]}
-                    start={{ x: 0.9, y: 0 }}
-                    end={{ x: 0.1, y: 1 }}
-                    style={styles.launchGradient}
-                  >
-                    {busy ? (
-                      <ActivityIndicator size="large" color="#FFFFFF" />
-                    ) : (
-                      <Ionicons
-                        name={running ? "pause" : "play"}
-                        size={39}
-                        color="#FFFFFF"
-                        style={!running && { marginLeft: 6 }}
-                      />
-                    )}
-                    <Text style={styles.launchLabel}>
-                      {busy ? "CONNECTING" : running ? "PAUSE" : "LAUNCH"}
-                    </Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-          <Text style={styles.launchHint}>
-            {running
-              ? "Your assistant is working for you"
-              : isLoggedIn
-                ? "Your next connection starts here"
-                : "Connect Tinder to get started"}
-          </Text>
-        </View>
+        <MasterControlOrb
+          stats={stats}
+          settings={settings}
+          isLoggedIn={isLoggedIn}
+          busy={busy}
+          onToggleAgent={onToggleAgent}
+          onOpenBrowser={onOpenBrowser}
+        />
 
         <View style={styles.tiles}>
           {[
