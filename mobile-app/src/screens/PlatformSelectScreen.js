@@ -1006,6 +1006,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
       <ContentTransition transitionKey={homeTab} style={{ flex: 1 }}>
       {homeTab === "home" ? (
         <HomeOverview
+          collectionBackendUrl={orchestratorUrl}
           stats={environment === "on_device" ? agentState : stats}
           settings={localSettings}
           isLoggedIn={isLoggedIn}

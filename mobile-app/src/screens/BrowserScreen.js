@@ -1,3 +1,5 @@
+import { collectionCaptureScript } from '../utils/tinderCollectionCapture';
+import { activateCollections, ingestCollectionEvent, configureCollectionBackend } from '../services/tinderCollections';
 import { theme as uiTheme } from '../theme';
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View, Dimensions, AppState, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
@@ -2599,6 +2601,14 @@ export default function BrowserScreen({ route, navigation }) {
               onMessage={async (event) => {
                 try {
                   const msg = JSON.parse(event.nativeEvent.data);
+                  if (msg.type === 'FE_COLLECTION_EVENT') {
+                    const sessionToken = getTinderAuthState()?.token;
+                    if (sessionToken && msg.sessionToken === sessionToken) {
+                      configureCollectionBackend(orchestratorUrl);
+                      activateCollections(sessionToken).then(() => ingestCollectionEvent(msg.event, sessionToken)).catch(() => {});
+                    }
+                    return;
+                  }
 
                   // ── Sub-50ms login sheet ready signal (3 buttons visible) ──
                   if (msg.type === 'FE_LOGIN_SHEET_READY') {
@@ -2929,7 +2939,8 @@ export default function BrowserScreen({ route, navigation }) {
               mixedContentMode="always"
               injectedJavaScriptBeforeContentLoaded={
                 isOnDevice
-                  ? `${generateChromeShim(SELECTORS_JSON, {
+                  ? `${collectionCaptureScript}
+${generateChromeShim(SELECTORS_JSON, {
                       latitude: extensionSettings?.locationLatitude || 40.7128,
                       longitude: extensionSettings?.locationLongitude || -74.0060,
                     })}
