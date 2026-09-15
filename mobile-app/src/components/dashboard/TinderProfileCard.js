@@ -697,13 +697,13 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.heading,
     fontSize: 16,
     color: theme.colors.text,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   collapsedAge: {
     fontFamily: theme.fonts.heading,
     fontSize: 16,
     color: theme.colors.textSecondary,
-    fontWeight: '400',
+    fontWeight: 'normal',
   },
   collapsedSubtitle: {
     ...theme.type.caption,
@@ -737,12 +737,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   telemetryText: {
+    fontFamily: theme.fonts.body,
     fontSize: 11,
     color: theme.colors.muted,
   },
   telemetryValue: {
+    fontFamily: theme.fonts.label,
     color: theme.colors.text,
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   emptyCard: {
     borderRadius: 20,
@@ -782,7 +784,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.heading,
     color: theme.colors.text,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   emptyStatusBadge: {
     flexDirection: 'row',
@@ -796,8 +798,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(254, 60, 114, 0.28)',
   },
   emptyStatusBadgeText: {
+    fontFamily: theme.fonts.label,
     fontSize: 9.5,
-    fontWeight: '700',
+    fontWeight: 'normal',
     color: '#FE3C72',
     letterSpacing: 0.5,
   },
@@ -832,11 +835,13 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   benefitTitle: {
+    fontFamily: theme.fonts.heading,
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: 'normal',
     color: theme.colors.text,
   },
   benefitDesc: {
+    fontFamily: theme.fonts.body,
     fontSize: 11,
     color: theme.colors.muted,
     lineHeight: 15,
@@ -856,8 +861,9 @@ const styles = StyleSheet.create({
   },
   connectButtonText: {
     ...theme.type.label,
+    fontFamily: theme.fonts.label,
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: 'normal',
     fontSize: 13.5,
   },
   trustRow: {
@@ -867,6 +873,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   trustText: {
+    fontFamily: theme.fonts.body,
     fontSize: 11,
     color: theme.colors.muted,
     opacity: 0.8,
@@ -892,9 +899,10 @@ const styles = StyleSheet.create({
   },
   headerBrandText: {
     ...theme.type.caption,
+    fontFamily: theme.fonts.label,
     color: '#FF655B',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: 'normal',
     letterSpacing: 1,
   },
   headerBadges: {
@@ -920,8 +928,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#61D6A3',
   },
   sessionText: {
+    fontFamily: theme.fonts.label,
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: 'normal',
     color: '#61D6A3',
   },
   tierPill: {
@@ -947,8 +956,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   tierText: {
+    fontFamily: theme.fonts.label,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: 'normal',
     color: theme.colors.text,
   },
   identityRow: {
@@ -1003,13 +1013,13 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.heading,
     fontSize: 19,
     color: theme.colors.text,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   profileAge: {
     fontFamily: theme.fonts.heading,
     fontSize: 19,
     color: theme.colors.textSecondary,
-    fontWeight: '400',
+    fontWeight: 'normal',
   },
   verifiedIcon: {
     marginLeft: 6,
@@ -1034,12 +1044,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionMiniTitle: {
+    fontFamily: theme.fonts.heading,
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: 'normal',
     color: theme.colors.muted,
     letterSpacing: 0.8,
   },
   sectionCounter: {
+    fontFamily: theme.fonts.body,
     fontSize: 11,
     color: theme.colors.muted,
   },
@@ -1102,9 +1114,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   interestChipText: {
+    fontFamily: theme.fonts.caption,
     fontSize: 12,
     color: theme.colors.text,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
   vitalsSection: {
     gap: 8,
@@ -1137,15 +1150,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   vitalLabel: {
+    fontFamily: theme.fonts.label,
     fontSize: 10,
     color: theme.colors.muted,
     textTransform: 'uppercase',
-    fontWeight: '600',
+    fontWeight: 'normal',
   },
   vitalValue: {
+    fontFamily: theme.fonts.caption,
     fontSize: 12,
     color: theme.colors.text,
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
   actionsDock: {
     flexDirection: 'row',
@@ -1166,8 +1181,9 @@ const styles = StyleSheet.create({
   },
   syncButtonText: {
     ...theme.type.label,
+    fontFamily: theme.fonts.label,
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: 'normal',
     fontSize: 13,
   },
   openTinderBtn: {
@@ -1185,8 +1201,9 @@ const styles = StyleSheet.create({
   },
   openTinderText: {
     ...theme.type.label,
+    fontFamily: theme.fonts.label,
     color: '#FE3C72',
-    fontWeight: '600',
+    fontWeight: 'normal',
     fontSize: 13,
   },
 });

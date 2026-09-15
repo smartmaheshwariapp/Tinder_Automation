@@ -44,8 +44,7 @@
     "plugins": [
       "expo-web-browser",
       "expo-location",
-      "expo-font",
-      "expo-status-bar"
+      "expo-font"
     ]
   }
 }

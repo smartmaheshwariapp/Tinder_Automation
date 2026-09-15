@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     color: '#FFF',
     textAlign: 'center',
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   message: {
     fontFamily: theme.fonts.body,
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   confirmBtnText: {
     fontFamily: theme.fonts.label,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: 'normal',
     color: '#FFF',
   },
   cancelBtn: {
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     fontFamily: theme.fonts.label,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: 'normal',
     color: theme.colors.textSecondary,
   },
 });

@@ -550,9 +550,10 @@ const styles = StyleSheet.create({
   },
   initial: {
     ...theme.type.display,
+    fontFamily: theme.fonts.heading,
     fontSize: 26,
     color: theme.colors.text,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   name: {
     ...theme.type.title,
@@ -561,10 +562,11 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...theme.type.caption,
+    fontFamily: theme.fonts.label,
     color: theme.colors.muted,
     letterSpacing: 1.5,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: 'normal',
   },
   pageTitle: {
     ...theme.type.section,
@@ -657,7 +659,8 @@ const styles = StyleSheet.create({
   },
   tinderPreviewName: {
     ...theme.type.body,
-    fontWeight: '700',
+    fontFamily: theme.fonts.heading,
+    fontWeight: 'normal',
     color: theme.colors.text,
   },
   tinderNoticeBox: {
@@ -751,9 +754,10 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     ...theme.type.caption,
+    fontFamily: theme.fonts.label,
     color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: 'normal',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
@@ -843,8 +847,9 @@ const styles = StyleSheet.create({
   },
   tierText: {
     ...theme.type.caption,
+    fontFamily: theme.fonts.label,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: 'normal',
     color: theme.colors.muted,
     textTransform: 'uppercase',
   },
