@@ -1,6 +1,7 @@
 import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/DashboardPanel.js — Apple iOS-Grade Root Dashboard Panel
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { MotionTouchable, ContentTransition } from '../common/Motion';
 import {
   View,
   Text,
@@ -45,6 +46,9 @@ export default function DashboardPanel({
 }) {
   const [internalTab, setInternalTab] = useState('activity');
   const activeTab = selectedTab || internalTab;
+  const [showSessionControls, setShowSessionControls] = useState(false);
+  const contentRef = useRef(null);
+  useEffect(() => { contentRef.current?.scrollTo({ y: 0, animated: false }); }, [activeTab]);
   const [targetSettingsSection, setTargetSettingsSection] = useState(null);
 
   const handleTabSelect = useCallback((tab) => {
@@ -139,28 +143,38 @@ export default function DashboardPanel({
 
   return (
     <View style={styles.panel}>
+      <View style={styles.tabDock}>
+        <SegmentedTabControl activeTab={activeTab} onSelectTab={handleTabSelect} />
+      </View>
       {/* ── Scrollable Dashboard Content ── */}
       <ScrollView
+        ref={contentRef}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {/* ── 1. Master Centerpiece Hero Controller (1:1 with Desktop V2) ── */}
-        {activeTab !== 'activity' && <MasterHeroController
+        <MotionTouchable style={styles.sessionSummary} onPress={() => setShowSessionControls(!showSessionControls)} accessibilityRole="button" accessibilityLabel="Session controls" accessibilityState={{ expanded: showSessionControls }}>
+          <Ionicons name="pulse-outline" size={19} color={uiTheme.colors.accent} />
+          <View style={{ flex: 1 }}><Text style={styles.sessionTitle}>Session controls</Text><Text style={styles.sessionDetail}>{agentState?.isRunning ? 'Assistant is running' : 'Manage your assistant'}</Text></View>
+          <Ionicons name={showSessionControls ? 'chevron-up' : 'chevron-down'} size={18} color={uiTheme.colors.muted} />
+        </MotionTouchable>
+        {showSessionControls && <MasterHeroController
           agentState={agentState}
           settings={effectiveSettings}
           onToggleAgent={onToggleAgent}
         />}
 
         {/* ── 2. Integrated Telemetry Capsule (Swipes, Messages, Matches) ── */}
-        <QuickTelemetryCapsule lifetimeStats={lifetimeStats} />
+        {activeTab === 'activity' && <QuickTelemetryCapsule lifetimeStats={lifetimeStats} />}
 
         {/* ── 3. Apple-Style Segmented Navigation (Activity | Automation | Settings) ── */}
-        <SegmentedTabControl
-          activeTab={activeTab}
-          onSelectTab={handleTabSelect}
-        />
+        {activeTab !== 'activity' && <View style={styles.tabIntroduction}>
+          <Text style={styles.tabTitle}>{activeTab === 'automation' ? 'Your assistant, your way.' : 'Fine-tune your experience.'}</Text>
+          <Text style={styles.tabDescription}>{activeTab === 'automation' ? 'Set your goals, conversation style, and preferences.' : 'Manage safety, scheduling, and account preferences.'}</Text>
+        </View>}
+        <ContentTransition transitionKey={activeTab}>
 
         {/* ── 4. Active Tab Content ── */}
         {activeTab === 'activity' && (
@@ -210,6 +224,7 @@ export default function DashboardPanel({
             initialOpenSection={targetSettingsSection}
           />
         )}
+        </ContentTransition>
       </ScrollView>
 
       {/* ─── 5. Global Floating Save Bar (Always Fixed at Viewport Bottom) ─── */}
@@ -226,14 +241,21 @@ export default function DashboardPanel({
 }
 
 const styles = StyleSheet.create({
+  tabDock: { width: '100%', maxWidth: 600, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8 },
+  sessionSummary: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, backgroundColor: uiTheme.colors.surface, borderRadius: 16, marginBottom: 20, minHeight: 64 },
+  sessionTitle: { ...uiTheme.type.label, color: uiTheme.colors.text },
+  sessionDetail: { ...uiTheme.type.caption, color: uiTheme.colors.muted },
+  tabIntroduction: { gap: 8, marginBottom: 24 },
+  tabTitle: { ...uiTheme.type.title, color: uiTheme.colors.text },
+  tabDescription: { ...uiTheme.type.body, color: uiTheme.colors.muted },
   panel: {
     flex: 1,
     backgroundColor: uiTheme.colors.background,
     position: 'relative',
   },
-  scrollContent: { width: '100%', maxWidth: 760, alignSelf: 'center',
-    paddingHorizontal: 14,
-    paddingTop: uiTheme.spacing.md,
+  scrollContent: { width: '100%', maxWidth: 600, alignSelf: 'center',
+    paddingHorizontal: uiTheme.spacing.xl,
+    paddingTop: uiTheme.spacing.lg,
     paddingBottom: 90, // Extra breathing space so content isn't covered by floating save bar
   },
   loadingWrap: {

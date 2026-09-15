@@ -82,6 +82,11 @@ export default function HomeOverview({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
     >
+      <View style={styles.introduction}>
+        <Text style={styles.welcomeLabel}>A LITTLE SPARK. MORE POSSIBILITY.</Text>
+        <Text style={styles.welcomeTitle}>Make room for connection.</Text>
+        <Text style={styles.welcomeBody}>Your assistant takes care of the introductions.</Text>
+      </View>
       <TouchableOpacity
         style={styles.instance}
         onPress={onOpenBrowser}
@@ -217,9 +222,6 @@ export default function HomeOverview({
                       : "Ready for Batch"}
             </Text>
           </View>
-        </View>
-        <View pointerEvents="none" style={styles.chipArtwork}>
-          <Ionicons name="hardware-chip-outline" size={94} color="#28182F" />
         </View>
 
         <MasterControlOrb
@@ -384,6 +386,10 @@ export function HomeBottomNavigation({ activeTab, onSelect }) {
 }
 
 const styles = StyleSheet.create({
+  introduction: { gap: 10, paddingTop: 4, paddingBottom: 4 },
+  welcomeLabel: { ...uiTheme.type.caption, color: uiTheme.colors.secondary, letterSpacing: 1.2 },
+  welcomeTitle: { ...uiTheme.type.display, color: uiTheme.colors.text, letterSpacing: -0.7 },
+  welcomeBody: { ...uiTheme.type.body, color: uiTheme.colors.muted },
   content: {
     width: "100%",
     maxWidth: 600,
@@ -400,8 +406,8 @@ const styles = StyleSheet.create({
     padding: uiTheme.spacing.lg,
     backgroundColor: uiTheme.colors.surface,
     borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    borderRadius: 28,
+    borderColor: uiTheme.colors.divider,
+    borderRadius: 20,
   },
   flameWrap: { position: "relative" },
   flame: {
@@ -513,10 +519,10 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   agentCard: {
-    backgroundColor: uiTheme.colors.surface,
+    backgroundColor: uiTheme.colors.elevated,
     borderWidth: 1,
     borderColor: uiTheme.colors.border,
-    borderRadius: 32,
+    borderRadius: 24,
     padding: 22,
     overflow: "hidden",
   },

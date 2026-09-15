@@ -1,83 +1,100 @@
-import { theme as uiTheme } from '../../theme';
-// src/components/dashboard/SegmentedTabControl.js — Apple iOS Segmented Control
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { MotionTouchable as TouchableOpacity } from '../common/Motion';
-import { Ionicons } from '@expo/vector-icons';
-
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Easing, View, Text, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { MotionTouchable } from "../common/Motion";
+import useReducedMotion from "../../hooks/useReducedMotion";
+import { theme } from "../../theme";
 const TABS = [
-  { id: 'activity',   label: 'Activity',   icon: 'pulse-outline' },
-  { id: 'automation', label: 'Automation', icon: 'flash-outline' },
-  { id: 'settings',   label: 'Settings',   icon: 'settings-outline' },
+  { id: "activity", label: "Activity", icon: "pulse-outline" },
+  { id: "automation", label: "Automation", icon: "flash-outline" },
+  { id: "settings", label: "Settings", icon: "options-outline" },
 ];
-
 export default function SegmentedTabControl({ activeTab, onSelectTab }) {
+  const reduced = useReducedMotion();
+  const [width, setWidth] = useState(0);
+  const index = TABS.findIndex((tab) => tab.id === activeTab);
+  const position = useRef(new Animated.Value(Math.max(0, index))).current;
+  useEffect(() => {
+    const animation = Animated.timing(position, {
+      toValue: Math.max(0, index),
+      duration: reduced ? 0 : 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+      isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [index, reduced, position]);
+  const slot = Math.max(0, width - 8) / 3;
   return (
-    <View style={styles.container} accessibilityRole="tablist">
-      {TABS.map((tab, idx) => {
-        const isActive = tab.id === activeTab;
-        return (
-          <TouchableOpacity
-            key={tab.id}
-            style={[styles.tab, isActive && styles.tabActive]}
-            onPress={() => onSelectTab(tab.id)}
-            activeOpacity={0.85}
-            accessibilityRole="tab"
-            accessibilityLabel={tab.label}
-            accessibilityState={{ selected: isActive }}
-          >
-            <Ionicons
-              name={tab.icon}
-              size={14}
-              color={isActive ? '#FFF' : uiTheme.colors.muted}
-            />
-            <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+    <View
+      style={styles.container}
+      accessibilityRole="tablist"
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+    >
+      {width > 0 && index >= 0 && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.indicator,
+            {
+              width: slot,
+              transform: [{ translateX: Animated.multiply(position, slot) }],
+            },
+          ]}
+        />
+      )}
+      {TABS.map((tab) => (
+        <MotionTouchable
+          key={tab.id}
+          style={styles.tab}
+          onPress={() => onSelectTab(tab.id)}
+          accessibilityRole="tab"
+          accessibilityLabel={tab.label}
+          accessibilityState={{ selected: tab.id === activeTab }}
+        >
+          <Ionicons
+            name={tab.icon}
+            size={17}
+            color={
+              tab.id === activeTab ? theme.colors.accent : theme.colors.muted
+            }
+          />
+          <Text style={[styles.label, tab.id === activeTab && styles.active]}>
+            {tab.label}
+          </Text>
+        </MotionTouchable>
+      ))}
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.input,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 14,
+    flexDirection: "row",
+    padding: 4,
+    backgroundColor: theme.colors.background,
+    borderRadius: 17,
+    marginBottom: 20,
+  },
+  indicator: {
+    position: "absolute",
+    left: 4,
+    top: 4,
+    bottom: 4,
+    borderRadius: 13,
+    backgroundColor: theme.colors.elevated,
   },
   tab: {
-    minHeight: 48,
-    paddingHorizontal: uiTheme.spacing.xs,
-    flexWrap: 'wrap',
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    minHeight: 25,
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
-    paddingVertical: 9,
-    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 2,
   },
-  tabActive: {
-    backgroundColor: uiTheme.colors.elevated,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tabText: { fontFamily: 'Inter_600SemiBold',
-    fontSize: 12.5,
-    fontWeight: 'normal',
-    color: uiTheme.colors.muted,
-  },
-  tabTextActive: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFF',
-    fontWeight: 'normal',
-  },
+  label: { ...theme.type.caption, color: theme.colors.muted },
+  active: { fontFamily: theme.fonts.label, color: theme.colors.text },
 });

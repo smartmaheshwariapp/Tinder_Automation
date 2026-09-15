@@ -150,3 +150,16 @@ Copy this template only after the full phase satisfies its requirements. Replace
 - Improved session configuration and cloud card spacing, corner consistency and touch targets. Filled remaining typography gaps and raised undersized captions in authentication, onboarding, home and profile components.
 - Validation: Android and iOS exports passed. All 10 existing suites / 110 tests passed. No connected-device rendering, gesture, keyboard, screen-reader or performance validation performed in this pass.
 - This is a completed shared implementation pass, not completion of all 35 master phases. Per-screen visual review and the remaining master audit items remain open.
+
+### Unified visual direction (2026-09-15)
+- Established a calmer editorial homepage hierarchy with introductory copy, simplified session card styling, and removed decorative hardware-chip artwork while retaining the orb controls and translucent navigation.
+- Rebuilt shared telemetry as readable metric cards. Explicitly distinguishes available daily counters from all-time values instead of guessing daily totals.
+- Rebuilt segmented navigation with measured-width, native-driven sliding selection and reduced-motion support.
+- Improved automation accordion spacing, wrapping and chips; standardized shared dashboard content width and gutters.
+- Full visual acceptance and device-specific verification remain open; this is a concrete design refinement, not a claim that every master phase is complete.
+
+### Activity / Automation / Settings layout correction (2026-09-15)
+- Fixed the tab bar above the scroll area, retained animated selection, and reset scroll position when changing tabs.
+- Removed nested full-form ScrollViews and duplicate gutters from Automation and Settings. Horizontal and modal scrolling remains intact.
+- Added concise introductions and consistent settings cards; session controller is available from a compact disclosure row on every tab. Lifetime telemetry remains on Activity. Save/discard controls remain fixed.
+- Validation: Android/iOS exports, 10 suites / 110 tests, and targeted whitespace check passed. Device keyboard, gestures and visual acceptance remain pending.

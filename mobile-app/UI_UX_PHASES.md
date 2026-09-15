@@ -1128,3 +1128,4 @@ Do not commit or push any changes unless explicitly instructed.
 - Modern profile visual refinement completed: compact identity card, grouped settings rows and expandable synced details. Device review remains pending.
 - Activity layout refinement completed: grouped timeline, filters, expandable details and history summary. Compilation/regression checks passed; device review remains pending.
 - App-wide shared visual/motion pass (2026-09-15) implemented across seven screens and 26 UI files: press feedback, input focus, tab transitions, reduced-motion handling for new animations, typography and layout refinements. Android/iOS exports and 110 tests passed. Full device visual/motion audit remains pending.
+- Dashboard tab layout completed (2026-09-15): fixed tabs, single parent scroll, cleaner Automation/Settings sections, collapsible session controls. Android/iOS and 110 regression tests passed; device review pending.

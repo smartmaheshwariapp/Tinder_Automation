@@ -658,11 +658,7 @@ export default function SettingsPanel({
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.scrollContent}>
 
         {/* ════════════════════ CATEGORY 1: SAFETY ════════════════════ */}
         <Text style={styles.categoryLabel}>SAFETY</Text>
@@ -1593,7 +1589,7 @@ export default function SettingsPanel({
           </>
         )}
 
-      </ScrollView>
+      </View>
 
       {/* ─── Modal: How AI Sees You (Profile Inspection Sheet) ─── */}
       <Modal
@@ -1717,17 +1713,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 14,
-    paddingBottom: 90,
+    padding: 0,
+    paddingBottom: 24,
     gap: 6,
   },
 
   categoryLabel: { fontFamily: 'Inter_600SemiBold',
     fontSize: uiTheme.type.caption.fontSize,
     fontWeight: 'normal',
-    color: '#94a3b8',
+    color: uiTheme.colors.textSecondary,
     letterSpacing: 0.8,
-    marginTop: 10,
+    marginTop: 20,
     marginBottom: uiTheme.spacing.xs,
     marginLeft: uiTheme.spacing.xs,
     textTransform: 'uppercase',
@@ -1735,17 +1731,17 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.input,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1,
     borderColor: uiTheme.colors.elevated,
-    padding: 14,
-    marginBottom: 6,
+    padding: 20,
+    marginBottom: 12,
   },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 36,
+    minHeight: 48,
   },
   headerLeftTouchable: {
     flexDirection: 'row',
