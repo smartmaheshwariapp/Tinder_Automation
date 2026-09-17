@@ -599,13 +599,24 @@ function handleLocationModal() {
 }
 
 function isLoggedIn() {
-  // 0. Never report logged in on marketing landing or login entry URLs
+  // 0. If logout is actively underway, never report logged in
+  if (window.__feLogoutInProgress) {
+    return false;
+  }
+
+  // 1. Never report logged in on marketing landing or login entry URLs
   const path = (window.location.pathname || '').toLowerCase();
   if (!path.includes('/app') || path === '/app' || path === '/app/' || path.includes('/app/login')) {
     return false;
   }
 
-  // 1. If login form inputs, login modal, or 3-button login sheet are visible, user is NOT logged in
+  // 2. If an error boundary/toast ("Uh Oh! Something went wrong") is visible, user is in an unauthenticated/crashed state
+  const pageText = (document.body ? (document.body.innerText || '') : '');
+  if (pageText.includes('Uh Oh! Something went wrong') || document.querySelector('.UhOh, [role="alert"][aria-live="assertive"]')) {
+    return false;
+  }
+
+  // 3. If login form inputs, login modal, or 3-button login sheet are visible, user is NOT logged in
   if (
     document.querySelector('input[type="tel"], input[name="phone_number"], input[autocomplete="one-time-code"], input[name="code"]') ||
     (typeof isLoginSheetOpen === 'function' && isLoginSheetOpen()) ||
@@ -614,40 +625,16 @@ function isLoggedIn() {
     return false;
   }
 
-  // 2. If an active Tinder API token is present in storage or window on an authenticated /app/* route
-  try {
-    const rawTok = (typeof _extractTinderAuthToken === 'function' ? _extractTinderAuthToken() : null) ||
-                   localStorage.getItem('TinderWeb/APIToken') ||
-                   window.__tinderAuthToken;
-    if (rawTok && typeof rawTok === 'string' && rawTok.replace(/['"]/g, '').trim().length >= 16) {
-      return true;
-    }
-  } catch (_) {}
+  // 4. Check for genuine active auth token
+  const rawTok = (typeof _extractTinderAuthToken === 'function' ? _extractTinderAuthToken() : null) ||
+                 localStorage.getItem('TinderWeb/APIToken') ||
+                 window.__tinderAuthToken;
+  if (rawTok && typeof rawTok === 'string' && rawTok.replace(/['"]/g, '').trim().length >= 16) {
+    return true;
+  }
 
-  const loginIndicators = [
-    () => window.SELECTORS?.navigation?.explore && findElement(window.SELECTORS.navigation.explore),
-    () => window.SELECTORS?.navigation?.messages && findElement(window.SELECTORS.navigation.messages),
-    () => window.SELECTORS?.buttons?.like && findElement(window.SELECTORS.buttons.like),
-    () => window.SELECTORS?.profile?.card && findElement(window.SELECTORS.profile.card),
-    () => document.querySelector('[data-testid="gamepad-like"], button[aria-label*="Like" i], a[href*="/app/recs"], a[href*="/app/messages"]'),
-    () => {
-      try {
-        const token = localStorage.getItem('TinderWeb/APIToken');
-        if (token && typeof token === 'string' && token.length > 20) return true;
-        const apiStore = localStorage.getItem('TinderWeb/APIStore');
-        if (apiStore) {
-          const parsed = JSON.parse(apiStore);
-          const tok = parsed && (parsed.token || parsed.auth_token || (parsed.user && parsed.user.api_token));
-          if (tok && typeof tok === 'string' && tok.length > 20) return true;
-        }
-        return false;
-      } catch(_) { return false; }
-    }
-  ];
-
-  return loginIndicators.some(check => {
-    try { return Boolean(check()); } catch(_) { return false; }
-  });
+  // 5. Without a valid token, residual DOM elements must NOT deceive the state
+  return false;
 }
 
 function detectInterventionNeeded() {

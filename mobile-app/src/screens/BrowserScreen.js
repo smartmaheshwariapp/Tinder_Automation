@@ -1,5 +1,5 @@
 import { theme as uiTheme } from '../theme';
-import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo, useImperativeHandle } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ActivityIndicator from '../components/common/SafeActivityIndicator';
@@ -51,163 +51,8 @@ import NotificationService from '../services/notifications';
 // waits (2.5s server logout + 2s storage teardown) plus a margin.
 const LOGOUT_CONFIRM_TIMEOUT_MS = 6000;
 
-const MASTER_PURGE_SCRIPT = `
-(async function() {
-  // Re-entrancy guard. A second purge racing the first would wipe storage
-  // mid-flight and emit a duplicate logged_out report to the app.
-  if (window.__feLogoutInProgress) return;
-  window.__feLogoutInProgress = true;
-
-  var LANDING_URL = 'https://tinder.com/';
-
-  // Every wait below is bounded. None of these APIs time out on their own, and
-  // a single hung promise used to abort the entire purge — leaving the WebView
-  // fully authenticated after the user tapped "Log Out".
-  var bounded = function(promise, ms) {
-    return Promise.race([
-      Promise.resolve(promise).catch(function() {}),
-      new Promise(function(resolve) { setTimeout(resolve, ms); })
-    ]);
-  };
-
-  var reportLoggedOut = function(purged) {
-    try {
-      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'FE_AUTH_STEP',
-          step: 'logged_out',
-          purged: purged
-        }));
-      }
-    } catch (_) {}
-  };
-
-  var goToLanding = function() {
-    try {
-      window.location.replace(LANDING_URL);
-    } catch (_) {
-      try { window.location.href = LANDING_URL; } catch (__) {}
-    }
-  };
-
-  var readAuthToken = function() {
-    var token = null;
-    try {
-      token = localStorage.getItem('TinderWeb/APIToken');
-
-      if (!token) {
-        var apiStore = localStorage.getItem('TinderWeb/APIStore');
-        if (apiStore) {
-          try {
-            var parsed = JSON.parse(apiStore);
-            token = parsed.token || parsed.auth_token || (parsed.user && parsed.user.api_token);
-          } catch (_) {}
-        }
-      }
-
-      if (!token) {
-        for (var i = 0; i < localStorage.length; i++) {
-          var key = localStorage.key(i);
-          if (key && (key.indexOf('APIToken') !== -1 || key.indexOf('authToken') !== -1)) {
-            token = localStorage.getItem(key);
-            if (token) break;
-          }
-        }
-      }
-
-      if (token) token = String(token).replace(/^["'](.*)["']$/, '$1').trim();
-    } catch (_) {}
-    return token || null;
-  };
-
-  // Invalidating the token server-side is the step that actually ends the
-  // session: document.cookie cannot remove Tinder's HttpOnly session cookies,
-  // so local clearing alone is not enough.
-  var revokeSessionServerSide = function(token) {
-    var headers = {
-      'Content-Type': 'application/json',
-      'x-auth-token': token,
-      'platform': 'web'
-    };
-    return Promise.allSettled([
-      fetch('https://api.gotinder.com/v2/auth/logout', { method: 'POST', headers: headers, body: '{}' }),
-      fetch('https://api.gotinder.com/auth/logout', { method: 'POST', headers: headers })
-    ]);
-  };
-
-  var purgeCookies = function() {
-    var names = [];
-    var raw = document.cookie.split(';');
-    for (var c = 0; c < raw.length; c++) {
-      var cookie = raw[c].trim();
-      if (!cookie) continue;
-      var eq = cookie.indexOf('=');
-      var name = eq > -1 ? cookie.substring(0, eq).trim() : cookie;
-      if (name && names.indexOf(name) === -1) names.push(name);
-    }
-
-    // Session cookies that may not be enumerable from this document.
-    var known = ['app_session', 'app_session_id', 'auth_token', 'tinder_web_token', 'refresh_token', '_session', 'session_id', 'x-auth-token'];
-    for (var k = 0; k < known.length; k++) {
-      if (names.indexOf(known[k]) === -1) names.push(known[k]);
-    }
-
-    var host = window.location.hostname;
-    var domains = ['', host, '.' + host, '.tinder.com', 'tinder.com', '.gotinder.com', 'gotinder.com', 'auth.gotinder.com', '.auth.gotinder.com'];
-    var paths = ['/', '/app', '/app/', '/app/login', '/v2'];
-    var expired = '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=';
-
-    for (var n = 0; n < names.length; n++) {
-      for (var d = 0; d < domains.length; d++) {
-        for (var p = 0; p < paths.length; p++) {
-          document.cookie = names[n] + expired + paths[p] + (domains[d] ? ';domain=' + domains[d] : '');
-        }
-      }
-    }
-  };
-
-  var purged = false;
-  try {
-    // Revoking the token server-side happens while the page is still fully
-    // intact, so this await is safe. It is also the step that actually ends the
-    // session, since document.cookie cannot remove HttpOnly session cookies.
-    var token = readAuthToken();
-    if (token) {
-      await bounded(revokeSessionServerSide(token), 2500);
-    }
-
-    // From here to goToLanding() there is no await on purpose. Tinder's SPA is
-    // still mounted and reads localStorage continuously; leaving it running on
-    // demolished storage crashed the WebView renderer, which takes the whole
-    // session down. Everything below is synchronous, so the SPA gets no chance
-    // to execute between the wipe and the navigation.
-    try { localStorage.clear(); } catch (_) {}
-    try { sessionStorage.clear(); } catch (_) {}
-    try {
-      if (window.chrome && window.chrome.storage && window.chrome.storage.local) {
-        window.chrome.storage.local.clear();
-      }
-    } catch (_) {}
-    try { purgeCookies(); } catch (_) {}
-
-    purged = true;
-  } catch (error) {
-    console.warn('[FlirtEasy] Master purge failed:', error);
-  }
-
-  reportLoggedOut(purged);
-
-  // If the navigation below somehow does not happen, un-mute the logout
-  // watchdog and release the re-entrancy guard so the app is not stuck with a
-  // stale view of the auth state. On a successful navigation this timer dies
-  // with the document, and the fresh one starts with no flag at all.
-  setTimeout(function() { window.__feLogoutInProgress = false; }, 5000);
-
-  // Allow postMessage bridge to flush to React Native before replacing document location
-  setTimeout(goToLanding, 150);
-})();
-true;
-`;
+import { buildMasterPurgeScript, MASTER_PURGE_SCRIPT } from '../utils/tinderPurge';
+export { buildMasterPurgeScript, MASTER_PURGE_SCRIPT };
 
 /**
  * Second stage of logout, injected on the landing page once MASTER_PURGE_SCRIPT
@@ -318,14 +163,15 @@ const maskProxy = (proxy) => {
 
 const persistentLoginCache = {};
 
-export default function BrowserScreen({
+const BrowserScreen = React.forwardRef(function BrowserScreen({
   route = {},
   navigation,
   isOverlay = false,
   isHeadless = false,
   onClose,
   onRequestIntervention,
-}) {
+  logoutTrigger = 0,
+}, ref) {
   const { platform, vpsUrl: rawVpsUrl, proxyIp, extensionSettings: initialSettings, orchestratorUrl: paramOrchestratorUrl, userId: paramUserId } = route.params || {};
   const [extensionSettings, setExtensionSettings] = useState(() => initialSettings || getSharedExtensionSettings());
 
@@ -375,6 +221,8 @@ export default function BrowserScreen({
   // message and must not touch state after the screen is gone.
   const isMountedRef = useRef(true);
   const logoutFailsafeRef = useRef(null);
+  const logoutResolveRef = useRef(null);
+  const lastLogoutTriggerRef = useRef(0);
   // True when this logout should close the session screen. Set only by
   // handleLogout on the on-device path, so a manual logout inside Tinder or a
   // renderer crash never ejects the user unexpectedly.
@@ -392,6 +240,10 @@ export default function BrowserScreen({
     if (logoutFailsafeRef.current) {
       clearTimeout(logoutFailsafeRef.current);
       logoutFailsafeRef.current = null;
+    }
+    if (logoutResolveRef.current) {
+      logoutResolveRef.current();
+      logoutResolveRef.current = null;
     }
     if (loginSheetTimeoutRef.current) {
       clearTimeout(loginSheetTimeoutRef.current);
@@ -2117,14 +1969,41 @@ export default function BrowserScreen({
     finishLogout();
   }, [finishLogout]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     // Re-entrancy guard against double-taps
     if (isLoggingOutRef.current) return;
     isLoggingOutRef.current = true;
     setLoggingOut(true);
 
     try {
-      // Local surfaces are reset first: if any later step fails, the app must
+      // 1. Immediately cease all automation loops and destroy worker singleton
+      try {
+        onDeviceSwipingRef.current = false;
+        setOnDeviceSwiping(false);
+        saveOnDeviceSessionState({ isRunning: false, currentPhase: 'idle' });
+        if (backgroundWorkerRef.current) {
+          backgroundWorkerRef.current.handleMessage({ action: 'stopAgent' });
+        }
+        destroyOnDeviceWorker();
+      } catch (_) {}
+
+      if (webViewRef.current) {
+        try {
+          webViewRef.current.injectJavaScript(`
+            (function() {
+              try {
+                window.__flirteasyAutoStartRequested = false;
+                if (window.__flirteasyStopAutomation) {
+                  window.__flirteasyStopAutomation();
+                }
+              } catch (_) {}
+            })();
+            true;
+          `);
+        } catch (_) {}
+      }
+
+      // 2. Local surfaces are reset first: if any later step fails, the app must
       // never be left showing a logged-in view of a dead session.
       setShowDashboard(false);
       setLoginStep('options');
@@ -2134,6 +2013,9 @@ export default function BrowserScreen({
       setSubmittedPhone('');
       setEmailErrorText('');
 
+      const currentAuth = getTinderAuthState();
+      const activeToken = currentAuth?.token || null;
+
       // Also arms pendingWebViewPurge in AsyncStorage for durable hygiene
       await clearTinderAuthState();
       setSharedExtensionSettings({ userProfile: null });
@@ -2142,17 +2024,24 @@ export default function BrowserScreen({
         exitAfterLogoutRef.current = true;
         if (webViewRef.current) {
           try {
-            webViewRef.current.injectJavaScript(MASTER_PURGE_SCRIPT);
+            const purgeScript = buildMasterPurgeScript(activeToken);
+            webViewRef.current.injectJavaScript(purgeScript);
+          } catch (_) {}
+          try { webViewRef.current?.stopLoading(); } catch (_) {}
+          try { webViewRef.current?.clearCache(true); } catch (_) {}
+          try { webViewRef.current?.clearHistory(); } catch (_) {}
+          try {
+            webViewRef.current?.injectJavaScript("window.location.replace('https://tinder.com/?logout=1'); true;");
           } catch (_) {}
         }
       } else {
         await setPendingWebViewPurge(true);
         const orchestratorUrl = getOrchestratorUrl(vpsUrl);
         if (orchestratorUrl) {
-          await postJsonWithTimeout(`${orchestratorUrl}/logout`, {
+          postJsonWithTimeout(`${orchestratorUrl}/logout`, {
             userId: route?.params?.userId || 'dev_user_1',
             platform: 'tinder',
-          });
+          }).catch(() => {});
           if (webViewRef.current) {
             try { webViewRef.current.reload(); } catch (_) {}
           }
@@ -2164,7 +2053,19 @@ export default function BrowserScreen({
       // Unconditionally dismiss modal, stop spinner, and return to Home Screen
       finishLogoutAndExit();
     }
-  };
+  }, [sessionKey, isOnDevice, vpsUrl, route?.params?.userId, finishLogoutAndExit]);
+
+  useImperativeHandle(ref, () => ({
+    handleLogout,
+    purgeSession: handleLogout,
+  }), [handleLogout]);
+
+  useEffect(() => {
+    if (logoutTrigger > 0 && logoutTrigger !== lastLogoutTriggerRef.current) {
+      lastLogoutTriggerRef.current = logoutTrigger;
+      handleLogout();
+    }
+  }, [logoutTrigger, handleLogout]);
 
   const confirmLogout = () => {
     setShowLogoutConfirm(true);
@@ -3591,10 +3492,13 @@ export default function BrowserScreen({
                         setPendingStorageTeardown(true);
                       }
                       addLog('Tinder session ended — user logged out', 'warn');
-                      // Resolves on the actual outcome instead of a fixed delay,
-                      // and closes the screen when this logout asked for it.
-                      // No-op for a manual in-page logout.
-                      finishLogoutAndExit();
+                      if (logoutResolveRef.current) {
+                        logoutResolveRef.current();
+                        logoutResolveRef.current = null;
+                      }
+                      if (exitAfterLogoutRef.current) {
+                        finishLogoutAndExit();
+                      }
                     }
                   }
                 } catch (_) { }
@@ -4487,7 +4391,9 @@ export default function BrowserScreen({
       )}
     </SafeAreaView>
   );
-}
+});
+
+export default BrowserScreen;
 
 const styles = StyleSheet.create({
   container: {

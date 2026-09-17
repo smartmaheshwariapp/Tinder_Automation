@@ -4986,6 +4986,37 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
     const nowLoggedIn = isLoggedIn();
     const currentToken = _extractTinderAuthToken();
 
+    // ── Zombie Session / 401 Error Auto-Recovery ──
+    // If the page is trapped in a 401 error state on /app/* without a valid token:
+    if (window.__feZombieRedirected) return;
+    const isErrorBannerPresent = Boolean(
+      document.body && (
+        (document.body.textContent || '').includes('Uh Oh! Something went wrong') ||
+        document.querySelector('.UhOh, [role="alert"][aria-live="assertive"]')
+      )
+    );
+    if (isErrorBannerPresent && !currentToken && (window.location.pathname || '').includes('/app')) {
+      window.__feZombieRedirected = true;
+      console.log('[FlirtEasy] Zombie 401 error detected without token. Auto-navigating to landing page...');
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FE_AUTH_STEP',
+            step: 'logged_out',
+            confirmed: true,
+            purged: true,
+            url: window.location.href,
+          }));
+        }
+      } catch (_) {}
+      try {
+        window.location.replace('https://tinder.com/?logout=1');
+      } catch (_) {
+        try { window.location.href = 'https://tinder.com/?logout=1'; } catch (__) {}
+      }
+      return;
+    }
+
     if (_wasLoggedIn && !nowLoggedIn) {
       _consecutiveLoggedOutTicks++;
       // Require at least 3 consecutive ticks without token before reporting logged_out

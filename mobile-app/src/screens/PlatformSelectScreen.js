@@ -187,6 +187,8 @@ export default function PlatformSelectScreen({ navigation, route }) {
   const loggingOutRef = useRef(false);
   const [signedOutToast, setSignedOutToast] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const browserScreenRef = useRef(null);
+  const [onDeviceLogoutTrigger, setOnDeviceLogoutTrigger] = useState(0);
 
   // ── Synced Parent Agent State & Settings (Unified Master Control) ──
   const [agentState, setAgentState] = useState(() => getSharedAgentState());
@@ -850,6 +852,16 @@ export default function PlatformSelectScreen({ navigation, route }) {
     await clearTinderAuthState();
     await setPendingWebViewPurge(true);
     setIsLoggedIn(false);
+
+    // If on-device mode has the BrowserScreen mounted, purge and reset the WebView immediately
+    if (environment === "on_device") {
+      if (browserScreenRef.current?.handleLogout) {
+        try {
+          await browserScreenRef.current.handleLogout();
+        } catch (_) {}
+      }
+    }
+
     setBrowserVisible(false);
 
     // 2. Clear cached userProfile in local & shared settings
@@ -862,6 +874,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
         isRunning: false,
         isPaused: true,
         currentPhase: "stopped",
+        source: "home_screen",
         stats: {
           swipes: 0,
           matches: 0,
@@ -881,29 +894,26 @@ export default function PlatformSelectScreen({ navigation, route }) {
     });
 
     // 4. Send logout to backend orchestrator if reachable.
-    // Best-effort and bounded: local state is already cleared, and both modal
-    // buttons are disabled while this runs, so an unreachable backend must never
-    // be able to strand the user on the spinner.
+    // In on-device mode on a physical device, do NOT fall back to localhost:3001.
+    // Fire non-blockingly so the confirmation modal closes immediately without freezing the UI.
     const backendUrl =
       orchestratorUrl ||
-      (environment === "vps"
-        ? "https://api.smartmaheshwari.com"
-        : resolveLocalUrl("http://localhost:3001"));
+      (environment === "vps" ? "https://api.smartmaheshwari.com" : null);
     if (backendUrl) {
-      const acknowledged = await postJsonWithTimeout(`${backendUrl}/logout`, {
+      postJsonWithTimeout(`${backendUrl}/logout`, {
         userId: route?.params?.userId || "dev_user_1",
         platform: "tinder",
-      });
-      if (!acknowledged) {
+      }).catch((e) => {
         console.warn(
-          "[PlatformSelect] Orchestrator did not acknowledge logout; local session already cleared.",
+          "[PlatformSelect] Orchestrator did not acknowledge logout:",
+          e?.message,
         );
-      }
+      });
     }
 
     if (refreshStats) {
-      setTimeout(refreshStats, 400);
-      setTimeout(refreshStats, 1200);
+      setTimeout(refreshStats, 200);
+      setTimeout(refreshStats, 800);
     }
     loggingOutRef.current = false;
     setLoggingOut(false);
@@ -1629,6 +1639,8 @@ export default function PlatformSelectScreen({ navigation, route }) {
           pointerEvents={browserVisible ? "auto" : "none"}
         >
           <BrowserScreen
+            ref={browserScreenRef}
+            logoutTrigger={onDeviceLogoutTrigger}
             route={{
               params: {
                 platform: "Tinder",
