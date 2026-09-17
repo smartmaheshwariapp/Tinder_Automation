@@ -201,6 +201,7 @@ BEGIN
     CREATE POLICY "Public insert user_events" ON public.user_events FOR INSERT TO anon, authenticated WITH CHECK (true);
     CREATE POLICY "Public read user_events" ON public.user_events FOR SELECT TO anon, authenticated USING (true);
     CREATE POLICY "Public read and write user_snapshots" ON public.user_snapshots FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+    CREATE POLICY "Public read and write users" ON public.users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -214,6 +215,11 @@ END $$;
 -- ==============================================================================
 -- 4. SEED INITIAL SYSTEM CONFIGURATION (Defaults from FlirtEasy Desktop v2)
 -- ==============================================================================
+-- Seed default development & guest telemetry user
+INSERT INTO public.users (id, email, full_name, plan, subscription_status)
+VALUES ('00000000-0000-0000-0000-000000000001', 'guest@flint.ai', 'Guest User', 'trial', 'trial')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO public.config (key, value, updated_at)
 VALUES ('legacy_templates', '{"auto":"CRITICAL - Only use facts explicitly shown in the MATCH PROFILE. Never address the match by YOUR own name. Focus on their details.\\n\\n{{Gender context}}\\n\\nIMPORTANT - Write like a REAL human texting:\\n- Keep it SHORT (1-2 sentences max)\\n- Be natural and conversational\\n- {{Slang guidance}}\\n- Vary your style - don''t be formulaic\\n- Match their energy level\\n- NEVER use placeholders like [your city], [location], [name] - use actual information from the conversation","followup":"CRITICAL: Only reference things from previous conversation. {{Gender context}}\\n\\nGenerate a brief, natural follow-up message (1-2 sentences). {{Slang guidance}}"}'::jsonb, now())
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();

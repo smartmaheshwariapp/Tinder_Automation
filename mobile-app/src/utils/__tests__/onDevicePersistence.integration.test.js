@@ -338,3 +338,93 @@ describe('AsyncStorage write integrity', () => {
     expect(state.lastSavedAt).toBeLessThanOrEqual(after);
   });
 });
+
+// ─── Tinder Persistent Auth Session: Cold Bundle Restart & Phone Login ───────
+
+describe('Tinder persistent auth session round-trip across app restarts', () => {
+  it('phone login user (no email, "Tinder Account" placeholder) survives cold bundle restart', async () => {
+    // 1. Simulate active phone login session stored in AsyncStorage
+    const validToken = 'c5e3d7a8-1234-5678-9abc-def012345678';
+    AsyncStorage._store['@linksy_tinder_auth_state'] = JSON.stringify({
+      isLoggedIn: true,
+      token: validToken,
+      accountName: 'Tinder Account',
+      accountEmail: null,
+      tinderPlan: 'free',
+      isTinderPro: false,
+      lastUpdated: Date.now() - 10000,
+    });
+
+    // 2. Simulate fresh app cold start
+    jest.resetModules();
+    const sm = loadFresh();
+    await Promise.resolve(); // flush eager AsyncStorage.getItem().then()
+
+    // 3. Verify session was NOT wiped and remains fully authenticated
+    const auth = sm.getTinderAuthState();
+    expect(auth.isLoggedIn).toBe(true);
+    expect(auth.token).toBe(validToken);
+    expect(auth.accountName).toBe('Tinder Account');
+
+    // Verify disk storage was NOT wiped
+    const stored = JSON.parse(AsyncStorage._store['@linksy_tinder_auth_state']);
+    expect(stored.isLoggedIn).toBe(true);
+    expect(stored.token).toBe(validToken);
+  });
+
+  it('cleanses phantom logins that claim isLoggedIn: true but lack a valid token', async () => {
+    // 1. Simulate phantom login with missing/short token
+    AsyncStorage._store['@linksy_tinder_auth_state'] = JSON.stringify({
+      isLoggedIn: true,
+      token: null,
+      accountName: 'Phantom User',
+      accountEmail: null,
+      lastUpdated: Date.now() - 10000,
+    });
+
+    // 2. Fresh cold start
+    jest.resetModules();
+    const sm = loadFresh();
+    await Promise.resolve();
+
+    // 3. Verify phantom login was cleansed
+    const auth = sm.getTinderAuthState();
+    expect(auth.isLoggedIn).toBe(false);
+    expect(auth.token).toBeNull();
+  });
+
+  it('restores session when accountName was "Swipe Right®" by sanitizing name while preserving token', async () => {
+    const validToken = 'c5e3d7a8-1234-5678-9abc-def012345678';
+    AsyncStorage._store['@linksy_tinder_auth_state'] = JSON.stringify({
+      isLoggedIn: true,
+      token: validToken,
+      accountName: 'Swipe Right®',
+      accountEmail: null,
+      lastUpdated: Date.now() - 5000,
+    });
+
+    jest.resetModules();
+    const sm = loadFresh();
+    await Promise.resolve();
+
+    const auth = sm.getTinderAuthState();
+    expect(auth.isLoggedIn).toBe(true);
+    expect(auth.token).toBe(validToken);
+    expect(auth.accountName).toBe('Tinder Account');
+  });
+
+  it('setTinderAuthState normalizes "Swipe Right®" to "Tinder Account" when valid token is present', () => {
+    const sm = loadFresh();
+    const validToken = 'c5e3d7a8-1234-5678-9abc-def012345678';
+    sm.setTinderAuthState({
+      isLoggedIn: true,
+      token: validToken,
+      accountName: 'Swipe Right®',
+    });
+
+    const auth = sm.getTinderAuthState();
+    expect(auth.isLoggedIn).toBe(true);
+    expect(auth.token).toBe(validToken);
+    expect(auth.accountName).toBe('Tinder Account');
+  });
+});

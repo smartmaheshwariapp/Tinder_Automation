@@ -5,6 +5,8 @@ const SupabaseService = {
   saveUserSnapshot: jest.fn(async () => {}),
   insertUserEvents: jest.fn(async () => ({ ok: true, status: 201 })),
   syncSnapshotWithEvents: jest.fn(async () => ({ ok: true, status: 200 })),
+  syncCloudTinderRateLimit: jest.fn(async () => ({ success: true })),
+  checkCloudTinderRateLimit: jest.fn(async () => ({ isLocked: false, rateLimitedUntil: null })),
 };
 
 module.exports = SupabaseService;

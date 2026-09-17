@@ -17,6 +17,7 @@ import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
 import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
+import SupabaseService from './src/services/supabase';
 
 const navigationTheme = {
   ...DarkTheme,
@@ -26,6 +27,8 @@ const navigationTheme = {
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
+  const [initialRoute, setInitialRoute] = useState('Auth');
+  const [initialUser, setInitialUser] = useState(null);
   const [updateStatus, setUpdateStatus] = useState("Checking for updates...");
   const [redirectNotif, setRedirectNotif] = useState(null);
   const navigationRef = useRef(null);
@@ -81,6 +84,20 @@ export default function App() {
             setUpdateStatus("Preparing your experience…");
           }
         }
+
+        // Restore authenticated Flint user session on startup
+        try {
+          const user = await SupabaseService.getCurrentUser();
+          if (user && (user.email || user.id)) {
+            console.log('[App] Restored authenticated Flint user session:', user.email || user.id);
+            setInitialUser(user);
+            setInitialRoute('PlatformSelect');
+          } else {
+            setInitialRoute('Auth');
+          }
+        } catch (_) {
+          setInitialRoute('Auth');
+        }
       } finally {
         setIsReady(true);
       }
@@ -103,7 +120,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer ref={navigationRef} theme={navigationTheme}>
-        <AppNavigator />
+        <AppNavigator initialRouteName={initialRoute} initialUser={initialUser} />
         <InAppNotificationBanner
           onNavigateToStream={(notif) => {
             const data = notif?.data || {};

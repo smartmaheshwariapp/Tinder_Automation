@@ -2261,6 +2261,7 @@ export default function OnboardingScreen({ navigation }) {
         StackActions.push('Auth', {
           initialMode: 'signup',
           onboardingData,
+          forceAuth: true,
         })
       );
     }
@@ -3854,6 +3855,7 @@ export default function OnboardingScreen({ navigation }) {
                   navigation.dispatch(
                     StackActions.push('Auth', {
                       initialMode: 'login',
+                      forceAuth: true,
                       onboardingData: {
                         platform: selectedPlatform,
                         country,

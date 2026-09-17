@@ -154,6 +154,293 @@ function parseCurrentProfile() {
   };
 }
 
+function getInterceptedProfileViaEvent(matchId) {
+  let receivedPerson = null;
+  const responseHandler = function (event) {
+    if (event.detail.matchId === matchId) {
+      receivedPerson = event.detail.person;
+      document.removeEventListener('flirteasy:matchProfileResponse', responseHandler);
+    }
+  };
+  document.addEventListener('flirteasy:matchProfileResponse', responseHandler);
+  document.dispatchEvent(new CustomEvent('flirteasy:getMatchProfile', {
+    detail: { matchId }
+  }));
+  if (receivedPerson) {
+    return _formatPersonObjectToProfile(receivedPerson);
+  }
+  document.removeEventListener('flirteasy:matchProfileResponse', responseHandler);
+  return null;
+}
+
+function _formatPersonObjectToProfile(person) {
+  if (!person) return null;
+
+  let age = null;
+  if (person.birth_date) {
+    const bDate = new Date(person.birth_date);
+    const diff = Date.now() - bDate.getTime();
+    age = Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+  }
+
+  const questionAnswers = (person.question_answers || []).map(qa => ({
+    question: qa.question || '',
+    answer: qa.answer || ''
+  }));
+
+  const interests = (person.user_interests || []).map(i => i.name || '').filter(Boolean);
+
+  const job = person.jobs?.[0]?.title?.name
+    ? (person.jobs[0].title.name + (person.jobs[0].company?.name ? ` at ${person.jobs[0].company.name}` : ''))
+    : null;
+  const school = person.schools?.[0]?.name || null;
+  const city = person.city?.name || null;
+
+  const descriptors = (person.selected_descriptors || []).map(d => {
+    const choices = (d.choice_selections || []).map(c => c.name).join(', ');
+    return choices ? `${d.name}: ${choices}` : null;
+  }).filter(Boolean);
+
+  return {
+    name: person.name,
+    age: age || null,
+    bio: (person.bio || '').trim() || null,
+    interests,
+    questionAnswers,
+    job,
+    school,
+    city,
+    descriptors,
+    platform: 'tinder'
+  };
+}
+
+async function fetchMatchProfileFromApi(matchId) {
+  if (!matchId) return null;
+
+  // 1. Check CustomEvent bridge to api-interceptor first
+  const cached = getInterceptedProfileViaEvent(matchId);
+  if (cached && (cached.bio || cached.interests?.length > 0 || cached.questionAnswers?.length > 0)) {
+    return cached;
+  }
+
+  // 2. Direct fetch using captured token
+  let token = null;
+  try {
+    token = localStorage.getItem('TinderWeb/APIToken');
+    if (!token) {
+      const s = localStorage.getItem('TinderWeb/APIStore');
+      if (s) {
+        const p = JSON.parse(s);
+        token = p?.token || p?.auth_token || p?.user?.api_token;
+      }
+    }
+  } catch (_) {}
+
+  if (!token && typeof window !== 'undefined' && window.__tinderAuthToken) {
+    token = window.__tinderAuthToken;
+  }
+
+  if (!token) return null;
+
+  try {
+    console.log(`[FlirtEasy] Fetching full profile from Tinder API for matchId ${matchId}...`);
+    const res = await fetch(`https://api.gotinder.com/v2/matches/${matchId}?locale=en`, {
+      method: 'GET',
+      headers: {
+        'x-auth-token': token,
+        'app-version': '1064501',
+        'platform': 'web',
+        'tinder-version': '6.45.1'
+      }
+    });
+
+    if (!res.ok) {
+      console.warn(`[FlirtEasy] Match API returned status ${res.status}`);
+      return null;
+    }
+
+    const json = await res.json();
+    const person = json?.data?.person;
+    if (!person) return null;
+
+    return _formatPersonObjectToProfile(person);
+  } catch (err) {
+    console.warn('[FlirtEasy] fetchMatchProfileFromApi error:', err);
+    return null;
+  }
+}
+
+function parseMobileProfileSheet() {
+  const profile = {
+    name: null,
+    age: null,
+    bio: null,
+    interests: [],
+    questionAnswers: [],
+    job: null,
+    school: null,
+    city: null,
+    descriptors: [],
+    platform: 'tinder'
+  };
+
+  const bodyText = document.body.innerText || '';
+
+  // 1. Name & Age from top of sheet (e.g. "Mallory 24")
+  const nameAgeMatch = bodyText.match(/([A-Z][a-zA-Z\s'-]+)\s+(\d{2})\b/);
+  if (nameAgeMatch && !nameAgeMatch[1].toLowerCase().includes('tinder')) {
+    profile.name = nameAgeMatch[1].trim();
+    profile.age = parseInt(nameAgeMatch[2]);
+  }
+  if (!profile.name) {
+    profile.name = getMatchName();
+  }
+
+  // 2. Bio from "About me"
+  const allElements = Array.from(document.querySelectorAll('div, h2, h3, h4, span, p'));
+  const aboutMeEl = allElements.find(el => (el.textContent || '').trim().toLowerCase() === 'about me' && el.children.length === 0);
+  if (aboutMeEl) {
+    const nextEl = aboutMeEl.parentElement?.querySelector('p, span, div:not(:first-child)') || aboutMeEl.nextElementSibling;
+    if (nextEl) {
+      const bioText = (nextEl.textContent || '').trim();
+      if (bioText && bioText.length > 2 && !bioText.toLowerCase().includes('about me')) {
+        profile.bio = bioText;
+      }
+    }
+  }
+  if (!profile.bio) {
+    const bioRegexMatch = bodyText.match(/About me\s*\n+([^\n]+)/i);
+    if (bioRegexMatch && bioRegexMatch[1].trim().length > 2) {
+      profile.bio = bioRegexMatch[1].trim();
+    }
+  }
+
+  // 3. Question Prompts
+  const promptRegex = /(?:My sense of humor is basically just\.\.\.|I can beat you in a game of\.\.\.|My latest hyperfixation is\.\.\.|The best way to ask me out is\.\.\.|I'm looking for\.\.\.|A life goal of mine\.\.\.|Two truths and a lie\.\.\.|I geek out on\.\.\.|Together people could\.\.\.|My simple pleasures\.\.\.|Teach me something about\.\.\.)\s*\n+([^\n]+)/gi;
+  let pMatch;
+  while ((pMatch = promptRegex.exec(bodyText)) !== null) {
+    const fullMatch = pMatch[0].split('\n').map(s => s.trim()).filter(Boolean);
+    if (fullMatch.length >= 2) {
+      const q = fullMatch[0];
+      const a = fullMatch[1];
+      if (q && a && !profile.questionAnswers.some(item => item.question === q)) {
+        profile.questionAnswers.push({ question: q, answer: a });
+      }
+    }
+  }
+
+  const promptContainers = document.querySelectorAll('[class*="prompt" i], [class*="Prompt" i], [class*="card" i]');
+  promptContainers.forEach(card => {
+    const lines = (card.innerText || '').split('\n').map(s => s.trim()).filter(Boolean);
+    if (lines.length >= 2 && lines[0].includes('...')) {
+      const q = lines[0];
+      const a = lines[1];
+      if (q && a && !profile.questionAnswers.some(item => item.question === q)) {
+        profile.questionAnswers.push({ question: q, answer: a });
+      }
+    }
+  });
+
+  // 4. Interests
+  const interestsEl = allElements.find(el => (el.textContent || '').trim().toLowerCase() === 'interests' && el.children.length === 0);
+  if (interestsEl) {
+    const container = interestsEl.parentElement || interestsEl.closest('section') || interestsEl.closest('div');
+    if (container) {
+      const chips = container.querySelectorAll('button, [role="button"], [class*="pill" i], [class*="chip" i], [class*="passions" i], span, li');
+      chips.forEach(chip => {
+        const txt = (chip.textContent || '').trim();
+        if (txt && txt.length >= 2 && txt.length <= 35 && txt.toLowerCase() !== 'interests' && !profile.interests.includes(txt)) {
+          if (!txt.toLowerCase().includes('unmatch') && !txt.toLowerCase().includes('block')) {
+            profile.interests.push(txt);
+          }
+        }
+      });
+    }
+  }
+
+  // 5. Essentials
+  const jobMatch = bodyText.match(/(?:Assistant Manager|Manager|Director|Engineer|Designer|Developer|Specialist|Teacher|Nurse|Doctor|Consultant|Founder|Student|Barista|Chef|Artist|Coordinator|Associate)[^\n,]+/i);
+  if (jobMatch) {
+    profile.job = jobMatch[0].trim();
+  }
+
+  const schoolMatch = bodyText.match(/([A-Z][a-zA-Z\s'-]+(?:highschool|high school|university|college|academy))\b/i);
+  if (schoolMatch) {
+    profile.school = schoolMatch[1].trim();
+  }
+
+  const cityMatch = bodyText.match(/Lives in\s+([^\n]+)/i);
+  if (cityMatch) {
+    profile.city = cityMatch[1].trim();
+  }
+
+  // 6. Descriptors
+  const descriptors = [];
+  if (bodyText.includes('Workout\nNever') || bodyText.match(/Workout\s*\n\s*Never/i)) {
+    descriptors.push('Workout: Never');
+  }
+  if (bodyText.includes('Long-term, open to short')) {
+    descriptors.push('Looking for: Long-term, open to short');
+  }
+  profile.descriptors = descriptors;
+
+  return profile;
+}
+
+async function fetchOrParseMatchProfile(matchId) {
+  // 1. Try API first (highest accuracy, zero DOM scraping error)
+  if (matchId) {
+    const apiProfile = await fetchMatchProfileFromApi(matchId);
+    if (apiProfile && (apiProfile.bio || apiProfile.interests?.length > 0 || apiProfile.questionAnswers?.length > 0 || apiProfile.job)) {
+      console.log('[FlirtEasy] ✅ Successfully retrieved rich profile via API:', apiProfile);
+      return apiProfile;
+    }
+  }
+
+  // 2. Try desktop profile panel DOM (if available)
+  const domProfile = parseCurrentProfile();
+  if (domProfile && (domProfile.bio || domProfile.interests?.length > 0 || domProfile.questionAnswers?.length > 0)) {
+    console.log('[FlirtEasy] ✅ Successfully retrieved profile via desktop DOM panel:', domProfile);
+    return domProfile;
+  }
+
+  // 3. Mobile fallback: expand profile sheet from chat header to read profile in DOM
+  try {
+    const headerTrigger = document.querySelector(
+      'header [class*="avatar" i], header img, header [class*="Avatar" i], header h2, header h3, header [class*="bold" i], [data-testid="chatHeader"]'
+    );
+    if (headerTrigger) {
+      console.log('[FlirtEasy] Mobile view: Expanding profile sheet from chat header to inspect profile details...');
+      headerTrigger.click();
+      await new Promise(r => setTimeout(r, 600));
+
+      const sheetProfile = parseMobileProfileSheet();
+
+      // Close profile sheet (tap down arrow / back / close button)
+      const closeBtn = document.querySelector(
+        'button[aria-label*="close" i], button[aria-label*="back" i], [class*="close" i], header button'
+      );
+      if (closeBtn) {
+        closeBtn.click();
+        await new Promise(r => setTimeout(r, 400));
+      } else {
+        headerTrigger.click();
+        await new Promise(r => setTimeout(r, 400));
+      }
+
+      if (sheetProfile && (sheetProfile.bio || sheetProfile.interests?.length > 0 || sheetProfile.questionAnswers?.length > 0)) {
+        console.log('[FlirtEasy] ✅ Successfully retrieved rich profile via mobile sheet DOM:', sheetProfile);
+        return sheetProfile;
+      }
+    }
+  } catch (sheetErr) {
+    console.warn('[FlirtEasy] Mobile profile sheet inspection failed:', sheetErr);
+  }
+
+  return domProfile || { name: getMatchName(), platform: 'tinder' };
+}
+
 // Bridge to page context using CustomEvent
 function getInterceptedMessagesViaEvent(matchId) {
   let receivedMessages = null;
@@ -566,26 +853,101 @@ async function tinderImageToBase64(url) {
 }
 
 function getNewMatchesFromGrid() {
-  const matchCards = document.querySelectorAll('a.matchListItem');
   const matches = [];
+  const seenIds = new Set();
 
-  matchCards.forEach((card, index) => {
-    const nameEl = card.querySelector('[aria-label]');
-    const name = nameEl ? nameEl.getAttribute('aria-label') : `Match ${index + 1}`;
+  // 1. Gather all candidate links across both desktop and mobile selectors
+  const candidateLinks = Array.from(document.querySelectorAll(
+    'a.matchListItem, [data-testid*="matchListItem"], a[href*="/app/messages/"], a[href*="/app/my-matches/"]'
+  ));
 
-    const href = card.getAttribute('href');
-    if (name === '99+ likes' || href === '/app/likes-you' || href === '/app/my-likes' || (href && !href.includes('/app/messages/'))) {
+  // 2. Identify "New matches" and "Messages" section boundaries
+  const allHeadings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, div, span'));
+  const newMatchesHeading = allHeadings.find(el => {
+    const txt = (el.textContent || '').trim().toLowerCase();
+    return (txt === 'new matches' || txt === 'new match') && (!el.firstElementChild || el.children.length <= 1);
+  });
+  const messagesHeading = allHeadings.find(el => {
+    const txt = (el.textContent || '').trim().toLowerCase();
+    return (txt === 'messages' || txt === 'conversations') && (!el.firstElementChild || el.children.length <= 1);
+  });
+
+  candidateLinks.forEach((card, index) => {
+    const href = card.getAttribute('href') || '';
+    const isMsgLink = href.includes('/app/messages/') || href.includes('/app/my-matches/');
+    if (!isMsgLink) return;
+
+    // Filter out likes you / gold links
+    if (href.includes('/app/likes-you') || href.includes('/app/my-likes') || href.includes('/app/gold-home')) {
       return;
     }
 
-    const matchId = href && href.includes('/app/messages/') ? href.split('/').pop() : null;
+    const pathParts = href.split('?')[0].split('/').filter(Boolean);
+    const matchId = pathParts.length > 0 ? pathParts[pathParts.length - 1] : null;
+    if (!matchId || matchId === 'messages' || matchId === 'my-matches') return;
 
-    matches.push({
-      matchId,
-      name,
-      element: card,
-      isNew: true
-    });
+    if (seenIds.has(matchId)) return;
+
+    // Extract name robustly
+    let name = '';
+    const nameEl = card.querySelector('h3, [class*="bold" i], [class*="Primary" i], .Ell');
+    if (nameEl) {
+      name = nameEl.textContent.trim();
+    }
+    if (!name) {
+      const aria = card.getAttribute('aria-label') || card.querySelector('[aria-label]')?.getAttribute('aria-label') || '';
+      if (aria && !aria.toLowerCase().includes('like') && !aria.toLowerCase().includes('message')) {
+        name = aria.trim();
+      }
+    }
+    if (!name) {
+      const lines = (card.innerText || '').split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length > 0) name = lines[0];
+    }
+    name = (name || '').trim();
+
+    // Filter out non-match cards like "1 Like", "99+ likes", "LIVE", etc.
+    const nameLower = name.toLowerCase();
+    if (
+      nameLower.includes('like') ||
+      nameLower.includes('likes') ||
+      nameLower.includes('live') ||
+      nameLower === 'say hello' ||
+      nameLower.includes('tap on a new match')
+    ) {
+      return;
+    }
+
+    if (!name) name = `Match ${index + 1}`;
+
+    // On mobile, distinguish new matches from existing conversation list rows:
+    // 1) Position before the "Messages" heading
+    // 2) Or has no conversation snippet
+    const snippetEl = card.querySelector('div[class*="snippet" i], div.text-ellipsis + div, .message-content');
+    const snippet = snippetEl ? snippetEl.innerText.trim() : '';
+
+    let isUnderNewMatches = false;
+    if (newMatchesHeading && messagesHeading) {
+      const compare = card.compareDocumentPosition(messagesHeading);
+      if (compare & Node.DOCUMENT_POSITION_FOLLOWING) {
+        // card appears before messagesHeading in DOM order
+        isUnderNewMatches = true;
+      }
+    } else if (newMatchesHeading) {
+      isUnderNewMatches = true;
+    }
+
+    // A card is a New Match if it is under the "New matches" section, has .matchListItem, or has no message snippet:
+    const isNewMatchCard = isUnderNewMatches || card.classList.contains('matchListItem') || !snippet;
+    if (isNewMatchCard) {
+      seenIds.add(matchId);
+      matches.push({
+        matchId,
+        name,
+        element: card,
+        isNew: true,
+      });
+    }
   });
 
   return matches;
@@ -613,11 +975,13 @@ function navigateToMatch(matchId) {
 
 function isOnMatchesPage() {
   return window.location.pathname.includes('/app/messages') ||
+    window.location.pathname.includes('/app/my-matches') ||
+    window.location.pathname.includes('/app/matches') ||
     window.location.pathname.includes('/app/recs');
 }
 
 function isOnChatPage() {
-  return window.location.pathname.includes('/app/messages/') &&
+  return (window.location.pathname.includes('/app/messages/') || window.location.pathname.includes('/app/my-matches/')) &&
     window.location.pathname.split('/').length > 4;
 }
 

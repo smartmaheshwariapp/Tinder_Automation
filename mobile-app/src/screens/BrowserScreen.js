@@ -1,15 +1,73 @@
-import { theme as uiTheme } from '../theme';
-import { collectionCaptureScript, createSwipeEventFromDomMessage } from '../utils/tinderCollectionCapture';
-import { activateCollections, ingestCollectionEvent } from '../services/tinderCollections';
-import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { StyleSheet, Text, View, Dimensions, AppState, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
-import { MotionTouchable as TouchableOpacity, FocusInput as TextInput } from '../components/common/Motion';
-import { LinearGradient } from 'expo-linear-gradient';
-import ActivityIndicator from '../components/common/SafeActivityIndicator';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
-import { Ionicons } from '@expo/vector-icons';
-import { resolveLocalUrl, postJsonWithTimeout } from '../utils/network';
+import { theme as uiTheme } from "../theme";
+import {
+  collectionCaptureScript,
+  createSwipeEventFromDomMessage,
+} from "../utils/tinderCollectionCapture";
+import {
+  activateCollections,
+  ingestCollectionEvent,
+} from "../services/tinderCollections";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  Dimensions,
+  AppState,
+  KeyboardAvoidingView,
+  Platform,
+  PanResponder,
+  Keyboard,
+  Modal,
+  Alert,
+  ScrollView,
+  BackHandler,
+  Animated,
+  Easing,
+} from "react-native";
+import {
+  MotionTouchable as TouchableOpacity,
+  FocusInput as TextInput,
+} from "../components/common/Motion";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useImperativeHandle,
+} from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Dimensions,
+  AppState,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  PanResponder,
+  Keyboard,
+  Modal,
+  Alert,
+  ScrollView,
+  BackHandler,
+  Animated,
+  Easing,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import ActivityIndicator from "../components/common/SafeActivityIndicator";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
+import { Ionicons } from "@expo/vector-icons";
+import { resolveLocalUrl, postJsonWithTimeout } from "../utils/network";
 import {
   cleanupCurrentSession,
   startHyperbeamCloudSession,
@@ -36,178 +94,29 @@ import {
   updateOnDeviceWorkerCallbacks,
   getProgressFeed,
   pushProgressFeedEvent,
-} from '../utils/sessionManager';
-import { generateChromeShim } from '../utils/chromeShim';
-import { SELECTORS_JSON } from '../utils/selectorsData';
-import { CONTENT_SCRIPT_BUNDLE } from '../utils/contentScriptBundle';
-import { DashboardPanel } from '../components/dashboard';
-import { useExtensionStats } from '../hooks/useExtensionStats';
-import trackingService from '../services/trackingService';
+  getRateLimitStatus,
+  subscribeRateLimit,
+  isAutoSwipeEnabled,
+  isAutoMessagingEnabled,
+} from "../utils/sessionManager";
+import { generateChromeShim } from "../utils/chromeShim";
+import { SELECTORS_JSON } from "../utils/selectorsData";
+import { CONTENT_SCRIPT_BUNDLE } from "../utils/contentScriptBundle";
+import { DashboardPanel } from "../components/dashboard";
+import { useExtensionStats } from "../hooks/useExtensionStats";
+import trackingService from "../services/trackingService";
+import NotificationService from "../services/notifications";
 
 // Maximum time the UI waits for the WebView to confirm a purge before it
 // releases the logout modal on its own. Covers the purge script's own bounded
 // waits (2.5s server logout + 2s storage teardown) plus a margin.
 const LOGOUT_CONFIRM_TIMEOUT_MS = 6000;
 
-const MASTER_PURGE_SCRIPT = `
-(async function() {
-  // Re-entrancy guard. A second purge racing the first would wipe storage
-  // mid-flight and emit a duplicate logged_out report to the app.
-  if (window.__feLogoutInProgress) return;
-  window.__feLogoutInProgress = true;
-
-  var LANDING_URL = 'https://tinder.com/';
-
-  // Every wait below is bounded. None of these APIs time out on their own, and
-  // a single hung promise used to abort the entire purge — leaving the WebView
-  // fully authenticated after the user tapped "Log Out".
-  var bounded = function(promise, ms) {
-    return Promise.race([
-      Promise.resolve(promise).catch(function() {}),
-      new Promise(function(resolve) { setTimeout(resolve, ms); })
-    ]);
-  };
-
-  var reportLoggedOut = function(purged) {
-    try {
-      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'FE_AUTH_STEP',
-          step: 'logged_out',
-          purged: purged
-        }));
-      }
-    } catch (_) {}
-  };
-
-  var goToLanding = function() {
-    try {
-      window.location.replace(LANDING_URL);
-    } catch (_) {
-      try { window.location.href = LANDING_URL; } catch (__) {}
-    }
-  };
-
-  var readAuthToken = function() {
-    var token = null;
-    try {
-      token = localStorage.getItem('TinderWeb/APIToken');
-
-      if (!token) {
-        var apiStore = localStorage.getItem('TinderWeb/APIStore');
-        if (apiStore) {
-          try {
-            var parsed = JSON.parse(apiStore);
-            token = parsed.token || parsed.auth_token || (parsed.user && parsed.user.api_token);
-          } catch (_) {}
-        }
-      }
-
-      if (!token) {
-        for (var i = 0; i < localStorage.length; i++) {
-          var key = localStorage.key(i);
-          if (key && (key.indexOf('APIToken') !== -1 || key.indexOf('authToken') !== -1)) {
-            token = localStorage.getItem(key);
-            if (token) break;
-          }
-        }
-      }
-
-      if (token) token = String(token).replace(/^["'](.*)["']$/, '$1').trim();
-    } catch (_) {}
-    return token || null;
-  };
-
-  // Invalidating the token server-side is the step that actually ends the
-  // session: document.cookie cannot remove Tinder's HttpOnly session cookies,
-  // so local clearing alone is not enough.
-  var revokeSessionServerSide = function(token) {
-    var headers = {
-      'Content-Type': 'application/json',
-      'x-auth-token': token,
-      'platform': 'web'
-    };
-    return Promise.allSettled([
-      fetch('https://api.gotinder.com/v2/auth/logout', { method: 'POST', headers: headers, body: '{}' }),
-      fetch('https://api.gotinder.com/auth/logout', { method: 'POST', headers: headers })
-    ]);
-  };
-
-  var purgeCookies = function() {
-    var names = [];
-    var raw = document.cookie.split(';');
-    for (var c = 0; c < raw.length; c++) {
-      var cookie = raw[c].trim();
-      if (!cookie) continue;
-      var eq = cookie.indexOf('=');
-      var name = eq > -1 ? cookie.substring(0, eq).trim() : cookie;
-      if (name && names.indexOf(name) === -1) names.push(name);
-    }
-
-    // Session cookies that may not be enumerable from this document.
-    var known = ['app_session', 'app_session_id', 'auth_token', 'tinder_web_token', 'refresh_token', '_session', 'session_id', 'x-auth-token'];
-    for (var k = 0; k < known.length; k++) {
-      if (names.indexOf(known[k]) === -1) names.push(known[k]);
-    }
-
-    var host = window.location.hostname;
-    var domains = ['', host, '.' + host, '.tinder.com', 'tinder.com', '.gotinder.com', 'gotinder.com', 'auth.gotinder.com', '.auth.gotinder.com'];
-    var paths = ['/', '/app', '/app/', '/app/login', '/v2'];
-    var expired = '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=';
-
-    for (var n = 0; n < names.length; n++) {
-      for (var d = 0; d < domains.length; d++) {
-        for (var p = 0; p < paths.length; p++) {
-          document.cookie = names[n] + expired + paths[p] + (domains[d] ? ';domain=' + domains[d] : '');
-        }
-      }
-    }
-  };
-
-  var purged = false;
-  try {
-    // Revoking the token server-side happens while the page is still fully
-    // intact, so this await is safe. It is also the step that actually ends the
-    // session, since document.cookie cannot remove HttpOnly session cookies.
-    var token = readAuthToken();
-    if (token) {
-      await bounded(revokeSessionServerSide(token), 2500);
-    }
-
-    // From here to goToLanding() there is no await on purpose. Tinder's SPA is
-    // still mounted and reads localStorage continuously; leaving it running on
-    // demolished storage crashed the WebView renderer, which takes the whole
-    // session down. Everything below is synchronous, so the SPA gets no chance
-    // to execute between the wipe and the navigation.
-    try { localStorage.clear(); } catch (_) {}
-    try { sessionStorage.clear(); } catch (_) {}
-    try {
-      if (window.chrome && window.chrome.storage && window.chrome.storage.local) {
-        window.chrome.storage.local.clear();
-      }
-    } catch (_) {}
-    try { purgeCookies(); } catch (_) {}
-
-    purged = true;
-  } catch (error) {
-    console.warn('[FlirtEasy] Master purge failed:', error);
-  }
-
-  reportLoggedOut(purged);
-
-  // If the navigation below somehow does not happen, un-mute the logout
-  // watchdog and release the re-entrancy guard so the app is not stuck with a
-  // stale view of the auth state. On a successful navigation this timer dies
-  // with the document, and the fresh one starts with no flag at all.
-  setTimeout(function() { window.__feLogoutInProgress = false; }, 5000);
-
-  // Navigate in the same task that wiped storage. IndexedDB, CacheStorage and
-  // service workers are torn down afterwards by STORAGE_TEARDOWN_SCRIPT on the
-  // landing page, where no SPA holds those handles open.
-  goToLanding();
-})();
-true;
-`;
+import {
+  buildMasterPurgeScript,
+  MASTER_PURGE_SCRIPT,
+} from "../utils/tinderPurge";
+export { buildMasterPurgeScript, MASTER_PURGE_SCRIPT };
 
 /**
  * Second stage of logout, injected on the landing page once MASTER_PURGE_SCRIPT
@@ -283,9 +192,9 @@ true;
 // ── Tri-state Tinder session status for the header controls ──
 // 'unknown' matters: until the WebView reports, neither a logout control nor a
 // signed-out chip would be truthful, so the header shows neither.
-const SESSION_UNKNOWN = 'unknown';
-const SESSION_SIGNED_IN = 'signed_in';
-const SESSION_SIGNED_OUT = 'signed_out';
+const SESSION_UNKNOWN = "unknown";
+const SESSION_SIGNED_IN = "signed_in";
+const SESSION_SIGNED_OUT = "signed_out";
 
 /**
  * Derives the tri-state status from the shared auth cache.
@@ -307,8 +216,10 @@ const NEKO_WIDTH = 414;
 const NEKO_HEIGHT = 896;
 
 const maskProxy = (proxy) => {
-  if (!proxy) return '';
-  const match = proxy.match(/^(https?|socks5?|socks):\/\/([^:]+):([^@]+)@(.+)$/);
+  if (!proxy) return "";
+  const match = proxy.match(
+    /^(https?|socks5?|socks):\/\/([^:]+):([^@]+)@(.+)$/,
+  );
   if (match) {
     const [_, protocol, user, pass, hostPort] = match;
     return `${protocol}://*****:*****@${hostPort}`;
@@ -318,12 +229,32 @@ const maskProxy = (proxy) => {
 
 const persistentLoginCache = {};
 
-export default function BrowserScreen({ route, navigation }) {
-  const { platform, vpsUrl: rawVpsUrl, proxyIp, extensionSettings: initialSettings, orchestratorUrl: paramOrchestratorUrl, userId: paramUserId } = route.params || {};
-  const [extensionSettings, setExtensionSettings] = useState(() => initialSettings || getSharedExtensionSettings());
+const BrowserScreen = React.forwardRef(function BrowserScreen(
+  {
+    route = {},
+    navigation,
+    isOverlay = false,
+    isHeadless = false,
+    onClose,
+    onRequestIntervention,
+    logoutTrigger = 0,
+  },
+  ref,
+) {
+  const {
+    platform,
+    vpsUrl: rawVpsUrl,
+    proxyIp,
+    extensionSettings: initialSettings,
+    orchestratorUrl: paramOrchestratorUrl,
+    userId: paramUserId,
+  } = route.params || {};
+  const [extensionSettings, setExtensionSettings] = useState(
+    () => initialSettings || getSharedExtensionSettings(),
+  );
 
-  const currentUserId = paramUserId || route?.params?.userId || 'dev_user_1';
-  const currentPlatform = platform || 'tinder';
+  const currentUserId = paramUserId || route?.params?.userId || "dev_user_1";
+  const currentPlatform = platform || "tinder";
 
   useEffect(() => {
     trackingService.init(currentUserId, currentPlatform);
@@ -347,17 +278,28 @@ export default function BrowserScreen({ route, navigation }) {
 
   const isOnDevice = Boolean(
     route.params?.isOnDevice ||
-    route.params?.environment === 'on_device' ||
-    rawVpsUrl === 'on_device' ||
-    getSelectedEnvironment() === 'on_device'
+    route.params?.environment === "on_device" ||
+    rawVpsUrl === "on_device" ||
+    getSelectedEnvironment() === "on_device",
   );
-  const isHyperbeam = Boolean(!isOnDevice && ((rawVpsUrl && rawVpsUrl.includes('hyperbeam.com')) || route.params?.isHyperbeam || rawVpsUrl === 'hyperbeam'));
-  const vpsUrl = isOnDevice ? 'https://tinder.com' : (isHyperbeam ? rawVpsUrl : resolveLocalUrl(rawVpsUrl));
-  const shouldForceLogout = Boolean(route.params?.forceLogout || getPendingWebViewPurge());
+  const isHyperbeam = Boolean(
+    !isOnDevice &&
+    ((rawVpsUrl && rawVpsUrl.includes("hyperbeam.com")) ||
+      route.params?.isHyperbeam ||
+      rawVpsUrl === "hyperbeam"),
+  );
+  const vpsUrl = isOnDevice
+    ? "https://tinder.com"
+    : isHyperbeam
+      ? rawVpsUrl
+      : resolveLocalUrl(rawVpsUrl);
+  const shouldForceLogout = Boolean(
+    route.params?.forceLogout || getPendingWebViewPurge(),
+  );
 
   useEffect(() => {
     if (isOnDevice) {
-      setSelectedEnvironment('on_device');
+      setSelectedEnvironment("on_device");
     }
   }, [isOnDevice]);
 
@@ -368,6 +310,8 @@ export default function BrowserScreen({ route, navigation }) {
   // message and must not touch state after the screen is gone.
   const isMountedRef = useRef(true);
   const logoutFailsafeRef = useRef(null);
+  const logoutResolveRef = useRef(null);
+  const lastLogoutTriggerRef = useRef(0);
   // True when this logout should close the session screen. Set only by
   // handleLogout on the on-device path, so a manual logout inside Tinder or a
   // renderer crash never ejects the user unexpectedly.
@@ -380,17 +324,32 @@ export default function BrowserScreen({ route, navigation }) {
   const loginSheetReadyRef = useRef(false);
   const loginSheetTimeoutRef = useRef(null);
 
-  useEffect(() => () => {
-    isMountedRef.current = false;
-    if (logoutFailsafeRef.current) {
-      clearTimeout(logoutFailsafeRef.current);
-      logoutFailsafeRef.current = null;
-    }
-    if (loginSheetTimeoutRef.current) {
-      clearTimeout(loginSheetTimeoutRef.current);
-      loginSheetTimeoutRef.current = null;
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      isMountedRef.current = false;
+      if (logoutFailsafeRef.current) {
+        clearTimeout(logoutFailsafeRef.current);
+        logoutFailsafeRef.current = null;
+      }
+      if (logoutResolveRef.current) {
+        logoutResolveRef.current();
+        logoutResolveRef.current = null;
+      }
+      if (loginSheetTimeoutRef.current) {
+        clearTimeout(loginSheetTimeoutRef.current);
+        loginSheetTimeoutRef.current = null;
+      }
+      if (veilTimeoutRef.current) {
+        clearTimeout(veilTimeoutRef.current);
+        veilTimeoutRef.current = null;
+      }
+      if (veilFadeAnimRef.current) {
+        veilFadeAnimRef.current.stop();
+        veilFadeAnimRef.current = null;
+      }
+    },
+    [],
+  );
 
   const profileSyncCallbacksRef = useRef(new Map());
   const pushBioCallbacksRef = useRef(new Map());
@@ -430,15 +389,113 @@ export default function BrowserScreen({ route, navigation }) {
             useNativeDriver: true,
           }),
         ]),
-      ])
+      ]),
     );
     pulse.start();
     return () => pulse.stop();
   }, [pulseAnim, glowAnim]);
 
+  // ── Smooth reveal transition state (veil) ──
+  const [prevIsHeadless, setPrevIsHeadless] = useState(isHeadless);
+  const [revealActive, setRevealActive] = useState(!isHeadless);
+  const prevLoadingRef = useRef(loading);
+  const veilOpacity = useRef(new Animated.Value(1)).current;
+  const veilTimeoutRef = useRef(null);
+  const veilFadeAnimRef = useRef(null);
+
+  // Synchronously activate reveal veil during render when opening so there is zero 1-frame flash
+  if (isHeadless !== prevIsHeadless) {
+    setPrevIsHeadless(isHeadless);
+    if (!isHeadless) {
+      setRevealActive(true);
+      veilOpacity.setValue(1);
+    } else {
+      setRevealActive(false);
+      veilOpacity.setValue(1);
+    }
+  }
+
+  // Handle timed fade-out once visible
+  useEffect(() => {
+    if (!isHeadless && revealActive) {
+      if (veilTimeoutRef.current) {
+        clearTimeout(veilTimeoutRef.current);
+        veilTimeoutRef.current = null;
+      }
+      if (veilFadeAnimRef.current) {
+        veilFadeAnimRef.current.stop();
+        veilFadeAnimRef.current = null;
+      }
+
+      // If already loaded in background, hold the sleek transition for ~550ms, then fade out smoothly
+      if (!loading) {
+        veilTimeoutRef.current = setTimeout(() => {
+          veilFadeAnimRef.current = Animated.timing(veilOpacity, {
+            toValue: 0,
+            duration: 240,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          });
+          veilFadeAnimRef.current.start(({ finished }) => {
+            if (finished) {
+              setRevealActive(false);
+              veilOpacity.setValue(1);
+            }
+          });
+        }, 550);
+      }
+    } else if (isHeadless) {
+      if (veilTimeoutRef.current) {
+        clearTimeout(veilTimeoutRef.current);
+        veilTimeoutRef.current = null;
+      }
+      if (veilFadeAnimRef.current) {
+        veilFadeAnimRef.current.stop();
+        veilFadeAnimRef.current = null;
+      }
+      if (revealActive) {
+        setRevealActive(false);
+      }
+      veilOpacity.setValue(1);
+    }
+  }, [isHeadless, revealActive, loading, veilOpacity]);
+
+  // When loading finishes while BrowserScreen is visible (e.g. cold load or opening while still loading)
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current;
+    prevLoadingRef.current = loading;
+
+    if (wasLoading && !loading && !isHeadless) {
+      if (veilTimeoutRef.current) {
+        clearTimeout(veilTimeoutRef.current);
+        veilTimeoutRef.current = null;
+      }
+      if (veilFadeAnimRef.current) {
+        veilFadeAnimRef.current.stop();
+        veilFadeAnimRef.current = null;
+      }
+
+      // Ensure at least 350ms display so it doesn't flash abruptly
+      veilTimeoutRef.current = setTimeout(() => {
+        veilFadeAnimRef.current = Animated.timing(veilOpacity, {
+          toValue: 0,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        });
+        veilFadeAnimRef.current.start(({ finished }) => {
+          if (finished) {
+            setRevealActive(false);
+            veilOpacity.setValue(1);
+          }
+        });
+      }, 350);
+    }
+  }, [loading, isHeadless, veilOpacity]);
+
   // Dynamic user-facing progress hints (zero technical jargon)
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !revealActive) {
       setLoadingStage(0);
       return;
     }
@@ -450,36 +507,36 @@ export default function BrowserScreen({ route, navigation }) {
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [loading]);
+  }, [loading, revealActive]);
 
   const loaderTitle = useMemo(() => {
     if (isOnDevice && getTinderAuthState()?.isLoggedIn) {
-      return 'Opening Tinder';
+      return "Opening Tinder";
     }
-    return 'Connecting to Tinder';
+    return "Connecting to Tinder";
   }, [isOnDevice]);
 
   const loaderSubtitle = useMemo(() => {
     if (isOnDevice && getTinderAuthState()?.isLoggedIn) {
-      return 'Loading your profile and matches…';
+      return "Loading your profile and matches…";
     }
     if (loadingStage === 0) {
-      return 'Connecting to Tinder…';
+      return "Connecting to Tinder…";
     }
     if (loadingStage === 1) {
-      return 'Preparing your sign-in options…';
+      return "Preparing your sign-in options…";
     }
     if (loadingStage === 2) {
-      return 'Almost ready, opening login screen…';
+      return "Almost ready, opening login screen…";
     }
-    return 'Just a moment, getting everything ready…';
+    return "Just a moment, getting everything ready…";
   }, [isOnDevice, loadingStage]);
 
   const [connectionError, setConnectionError] = useState(null);
-  const sessionKey = `${platform || 'tinder'}_login_step`;
+  const sessionKey = `${platform || "tinder"}_login_step`;
   const [loginStep, setLoginStepState] = useState(() => {
-    if (shouldForceLogout) return 'options';
-    return persistentLoginCache[sessionKey] || 'options';
+    if (shouldForceLogout) return "options";
+    return persistentLoginCache[sessionKey] || "options";
   });
 
   const setLoginStep = (step) => {
@@ -490,15 +547,18 @@ export default function BrowserScreen({ route, navigation }) {
   // Drives the header's auth-dependent controls. Kept in React state (rather than
   // read imperatively) so the header actually re-renders when the session changes.
   const [sessionStatus, setSessionStatus] = useState(readSessionStatus);
+  const [currentTinderAuth, setCurrentTinderAuth] =
+    useState(getTinderAuthState);
 
   // Two-way auth synchronization: if home page or background logs out, reset UI state
   useEffect(() => {
     const unsub = subscribeTinderAuthState((state) => {
       setTimeout(() => {
         if (isMountedRef.current) {
+          setCurrentTinderAuth(state);
           setSessionStatus(readSessionStatus());
           if (!state?.isLoggedIn) {
-            setLoginStep('options');
+            setLoginStep("options");
             delete persistentLoginCache[sessionKey];
           }
         }
@@ -508,32 +568,102 @@ export default function BrowserScreen({ route, navigation }) {
   }, [sessionKey]);
   const [showNeko, setShowNeko] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [inputText, setInputText] = useState('');
-  const [countryCode, setCountryCode] = useState('+91');
-  const [captchaText, setCaptchaText] = useState('');
+  const [inputText, setInputText] = useState("");
+  const [countryCode, setCountryCode] = useState("+91");
+  const [captchaText, setCaptchaText] = useState("");
   const [sendingText, setSendingText] = useState(false);
   const [resendingCode, setResendingCode] = useState(false);
-  const [resendStatusText, setResendStatusText] = useState('');
-  const [otpSubtype, setOtpSubtype] = useState('email'); // 'email' or 'sms'
-  const [emailErrorText, setEmailErrorText] = useState('');
-  const [submittedEmail, setSubmittedEmail] = useState('');
-  const [submittedPhone, setSubmittedPhone] = useState('');
+  const [resendStatusText, setResendStatusText] = useState("");
+  const [otpSubtype, setOtpSubtype] = useState("email"); // 'email' or 'sms'
+  const [emailErrorText, setEmailErrorText] = useState("");
+  const [submittedEmail, setSubmittedEmail] = useState("");
+  const [submittedPhone, setSubmittedPhone] = useState("");
+  const [rateLimitTimer, setRateLimitTimer] = useState(0);
+  useEffect(() => {
+    if (rateLimitTimer <= 0) return;
+    const t = setInterval(() => {
+      setRateLimitTimer((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [rateLimitTimer]);
   const initialSwiping = Boolean(route.params?.autoStartAgent);
   const [onDeviceSwiping, setOnDeviceSwiping] = useState(initialSwiping);
-  const [onDeviceSwipes, setOnDeviceSwipes] = useState(() => getOnDeviceSessionState().swipes);
-  const [onDeviceMatches, setOnDeviceMatches] = useState(() => getOnDeviceSessionState().matches);
-  const [onDeviceMessages, setOnDeviceMessages] = useState(() => getOnDeviceSessionState().messages);
+  const [onDeviceSwipes, setOnDeviceSwipes] = useState(() => {
+    const s = getOnDeviceSessionState();
+    return Math.max(s.swipes || 0, s.cycleLikes || 0);
+  });
+  const [onDeviceCycleLikes, setOnDeviceCycleLikes] = useState(
+    () => getOnDeviceSessionState().cycleLikes || 0,
+  );
+  const [onDeviceMatches, setOnDeviceMatches] = useState(
+    () => getOnDeviceSessionState().matches,
+  );
+  const [onDeviceMessages, setOnDeviceMessages] = useState(
+    () => getOnDeviceSessionState().messages,
+  );
+  const [onDeviceCycleMessages, setOnDeviceCycleMessages] = useState(
+    () => getOnDeviceSessionState().cycleMessages || 0,
+  );
   const onDeviceSwipesRef = useRef(onDeviceSwipes);
-  useEffect(() => { onDeviceSwipesRef.current = onDeviceSwipes; }, [onDeviceSwipes]);
+  useEffect(() => {
+    onDeviceSwipesRef.current = onDeviceSwipes;
+  }, [onDeviceSwipes]);
+  const onDeviceCycleLikesRef = useRef(onDeviceCycleLikes);
+  useEffect(() => {
+    onDeviceCycleLikesRef.current = onDeviceCycleLikes;
+  }, [onDeviceCycleLikes]);
   const onDeviceMatchesRef = useRef(onDeviceMatches);
-  useEffect(() => { onDeviceMatchesRef.current = onDeviceMatches; }, [onDeviceMatches]);
+  useEffect(() => {
+    onDeviceMatchesRef.current = onDeviceMatches;
+  }, [onDeviceMatches]);
   const onDeviceMessagesRef = useRef(onDeviceMessages);
-  useEffect(() => { onDeviceMessagesRef.current = onDeviceMessages; }, [onDeviceMessages]);
+  useEffect(() => {
+    onDeviceMessagesRef.current = onDeviceMessages;
+  }, [onDeviceMessages]);
+  const onDeviceCycleMessagesRef = useRef(onDeviceCycleMessages);
+  useEffect(() => {
+    onDeviceCycleMessagesRef.current = onDeviceCycleMessages;
+  }, [onDeviceCycleMessages]);
+
+  const [rateLimitStatusState, setRateLimitStatusState] = useState(() => {
+    try {
+      const isSafetyOn = extensionSettings?.safetyMode !== false;
+      return getRateLimitStatus(isSafetyOn, {
+        likesPerHour: extensionSettings?.likesPerCycle || 50,
+        messagesPerHour: extensionSettings?.messagesPerCycle || 50,
+      });
+    } catch (_) {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const isSafetyOn = extensionSettings?.safetyMode !== false;
+      setRateLimitStatusState(
+        getRateLimitStatus(isSafetyOn, {
+          likesPerHour: extensionSettings?.likesPerCycle || 50,
+          messagesPerHour: extensionSettings?.messagesPerCycle || 50,
+        }),
+      );
+    } catch (_) {}
+    const unsub = subscribeRateLimit((status) => {
+      if (isMountedRef.current) {
+        setRateLimitStatusState(status);
+      }
+    });
+    return unsub;
+  }, [
+    extensionSettings?.safetyMode,
+    extensionSettings?.likesPerCycle,
+    extensionSettings?.messagesPerCycle,
+  ]);
+
   const canGoBackWebState = useState(false);
   const [canGoBackWeb, setCanGoBackWeb] = canGoBackWebState;
 
   // Handle Android hardware back press: navigate back inside WebView instead of kicking to home screen
-  const [dummyText, setDummyText] = useState('');
+  const [dummyText, setDummyText] = useState("");
   const [showDashboard, setShowDashboard] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -545,6 +675,12 @@ export default function BrowserScreen({ route, navigation }) {
   // that left the screen with no way out at all.
   useEffect(() => {
     const onBackPress = () => {
+      if (!isHeadless && (revealActive || loading)) {
+        if (onClose) {
+          onClose();
+          return true;
+        }
+      }
       if (showLogoutConfirm) {
         // Deliberately inert while the logout is running so the purge is not
         // abandoned halfway; it is time-bounded by LOGOUT_CONFIRM_TIMEOUT_MS.
@@ -562,27 +698,60 @@ export default function BrowserScreen({ route, navigation }) {
       return false; // let react-navigation handle exit
     };
 
-    const backSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    const backSub = BackHandler.addEventListener(
+      "hardwareBackPress",
+      onBackPress,
+    );
     return () => backSub.remove();
-  }, [canGoBackWeb, showLogoutConfirm, showDashboard, loggingOut]);
+  }, [
+    canGoBackWeb,
+    showLogoutConfirm,
+    showDashboard,
+    loggingOut,
+    isHeadless,
+    revealActive,
+    loading,
+    onClose,
+  ]);
   const [hyperbeamEmbedUrl, setHyperbeamEmbedUrl] = useState(
-    vpsUrl && vpsUrl.includes('hyperbeam.com') ? vpsUrl : ''
+    vpsUrl && vpsUrl.includes("hyperbeam.com") ? vpsUrl : "",
   );
   const [startingHyperbeam, setStartingHyperbeam] = useState(false);
   const [lastCoord, setLastCoord] = useState(null);
   const [logs, setLogs] = useState([
-    { id: 'log_init_1', time: new Date().toLocaleTimeString(), text: 'Flint Automation Engine initialized.', type: 'info' },
-    { id: 'log_init_2', time: new Date().toLocaleTimeString(), text: 'Desktop Web View (1280x720) ready for interaction.', type: 'info' }
+    {
+      id: "log_init_1",
+      time: new Date().toLocaleTimeString(),
+      text: "Flint Automation Engine initialized.",
+      type: "info",
+    },
+    {
+      id: "log_init_2",
+      time: new Date().toLocaleTimeString(),
+      text: "Desktop Web View (1280x720) ready for interaction.",
+      type: "info",
+    },
   ]);
 
   const logCounterRef = useRef(0);
+  const lastLogRef = useRef({ text: "", time: 0 });
 
-  const addLog = useCallback((text, type = 'info') => {
+  const addLog = useCallback((text, type = "info") => {
+    const now = Date.now();
+    if (
+      lastLogRef.current.text === text &&
+      now - lastLogRef.current.time < 1000
+    ) {
+      return;
+    }
+    lastLogRef.current = { text, time: now };
     const time = new Date().toLocaleTimeString();
     logCounterRef.current += 1;
-    const uniqueId = `log_${Date.now()}_${logCounterRef.current}_${Math.random().toString(36).slice(2, 8)}`;
+    const uniqueId = `log_${now}_${logCounterRef.current}_${Math.random().toString(36).slice(2, 8)}`;
     console.log(`[FE-LOG ${time}] [${type.toUpperCase()}] ${text}`);
-    setLogs(prev => [{ id: uniqueId, time, text, type }, ...prev].slice(0, 80));
+    setLogs((prev) =>
+      [{ id: uniqueId, time, text, type }, ...prev].slice(0, 80),
+    );
   }, []);
 
   // ── On-Device FlirtEasy Background Worker Singleton ──
@@ -600,16 +769,22 @@ export default function BrowserScreen({ route, navigation }) {
           setOnDeviceMatches(state.stats.matches || 0);
           setOnDeviceMessages(state.stats.messages || 0);
         }
+        if (state.currentCycle?.likesCompleted !== undefined) {
+          setOnDeviceCycleLikes(state.currentCycle.likesCompleted);
+        }
+        if (state.currentCycle?.messagesProcessed !== undefined) {
+          setOnDeviceCycleMessages(state.currentCycle.messagesProcessed);
+        }
         if (state.isRunning !== undefined) {
           setOnDeviceSwiping(state.isRunning);
         }
       },
       (logText) => {
-        addLog(logText, 'info');
-      }
+        addLog(logText, "info");
+      },
     );
     if (route.params?.autoStartAgent) {
-      backgroundWorkerRef.current.handleMessage({ action: 'startAgent' });
+      backgroundWorkerRef.current.handleMessage({ action: "startAgent" });
     }
   }
 
@@ -617,7 +792,7 @@ export default function BrowserScreen({ route, navigation }) {
   useEffect(() => {
     if (isOnDevice && route.params?.autoStartAgent) {
       if (backgroundWorkerRef.current) {
-        backgroundWorkerRef.current.handleMessage({ action: 'startAgent' });
+        backgroundWorkerRef.current.handleMessage({ action: "startAgent" });
       }
     }
   }, [isOnDevice, route.params?.autoStartAgent]);
@@ -632,9 +807,15 @@ export default function BrowserScreen({ route, navigation }) {
           setOnDeviceMatches(state.stats.matches || 0);
           setOnDeviceMessages(state.stats.messages || 0);
         }
+        if (state.currentCycle?.likesCompleted !== undefined) {
+          setOnDeviceCycleLikes(state.currentCycle.likesCompleted);
+        }
+        if (state.currentCycle?.messagesProcessed !== undefined) {
+          setOnDeviceCycleMessages(state.currentCycle.messagesProcessed);
+        }
         if (state.isRunning !== undefined) setOnDeviceSwiping(state.isRunning);
       },
-      (logText) => addLog(logText, 'info')
+      (logText) => addLog(logText, "info"),
     );
   }, [addLog]);
 
@@ -648,11 +829,14 @@ export default function BrowserScreen({ route, navigation }) {
 
   const lastSwipeTime = useRef(0);
 
-
   // Safety timeout to dismiss loading overlay after 3 seconds max (Neko VPS only)
   // For on-device disconnected sessions, loading stays active until FE_LOGIN_SHEET_READY arrives (or 15s failsafe in onLoadEnd)
   useEffect(() => {
-    if (isOnDevice && !getTinderAuthState()?.isLoggedIn && !route.params?.autoStartAgent) {
+    if (
+      isOnDevice &&
+      !getTinderAuthState()?.isLoggedIn &&
+      !route.params?.autoStartAgent
+    ) {
       return;
     }
     const timer = setTimeout(() => {
@@ -669,11 +853,11 @@ export default function BrowserScreen({ route, navigation }) {
     try {
       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
       fetch(`${orchestratorUrl}/swipe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: direction }),
-      }).catch(() => { });
-    } catch (e) { }
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   const panResponder = useRef(
@@ -681,24 +865,27 @@ export default function BrowserScreen({ route, navigation }) {
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 25 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
+        return (
+          Math.abs(gestureState.dx) > 25 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
+        );
       },
       onPanResponderRelease: (_, gestureState) => {
         const { dx } = gestureState;
         if (dx > 25) {
-          console.log('[Mobile] Swiped Right -> Triggering Left arrow key');
-          handleSwipe('Left');
+          console.log("[Mobile] Swiped Right -> Triggering Left arrow key");
+          handleSwipe("Left");
         } else if (dx < -25) {
-          console.log('[Mobile] Swiped Left -> Triggering Right arrow key');
-          handleSwipe('Right');
+          console.log("[Mobile] Swiped Left -> Triggering Right arrow key");
+          handleSwipe("Right");
         }
       },
-    })
+    }),
   ).current;
 
   // Poll /check-page-state while we are in the login process (Neko only)
   useEffect(() => {
-    if (isOnDevice || isHyperbeam || loginStep === 'done') return;
+    if (isOnDevice || isHyperbeam || loginStep === "done") return;
 
     let cancelled = false;
     const orchestratorUrl = getOrchestratorUrl(vpsUrl);
@@ -710,66 +897,79 @@ export default function BrowserScreen({ route, navigation }) {
         const data = await resp.json();
         const state = data.state;
         if (!cancelled) {
-          if (state === 'logged_in') {
-            if (loginStep !== 'done') {
-              setLoginStep('done');
+          if (state === "logged_in") {
+            if (loginStep !== "done") {
+              setLoginStep("done");
             }
           } else {
             // Not logged in! If we are in 'done' state, reset back to login wizard
-            if (loginStep === 'done') {
-              console.log('[Browser] Logout or logged-out state detected -> resetting to login options');
-              setLoginStep('options');
+            if (loginStep === "done") {
+              console.log(
+                "[Browser] Logout or logged-out state detected -> resetting to login options",
+              );
+              setLoginStep("options");
               setShowDashboard(false);
-              setInputText('');
-            } else if (state === 'captcha') {
+              setInputText("");
+            } else if (state === "captcha") {
               setShowNeko(true); // Automatically show live browser when puzzle appears
-              setLoginStep('captcha');
-            } else if (state === 'email_rate_limited') {
-              setEmailErrorText('⚠️ You\'ve made too many attempts. Please try again later.');
+              setLoginStep("captcha");
+            } else if (state === "email_rate_limited") {
+              setEmailErrorText(
+                "⚠️ You've made too many attempts. Please try again later.",
+              );
               setRateLimitTimer(60);
-              if (loginStep !== 'email') {
-                setLoginStep('email');
+              if (loginStep !== "email") {
+                setLoginStep("email");
               }
-            } else if (state === 'email_screen' && loginStep !== 'email') {
-              setInputText('');
-              setEmailErrorText('');
-              setLoginStep('email');
-            } else if (state === 'waiting_email' && loginStep !== 'waiting_email') {
-              setLoginStep('waiting_email');
-            } else if (state === 'phone_screen' && loginStep !== 'phone') {
-              setInputText('');
-              setLoginStep('phone');
-            } else if (state === 'google_email_screen' && loginStep !== 'google_email') {
-              setInputText('');
-              setLoginStep('google_email');
-            } else if (state === 'google_password_screen' && loginStep !== 'google_password') {
-              setInputText('');
-              setLoginStep('google_password');
-            } else if (state === 'email_otp_screen') {
-              setOtpSubtype('email');
+            } else if (state === "email_screen" && loginStep !== "email") {
+              setInputText("");
+              setEmailErrorText("");
+              setLoginStep("email");
+            } else if (
+              state === "waiting_email" &&
+              loginStep !== "waiting_email"
+            ) {
+              setLoginStep("waiting_email");
+            } else if (state === "phone_screen" && loginStep !== "phone") {
+              setInputText("");
+              setLoginStep("phone");
+            } else if (
+              state === "google_email_screen" &&
+              loginStep !== "google_email"
+            ) {
+              setInputText("");
+              setLoginStep("google_email");
+            } else if (
+              state === "google_password_screen" &&
+              loginStep !== "google_password"
+            ) {
+              setInputText("");
+              setLoginStep("google_password");
+            } else if (state === "email_otp_screen") {
+              setOtpSubtype("email");
               if (data && data.email) setSubmittedEmail(data.email);
-              if (loginStep !== 'otp') {
-                setInputText('');
-                setLoginStep('otp');
+              if (loginStep !== "otp") {
+                setInputText("");
+                setLoginStep("otp");
               }
-            } else if (state === 'sms_otp_screen') {
-              setOtpSubtype('sms');
+            } else if (state === "sms_otp_screen") {
+              setOtpSubtype("sms");
               if (data && data.phone) setSubmittedPhone(data.phone);
-              if (loginStep !== 'otp') {
-                setInputText('');
-                setLoginStep('otp');
+              if (loginStep !== "otp") {
+                setInputText("");
+                setLoginStep("otp");
               }
-            } else if (state === 'otp_screen') {
-              if (loginStep !== 'otp') {
-                setInputText('');
-                setLoginStep('otp');
+            } else if (state === "otp_screen") {
+              if (loginStep !== "otp") {
+                setInputText("");
+                setLoginStep("otp");
               }
             }
           }
         }
-      } catch (_) { }
+      } catch (_) {}
       if (!cancelled) {
-        setTimeout(poll, loginStep === 'done' ? 2500 : 1000);
+        setTimeout(poll, loginStep === "done" ? 2500 : 1000);
       }
     };
 
@@ -782,9 +982,9 @@ export default function BrowserScreen({ route, navigation }) {
 
   // When loginStep reaches 'done', automatically dismiss post-login Privacy / Consent modal (1263, 478)
   useEffect(() => {
-    if (loginStep === 'done') {
+    if (loginStep === "done") {
       const timer = setTimeout(() => {
-        dispatchCoordClick(1263, 478, 'Auto-close Privacy / Consent Dialog');
+        dispatchCoordClick(1263, 478, "Auto-close Privacy / Consent Dialog");
       }, 1000);
       return () => clearTimeout(timer);
     }
@@ -792,28 +992,34 @@ export default function BrowserScreen({ route, navigation }) {
 
   const getOrchestratorUrl = (nekoUrl) => {
     if (paramOrchestratorUrl) return paramOrchestratorUrl;
-    if (isOnDevice || !nekoUrl || nekoUrl.includes('tinder.com')) {
-      return resolveLocalUrl('http://localhost:3001');
+    if (isOnDevice || !nekoUrl || nekoUrl.includes("tinder.com")) {
+      return resolveLocalUrl("http://localhost:3001");
     }
     try {
       const resolvedNekoUrl = resolveLocalUrl(nekoUrl);
-      const urlObj = new URL(resolvedNekoUrl.split('/?')[0]);
-      if (urlObj.hostname.startsWith('stream.')) {
-        return urlObj.protocol + '//' + urlObj.hostname.replace('stream.', 'api.');
+      const urlObj = new URL(resolvedNekoUrl.split("/?")[0]);
+      if (urlObj.hostname.startsWith("stream.")) {
+        return (
+          urlObj.protocol + "//" + urlObj.hostname.replace("stream.", "api.")
+        );
       }
-      urlObj.protocol = 'http:';
-      urlObj.port = '3001';
+      urlObj.protocol = "http:";
+      urlObj.port = "3001";
       return urlObj.origin;
     } catch (e) {
-      return resolveLocalUrl('http://localhost:3001');
+      return resolveLocalUrl("http://localhost:3001");
     }
   };
 
   // ─── Extension stats polling (always active — accessible before and after login) ───
   const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-  const { stats: extensionStats, loading: statsLoading, error: statsError } = useExtensionStats(
+  const {
+    stats: extensionStats,
+    loading: statsLoading,
+    error: statsError,
+  } = useExtensionStats(
     orchestratorUrl,
-    !isOnDevice  // Only poll orchestrator if not in local on-device mode
+    !isOnDevice, // Only poll orchestrator if not in local on-device mode
   );
 
   const onDeviceSwipingRef = useRef(onDeviceSwiping);
@@ -822,19 +1028,129 @@ export default function BrowserScreen({ route, navigation }) {
   }, [onDeviceSwiping]);
   const isTogglingRef = useRef(false);
 
-  // Helper to reliably dispatch auto-like start command into WebView DOM
-  const dispatchStartToDOM = useCallback((targetCount = null) => {
+  // Trigger processing match chats using FlirtEasy AI
+  const triggerProcessChats = useCallback(() => {
     if (!webViewRef.current) return;
     const worker = backgroundWorkerRef.current;
-    if (worker) {
-      worker.handleMessage({ action: 'startAgent' });
-    }
-    const count = targetCount || extensionSettings?.likesPerCycle || 50;
+    const settings = worker?.settings || extensionSettings || {};
+    const maxMsgs =
+      typeof settings.messagesPerCycle === "number" &&
+      settings.messagesPerCycle > 0
+        ? settings.messagesPerCycle
+        : 50;
     webViewRef.current.injectJavaScript(`
       (function() {
+        var isOnMessages = window.location.pathname.includes('/app/messages') ||
+          window.location.pathname.includes('/app/my-matches') ||
+          window.location.pathname.includes('/app/matches');
+        if (!isOnMessages) {
+          var msgLink = document.querySelector('a[href*="/app/messages"], a[href*="/app/my-matches"], a[href*="/app/matches"], [aria-label*="Messages" i], [aria-label*="Matches" i], [aria-label*="Chat" i], nav a:nth-child(4)');
+          if (msgLink) {
+            msgLink.click();
+          } else {
+            window.location.href = 'https://tinder.com/app/messages';
+          }
+        }
+        if (typeof window.__flirteasyStartMessaging === 'function') {
+          window.__flirteasyStartMessaging(${maxMsgs}, ${JSON.stringify(settings)});
+        } else if (window.__chromeDispatchMessage) {
+          window.__chromeDispatchMessage({
+            action: 'processChats',
+            settings: ${JSON.stringify(settings)},
+            maxMessages: ${maxMsgs}
+          });
+        }
+      })();
+      true;
+    `);
+    addLog("💬 Processing unread match chats with AI...", "action");
+  }, [extensionSettings, addLog]);
+
+  // Helper to reliably dispatch automation start command into WebView DOM (Swiping or Messaging)
+  const dispatchStartToDOM = useCallback(
+    (targetCount = null) => {
+      if (!webViewRef.current) return;
+      const worker = backgroundWorkerRef.current;
+      if (worker) {
+        worker.handleMessage({ action: "startAgent" });
+      }
+
+      const swipingEnabled = isAutoSwipeEnabled(extensionSettings);
+      const messagingEnabled = isAutoMessagingEnabled(extensionSettings);
+      const sessionState = getOnDeviceSessionState();
+      const isLikesExhausted =
+        sessionState?.waitingReason === "likes_exhausted" &&
+        (sessionState?.likesReplenishTimestamp || 0) > Date.now();
+
+      // If both are disabled, warn user and do not proceed
+      if (!swipingEnabled && !messagingEnabled) {
+        addLog(
+          "⚠️ Both Auto-Swipe and Auto-Messaging are disabled in settings. Enable at least one to start.",
+          "warn",
+        );
+        return;
+      }
+
+      // If Auto-Swipe is OFF or daily likes are refilling, pivot directly to messaging (if enabled)
+      if (!swipingEnabled || isLikesExhausted) {
+        if (!messagingEnabled) {
+          addLog(
+            "⚠️ Swiping is disabled/exhausted and Auto-Messaging is turned off in settings.",
+            "warn",
+          );
+          return;
+        }
+        const reasonText = !swipingEnabled
+          ? "Auto-Swipe is disabled"
+          : "Tinder daily likes refilling";
+        addLog(
+          `💬 ${reasonText} — Wingman starting in Messaging Only mode`,
+          "action",
+        );
+        saveOnDeviceSessionState({
+          isRunning: true,
+          currentPhase: "messaging",
+          waitingReason: isLikesExhausted ? "likes_exhausted" : null,
+        });
+        if (worker) {
+          worker.handleMessage({
+            action: "updateAgentState",
+            state: {
+              isRunning: true,
+              currentPhase: "messaging",
+              waitingReason: isLikesExhausted ? "likes_exhausted" : null,
+            },
+          });
+        }
+        triggerProcessChats();
+        return;
+      }
+
+      const count =
+        targetCount !== null
+          ? targetCount
+          : typeof extensionSettings?.likesPerCycle === "number" &&
+              extensionSettings.likesPerCycle > 0
+            ? extensionSettings.likesPerCycle
+            : 50;
+
+      if (onDeviceCycleLikesRef.current >= count) {
+        onDeviceCycleLikesRef.current = 0;
+        setOnDeviceCycleLikes(0);
+        saveOnDeviceSessionState({
+          cycleLikes: 0,
+          waitingReason: null,
+          nextRunTimestamp: null,
+        });
+      }
+      const currentProgress = onDeviceCycleLikesRef.current || 0;
+      webViewRef.current.injectJavaScript(`
+      (function() {
         var targetCount = ${count};
+        var initialProgress = ${currentProgress};
         window.__flirteasyAutoStartRequested = true;
         window.__flirteasyAutoStartCount = targetCount;
+        window.__flirteasyAutoStartProgress = initialProgress;
         window.__flirteasy_stop = false;
         if (window.chrome && window.chrome.runtime && window.chrome.runtime.sendMessage) {
           try { window.chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }); } catch(_) {}
@@ -845,14 +1161,14 @@ export default function BrowserScreen({ route, navigation }) {
           try {
             // 1. Direct global hook if content script is loaded
             if (typeof window.__flirteasyStartAutomation === 'function') {
-              window.__flirteasyStartAutomation(targetCount);
-              console.log('[FlirtEasy Bridge] Started automation via direct global hook');
+              window.__flirteasyStartAutomation(targetCount, initialProgress);
+              console.log('[FlirtEasy Bridge] Started automation via direct global hook (progress: ' + initialProgress + '/' + targetCount + ')');
               return true;
             }
 
             // 2. Dispatch via content script message bridge
             if (typeof window.__chromeDispatchMessage === 'function') {
-              var countDispatched = window.__chromeDispatchMessage({ action: 'autoLike', count: targetCount });
+              var countDispatched = window.__chromeDispatchMessage({ action: 'autoLike', count: targetCount, initialProgress: initialProgress });
               if (countDispatched > 0) {
                 console.log('[FlirtEasy Bridge] Dispatched autoLike to ' + countDispatched + ' listener(s)');
                 return true;
@@ -861,7 +1177,7 @@ export default function BrowserScreen({ route, navigation }) {
 
             // 3. If not on recs deck, attempt navigation
             if (!window.location.pathname.includes('/app/recs')) {
-              var recsLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Explore" i]');
+              var recsLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Recommendations" i], [aria-label*="Tinder" i], nav a:nth-child(1)');
               if (recsLink) recsLink.click();
             }
           } catch(e) {
@@ -878,7 +1194,9 @@ export default function BrowserScreen({ route, navigation }) {
       })();
       true;
     `);
-  }, [extensionSettings]);
+    },
+    [extensionSettings, triggerProcessChats, addLog],
+  );
 
   // Auto-start coordination: ensures automation reliably engages once Tinder DOM is loaded and logged in
   const pendingAutoStartRef = useRef(Boolean(route.params?.autoStartAgent));
@@ -896,41 +1214,57 @@ export default function BrowserScreen({ route, navigation }) {
 
     const worker = backgroundWorkerRef.current;
     if (worker) {
-      worker.handleMessage({ action: 'startAgent' });
+      worker.handleMessage({ action: "startAgent" });
     }
 
-    addLog('⚡ Tinder ready — starting AI Automation engine...', 'success');
+    addLog("⚡ Tinder ready — starting AI Automation engine...", "success");
     dispatchStartToDOM();
   }, [isOnDevice, addLog, dispatchStartToDOM]);
 
   // Toggle local On-Device Tinder automation engine
-  const toggleOnDeviceSwiping = useCallback((forceStart = null) => {
-    if (!webViewRef.current || isTogglingRef.current) return;
-    const worker = backgroundWorkerRef.current;
-    const shouldStart = forceStart !== null ? forceStart : !onDeviceSwipingRef.current;
+  const toggleOnDeviceSwiping = useCallback(
+    (forceStart = null) => {
+      if (!webViewRef.current || isTogglingRef.current) return;
+      const worker = backgroundWorkerRef.current;
+      const shouldStart =
+        forceStart !== null ? forceStart : !onDeviceSwipingRef.current;
 
-    // Guard: already in the requested state — abort to prevent redundant calls & infinite loops
-    if (forceStart === null && shouldStart === onDeviceSwipingRef.current) return;
+      // Guard: already in the requested state — abort to prevent redundant calls & infinite loops
+      if (shouldStart === onDeviceSwipingRef.current) return;
 
-    isTogglingRef.current = true;
-    try {
-      // Synchronously update the ref immediately so state listeners never re-enter recursively
-      onDeviceSwipingRef.current = shouldStart;
-      setOnDeviceSwiping(shouldStart);
-      saveOnDeviceSessionState({ isRunning: shouldStart });
+      isTogglingRef.current = true;
+      try {
+        const swipingEnabled = isAutoSwipeEnabled(extensionSettings);
+        const messagingEnabled = isAutoMessagingEnabled(extensionSettings);
+        const initialPhase = shouldStart
+          ? swipingEnabled
+            ? "swiping"
+            : messagingEnabled
+              ? "messaging"
+              : "idle"
+          : "idle";
+        onDeviceSwipingRef.current = shouldStart;
+        setOnDeviceSwiping(shouldStart);
+        saveOnDeviceSessionState({
+          isRunning: shouldStart,
+          currentPhase: initialPhase,
+        });
 
-      // Only block if explicitly confirmed logged out
-      if (shouldStart && sessionStatus === SESSION_SIGNED_OUT) {
-        onDeviceSwipingRef.current = false;
-        setOnDeviceSwiping(false);
-        saveOnDeviceSessionState({ isRunning: false });
-        addLog('Cannot start automation: Please log into Tinder first', 'warn');
-        return;
-      }
+        // Only block if explicitly confirmed logged out
+        if (shouldStart && sessionStatus === SESSION_SIGNED_OUT) {
+          onDeviceSwipingRef.current = false;
+          setOnDeviceSwiping(false);
+          saveOnDeviceSessionState({ isRunning: false });
+          addLog(
+            "Cannot start automation: Please log into Tinder first",
+            "warn",
+          );
+          return;
+        }
 
-      if (!shouldStart) {
-        if (worker) worker.handleMessage({ action: 'stopAgent' });
-        webViewRef.current.injectJavaScript(`
+        if (!shouldStart) {
+          if (worker) worker.handleMessage({ action: "stopAgent" });
+          webViewRef.current.injectJavaScript(`
           (function() {
             try {
               window.__flirteasyAutoStartRequested = false;
@@ -947,36 +1281,50 @@ export default function BrowserScreen({ route, navigation }) {
           })();
           true;
         `);
-        addLog('⏸️ FlirtEasy AI Automation paused', 'info');
-      } else {
-        if (worker) worker.handleMessage({ action: 'startAgent' });
-        dispatchStartToDOM();
-        const count = extensionSettings?.likesPerCycle || 50;
-        addLog(`🚀 FlirtEasy AI Automation started (${count} profiles target)`, 'success');
+          addLog("⏸️ FlirtEasy AI Automation paused", "info");
+        } else {
+          if (worker) worker.handleMessage({ action: "startAgent" });
+          dispatchStartToDOM();
+          const swipingEnabled = isAutoSwipeEnabled(extensionSettings);
+          const messagingEnabled = isAutoMessagingEnabled(extensionSettings);
+          if (swipingEnabled && messagingEnabled) {
+            const count =
+              typeof extensionSettings?.likesPerCycle === "number" &&
+              extensionSettings.likesPerCycle > 0
+                ? extensionSettings.likesPerCycle
+                : 50;
+            addLog(
+              `🚀 FlirtEasy AI Automation started (${count} profiles target · Full Auto)`,
+              "success",
+            );
+          } else if (swipingEnabled) {
+            const count =
+              typeof extensionSettings?.likesPerCycle === "number" &&
+              extensionSettings.likesPerCycle > 0
+                ? extensionSettings.likesPerCycle
+                : 50;
+            addLog(
+              `🚀 FlirtEasy AI Swiper started (${count} profiles target · Swiping Only)`,
+              "success",
+            );
+          } else if (messagingEnabled) {
+            addLog(
+              "💬 FlirtEasy AI Wingman started (Messaging Only)",
+              "success",
+            );
+          } else {
+            addLog(
+              "⚠️ Both Auto-Swipe and Auto-Messaging are disabled in settings.",
+              "warn",
+            );
+          }
+        }
+      } finally {
+        isTogglingRef.current = false;
       }
-    } finally {
-      isTogglingRef.current = false;
-    }
-  }, [addLog, extensionSettings, dispatchStartToDOM, sessionStatus]);
-
-  // Manually trigger processing match chats using FlirtEasy AI
-  const triggerProcessChats = useCallback(() => {
-    if (!webViewRef.current) return;
-    const worker = backgroundWorkerRef.current;
-    const settings = worker?.settings || extensionSettings || {};
-    const maxMsgs = settings.messagesPerCycle || 50;
-    webViewRef.current.injectJavaScript(`
-      if (window.__chromeDispatchMessage) {
-        window.__chromeDispatchMessage({
-          action: 'processChats',
-          settings: ${JSON.stringify(settings)},
-          maxMessages: ${maxMsgs}
-        });
-      }
-      true;
-    `);
-    addLog('💬 Processing unread match chats with AI...', 'action');
-  }, [extensionSettings, addLog]);
+    },
+    [addLog, extensionSettings, dispatchStartToDOM, sessionStatus],
+  );
 
   // Start / stop FlirtEasy AI swiping & messaging agent (local on-device or remote orchestrator CDP bridge)
   const handleToggleAgent = useCallback(async () => {
@@ -987,34 +1335,36 @@ export default function BrowserScreen({ route, navigation }) {
     try {
       const isRunning = Boolean(
         extensionStats?.agentState?.isRunning ||
-        (extensionStats?.agentState?.currentPhase && extensionStats.agentState.currentPhase !== 'stopped')
+        (extensionStats?.agentState?.currentPhase &&
+          extensionStats.agentState.currentPhase !== "stopped"),
       );
-      const endpoint = isRunning ? '/stop-agent' : '/start-agent';
+      const endpoint = isRunning ? "/stop-agent" : "/start-agent";
       console.log(`[Browser] Remote agent toggle -> ${endpoint}`);
       await fetch(`${orchestratorUrl}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: 'Tinder' }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: "Tinder" }),
       });
     } catch (e) {
-      console.error('[Browser] handleToggleAgent error:', e);
+      console.error("[Browser] handleToggleAgent error:", e);
     }
   }, [isOnDevice, toggleOnDeviceSwiping, extensionStats, orchestratorUrl]);
 
   // Save settings for on-device mode directly to BackgroundWorker, sessionManager, and WebView chrome.storage.local
-  const handleSaveOnDeviceSettings = useCallback(async (updatedSettings) => {
-    try {
-      const merged = { ...(extensionSettings || {}), ...updatedSettings };
-      setExtensionSettings(merged);
-      setSharedExtensionSettings(merged);
-      const worker = backgroundWorkerRef.current;
-      if (worker) {
-        worker.updateSettings(merged);
-      }
-      if (webViewRef.current) {
-        const jsonStr = JSON.stringify(merged);
-        const cityStr = JSON.stringify(merged.locationCity || '');
-        webViewRef.current.injectJavaScript(`
+  const handleSaveOnDeviceSettings = useCallback(
+    async (updatedSettings) => {
+      try {
+        const merged = { ...(extensionSettings || {}), ...updatedSettings };
+        setExtensionSettings(merged);
+        setSharedExtensionSettings(merged);
+        const worker = backgroundWorkerRef.current;
+        if (worker) {
+          worker.updateSettings(merged);
+        }
+        if (webViewRef.current) {
+          const jsonStr = JSON.stringify(merged);
+          const cityStr = JSON.stringify(merged.locationCity || "");
+          webViewRef.current.injectJavaScript(`
           if (window.chrome && window.chrome.storage && window.chrome.storage.local) {
             window.chrome.storage.local.set({ extensionSettings: ${jsonStr} });
           }
@@ -1023,32 +1373,45 @@ export default function BrowserScreen({ route, navigation }) {
           }
           true;
         `);
+        }
+        if (updatedSettings.locationCity || updatedSettings.locationLatitude) {
+          addLog(
+            `📍 Target location synced: ${merged.locationCity || "Target"} (${merged.locationLatitude}, ${merged.locationLongitude})`,
+            "success",
+          );
+        } else {
+          addLog("⚙️ FlirtEasy settings saved and applied", "success");
+        }
+        trackingService.trackEvent("settings_change", updatedSettings);
+        return true;
+      } catch (e) {
+        console.error("[Browser] handleSaveOnDeviceSettings error:", e);
+        addLog("Failed to save settings: " + e.message, "error");
+        return false;
       }
-      if (updatedSettings.locationCity || updatedSettings.locationLatitude) {
-        addLog(`📍 Target location synced: ${merged.locationCity || 'Target'} (${merged.locationLatitude}, ${merged.locationLongitude})`, 'success');
-      } else {
-        addLog('⚙️ FlirtEasy settings saved and applied', 'success');
-      }
-      trackingService.trackEvent('settings_change', updatedSettings);
-      return true;
-    } catch(e) {
-      console.error('[Browser] handleSaveOnDeviceSettings error:', e);
-      addLog('Failed to save settings: ' + e.message, 'error');
-      return false;
-    }
-  }, [extensionSettings, addLog]);
+    },
+    [extensionSettings, addLog],
+  );
 
   // Live profile extraction directly from Tinder WebView (On-Device Mode)
   const handleSyncProfileOnDevice = useCallback(() => {
     return new Promise((resolve) => {
       if (!webViewRef.current) {
-        resolve({ success: false, error: 'Tinder browser session is not ready.' });
+        resolve({
+          success: false,
+          error: "Tinder browser session is not ready.",
+        });
         return;
       }
-      const requestId = 'sync_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+      const requestId =
+        "sync_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
       const timer = setTimeout(() => {
         profileSyncCallbacksRef.current.delete(requestId);
-        resolve({ success: false, error: 'Sync request timed out. Please check your Tinder login in the browser.' });
+        resolve({
+          success: false,
+          error:
+            "Sync request timed out. Please check your Tinder login in the browser.",
+        });
       }, 12000);
 
       profileSyncCallbacksRef.current.set(requestId, (res) => {
@@ -1244,13 +1607,20 @@ export default function BrowserScreen({ route, navigation }) {
   const handlePushBioOnDevice = useCallback((newBio) => {
     return new Promise((resolve) => {
       if (!webViewRef.current) {
-        resolve({ success: false, error: 'Tinder browser session is not ready.' });
+        resolve({
+          success: false,
+          error: "Tinder browser session is not ready.",
+        });
         return;
       }
-      const requestId = 'push_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+      const requestId =
+        "push_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
       const timer = setTimeout(() => {
         pushBioCallbacksRef.current.delete(requestId);
-        resolve({ success: false, error: 'Push request timed out. Please check your Tinder connection.' });
+        resolve({
+          success: false,
+          error: "Push request timed out. Please check your Tinder connection.",
+        });
       }, 15000);
 
       pushBioCallbacksRef.current.set(requestId, (res) => {
@@ -1258,7 +1628,7 @@ export default function BrowserScreen({ route, navigation }) {
         resolve(res);
       });
 
-      const escapedBio = JSON.stringify(newBio || '');
+      const escapedBio = JSON.stringify(newBio || "");
 
       const script = `
         (async function() {
@@ -1407,52 +1777,69 @@ export default function BrowserScreen({ route, navigation }) {
   }, []);
 
   // Unified on-device statistics object for DashboardPanel
-  const onDeviceStats = useMemo(() => ({
-    agentState: {
-      isRunning: onDeviceSwiping,
-      isPaused: !onDeviceSwiping,
-      currentPhase: onDeviceSwiping ? 'liking' : 'stopped',
-      stats: {
-        swipes: onDeviceSwipes,
-        matches: onDeviceMatches,
-        messages: onDeviceMessages,
-        likesCompleted: onDeviceSwipes,
-        matchesCreated: onDeviceMatches,
-        messagesSent: onDeviceMessages,
+  const onDeviceStats = useMemo(
+    () => ({
+      agentState: {
+        isRunning: onDeviceSwiping,
+        isPaused: !onDeviceSwiping,
+        currentPhase: onDeviceSwiping ? "liking" : "stopped",
+        stats: {
+          swipes: onDeviceSwipes,
+          matches: onDeviceMatches,
+          messages: onDeviceMessages,
+          likesCompleted: onDeviceCycleLikes,
+          matchesCreated: onDeviceMatches,
+          messagesSent: onDeviceMessages,
+        },
+        currentCycle: {
+          likesCompleted: onDeviceCycleLikes,
+          messagesProcessed: onDeviceCycleMessages,
+          followUpsSent: 0,
+        },
       },
-      currentCycle: {
-        likesCompleted: onDeviceSwipes,
-        messagesProcessed: onDeviceMessages,
-        followUpsSent: 0,
-      }
-    },
-    lifetimeStats: {
-      totalSwipes: onDeviceSwipes,
-      todaySwipes: onDeviceSwipes,
-      totalLikes: onDeviceSwipes,
-      totalMatches: onDeviceMatches,
-      matchesCreated: onDeviceMatches,
-      totalMessages: onDeviceMessages,
-      todayMessages: onDeviceMessages,
-      messagesSent: onDeviceMessages,
-      activeChats: onDeviceMatches,
-      activeConversations: onDeviceMatches,
-    },
-    progressFeed: (() => {
-      const persisted = getProgressFeed();
-      if (persisted && persisted.length > 0) return persisted;
-      return logs.map(l => ({
-        id: l.id,
-        timestamp: l.timestamp || Date.now(),
-        detail: l.text,
-        name: null,
-        type: l.logType === 'success' && l.text.includes('Match') ? 'match_detected'
-          : (l.text.includes('Liked') ? 'profile_liked'
-          : (l.text.includes('Message') || l.text.includes('Reply') ? 'message_replied' : 'persona_update')),
-      }));
-    })(),
-    settings: extensionSettings
-  }), [onDeviceSwiping, onDeviceSwipes, onDeviceMatches, onDeviceMessages, logs, extensionSettings]);
+      lifetimeStats: {
+        totalSwipes: onDeviceSwipes,
+        todaySwipes: onDeviceSwipes,
+        totalLikes: onDeviceSwipes,
+        totalMatches: onDeviceMatches,
+        matchesCreated: onDeviceMatches,
+        totalMessages: onDeviceMessages,
+        todayMessages: onDeviceMessages,
+        messagesSent: onDeviceMessages,
+        activeChats: onDeviceMatches,
+        activeConversations: onDeviceMatches,
+      },
+      progressFeed: (() => {
+        const persisted = getProgressFeed();
+        if (persisted && persisted.length > 0) return persisted;
+        return logs.map((l) => ({
+          id: l.id,
+          timestamp: l.timestamp || Date.now(),
+          detail: l.text,
+          name: null,
+          type:
+            l.logType === "success" && l.text.includes("Match")
+              ? "match_detected"
+              : l.text.includes("Liked")
+                ? "profile_liked"
+                : l.text.includes("Message") || l.text.includes("Reply")
+                  ? "message_replied"
+                  : "persona_update",
+        }));
+      })(),
+      settings: extensionSettings,
+    }),
+    [
+      onDeviceSwiping,
+      onDeviceSwipes,
+      onDeviceCycleLikes,
+      onDeviceMatches,
+      onDeviceMessages,
+      onDeviceCycleMessages,
+      logs,
+      extensionSettings,
+    ],
+  );
 
   // Two-way sync: listen to external / worker shared agent updates
   useEffect(() => {
@@ -1462,23 +1849,56 @@ export default function BrowserScreen({ route, navigation }) {
         if (!isMountedRef.current) return;
         const stats = shared?.agentState?.stats;
         if (stats) {
-          if (typeof stats.swipes === 'number' && stats.swipes !== onDeviceSwipes) {
+          if (
+            typeof stats.swipes === "number" &&
+            stats.swipes !== onDeviceSwipes
+          ) {
             setOnDeviceSwipes(stats.swipes);
           }
-          if (typeof stats.matches === 'number' && stats.matches !== onDeviceMatches) {
+          if (
+            typeof stats.matches === "number" &&
+            stats.matches !== onDeviceMatches
+          ) {
             setOnDeviceMatches(stats.matches);
           }
-          if (typeof stats.messages === 'number' && stats.messages !== onDeviceMessages) {
+          if (
+            typeof stats.messages === "number" &&
+            stats.messages !== onDeviceMessages
+          ) {
             setOnDeviceMessages(stats.messages);
           }
         }
-        if (typeof shared?.agentState?.isRunning === 'boolean' && shared.agentState.isRunning !== onDeviceSwiping) {
+        const cycle = shared?.agentState?.currentCycle;
+        if (
+          typeof cycle?.likesCompleted === "number" &&
+          cycle.likesCompleted !== onDeviceCycleLikes
+        ) {
+          setOnDeviceCycleLikes(cycle.likesCompleted);
+        }
+        if (
+          typeof cycle?.messagesProcessed === "number" &&
+          cycle.messagesProcessed !== onDeviceCycleMessages
+        ) {
+          setOnDeviceCycleMessages(cycle.messagesProcessed);
+        }
+        if (
+          typeof shared?.agentState?.isRunning === "boolean" &&
+          shared.agentState.isRunning !== onDeviceSwiping
+        ) {
           setOnDeviceSwiping(shared.agentState.isRunning);
         }
       }, 0);
     });
     return unsub;
-  }, [isOnDevice, onDeviceSwipes, onDeviceMatches, onDeviceMessages, onDeviceSwiping]);
+  }, [
+    isOnDevice,
+    onDeviceSwipes,
+    onDeviceCycleLikes,
+    onDeviceMatches,
+    onDeviceMessages,
+    onDeviceCycleMessages,
+    onDeviceSwiping,
+  ]);
 
   // Persist session counters so they survive back-navigation, force-close, and
   // app restart. Debounced at 1 s so a rapid swipe burst doesn't hammer
@@ -1488,21 +1908,33 @@ export default function BrowserScreen({ route, navigation }) {
     const timer = setTimeout(() => {
       saveOnDeviceSessionState({
         swipes: onDeviceSwipes,
+        cycleLikes: onDeviceCycleLikes,
         matches: onDeviceMatches,
         messages: onDeviceMessages,
+        cycleMessages: onDeviceCycleMessages,
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [isOnDevice, onDeviceSwipes, onDeviceMatches, onDeviceMessages]);
+  }, [
+    isOnDevice,
+    onDeviceSwipes,
+    onDeviceCycleLikes,
+    onDeviceMatches,
+    onDeviceMessages,
+    onDeviceCycleMessages,
+  ]);
 
   // Auto-start agent trigger: launches swiping on Tinder DOM when launched with autoStartAgent
   useEffect(() => {
     if (isOnDevice && route.params?.autoStartAgent) {
       const worker = backgroundWorkerRef.current;
       if (worker) {
-        worker.handleMessage({ action: 'startAgent' });
+        worker.handleMessage({ action: "startAgent" });
       }
-      addLog('⚡ Auto-launching AI Automation engine from Home Screen...', 'action');
+      addLog(
+        "⚡ Auto-launching AI Automation engine from Home Screen...",
+        "action",
+      );
       const timer = setTimeout(() => {
         dispatchStartToDOM();
       }, 1000);
@@ -1510,20 +1942,28 @@ export default function BrowserScreen({ route, navigation }) {
     }
   }, [isOnDevice, route.params?.autoStartAgent, dispatchStartToDOM, addLog]);
 
-  // Sync external stop/pause command from Home Screen
+  // Sync external start / stop commands from Home Screen
   useEffect(() => {
     const unsub = subscribeSharedAgentState((state) => {
-      if (state?.agentState?.source === 'home_screen' && state?.agentState?.isRunning === false && onDeviceSwipingRef.current && !isTogglingRef.current) {
-        toggleOnDeviceSwiping(false);
+      if (state?.agentState?.source === "home_screen") {
+        if (state?.agentState?.isRunning === true) {
+          if (!onDeviceSwipingRef.current && !isTogglingRef.current) {
+            toggleOnDeviceSwiping(true);
+          }
+        } else if (state?.agentState?.isRunning === false) {
+          if (onDeviceSwipingRef.current && !isTogglingRef.current) {
+            toggleOnDeviceSwiping(false);
+          }
+        }
       }
     });
     return unsub;
   }, [toggleOnDeviceSwiping]);
 
   // Helper to execute coordinate-based click on WebRTC player and Orchestrator backend
-  const dispatchCoordClick = async (x, y, label = '') => {
+  const dispatchCoordClick = async (x, y, label = "") => {
     try {
-      if (label) addLog(`🖱️ Clicking ${label} at (${x}, ${y})`, 'action');
+      if (label) addLog(`🖱️ Clicking ${label} at (${x}, ${y})`, "action");
 
       // 1. In-WebView synthetic pointer & mouse dispatch at normalized 1280x720
       const coordJs = `(function() {
@@ -1551,25 +1991,26 @@ export default function BrowserScreen({ route, navigation }) {
       // 2. Orchestrator xdotool fallback (for Neko Docker)
       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
       fetch(`${orchestratorUrl}/click`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ x, y }),
-      }).catch(() => { });
+      }).catch(() => {});
     } catch (e) {
-      console.warn('[Browser] dispatchCoordClick error:', e);
+      console.warn("[Browser] dispatchCoordClick error:", e);
     }
   };
 
   // Helper to type text into virtual browser at coordinate
-  const dispatchCoordType = async (x, y, text, label = '') => {
+  const dispatchCoordType = async (x, y, text, label = "") => {
     try {
-      if (label) addLog(`✍️ Focusing (${x}, ${y}) & typing: "${text}"`, 'action');
+      if (label)
+        addLog(`✍️ Focusing (${x}, ${y}) & typing: "${text}"`, "action");
 
       // First click the input field at (x, y) to focus
       await dispatchCoordClick(x, y);
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 200));
 
-      const safeText = JSON.stringify(String(text || ''));
+      const safeText = JSON.stringify(String(text || ""));
       const typeJs = `(async function() {
         var str = ${safeText};
         var active = document.activeElement || document.querySelector('video') || document.querySelector('canvas') || document.body;
@@ -1598,12 +2039,12 @@ export default function BrowserScreen({ route, navigation }) {
       // Backend typing endpoint fallback
       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
       fetch(`${orchestratorUrl}/type-text`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
-      }).catch(() => { });
+      }).catch(() => {});
     } catch (e) {
-      console.warn('[Browser] dispatchCoordType error:', e);
+      console.warn("[Browser] dispatchCoordType error:", e);
     }
   };
 
@@ -1614,61 +2055,77 @@ export default function BrowserScreen({ route, navigation }) {
       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
 
       if (isOnDevice) {
-        if (action === 'CLICK_LOGIN') {
-          webViewRef.current?.injectJavaScript('window.__linksyOpenEmailLogin ? true : false; true;');
-        } else if (action === 'CLICK_EMAIL_LOGIN') {
-          setLoginStep('email');
-          webViewRef.current?.injectJavaScript('window.__linksyOpenEmailLogin && window.__linksyOpenEmailLogin(); true;');
-        } else if (action === 'CLICK_PHONE_LOGIN') {
-          setLoginStep('phone');
-          webViewRef.current?.injectJavaScript('window.__linksyOpenPhoneLogin && window.__linksyOpenPhoneLogin(); true;');
-        } else if (action === 'CLICK_GOOGLE_LOGIN') {
-          setLoginStep('google_email');
-          webViewRef.current?.injectJavaScript('window.__linksyOpenGoogleLogin && window.__linksyOpenGoogleLogin(); true;');
-        } else if (action === 'CLICK_TROUBLE') {
-          webViewRef.current?.injectJavaScript('window.__linksyOpenTroubleLogin && window.__linksyOpenTroubleLogin(); true;');
-        } else if (action === 'SUBMIT_EMAIL') {
-          addLog(`On-Device: Submitting email ${payload.email}`, 'action');
-          webViewRef.current?.injectJavaScript(`window.__linksyFillEmail && window.__linksyFillEmail(${JSON.stringify(payload.email)}); true;`);
-        } else if (action === 'SUBMIT_PHONE') {
-          addLog(`On-Device: Submitting phone ${payload.phone}`, 'action');
-          webViewRef.current?.injectJavaScript(`window.__linksyFillPhone && window.__linksyFillPhone(${JSON.stringify(payload.phone)}, ${JSON.stringify(payload.countryCode)}); true;`);
-        } else if (action === 'SUBMIT_OTP') {
-          addLog('On-Device: Verifying OTP...', 'action');
-          webViewRef.current?.injectJavaScript(`window.__linksyFillOTP && window.__linksyFillOTP(${JSON.stringify(payload.otp)}); true;`);
+        if (action === "CLICK_LOGIN") {
+          webViewRef.current?.injectJavaScript(
+            "window.__linksyOpenEmailLogin ? true : false; true;",
+          );
+        } else if (action === "CLICK_EMAIL_LOGIN") {
+          setLoginStep("email");
+          webViewRef.current?.injectJavaScript(
+            "window.__linksyOpenEmailLogin && window.__linksyOpenEmailLogin(); true;",
+          );
+        } else if (action === "CLICK_PHONE_LOGIN") {
+          setLoginStep("phone");
+          webViewRef.current?.injectJavaScript(
+            "window.__linksyOpenPhoneLogin && window.__linksyOpenPhoneLogin(); true;",
+          );
+        } else if (action === "CLICK_GOOGLE_LOGIN") {
+          setLoginStep("google_email");
+          webViewRef.current?.injectJavaScript(
+            "window.__linksyOpenGoogleLogin && window.__linksyOpenGoogleLogin(); true;",
+          );
+        } else if (action === "CLICK_TROUBLE") {
+          webViewRef.current?.injectJavaScript(
+            "window.__linksyOpenTroubleLogin && window.__linksyOpenTroubleLogin(); true;",
+          );
+        } else if (action === "SUBMIT_EMAIL") {
+          addLog(`On-Device: Submitting email ${payload.email}`, "action");
+          webViewRef.current?.injectJavaScript(
+            `window.__linksyFillEmail && window.__linksyFillEmail(${JSON.stringify(payload.email)}); true;`,
+          );
+        } else if (action === "SUBMIT_PHONE") {
+          addLog(`On-Device: Submitting phone ${payload.phone}`, "action");
+          webViewRef.current?.injectJavaScript(
+            `window.__linksyFillPhone && window.__linksyFillPhone(${JSON.stringify(payload.phone)}, ${JSON.stringify(payload.countryCode)}); true;`,
+          );
+        } else if (action === "SUBMIT_OTP") {
+          addLog("On-Device: Verifying OTP...", "action");
+          webViewRef.current?.injectJavaScript(
+            `window.__linksyFillOTP && window.__linksyFillOTP(${JSON.stringify(payload.otp)}); true;`,
+          );
         }
         return;
       }
 
       if (isHyperbeam) {
-        if (action === 'CLICK_LOGIN') {
-          await dispatchCoordClick(845, 526, 'Accept Cookies');
-          await new Promise(r => setTimeout(r, 400));
-          await dispatchCoordClick(1190, 220, 'Header Log In Button');
-        } else if (action === 'CLICK_EMAIL_LOGIN') {
-          await dispatchCoordClick(845, 526, 'Accept Cookies');
-          await new Promise(r => setTimeout(r, 300));
-          await dispatchCoordClick(1190, 220, 'Header Log In');
-          await new Promise(r => setTimeout(r, 500));
-          await dispatchCoordClick(700, 358, 'Log in with Email');
-        } else if (action === 'CLICK_PHONE_LOGIN') {
-          await dispatchCoordClick(845, 526, 'Accept Cookies');
-          await new Promise(r => setTimeout(r, 300));
-          await dispatchCoordClick(1190, 220, 'Header Log In');
-          await new Promise(r => setTimeout(r, 500));
+        if (action === "CLICK_LOGIN") {
+          await dispatchCoordClick(845, 526, "Accept Cookies");
+          await new Promise((r) => setTimeout(r, 400));
+          await dispatchCoordClick(1190, 220, "Header Log In Button");
+        } else if (action === "CLICK_EMAIL_LOGIN") {
+          await dispatchCoordClick(845, 526, "Accept Cookies");
+          await new Promise((r) => setTimeout(r, 300));
+          await dispatchCoordClick(1190, 220, "Header Log In");
+          await new Promise((r) => setTimeout(r, 500));
+          await dispatchCoordClick(700, 358, "Log in with Email");
+        } else if (action === "CLICK_PHONE_LOGIN") {
+          await dispatchCoordClick(845, 526, "Accept Cookies");
+          await new Promise((r) => setTimeout(r, 300));
+          await dispatchCoordClick(1190, 220, "Header Log In");
+          await new Promise((r) => setTimeout(r, 500));
           await dispatchCoordClick(640, 440, '"Log in with Phone"');
-        } else if (action === 'CLICK_GOOGLE_LOGIN') {
-          await dispatchCoordClick(845, 526, 'Accept Cookies');
-          await new Promise(r => setTimeout(r, 300));
-          await dispatchCoordClick(1190, 220, 'Header Log In');
-          await new Promise(r => setTimeout(r, 500));
+        } else if (action === "CLICK_GOOGLE_LOGIN") {
+          await dispatchCoordClick(845, 526, "Accept Cookies");
+          await new Promise((r) => setTimeout(r, 300));
+          await dispatchCoordClick(1190, 220, "Header Log In");
+          await new Promise((r) => setTimeout(r, 500));
           await dispatchCoordClick(640, 330, '"Continue with Google"');
-        } else if (action === 'CLICK_TROUBLE') {
-          await dispatchCoordClick(640, 510, 'Trouble Logging In');
-        } else if (action === 'DISMISS_PRIVACY') {
-          await dispatchCoordClick(1263, 478, 'Close Privacy Dialog');
-        } else if (action === 'SUBMIT_EMAIL') {
-          const safeEmail = JSON.stringify(payload.email || '');
+        } else if (action === "CLICK_TROUBLE") {
+          await dispatchCoordClick(640, 510, "Trouble Logging In");
+        } else if (action === "DISMISS_PRIVACY") {
+          await dispatchCoordClick(1263, 478, "Close Privacy Dialog");
+        } else if (action === "SUBMIT_EMAIL") {
+          const safeEmail = JSON.stringify(payload.email || "");
           const js = `(function() {
             var el = document.querySelector('input[type="email"], input[name="email"], input');
             if (el) {
@@ -1684,8 +2141,8 @@ export default function BrowserScreen({ route, navigation }) {
             }
           })(); true;`;
           if (webViewRef.current) webViewRef.current.injectJavaScript(js);
-        } else if (action === 'SUBMIT_PHONE') {
-          const digits = String(payload.phone || '').replace(/\D/g, '');
+        } else if (action === "SUBMIT_PHONE") {
+          const digits = String(payload.phone || "").replace(/\D/g, "");
           const safeDigits = JSON.stringify(digits);
           const js = `(function() {
             var el = document.querySelector('input[type="tel"], input[name="phone_number"], input');
@@ -1702,8 +2159,8 @@ export default function BrowserScreen({ route, navigation }) {
             }
           })(); true;`;
           if (webViewRef.current) webViewRef.current.injectJavaScript(js);
-        } else if (action === 'SUBMIT_OTP') {
-          const otpDigits = String(payload.otp || '').replace(/\D/g, '');
+        } else if (action === "SUBMIT_OTP") {
+          const otpDigits = String(payload.otp || "").replace(/\D/g, "");
           const safeOtp = JSON.stringify(otpDigits);
           const js = `(function() {
             var el = document.querySelector('input[autocomplete="one-time-code"], input');
@@ -1725,46 +2182,67 @@ export default function BrowserScreen({ route, navigation }) {
       }
 
       // Neko backend orchestration (CDP precision)
-      if (action === 'CLICK_EMAIL_LOGIN') {
-        fetch(`${orchestratorUrl}/click-text`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'email' }) }).catch(() => { });
-      } else if (action === 'CLICK_PHONE_LOGIN') {
-        fetch(`${orchestratorUrl}/click-text`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'phone' }) }).catch(() => { });
-      } else if (action === 'CLICK_GOOGLE_LOGIN') {
-        fetch(`${orchestratorUrl}/click-text`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'google' }) }).catch(() => { });
-      } else if (action === 'CLICK_TROUBLE') {
-        fetch(`${orchestratorUrl}/click-text`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'trouble' }) }).catch(() => { });
-      } else if (action === 'DISMISS_PRIVACY') {
-        await dispatchCoordClick(1263, 478, 'Close Privacy Dialog');
-      } else if (action === 'SUBMIT_EMAIL') {
-        addLog(`Submitting email: ${payload.email}`, 'action');
+      if (action === "CLICK_EMAIL_LOGIN") {
+        fetch(`${orchestratorUrl}/click-text`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "email" }),
+        }).catch(() => {});
+      } else if (action === "CLICK_PHONE_LOGIN") {
+        fetch(`${orchestratorUrl}/click-text`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "phone" }),
+        }).catch(() => {});
+      } else if (action === "CLICK_GOOGLE_LOGIN") {
+        fetch(`${orchestratorUrl}/click-text`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "google" }),
+        }).catch(() => {});
+      } else if (action === "CLICK_TROUBLE") {
+        fetch(`${orchestratorUrl}/click-text`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "trouble" }),
+        }).catch(() => {});
+      } else if (action === "DISMISS_PRIVACY") {
+        await dispatchCoordClick(1263, 478, "Close Privacy Dialog");
+      } else if (action === "SUBMIT_EMAIL") {
+        addLog(`Submitting email: ${payload.email}`, "action");
         const res = await fetch(`${orchestratorUrl}/submit-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: payload.email })
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: payload.email }),
         });
-        if (res.ok) addLog('Email submitted successfully', 'success');
-      } else if (action === 'SUBMIT_PHONE') {
-        addLog(`Submitting phone: ${payload.phone}`, 'action');
+        if (res.ok) addLog("Email submitted successfully", "success");
+      } else if (action === "SUBMIT_PHONE") {
+        addLog(`Submitting phone: ${payload.phone}`, "action");
         const res = await fetch(`${orchestratorUrl}/submit-phone`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ countryCode: payload.countryCode || '+91', phoneNumber: payload.phone })
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            countryCode: payload.countryCode || "+91",
+            phoneNumber: payload.phone,
+          }),
         });
-        if (res.ok) addLog('Phone number submitted successfully', 'success');
-      } else if (action === 'SUBMIT_OTP') {
-        addLog(`Submitting OTP code...`, 'action');
+        if (res.ok) addLog("Phone number submitted successfully", "success");
+      } else if (action === "SUBMIT_OTP") {
+        addLog(`Submitting OTP code...`, "action");
         const res = await fetch(`${orchestratorUrl}/submit-otp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ otp: payload.otp })
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ otp: payload.otp }),
         });
-        if (res.ok) addLog('OTP submitted successfully', 'success');
-      } else if (action === 'RESEND_OTP') {
-        fetch(`${orchestratorUrl}/resend-code`, { method: 'POST' }).catch(() => { });
+        if (res.ok) addLog("OTP submitted successfully", "success");
+      } else if (action === "RESEND_OTP") {
+        fetch(`${orchestratorUrl}/resend-code`, { method: "POST" }).catch(
+          () => {},
+        );
       }
     } catch (e) {
-      console.warn('[Browser] sendBrowserCommand error:', e);
-      addLog(`Command error: ${e.message}`, 'error');
+      console.warn("[Browser] sendBrowserCommand error:", e);
+      addLog(`Command error: ${e.message}`, "error");
     }
   };
 
@@ -1773,29 +2251,25 @@ export default function BrowserScreen({ route, navigation }) {
     try {
       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
       await fetch(`${orchestratorUrl}/click`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ x, y }),
       });
     } catch (e) {
-      console.error('[Browser] clickAt error:', e);
+      console.error("[Browser] clickAt error:", e);
     }
   };
 
-
-
   /**
-   * The single exit point of the logout flow. Cancels the failsafe timer,
-   * releases the re-entrancy lock and closes the modal. Idempotent, and safe to
-   * call after unmount — the on-device path is resolved by a WebView message
-   * that can arrive at any time, including never.
+   * The single exit point of the logout flow. Cancels any failsafe timer,
+   * releases the re-entrancy lock, and guarantees the confirmation modal and
+   * spinner are dismissed.
    */
   const finishLogout = useCallback(() => {
     if (logoutFailsafeRef.current) {
       clearTimeout(logoutFailsafeRef.current);
       logoutFailsafeRef.current = null;
     }
-    if (!isLoggingOutRef.current) return;
     isLoggingOutRef.current = false;
     if (!isMountedRef.current) return;
     setLoggingOut(false);
@@ -1803,23 +2277,21 @@ export default function BrowserScreen({ route, navigation }) {
   }, []);
 
   /**
-   * Ends the logout flow and, when the logout came from this screen's own
-   * controls in on-device mode, returns to the home screen.
-   *
-   * Signing back in on-device happens through Tinder's own page, and the browser
-   * re-opens straight into it. Leaving the user parked in a session they just
-   * ended means the landing-page helper immediately reopens Tinder's signup
-   * sheet — the app would answer "log me out" with "let's sign up".
+   * Ends the logout flow, ensures all dialogs and spinners are closed, and
+   * dismisses the session view (either via onClose overlay callback or stack navigation).
    */
   const finishLogoutAndExit = useCallback(() => {
-    const shouldExit = exitAfterLogoutRef.current;
     exitAfterLogoutRef.current = false;
     finishLogout();
-    if (!shouldExit || !isMountedRef.current) return;
+    if (!isMountedRef.current) return;
     isExitingRef.current = true;
     cleanupCurrentSession();
-    navigation.navigate('PlatformSelect', { justSignedOut: true });
-  }, [finishLogout, navigation]);
+    if (typeof onClose === "function") {
+      onClose({ justSignedOut: true });
+    } else if (navigation?.navigate) {
+      navigation.navigate("PlatformSelect", { justSignedOut: true });
+    }
+  }, [finishLogout, navigation, onClose]);
 
   /**
    * Brings the WebView back after its renderer process died. The old instance is
@@ -1833,76 +2305,129 @@ export default function BrowserScreen({ route, navigation }) {
     exitAfterLogoutRef.current = false;
     setLoading(true);
     setConnectionError(null);
-    try { webViewRef.current?.reload(); } catch (_) {}
+    try {
+      webViewRef.current?.reload();
+    } catch (_) {}
     finishLogout();
   }, [finishLogout]);
 
-  const handleLogout = async () => {
-    // `disabled={loggingOut}` is driven by async state, so a double tap within
-    // the same frame can still reach this twice. The ref is the real lock.
+  const handleLogout = useCallback(async () => {
+    // Re-entrancy guard against double-taps
     if (isLoggingOutRef.current) return;
     isLoggingOutRef.current = true;
     setLoggingOut(true);
 
-    // Local surfaces are reset first: if any later step fails, the app must
-    // never be left showing a logged-in view of a dead session.
-    setShowDashboard(false);
-    setLoginStep('options');
-    delete persistentLoginCache[sessionKey];
-    setInputText('');
-    setSubmittedEmail('');
-    setSubmittedPhone('');
-    setEmailErrorText('');
-
-    // Also arms pendingWebViewPurge, which is what makes an interrupted logout
-    // recoverable on the next launch.
-    await clearTinderAuthState();
-    setSharedExtensionSettings({ userProfile: null });
-
-    if (isOnDevice) {
-      // On-device the session lives entirely in the WebView, so there is no
-      // orchestrator to notify. Purge the native caches, then hand off to the
-      // in-page purge which reports back via FE_AUTH_STEP { purged: true }.
-      // pendingWebViewPurge is deliberately left armed until that confirmation
-      // arrives; clearing it up front would mark a failed purge as done.
-      // Close the session screen once the purge settles. Navigating on tap
-      // instead would unmount the WebView before the in-page purge could revoke
-      // the token, leaving the app "signed out" while the Tinder session lived on.
-      exitAfterLogoutRef.current = true;
+    try {
+      // 1. Immediately cease all automation loops and destroy worker singleton
+      try {
+        onDeviceSwipingRef.current = false;
+        setOnDeviceSwiping(false);
+        saveOnDeviceSessionState({ isRunning: false, currentPhase: "idle" });
+        if (backgroundWorkerRef.current) {
+          backgroundWorkerRef.current.handleMessage({ action: "stopAgent" });
+        }
+        destroyOnDeviceWorker();
+      } catch (_) {}
 
       if (webViewRef.current) {
-        // Native cache/history clearing is deliberately deferred until the
-        // WebView has reached the landing page. Doing it here, against a loaded
-        // authenticated document that is about to be purged and navigated, is
-        // needless pressure on the renderer.
-        webViewRef.current.injectJavaScript(MASTER_PURGE_SCRIPT);
-        // injectJavaScript is fire-and-forget, so the UI cannot depend on the
-        // page answering. If it stays silent, the purge stays armed and
-        // onLoadEnd retries it on the next load. The user still leaves: local
-        // auth is already cleared, so keeping them in the session is the exact
-        // confusion this flow exists to remove.
-        logoutFailsafeRef.current = setTimeout(finishLogoutAndExit, LOGOUT_CONFIRM_TIMEOUT_MS);
-        return;
+        try {
+          webViewRef.current.injectJavaScript(`
+            (function() {
+              try {
+                window.__flirteasyAutoStartRequested = false;
+                if (window.__flirteasyStopAutomation) {
+                  window.__flirteasyStopAutomation();
+                }
+              } catch (_) {}
+            })();
+            true;
+          `);
+        } catch (_) {}
       }
-      finishLogoutAndExit();
-      return;
-    }
 
-    // Neko / Hyperbeam: the browser session lives on the orchestrator. Keep the
-    // purge armed so the WebView is cleaned the next time one is mounted.
-    await setPendingWebViewPurge(true);
-    const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-    if (orchestratorUrl) {
-      // Best-effort and bounded: an unreachable orchestrator must not hold the
-      // modal open with both buttons disabled.
-      await postJsonWithTimeout(`${orchestratorUrl}/logout`, {
-        userId: route?.params?.userId || 'dev_user_1',
-        platform: 'tinder',
-      });
-      if (webViewRef.current) webViewRef.current.reload();
+      // 2. Local surfaces are reset first: if any later step fails, the app must
+      // never be left showing a logged-in view of a dead session.
+      setShowDashboard(false);
+      setLoginStep("options");
+      delete persistentLoginCache[sessionKey];
+      setInputText("");
+      setSubmittedEmail("");
+      setSubmittedPhone("");
+      setEmailErrorText("");
+
+      const currentAuth = getTinderAuthState();
+      const activeToken = currentAuth?.token || null;
+
+      // Also arms pendingWebViewPurge in AsyncStorage for durable hygiene
+      await clearTinderAuthState();
+      setSharedExtensionSettings({ userProfile: null });
+
+      if (isOnDevice) {
+        exitAfterLogoutRef.current = true;
+        if (webViewRef.current) {
+          try {
+            const purgeScript = buildMasterPurgeScript(activeToken);
+            webViewRef.current.injectJavaScript(purgeScript);
+          } catch (_) {}
+          try {
+            webViewRef.current?.stopLoading();
+          } catch (_) {}
+          try {
+            webViewRef.current?.clearCache(true);
+          } catch (_) {}
+          try {
+            webViewRef.current?.clearHistory();
+          } catch (_) {}
+          try {
+            webViewRef.current?.injectJavaScript(
+              "window.location.replace('https://tinder.com/?logout=1'); true;",
+            );
+          } catch (_) {}
+        }
+      } else {
+        await setPendingWebViewPurge(true);
+        const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+        if (orchestratorUrl) {
+          postJsonWithTimeout(`${orchestratorUrl}/logout`, {
+            userId: route?.params?.userId || "dev_user_1",
+            platform: "tinder",
+          }).catch(() => {});
+          if (webViewRef.current) {
+            try {
+              webViewRef.current.reload();
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Browser] handleLogout error:", err);
+    } finally {
+      // Unconditionally dismiss modal, stop spinner, and return to Home Screen
+      finishLogoutAndExit();
     }
-    finishLogout();
-  };
+  }, [
+    sessionKey,
+    isOnDevice,
+    vpsUrl,
+    route?.params?.userId,
+    finishLogoutAndExit,
+  ]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      handleLogout,
+      purgeSession: handleLogout,
+    }),
+    [handleLogout],
+  );
+
+  useEffect(() => {
+    if (logoutTrigger > 0 && logoutTrigger !== lastLogoutTriggerRef.current) {
+      lastLogoutTriggerRef.current = logoutTrigger;
+      handleLogout();
+    }
+  }, [logoutTrigger, handleLogout]);
 
   const confirmLogout = () => {
     setShowLogoutConfirm(true);
@@ -1910,12 +2435,12 @@ export default function BrowserScreen({ route, navigation }) {
 
   const handleGoBack = async () => {
     setSendingText(false);
-    setInputText('');
-    setLoginStep('options');
+    setInputText("");
+    setLoginStep("options");
     try {
       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-      await fetch(`${orchestratorUrl}/go-back`, { method: 'POST' });
-    } catch (e) { }
+      await fetch(`${orchestratorUrl}/go-back`, { method: "POST" });
+    } catch (e) {}
   };
 
   const handleSendText = async () => {
@@ -1924,18 +2449,18 @@ export default function BrowserScreen({ route, navigation }) {
     try {
       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
       const response = await fetch(`${orchestratorUrl}/type-text`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: inputText }),
       });
       if (response.ok) {
-        setInputText(''); // Clear input on success
+        setInputText(""); // Clear input on success
         await handlePressEnter();
       } else {
-        console.error('Failed to send text to virtual browser');
+        console.error("Failed to send text to virtual browser");
       }
     } catch (e) {
-      console.error('Network error sending text:', e);
+      console.error("Network error sending text:", e);
     } finally {
       setSendingText(false);
     }
@@ -1945,21 +2470,22 @@ export default function BrowserScreen({ route, navigation }) {
     try {
       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
       await fetch(`${orchestratorUrl}/press-enter`, {
-        method: 'POST',
+        method: "POST",
       });
     } catch (e) {
-      console.error('Network error pressing Enter:', e);
+      console.error("Network error pressing Enter:", e);
     }
   };
 
   const injectKeyEvent = (key) => {
     let normalizedKey = key;
-    if (key === '\n') normalizedKey = 'Enter';
+    if (key === "\n") normalizedKey = "Enter";
 
-    const charCode = normalizedKey.length === 1 ? normalizedKey.charCodeAt(0) : 0;
+    const charCode =
+      normalizedKey.length === 1 ? normalizedKey.charCodeAt(0) : 0;
     let keyCode = charCode;
-    if (normalizedKey === 'Backspace') keyCode = 8;
-    if (normalizedKey === 'Enter') keyCode = 13;
+    if (normalizedKey === "Backspace") keyCode = 8;
+    if (normalizedKey === "Enter") keyCode = 13;
 
     const jsCode = `
       (function() {
@@ -1967,7 +2493,7 @@ export default function BrowserScreen({ route, navigation }) {
         const createEvent = (type) => {
           const e = new KeyboardEvent(type, {
             key: ${JSON.stringify(normalizedKey)},
-            code: ${JSON.stringify(normalizedKey === 'Backspace' ? 'Backspace' : normalizedKey === 'Enter' ? 'Enter' : '')},
+            code: ${JSON.stringify(normalizedKey === "Backspace" ? "Backspace" : normalizedKey === "Enter" ? "Enter" : "")},
             keyCode: ${keyCode},
             which: ${keyCode},
             charCode: ${charCode},
@@ -1986,7 +2512,7 @@ export default function BrowserScreen({ route, navigation }) {
 
   const handleTextChange = (text) => {
     if (text.length < dummyText.length) {
-      injectKeyEvent('Backspace');
+      injectKeyEvent("Backspace");
     } else {
       const addedChar = text.slice(dummyText.length);
       for (let i = 0; i < addedChar.length; i++) {
@@ -1997,9 +2523,9 @@ export default function BrowserScreen({ route, navigation }) {
   };
 
   React.useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
       const wasBackground = appState.current.match(/inactive|background/);
-      const isReturning = wasBackground && nextAppState === 'active';
+      const isReturning = wasBackground && nextAppState === "active";
 
       if (isOnDevice && isReturning) {
         // ── On-device foreground recovery ──
@@ -2026,11 +2552,15 @@ export default function BrowserScreen({ route, navigation }) {
             })(); true;
           `);
         }
-        console.log('[Browser] On-device: returned to foreground, checked renderer health.');
+        console.log(
+          "[Browser] On-device: returned to foreground, checked renderer health.",
+        );
       } else if (!isOnDevice && !isHyperbeam && isReturning) {
         // ── Neko/VPS stream reconnect ──
         // NEVER reload on-device — it would destroy the live Tinder login.
-        console.log('[Browser] App returned to foreground. Reloading WebView to refresh Neko connection...');
+        console.log(
+          "[Browser] App returned to foreground. Reloading WebView to refresh Neko connection...",
+        );
         if (webViewRef.current) {
           webViewRef.current.reload();
         }
@@ -2040,7 +2570,7 @@ export default function BrowserScreen({ route, navigation }) {
     });
 
     // Auto-reset Neko video scale and scroll position whenever native keyboard hides
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
       if (webViewRef.current) {
         webViewRef.current.injectJavaScript(`
           (function() {
@@ -2087,8 +2617,6 @@ export default function BrowserScreen({ route, navigation }) {
       }
     `;
 
-
-
     const jsCode = `
       (function() {
         try {
@@ -2128,29 +2656,36 @@ export default function BrowserScreen({ route, navigation }) {
 
   // Auto-start Hyperbeam Cloud VM if navigated with generic 'hyperbeam' endpoint
   useEffect(() => {
-    if (isHyperbeam && (!hyperbeamEmbedUrl || vpsUrl === 'hyperbeam')) {
+    if (isHyperbeam && (!hyperbeamEmbedUrl || vpsUrl === "hyperbeam")) {
       let isCancelled = false;
       setStartingHyperbeam(true);
       setConnectionError(null);
-      console.log('[Browser] Initiating Hyperbeam Cloud VM session fallback...');
+      console.log(
+        "[Browser] Initiating Hyperbeam Cloud VM session fallback...",
+      );
 
       startHyperbeamCloudSession({
-        platform: platform || 'tinder',
-        proxyIp: proxyIp || '',
+        platform: platform || "tinder",
+        proxyIp: proxyIp || "",
         orchestratorUrl: paramOrchestratorUrl || getOrchestratorUrl(vpsUrl),
       })
         .then(({ embedUrl }) => {
           if (!isCancelled) {
-            console.log('[Browser] Hyperbeam Cloud VM session ready:', embedUrl);
+            console.log(
+              "[Browser] Hyperbeam Cloud VM session ready:",
+              embedUrl,
+            );
             setHyperbeamEmbedUrl(embedUrl);
             setStartingHyperbeam(false);
           }
         })
         .catch((err) => {
           if (!isCancelled) {
-            console.error('[Browser] Hyperbeam startup error:', err);
+            console.error("[Browser] Hyperbeam startup error:", err);
             setStartingHyperbeam(false);
-            setConnectionError({ description: `Hyperbeam error: ${err.message}` });
+            setConnectionError({
+              description: `Hyperbeam error: ${err.message}`,
+            });
           }
         });
 
@@ -2162,59 +2697,164 @@ export default function BrowserScreen({ route, navigation }) {
 
   const finalUrl = React.useMemo(() => {
     if (isOnDevice) {
-      return (getTinderAuthState()?.isLoggedIn || route.params?.autoStartAgent)
-        ? 'https://tinder.com/app/recs'
-        : 'https://tinder.com/';
+      const auth = getTinderAuthState();
+      const hasAuth = Boolean(
+        auth?.isLoggedIn ||
+        currentTinderAuth?.isLoggedIn ||
+        (auth?.token &&
+          typeof auth.token === "string" &&
+          auth.token.length >= 16) ||
+        (currentTinderAuth?.token &&
+          typeof currentTinderAuth.token === "string" &&
+          currentTinderAuth.token.length >= 16) ||
+        route.params?.autoStartAgent,
+      );
+      return hasAuth ? "https://tinder.com/app/recs" : "https://tinder.com/";
     }
     if (isHyperbeam) {
       if (hyperbeamEmbedUrl) return hyperbeamEmbedUrl;
-      if (vpsUrl && vpsUrl.includes('hyperbeam.com')) return vpsUrl;
-      return '';
+      if (vpsUrl && vpsUrl.includes("hyperbeam.com")) return vpsUrl;
+      return "";
     }
-    let clean = vpsUrl || '';
-    if (clean === 'hyperbeam' || clean.startsWith('https://hyperbeam') || clean.startsWith('http://hyperbeam')) {
-      return '';
+    let clean = vpsUrl || "";
+    if (
+      clean === "hyperbeam" ||
+      clean.startsWith("https://hyperbeam") ||
+      clean.startsWith("http://hyperbeam")
+    ) {
+      return "";
     }
-    if (clean.includes('hyperbeam.com')) {
+    if (clean.includes("hyperbeam.com")) {
       return clean;
     }
-    const isLocal = clean.includes('localhost') ||
-      clean.includes('127.0.0.1') ||
-      clean.includes('10.0.2.2') ||
-      clean.includes('10.') ||
-      clean.includes('192.168.') ||
-      clean.includes('172.');
+    const isLocal =
+      clean.includes("localhost") ||
+      clean.includes("127.0.0.1") ||
+      clean.includes("10.0.2.2") ||
+      clean.includes("10.") ||
+      clean.includes("192.168.") ||
+      clean.includes("172.");
 
     if (!isLocal) {
-      clean = clean.replace('http://', 'https://');
-      if (clean.includes('stream.') || clean.startsWith('https://')) {
-        clean = clean.replace(':8080', '');
+      clean = clean.replace("http://", "https://");
+      if (clean.includes("stream.") || clean.startsWith("https://")) {
+        clean = clean.replace(":8080", "");
       }
-      if (!clean.startsWith('https://')) {
-        clean = 'https://' + clean;
+      if (!clean.startsWith("https://")) {
+        clean = "https://" + clean;
       }
     } else {
-      if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
-        clean = 'http://' + clean;
+      if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+        clean = "http://" + clean;
       }
     }
-    return `${clean}${clean.includes('?') ? '&' : '?'}t=${Date.now()}`;
-  }, [vpsUrl, isHyperbeam, hyperbeamEmbedUrl]);
+    return `${clean}${clean.includes("?") ? "&" : "?"}t=${Date.now()}`;
+  }, [
+    vpsUrl,
+    isHyperbeam,
+    hyperbeamEmbedUrl,
+    isOnDevice,
+    currentTinderAuth?.isLoggedIn,
+    currentTinderAuth?.token,
+    route.params?.autoStartAgent,
+  ]);
+
+  // ── On-Device Telemetry: Likes and Messages Remaining for Header ──
+  const isTinderPaid = Boolean(
+    currentTinderAuth?.isTinderPro ||
+    currentTinderAuth?.tinderPlan === "plus" ||
+    currentTinderAuth?.tinderPlan === "gold" ||
+    currentTinderAuth?.tinderPlan === "platinum" ||
+    extensionSettings?.userProfile?.isTinderPro,
+  );
+
+  const likesBudget =
+    typeof extensionSettings?.likesPerCycle === "number" &&
+    extensionSettings.likesPerCycle > 0
+      ? extensionSettings.likesPerCycle
+      : 50;
+
+  const currentOnDeviceSession = getOnDeviceSessionState();
+  const isLikesExhausted = Boolean(
+    (currentOnDeviceSession?.likesReplenishTimestamp &&
+      currentOnDeviceSession.likesReplenishTimestamp > Date.now()) ||
+    (currentOnDeviceSession?.likesExhaustedAt > 0 &&
+      Date.now() - currentOnDeviceSession.likesExhaustedAt <
+        12 * 3600 * 1000) ||
+    currentTinderAuth?.likesRemaining === 0,
+  );
+
+  const currentLikes = onDeviceCycleLikes || 0;
+  const currentTargetLikes = likesBudget || 50;
+  const currentMessages = onDeviceCycleMessages || 0;
+  const currentTargetMessages =
+    typeof extensionSettings?.messagesPerCycle === "number" &&
+    extensionSettings.messagesPerCycle > 0
+      ? extensionSettings.messagesPerCycle
+      : 50;
+  const isSafetyLocked = Boolean(
+    rateLimitStatusState?.isSafetyLocked ||
+    currentOnDeviceSession?.waitingReason === "safety_lock",
+  );
+  const cooldownMin = rateLimitStatusState?.resetIn || 12;
+  const swipingActive = isAutoSwipeEnabled(extensionSettings);
+  const messagingActive = isAutoMessagingEnabled(extensionSettings);
+  const currentPhase =
+    currentOnDeviceSession?.currentPhase ||
+    (onDeviceSwiping ? (swipingActive ? "swiping" : "messaging") : "idle");
+  const isMessagingMode = !swipingActive || currentPhase === "messaging";
+
+  let onDeviceHeaderSubtitle = "";
+  let onDeviceStatusColor = "rgba(255, 255, 255, 0.35)";
+
+  if (sessionStatus !== SESSION_SIGNED_IN) {
+    onDeviceHeaderSubtitle =
+      sessionStatus === SESSION_SIGNED_OUT
+        ? "Not signed in"
+        : "Checking session…";
+    onDeviceStatusColor = "rgba(255, 255, 255, 0.35)";
+  } else if (isLikesExhausted) {
+    onDeviceHeaderSubtitle = "Wingman active · Daily quota reached";
+    onDeviceStatusColor = "#EA580C";
+  } else if (isSafetyLocked) {
+    onDeviceHeaderSubtitle = `${currentLikes}/${currentTargetLikes} likes · Cooldown (${cooldownMin}m)`;
+    onDeviceStatusColor = "#F59E0B";
+  } else if (onDeviceSwiping) {
+    if (isMessagingMode) {
+      onDeviceHeaderSubtitle = `${currentMessages}/${currentTargetMessages} msgs · Chatting…`;
+      onDeviceStatusColor = "#EC4899";
+    } else {
+      onDeviceHeaderSubtitle = `${currentLikes}/${currentTargetLikes} likes · Swiping…`;
+      onDeviceStatusColor = uiTheme.colors.success || "#10B981";
+    }
+  } else {
+    if (!swipingActive && messagingActive) {
+      onDeviceHeaderSubtitle = `${currentMessages}/${currentTargetMessages} msgs · Standby`;
+    } else {
+      onDeviceHeaderSubtitle = `${currentLikes}/${currentTargetLikes} likes · Standby`;
+    }
+    onDeviceStatusColor = "#FE3C72";
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={0}
       >
         {/* ─── Upgraded Modern Glass Header ─── */}
         <View style={styles.header}>
-          <TouchableOpacity accessibilityRole="button"
+          <TouchableOpacity
+            accessibilityRole="button"
             style={styles.closeBtnCircular}
             onPress={() => {
-              cleanupCurrentSession();
-              navigation.goBack();
+              if (onClose) {
+                onClose();
+              } else {
+                cleanupCurrentSession();
+                navigation?.goBack?.();
+              }
             }}
           >
             <Ionicons name="close" size={18} color={uiTheme.colors.text} />
@@ -2222,18 +2862,28 @@ export default function BrowserScreen({ route, navigation }) {
           <View style={styles.headerLeft}>
             <View style={styles.headerTitleRow}>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {isOnDevice ? 'Tinder' : `${platform} Session`}
+                {isOnDevice ? "Tinder" : `${platform} Session`}
               </Text>
             </View>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {isOnDevice
-                ? (sessionStatus === SESSION_SIGNED_IN
-                    ? `${onDeviceSwipes} swipes · ${onDeviceMatches} matches`
-                    : sessionStatus === SESSION_SIGNED_OUT
-                      ? 'Not signed in'
-                      : 'Checking session…')
-                : (isHyperbeam ? '⚡ Hyperbeam Cloud Stream' : (proxyIp ? `IP: ${maskProxy(proxyIp)}` : 'Direct Connection'))}
-            </Text>
+            <View style={styles.subtitleRow}>
+              {isOnDevice && sessionStatus === SESSION_SIGNED_IN && (
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: onDeviceStatusColor },
+                  ]}
+                />
+              )}
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {isOnDevice
+                  ? onDeviceHeaderSubtitle
+                  : isHyperbeam
+                    ? "⚡ Hyperbeam Cloud Stream"
+                    : proxyIp
+                      ? `IP: ${maskProxy(proxyIp)}`
+                      : "Direct Connection"}
+              </Text>
+            </View>
           </View>
           {isOnDevice ? (
             <View style={styles.headerActions}>
@@ -2243,28 +2893,52 @@ export default function BrowserScreen({ route, navigation }) {
               <TouchableOpacity
                 style={[
                   styles.onDeviceDashboardBtn,
-                  onDeviceSwiping ? styles.onDeviceDashboardBtnActive : styles.onDeviceDashboardBtnIdle,
-                  sessionStatus !== SESSION_SIGNED_IN && styles.headerBtnDisabled,
+                  onDeviceSwiping
+                    ? styles.onDeviceDashboardBtnActive
+                    : styles.onDeviceDashboardBtnIdle,
+                  sessionStatus !== SESSION_SIGNED_IN &&
+                    styles.headerBtnDisabled,
                 ]}
                 onPress={() => setShowDashboard(true)}
                 disabled={sessionStatus !== SESSION_SIGNED_IN}
                 activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel={onDeviceSwiping ? `AI automation active, ${onDeviceSwipes} swipes` : 'AI controls'}
+                accessibilityLabel={
+                  onDeviceSwiping
+                    ? isMessagingMode
+                      ? `AI automation active, ${currentMessages} of ${currentTargetMessages} messages completed`
+                      : `AI automation active, ${currentLikes} of ${currentTargetLikes} likes completed`
+                    : isMessagingMode
+                      ? `AI controls, ${currentMessages} of ${currentTargetMessages} messages completed`
+                      : `AI controls, ${currentLikes} of ${currentTargetLikes} likes completed`
+                }
                 accessibilityHint={
-                  sessionStatus === SESSION_SIGNED_IN ? undefined : 'Sign in to Tinder to enable AI controls'
+                  sessionStatus === SESSION_SIGNED_IN
+                    ? undefined
+                    : "Sign in to Tinder to enable AI controls"
                 }
               >
                 <Ionicons
                   name={onDeviceSwiping ? "flash" : "options"}
                   size={13}
-                  color={onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.primary}
+                  color={
+                    onDeviceSwiping
+                      ? uiTheme.colors.success
+                      : uiTheme.colors.primary
+                  }
                 />
                 {/* No swipe count here: it is already on the subtitle line and in
                     the dashboard, and an unbounded number in this label is what
                     pushed the row past the width of a 360dp screen. */}
-                <Text style={[styles.onDeviceDashboardBtnText, { color: onDeviceSwiping ? uiTheme.colors.success : "#FFF" }]}>
-                  {onDeviceSwiping ? 'AI Active' : 'AI Controls'}
+                <Text
+                  style={[
+                    styles.onDeviceDashboardBtnText,
+                    {
+                      color: onDeviceSwiping ? uiTheme.colors.success : "#FFF",
+                    },
+                  ]}
+                >
+                  {onDeviceSwiping ? "AI Active" : "AI Controls"}
                 </Text>
               </TouchableOpacity>
 
@@ -2274,13 +2948,23 @@ export default function BrowserScreen({ route, navigation }) {
                   wording lives on the subtitle line where there is room for it. */}
               {sessionStatus === SESSION_SIGNED_IN ? (
                 <TouchableOpacity
-                  style={[styles.onDeviceLogsBtn, { backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
+                  style={[
+                    styles.onDeviceLogsBtn,
+                    {
+                      backgroundColor: "rgba(239, 68, 68, 0.14)",
+                      borderColor: "rgba(239, 68, 68, 0.35)",
+                    },
+                  ]}
                   onPress={confirmLogout}
                   activeOpacity={0.8}
                   accessibilityRole="button"
                   accessibilityLabel="Log out of Tinder"
                 >
-                  <Ionicons name="log-out-outline" size={14} color={uiTheme.colors.error} />
+                  <Ionicons
+                    name="log-out-outline"
+                    size={14}
+                    color={uiTheme.colors.error}
+                  />
                 </TouchableOpacity>
               ) : (
                 <View
@@ -2290,67 +2974,130 @@ export default function BrowserScreen({ route, navigation }) {
                 />
               )}
             </View>
-          ) : (loginStep !== 'done' ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity accessibilityRole="button"
+          ) : loginStep !== "done" ? (
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TouchableOpacity
+                accessibilityRole="button"
                 style={[styles.toggleNekoBtn, { marginRight: 4 }]}
                 onPress={() => setIsExpanded(!isExpanded)}
               >
-                <Ionicons name={isExpanded ? "contract-outline" : "expand-outline"} size={13} color={uiTheme.colors.text} />
+                <Ionicons
+                  name={isExpanded ? "contract-outline" : "expand-outline"}
+                  size={13}
+                  color={uiTheme.colors.text}
+                />
                 <Text style={styles.toggleNekoBtnText}>
-                  {isExpanded ? 'Split' : 'Expand'}
+                  {isExpanded ? "Split" : "Expand"}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button"
+              <TouchableOpacity
+                accessibilityRole="button"
                 style={[styles.toggleNekoBtn, { marginRight: 4 }]}
                 onPress={() => setShowNeko(!showNeko)}
               >
-                <Ionicons name={showNeko ? "eye-off-outline" : "eye-outline"} size={13} color={uiTheme.colors.text} />
+                <Ionicons
+                  name={showNeko ? "eye-off-outline" : "eye-outline"}
+                  size={13}
+                  color={uiTheme.colors.text}
+                />
                 <Text style={styles.toggleNekoBtnText}>
-                  {showNeko ? 'Hide' : 'View'}
+                  {showNeko ? "Hide" : "View"}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button"
+              <TouchableOpacity
+                accessibilityRole="button"
                 style={[styles.dashboardBtn, { marginRight: 4 }]}
                 onPress={() => setShowDashboard(true)}
               >
-                <Ionicons name="stats-chart-outline" size={15} color={uiTheme.colors.primary} />
+                <Ionicons
+                  name="stats-chart-outline"
+                  size={15}
+                  color={uiTheme.colors.primary}
+                />
               </TouchableOpacity>
               {sessionStatus === SESSION_SIGNED_IN && (
-                <TouchableOpacity accessibilityRole="button"
-                  style={[styles.dashboardBtn, { marginRight: 4, backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[
+                    styles.dashboardBtn,
+                    {
+                      marginRight: 4,
+                      backgroundColor: "rgba(239, 68, 68, 0.14)",
+                      borderColor: "rgba(239, 68, 68, 0.35)",
+                    },
+                  ]}
                   onPress={confirmLogout}
                 >
-                  <Ionicons name="log-out-outline" size={14} color={uiTheme.colors.error} />
+                  <Ionicons
+                    name="log-out-outline"
+                    size={14}
+                    color={uiTheme.colors.error}
+                  />
                 </TouchableOpacity>
               )}
-              <TouchableOpacity accessibilityRole="button" style={styles.skipBtn} onPress={() => setLoginStep('done')}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={styles.skipBtn}
+                onPress={() => setLoginStep("done")}
+              >
                 <Text style={styles.skipBtnText}>Skip</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity accessibilityRole="button"
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TouchableOpacity
+                accessibilityRole="button"
                 style={[styles.dashboardBtn, { marginRight: 6 }]}
                 onPress={() => setShowDashboard(true)}
               >
-                <Ionicons name="stats-chart-outline" size={15} color={uiTheme.colors.primary} />
+                <Ionicons
+                  name="stats-chart-outline"
+                  size={15}
+                  color={uiTheme.colors.primary}
+                />
               </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button"
-                style={[styles.dashboardBtn, { marginRight: 6, backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={[
+                  styles.dashboardBtn,
+                  {
+                    marginRight: 6,
+                    backgroundColor: "rgba(239, 68, 68, 0.14)",
+                    borderColor: "rgba(239, 68, 68, 0.35)",
+                  },
+                ]}
                 onPress={confirmLogout}
               >
-                <Ionicons name="log-out-outline" size={14} color={uiTheme.colors.error} />
+                <Ionicons
+                  name="log-out-outline"
+                  size={14}
+                  color={uiTheme.colors.error}
+                />
               </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button"
-                style={[styles.menuBtn, { marginRight: 8, backgroundColor: '#3A3A4A15', borderColor: '#3A3A4A40' }]}
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={[
+                  styles.menuBtn,
+                  {
+                    marginRight: 8,
+                    backgroundColor: "#3A3A4A15",
+                    borderColor: "#3A3A4A40",
+                  },
+                ]}
                 onPress={() => inputRef.current.focus()}
               >
-                <Ionicons name="keypad-outline" size={13} color="#FFF" style={{ marginRight: 4 }} />
-                <Text style={[styles.menuBtnText, { color: '#FFF' }]}>Keyboard</Text>
+                <Ionicons
+                  name="keypad-outline"
+                  size={13}
+                  color="#FFF"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[styles.menuBtnText, { color: "#FFF" }]}>
+                  Keyboard
+                </Text>
               </TouchableOpacity>
             </View>
-          ))}
+          )}
         </View>
 
         {/* ─── Full-screen Dashboard Modal (accessible at any loginStep) ─── */}
@@ -2362,26 +3109,45 @@ export default function BrowserScreen({ route, navigation }) {
         >
           <SafeAreaView style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="stats-chart" size={16} color={uiTheme.colors.primary} />
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
+                <Ionicons
+                  name="stats-chart"
+                  size={16}
+                  color={uiTheme.colors.primary}
+                />
                 <Text style={styles.modalTitle}>Flint Dashboard</Text>
               </View>
               <View style={styles.headerRightActions}>
-                {(isOnDevice ? (sessionStatus === SESSION_SIGNED_IN) : (loginStep === 'done' || sessionStatus === SESSION_SIGNED_IN)) && (
-                  <TouchableOpacity accessibilityRole="button"
+                {(isOnDevice
+                  ? sessionStatus === SESSION_SIGNED_IN
+                  : loginStep === "done" ||
+                    sessionStatus === SESSION_SIGNED_IN) && (
+                  <TouchableOpacity
+                    accessibilityRole="button"
                     style={styles.headerLogoutBtn}
                     onPress={confirmLogout}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="log-out-outline" size={15} color={uiTheme.colors.error} />
+                    <Ionicons
+                      name="log-out-outline"
+                      size={15}
+                      color={uiTheme.colors.error}
+                    />
                     <Text style={styles.headerLogoutBtnText}>Log Out</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.modalCloseBtn}
                   onPress={() => setShowDashboard(false)}
                 >
-                  <Ionicons name="close" size={16} color={uiTheme.colors.text} />
+                  <Ionicons
+                    name="close"
+                    size={16}
+                    color={uiTheme.colors.text}
+                  />
                 </TouchableOpacity>
               </View>
             </View>
@@ -2389,24 +3155,35 @@ export default function BrowserScreen({ route, navigation }) {
               stats={isOnDevice ? onDeviceStats : extensionStats}
               loading={isOnDevice ? false : statsLoading}
               error={isOnDevice ? null : statsError}
-              orchestratorUrl={orchestratorUrl || resolveLocalUrl('http://localhost:3001')}
+              orchestratorUrl={
+                orchestratorUrl || resolveLocalUrl("http://localhost:3001")
+              }
               onToggleAgent={handleToggleAgent}
               onLogout={handleLogout}
               onConnect={() => {
                 setShowDashboard(false);
                 if (webViewRef.current) {
-                  webViewRef.current.injectJavaScript('if (!window.location.href.includes("tinder.com")) { window.location.href = "https://tinder.com/"; } true;');
+                  webViewRef.current.injectJavaScript(
+                    'if (!window.location.href.includes("tinder.com")) { window.location.href = "https://tinder.com/"; } true;',
+                  );
                 }
               }}
-              isLoggedIn={isOnDevice ? (sessionStatus === SESSION_SIGNED_IN) : (loginStep === 'done' || sessionStatus === SESSION_SIGNED_IN)}
-              onSaveSettings={isOnDevice ? handleSaveOnDeviceSettings : undefined}
+              isLoggedIn={
+                isOnDevice
+                  ? sessionStatus === SESSION_SIGNED_IN
+                  : loginStep === "done" || sessionStatus === SESSION_SIGNED_IN
+              }
+              onSaveSettings={
+                isOnDevice ? handleSaveOnDeviceSettings : undefined
+              }
               settings={isOnDevice ? extensionSettings : undefined}
               onSyncProfile={handleSyncProfileOnDevice}
               onPushBio={handlePushBioOnDevice}
               controlsContent={
                 isOnDevice ? (
                   <View style={styles.onDeviceControlsBox}>
-                    <TouchableOpacity accessibilityRole="button"
+                    <TouchableOpacity
+                      accessibilityRole="button"
                       style={styles.onDeviceQuickChatsBtn}
                       onPress={() => {
                         setShowDashboard(false);
@@ -2414,8 +3191,14 @@ export default function BrowserScreen({ route, navigation }) {
                       }}
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="chatbubbles" size={15} color={uiTheme.colors.info} />
-                      <Text style={styles.onDeviceQuickChatsBtnText}>💬 Reply to Unread Matches with AI</Text>
+                      <Ionicons
+                        name="chatbubbles"
+                        size={15}
+                        color={uiTheme.colors.info}
+                      />
+                      <Text style={styles.onDeviceQuickChatsBtnText}>
+                        💬 Reply to Unread Matches with AI
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -2429,7 +3212,8 @@ export default function BrowserScreen({ route, navigation }) {
                       autoCapitalize="none"
                       autoCorrect={false}
                     />
-                    <TouchableOpacity accessibilityRole="button"
+                    <TouchableOpacity
+                      accessibilityRole="button"
                       style={styles.sendBtn}
                       onPress={handleSendText}
                       disabled={sendingText}
@@ -2440,7 +3224,11 @@ export default function BrowserScreen({ route, navigation }) {
                         <Text style={styles.sendBtnText}>Send</Text>
                       )}
                     </TouchableOpacity>
-                    <TouchableOpacity accessibilityRole="button" style={styles.enterBtn} onPress={handlePressEnter}>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      style={styles.enterBtn}
+                      onPress={handlePressEnter}
+                    >
                       <Text style={styles.enterBtnText}>⏎ Enter</Text>
                     </TouchableOpacity>
                   </View>
@@ -2461,16 +3249,22 @@ export default function BrowserScreen({ route, navigation }) {
           <View style={styles.logoutModalOverlay}>
             <View style={styles.logoutModalCard}>
               <View style={styles.logoutIconBadge}>
-                <Ionicons name="log-out" size={28} color={uiTheme.colors.error} />
+                <Ionicons
+                  name="log-out"
+                  size={28}
+                  color={uiTheme.colors.error}
+                />
               </View>
 
               <Text style={styles.logoutModalTitle}>Log Out of Tinder?</Text>
               <Text style={styles.logoutModalSubtitle}>
-                This will terminate the active session, clear browser state, and return you to the login screen.
+                This will terminate the active session, clear browser state, and
+                return you to the login screen.
               </Text>
 
               <View style={styles.logoutModalBtnRow}>
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.logoutModalCancelBtn}
                   onPress={() => setShowLogoutConfirm(false)}
                   disabled={loggingOut}
@@ -2479,7 +3273,8 @@ export default function BrowserScreen({ route, navigation }) {
                   <Text style={styles.logoutModalCancelText}>Cancel</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.logoutModalConfirmBtn}
                   onPress={handleLogout}
                   disabled={loggingOut}
@@ -2501,14 +3296,16 @@ export default function BrowserScreen({ route, navigation }) {
 
         {/* ─── Rounded Glass Browser Container ─── */}
         <View
-          {...((isHyperbeam || isOnDevice) ? {} : panResponder.panHandlers)}
+          {...(isHyperbeam || isOnDevice ? {} : panResponder.panHandlers)}
           style={[
             styles.webviewContainer,
-            (isOnDevice || loginStep === 'done')
+            isOnDevice || loginStep === "done"
               ? styles.webviewContainerFull
-              : (showNeko
-                ? (isExpanded || loginStep === 'captcha' ? styles.webviewContainerFull : styles.webviewContainerSplit)
-                : styles.webviewContainerHidden)
+              : showNeko
+                ? isExpanded || loginStep === "captcha"
+                  ? styles.webviewContainerFull
+                  : styles.webviewContainerSplit
+                : styles.webviewContainerHidden,
           ]}
         >
           {Boolean(finalUrl) && (
@@ -2518,7 +3315,7 @@ export default function BrowserScreen({ route, navigation }) {
               style={[styles.webview, isOnDevice && styles.onDeviceWebview]}
               scrollEnabled={true}
               bounces={false}
-              scalesPageToFit={!isOnDevice && Platform.OS === 'ios'}
+              scalesPageToFit={!isOnDevice && Platform.OS === "ios"}
               nestedScrollEnabled={false}
               setSupportMultipleWindows={false}
               setBuiltInZoomControls={false}
@@ -2538,25 +3335,29 @@ export default function BrowserScreen({ route, navigation }) {
               mediaPlaybackRequiresUserAction={false}
               androidHardwareAccelerationDisabled={false}
               androidLayerType="hardware"
-              originWhitelist={['*']}
+              originWhitelist={["*"]}
               userAgent={
                 isOnDevice
-                  ? (Platform.OS === 'ios'
-                      ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
-                      : 'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.127 Mobile Safari/537.36')
-                  : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                  ? Platform.OS === "ios"
+                    ? "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+                    : "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.127 Mobile Safari/537.36"
+                  : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
               }
               onLoadStart={() => {
                 setConnectionError(null);
               }}
               onLoadEnd={() => {
-                const isDisconnectedOnDevice = isOnDevice && !getTinderAuthState()?.isLoggedIn && !route.params?.autoStartAgent;
+                const isDisconnectedOnDevice =
+                  isOnDevice &&
+                  !getTinderAuthState()?.isLoggedIn &&
+                  !route.params?.autoStartAgent;
                 if (!isDisconnectedOnDevice || loginSheetReadyRef.current) {
                   setLoading(false);
                 } else {
                   // Keep loading veil active until 3-button login modal is signaled by WebView.
                   // Failsafe: reveal page after 15s in case Tinder layout changes or network hangs.
-                  if (loginSheetTimeoutRef.current) clearTimeout(loginSheetTimeoutRef.current);
+                  if (loginSheetTimeoutRef.current)
+                    clearTimeout(loginSheetTimeoutRef.current);
                   loginSheetTimeoutRef.current = setTimeout(() => {
                     if (isMountedRef.current) {
                       setLoading(false);
@@ -2565,13 +3366,23 @@ export default function BrowserScreen({ route, navigation }) {
                 }
                 injectConfigScript();
                 // If opening after an external logout (from Home Screen), purge and reset session cleanly once
-                if (isOnDevice && (getPendingWebViewPurge() || (shouldForceLogout && !hasExecutedPurgeRef.current))) {
+                if (
+                  isOnDevice &&
+                  (getPendingWebViewPurge() ||
+                    (shouldForceLogout && !hasExecutedPurgeRef.current))
+                ) {
                   hasExecutedPurgeRef.current = true;
                   setPendingWebViewPurge(false);
                   delete persistentLoginCache[sessionKey];
-                  try { webViewRef.current?.clearCache(true); } catch (_) {}
-                  try { webViewRef.current?.clearFormData(); } catch (_) {}
-                  try { webViewRef.current?.clearHistory(); } catch (_) {}
+                  try {
+                    webViewRef.current?.clearCache(true);
+                  } catch (_) {}
+                  try {
+                    webViewRef.current?.clearFormData();
+                  } catch (_) {}
+                  try {
+                    webViewRef.current?.clearHistory();
+                  } catch (_) {}
                   webViewRef.current?.injectJavaScript(MASTER_PURGE_SCRIPT);
                 }
 
@@ -2579,11 +3390,21 @@ export default function BrowserScreen({ route, navigation }) {
                 // the handles. Skipped while this screen is on its way out, so the
                 // flag stays armed and the work happens on the next open rather
                 // than being cut short by the unmount.
-                if (isOnDevice && getPendingStorageTeardown() && !isExitingRef.current) {
+                if (
+                  isOnDevice &&
+                  getPendingStorageTeardown() &&
+                  !isExitingRef.current
+                ) {
                   setPendingStorageTeardown(false);
-                  try { webViewRef.current?.clearCache(true); } catch (_) {}
-                  try { webViewRef.current?.clearFormData(); } catch (_) {}
-                  try { webViewRef.current?.clearHistory(); } catch (_) {}
+                  try {
+                    webViewRef.current?.clearCache(true);
+                  } catch (_) {}
+                  try {
+                    webViewRef.current?.clearFormData();
+                  } catch (_) {}
+                  try {
+                    webViewRef.current?.clearHistory();
+                  } catch (_) {}
                   webViewRef.current?.injectJavaScript(STORAGE_TEARDOWN_SCRIPT);
                 }
                 // The "landing page -> Create account" helper lives in the
@@ -2591,7 +3412,11 @@ export default function BrowserScreen({ route, navigation }) {
                 // nothing to inject from here.
 
                 // Auto-start only if explicitly requested from Home Screen via autoStartAgent
-                if (isOnDevice && route.params?.autoStartAgent && pendingAutoStartRef.current) {
+                if (
+                  isOnDevice &&
+                  route.params?.autoStartAgent &&
+                  pendingAutoStartRef.current
+                ) {
                   triggerAutoStartIfReady();
                 }
               }}
@@ -2602,18 +3427,23 @@ export default function BrowserScreen({ route, navigation }) {
                 try {
                   const msg = JSON.parse(event.nativeEvent.data);
 
-                  if (msg.type === 'FE_COLLECTION_EVENT') {
+                  if (msg.type === "FE_COLLECTION_EVENT") {
                     const collectionToken = getTinderAuthState()?.token;
-                    if (collectionToken && msg.sessionToken === collectionToken) {
+                    if (
+                      collectionToken &&
+                      msg.sessionToken === collectionToken
+                    ) {
                       activateCollections(collectionToken)
-                        .then(() => ingestCollectionEvent(msg.event, collectionToken))
+                        .then(() =>
+                          ingestCollectionEvent(msg.event, collectionToken),
+                        )
                         .catch(() => {});
                     }
                     return;
                   }
 
                   // ── Sub-50ms login sheet ready signal (3 buttons visible) ──
-                  if (msg.type === 'FE_LOGIN_SHEET_READY') {
+                  if (msg.type === "FE_LOGIN_SHEET_READY") {
                     loginSheetReadyRef.current = true;
                     if (loginSheetTimeoutRef.current) {
                       clearTimeout(loginSheetTimeoutRef.current);
@@ -2626,219 +3456,67 @@ export default function BrowserScreen({ route, navigation }) {
                   }
 
                   // ── Foreground renderer health probe response ──
-                  if (msg.type === 'FE_RENDERER_NEEDS_RELOAD') {
-                    addLog('Browser engine was reset while backgrounded — reloading session', 'warn');
+                  if (msg.type === "FE_RENDERER_NEEDS_RELOAD") {
+                    addLog(
+                      "Browser engine was reset while backgrounded — reloading session",
+                      "warn",
+                    );
                     if (webViewRef.current) webViewRef.current.reload();
                     return;
                   }
 
                   // ── Chrome Extension Runtime Bridge (On-Device Mode) ──
-                  if (msg.type === 'FE_CHROME_MSG') {
+                  if (msg.type === "FE_CHROME_MSG") {
                     const { _callbackId } = msg;
                     const worker = backgroundWorkerRef.current;
                     if (worker) {
                       const response = await worker.handleMessage(msg);
                       if (_callbackId && webViewRef.current) {
-                        const respStr = JSON.stringify(response !== undefined ? response : null);
+                        const respStr = JSON.stringify(
+                          response !== undefined ? response : null,
+                        );
                         webViewRef.current.injectJavaScript(
-                          `window.__chromeCallbacks && window.__chromeCallbacks.resolve(${_callbackId}, ${respStr}); true;`
+                          `window.__chromeCallbacks && window.__chromeCallbacks.resolve(${_callbackId}, ${respStr}); true;`,
                         );
                       }
                     }
                     return;
                   }
 
-                  if (msg.type === 'FE_PORT_MSG') {
+                  if (msg.type === "FE_PORT_MSG") {
                     return;
                   }
 
-                  if (msg.type === 'FE_TOKEN_CAPTURED' && msg.token) {
-                    const cleanToken = String(msg.token).replace(/^["'](.*)["']$/, '$1').trim();
+                  if (msg.type === "FE_TOKEN_CAPTURED" && msg.token) {
+                    const cleanToken = String(msg.token)
+                      .replace(/^["'](.*)["']$/, "$1")
+                      .trim();
                     if (cleanToken.length >= 16) {
                       const current = getTinderAuthState();
-                      if (!current?.isLoggedIn || current?.token !== cleanToken) {
+                      if (
+                        !current?.isLoggedIn ||
+                        current?.token !== cleanToken
+                      ) {
                         setTinderAuthState({
                           isLoggedIn: true,
                           token: cleanToken,
-                          accountName: current?.accountName || 'Tinder Account',
+                          accountName: current?.accountName || "Tinder Account",
                         });
-                        addLog('🔑 Tinder session token securely captured', 'success');
-                        probeTinderSession(cleanToken).then((res) => {
-                          if (res?.ok && (res.profile || res.user)) {
-                            const profile = res.profile || parseTinderUserProfile(res.user, {
-                              plan: res.plan,
-                              isPro: res.isPro,
-                              likesRemaining: res.likesRemaining,
-                              rateLimitedUntil: res.rateLimitedUntil,
-                            });
-                            if (profile) {
-                              handleSaveOnDeviceSettings({
-                                userProfile: profile,
-                                manualBio: profile.bio || undefined,
-                              });
-                            }
-                          }
-                        }).catch(() => {});
-                      }
-                    }
-                    return;
-                  }
-
-                  if (msg.type === 'FE_PROFILE_SYNC_RESPONSE') {
-                    const cb = profileSyncCallbacksRef.current.get(msg.requestId);
-                    if (cb) {
-                      profileSyncCallbacksRef.current.delete(msg.requestId);
-                      cb(msg);
-                    }
-                    if (msg.success && msg.profile) {
-                      const profileToken = msg.token || msg.profile?.token;
-                      const authUpdates = { isLoggedIn: true };
-                      if (msg.profile.name) authUpdates.accountName = msg.profile.name;
-                      if (profileToken) authUpdates.token = profileToken;
-                      setTinderAuthState(authUpdates);
-                      addLog(`Profile synced for ${msg.profile.name || 'user'}`, 'success');
-                      handleSaveOnDeviceSettings({ userProfile: msg.profile, manualBio: msg.profile.bio || undefined });
-                    }
-                    return;
-                  }
-
-                  if (msg.type === 'FE_PUSH_BIO_RESPONSE') {
-                    const cb = pushBioCallbacksRef.current.get(msg.requestId);
-                    if (cb) {
-                      pushBioCallbacksRef.current.delete(msg.requestId);
-                      cb(msg);
-                    }
-                    if (msg.success && msg.bio) {
-                      addLog(`Pushed new bio to Tinder (${msg.method === 'dom' ? 'DOM' : 'API'})`, 'success');
-                      handleSaveOnDeviceSettings({ manualBio: msg.bio });
-                    } else if (!msg.success) {
-                      addLog(`Bio push failed: ${msg.error || 'Unknown error'}`, 'error');
-                    }
-                    return;
-                  }
-
-                  if (msg.type === 'FE_LOG') {
-                    addLog(msg.text, msg.logType || 'info');
-                  }
-                  if (msg.type === 'FE_COORD') {
-                    setLastCoord({ x: msg.x, y: msg.y });
-                    addLog(`📍 Tap Coordinate: X=${msg.x}, Y=${msg.y}`, 'action');
-                  }
-                  if (msg.type === 'FE_SWIPE') {
-                    const prev = onDeviceSwipesRef.current || 0;
-                    const updated = Math.max(prev + 1, msg.swipeCount || (prev + 1));
-                    onDeviceSwipesRef.current = updated;
-                    setOnDeviceSwipes(updated);
-                    setOnDeviceSwiping(true);
-                    saveOnDeviceSessionState({ swipes: updated, isRunning: true });
-                    setTinderAuthState({ isLoggedIn: true, accountName: 'Tinder Account' });
-                    const targetName = msg.name || 'Someone New';
-                    const detail = msg.detail || (msg.age ? `Age ${msg.age} · Verified Profile` : 'AI Target Match · Safe Paced');
-                    addLog(`❤️ Swiped profile: ${targetName} (${msg.swipeCount || updated}/${msg.total || 50})`, 'action');
-                    trackingService.trackLike(1);
-                    pushProgressFeedEvent('profile_liked', detail, targetName, 5);
-                    const collectionToken = getTinderAuthState()?.token;
-                    if (collectionToken) {
-                      const swipeEvent = createSwipeEventFromDomMessage(msg);
-                      activateCollections(collectionToken)
-                        .then(() => ingestCollectionEvent(swipeEvent, collectionToken))
-                        .catch(() => addLog('Swipe counted, but its profile could not be saved locally.', 'warn'));
-                    }
-                  }
-                  if (msg.type === 'FE_MATCH') {
-                    const prev = onDeviceMatchesRef.current || 0;
-                    const updated = Math.max(prev + 1, msg.matchCount || (prev + 1));
-                    onDeviceMatchesRef.current = updated;
-                    setOnDeviceMatches(updated);
-                    saveOnDeviceSessionState({ matches: updated });
-                    setTinderAuthState({ isLoggedIn: true, accountName: 'Tinder Account' });
-                    const matchName = msg.matchName || 'New Match';
-                    addLog(`🎉 New Match detected (${matchName})!`, 'success');
-                    trackingService.trackMatch({ matchName });
-                    pushProgressFeedEvent('match_detected', 'New Match Connected!', matchName, 25);
-
-                    const matchId = msg.matchId || `match_${Date.now()}`;
-                    const worker = backgroundWorkerRef.current;
-                    if (worker && worker.handleMessage) {
-                      worker.handleMessage({
-                        action: 'saveMatchData',
-                        matchId,
-                        data: {
-                          matchId,
-                          name: matchName,
-                          photoUrl: msg.photoUrl || null,
-                          matchedAt: Date.now()
-                        }
-                      }).catch(() => {});
-                    }
-                  }
-                  if (msg.type === 'FE_OUT_OF_LIKES') {
-                    const now = msg.timestamp || Date.now();
-                    saveOnDeviceSessionState({ likesExhaustedAt: now, isRunning: false });
-                    onDeviceSwipingRef.current = false;
-                    setOnDeviceSwiping(false);
-                    addLog('Daily like quota exhausted (12h reset countdown active). Paused.', 'warn');
-                    trackingService.trackEvent('like_quota_exhausted', {
-                      exhausted_at: new Date(now).toISOString()
-                    });
-                    pushProgressFeedEvent('rate_limit', 'Daily like limit reached. Refills in 12h.', null, 10);
-                  }
-                  if (msg.type === 'FE_SESSION_EXPIRED') {
-                    addLog('⚠️ Tinder session expired (401 Unauthorized). Automation halted. Reconnect your account.', 'error');
-                    setOnDeviceSwiping(false);
-                    onDeviceSwipingRef.current = false;
-                    saveOnDeviceSessionState({ isRunning: false });
-                    clearTinderAuthState();
-                    trackingService.trackEvent('tinder_session_expired', {
-                      status: msg.status || 401,
-                      url: msg.url || null,
-                    });
-                    pushProgressFeedEvent('session_expired', 'Tinder session expired. Reconnect to continue.', null, 15);
-                  }
-                  if (msg.type === 'FE_PLAN_DETECTED') {
-                    const plan = msg.plan || 'free';
-                    const isPro = Boolean(msg.isPro);
-                    setTinderAuthState({ tinderPlan: plan, isTinderPro: isPro });
-                    if (onDeviceSettingsRef.current) {
-                      const prevProfile = onDeviceSettingsRef.current.userProfile || {};
-                      const updatedProfile = { ...prevProfile, tinderPlan: plan, isTinderPro: isPro };
-                      onDeviceSettingsRef.current = { ...onDeviceSettingsRef.current, userProfile: updatedProfile };
-                      setSharedExtensionSettings(onDeviceSettingsRef.current);
-                    }
-                    const planLabel = plan === 'platinum' ? 'Platinum 💎' : plan === 'gold' ? 'Gold 👑' : plan === 'plus' ? 'Plus ⚡' : 'Free';
-                    addLog(`Detected Tinder ${planLabel} tier.`, 'info');
-                  }
-                  if (msg.type === 'FE_CYCLE_DONE') {
-                    onDeviceSwipingRef.current = false;
-                    setOnDeviceSwiping(false);
-                    saveOnDeviceSessionState({ isRunning: false });
-                    const count = typeof msg.count === 'number' ? msg.count : onDeviceSwipesRef.current;
-                    addLog(`Cycle target reached (${count} likes). Paused.`, 'info');
-                    trackingService.trackCycleEnd({ likes_sent: count });
-                    pushProgressFeedEvent('cycle_complete', `Batch complete · ${count} swiped`, null, 15);
-                  }
-                  if (msg.type === 'FE_PAGE_STATUS') {
-                    // Ignore page status reports while a logout is actively executing or pending
-                    if (isLoggingOutRef.current || getPendingWebViewPurge()) return;
-                    // ── Initial Page Status Report (fired on content.js inject) ──
-                    // Syncs the home screen to the live WebView page state on load.
-                    if (typeof msg.isLoggedIn === 'boolean') {
-                      if (msg.isLoggedIn) {
-                        const capturedToken = msg.token || undefined;
-                        setTinderAuthState({
-                          isLoggedIn: true,
-                          token: capturedToken,
-                          accountName: msg.accountName || 'Tinder Account'
-                        });
-                        if (capturedToken) {
-                          probeTinderSession(capturedToken).then((res) => {
+                        addLog(
+                          "🔑 Tinder session token securely captured",
+                          "success",
+                        );
+                        probeTinderSession(cleanToken)
+                          .then((res) => {
                             if (res?.ok && (res.profile || res.user)) {
-                              const profile = res.profile || parseTinderUserProfile(res.user, {
-                                plan: res.plan,
-                                isPro: res.isPro,
-                                likesRemaining: res.likesRemaining,
-                                rateLimitedUntil: res.rateLimitedUntil,
-                              });
+                              const profile =
+                                res.profile ||
+                                parseTinderUserProfile(res.user, {
+                                  plan: res.plan,
+                                  isPro: res.isPro,
+                                  likesRemaining: res.likesRemaining,
+                                  rateLimitedUntil: res.rateLimitedUntil,
+                                });
                               if (profile) {
                                 handleSaveOnDeviceSettings({
                                   userProfile: profile,
@@ -2846,56 +3524,865 @@ export default function BrowserScreen({ route, navigation }) {
                                 });
                               }
                             }
-                          }).catch(() => {});
+                          })
+                          .catch(() => {});
+                      }
+                    }
+                    return;
+                  }
+
+                  if (msg.type === "FE_PROFILE_SYNC_RESPONSE") {
+                    const cb = profileSyncCallbacksRef.current.get(
+                      msg.requestId,
+                    );
+                    if (cb) {
+                      profileSyncCallbacksRef.current.delete(msg.requestId);
+                      cb(msg);
+                    }
+                    if (msg.success && msg.profile) {
+                      const profileToken = msg.token || msg.profile?.token;
+                      const authUpdates = { isLoggedIn: true };
+                      if (msg.profile.name)
+                        authUpdates.accountName = msg.profile.name;
+                      if (profileToken) authUpdates.token = profileToken;
+                      setTinderAuthState(authUpdates);
+                      addLog(
+                        `Profile synced for ${msg.profile.name || "user"}`,
+                        "success",
+                      );
+                      handleSaveOnDeviceSettings({
+                        userProfile: msg.profile,
+                        manualBio: msg.profile.bio || undefined,
+                      });
+                    }
+                    return;
+                  }
+
+                  if (msg.type === "FE_PUSH_BIO_RESPONSE") {
+                    const cb = pushBioCallbacksRef.current.get(msg.requestId);
+                    if (cb) {
+                      pushBioCallbacksRef.current.delete(msg.requestId);
+                      cb(msg);
+                    }
+                    if (msg.success && msg.bio) {
+                      addLog(
+                        `Pushed new bio to Tinder (${msg.method === "dom" ? "DOM" : "API"})`,
+                        "success",
+                      );
+                      handleSaveOnDeviceSettings({ manualBio: msg.bio });
+                    } else if (!msg.success) {
+                      addLog(
+                        `Bio push failed: ${msg.error || "Unknown error"}`,
+                        "error",
+                      );
+                    }
+                    return;
+                  }
+
+                  if (msg.type === "FE_LOG") {
+                    addLog(msg.text, msg.logType || "info");
+                  }
+                  if (msg.type === "FE_COORD") {
+                    setLastCoord({ x: msg.x, y: msg.y });
+                    addLog(
+                      `📍 Tap Coordinate: X=${msg.x}, Y=${msg.y}`,
+                      "action",
+                    );
+                  }
+                  if (msg.type === "FE_SWIPE") {
+                    const prevCycle = onDeviceCycleLikesRef.current || 0;
+                    const cycleTarget =
+                      msg.total || extensionSettings?.likesPerCycle || 50;
+                    let updatedCycle;
+                    if (
+                      typeof msg.swipeCount === "number" &&
+                      msg.swipeCount > 0
+                    ) {
+                      if (msg.swipeCount > prevCycle) {
+                        updatedCycle = msg.swipeCount;
+                      } else if (prevCycle >= cycleTarget) {
+                        updatedCycle = msg.swipeCount;
+                      } else {
+                        updatedCycle = prevCycle + 1;
+                      }
+                    } else {
+                      updatedCycle = prevCycle + 1;
+                    }
+                    onDeviceCycleLikesRef.current = updatedCycle;
+                    setOnDeviceCycleLikes(updatedCycle);
+
+                    const prevCumulative = Math.max(
+                      onDeviceSwipesRef.current || 0,
+                      prevCycle,
+                    );
+                    const updatedCumulative = Math.max(
+                      prevCumulative + 1,
+                      updatedCycle,
+                    );
+                    onDeviceSwipesRef.current = updatedCumulative;
+                    setOnDeviceSwipes(updatedCumulative);
+
+                    setOnDeviceSwiping(true);
+                    saveOnDeviceSessionState({
+                      swipes: updatedCumulative,
+                      cycleLikes: updatedCycle,
+                      cycleTarget: cycleTarget,
+                      isRunning: true,
+                    });
+                    setTinderAuthState({
+                      isLoggedIn: true,
+                      accountName: "Tinder Account",
+                    });
+                    const targetName = msg.name || "Someone New";
+                    const detail =
+                      msg.detail ||
+                      (msg.age
+                        ? `Age ${msg.age} · Verified Profile`
+                        : "AI Target Match · Safe Paced");
+                    addLog(
+                      `❤️ Swiped profile: ${targetName} (${updatedCycle}/${cycleTarget})`,
+                      "action",
+                    );
+                    trackingService.trackLike(1);
+                    pushProgressFeedEvent(
+                      "profile_liked",
+                      detail,
+                      targetName,
+                      5,
+                    );
+                    const collectionToken = getTinderAuthState()?.token;
+                    if (collectionToken) {
+                      const swipeEvent = createSwipeEventFromDomMessage(msg);
+                      activateCollections(collectionToken)
+                        .then(() =>
+                          ingestCollectionEvent(swipeEvent, collectionToken),
+                        )
+                        .catch(() =>
+                          addLog(
+                            "Swipe counted, but its profile could not be saved locally.",
+                            "warn",
+                          ),
+                        );
+                    }
+                  }
+                  if (msg.type === "FE_MESSAGE") {
+                    const prevMsgs = onDeviceMessagesRef.current || 0;
+                    const updatedMsgs = prevMsgs + 1;
+                    onDeviceMessagesRef.current = updatedMsgs;
+                    setOnDeviceMessages(updatedMsgs);
+
+                    const prevCycleMsgs = onDeviceCycleMessagesRef.current || 0;
+                    const msgTarget = extensionSettings?.messagesPerCycle || 50;
+                    let updatedCycleMsgs;
+                    if (
+                      typeof msg.messageCount === "number" &&
+                      msg.messageCount > 0
+                    ) {
+                      if (msg.messageCount > prevCycleMsgs) {
+                        updatedCycleMsgs = msg.messageCount;
+                      } else if (prevCycleMsgs >= msgTarget) {
+                        updatedCycleMsgs = msg.messageCount;
+                      } else {
+                        updatedCycleMsgs = prevCycleMsgs + 1;
+                      }
+                    } else {
+                      updatedCycleMsgs = prevCycleMsgs + 1;
+                    }
+                    onDeviceCycleMessagesRef.current = updatedCycleMsgs;
+                    setOnDeviceCycleMessages(updatedCycleMsgs);
+
+                    saveOnDeviceSessionState({
+                      messages: updatedMsgs,
+                      cycleMessages: updatedCycleMsgs,
+                      cycleMessagesTarget: msgTarget,
+                      isRunning: true,
+                    });
+                    const targetName = msg.currentName || "Match";
+                    const detail =
+                      (msg.currentMessage || "").trim() ||
+                      `Replied to ${targetName}`;
+                    addLog(
+                      `💬 Wingman replied to ${targetName} (${updatedCycleMsgs}/${msgTarget})`,
+                      "action",
+                    );
+                    trackingService.trackMessage({ count: 1 });
+                    pushProgressFeedEvent(
+                      "message_replied",
+                      detail,
+                      targetName,
+                      10,
+                    );
+                  }
+                  if (msg.type === "FE_MATCH") {
+                    const prev = onDeviceMatchesRef.current || 0;
+                    const updated = Math.max(
+                      prev + 1,
+                      msg.matchCount || prev + 1,
+                    );
+                    onDeviceMatchesRef.current = updated;
+                    setOnDeviceMatches(updated);
+                    saveOnDeviceSessionState({ matches: updated });
+                    setTinderAuthState({
+                      isLoggedIn: true,
+                      accountName: "Tinder Account",
+                    });
+                    const matchName = msg.matchName || "New Match";
+                    addLog(`🎉 New Match detected (${matchName})!`, "success");
+                    trackingService.trackMatch({ matchName });
+                    pushProgressFeedEvent(
+                      "match_detected",
+                      "New Match Connected!",
+                      matchName,
+                      25,
+                    );
+
+                    const matchId = msg.matchId || `match_${Date.now()}`;
+                    const worker = backgroundWorkerRef.current;
+                    if (worker && worker.handleMessage) {
+                      worker
+                        .handleMessage({
+                          action: "saveMatchData",
+                          matchId,
+                          data: {
+                            matchId,
+                            name: matchName,
+                            photoUrl: msg.photoUrl || null,
+                            matchedAt: Date.now(),
+                          },
+                        })
+                        .catch(() => {});
+                    }
+                  }
+                  if (msg.type === "FE_OUT_OF_LIKES") {
+                    const now = Date.now();
+                    const currentOnDevice = getOnDeviceSessionState();
+                    const existingReplenish =
+                      currentOnDevice?.likesReplenishTimestamp;
+                    const isExistingValid = Boolean(
+                      existingReplenish && existingReplenish > now,
+                    );
+
+                    let rawIncoming =
+                      msg.replenishTimestamp ||
+                      msg.rateLimitedUntil ||
+                      (msg.timestamp && msg.timestamp > now + 60000
+                        ? msg.timestamp
+                        : null);
+                    if (rawIncoming && rawIncoming < 10000000000) {
+                      rawIncoming *= 1000;
+                    }
+
+                    // Determine replenish timestamp. Never allow a generic 12h fallback to overwrite an active countdown!
+                    let replenishTimestamp;
+                    if (rawIncoming && rawIncoming > now) {
+                      if (isExistingValid) {
+                        const incomingDeltaHours =
+                          (rawIncoming - now) / 3600000;
+                        if (
+                          incomingDeltaHours >= 11.0 &&
+                          existingReplenish < rawIncoming
+                        ) {
+                          replenishTimestamp = existingReplenish;
+                        } else {
+                          replenishTimestamp = rawIncoming;
                         }
-                        triggerAutoStartIfReady();
+                      } else {
+                        replenishTimestamp = rawIncoming;
+                      }
+                    } else {
+                      replenishTimestamp = isExistingValid
+                        ? existingReplenish
+                        : now + 12 * 60 * 60 * 1000;
+                    }
+
+                    const existingExhaustedAt =
+                      currentOnDevice?.likesExhaustedAt;
+                    const finalExhaustedAt =
+                      existingExhaustedAt > 0 &&
+                      now - existingExhaustedAt < 12 * 3600 * 1000
+                        ? existingExhaustedAt
+                        : now;
+
+                    // Stop swiping on device, but keep session active for intelligent Wingman pivot (messaging matches)
+                    onDeviceSwipingRef.current = false;
+                    setOnDeviceSwiping(false);
+
+                    const messagingEnabled =
+                      isAutoMessagingEnabled(extensionSettings);
+                    if (messagingEnabled) {
+                      saveOnDeviceSessionState({
+                        likesExhaustedAt: finalExhaustedAt,
+                        likesReplenishTimestamp: replenishTimestamp,
+                        waitingReason: "likes_exhausted",
+                        isRunning: true,
+                        currentPhase: "messaging",
+                      });
+
+                      // Signal background worker to pivot directly to match conversations
+                      const worker = getOnDeviceWorker();
+                      if (
+                        worker &&
+                        typeof worker.handleMessage === "function"
+                      ) {
+                        worker.handleMessage({
+                          action: "likesExhausted",
+                          replenishTimestamp,
+                          exhaustedAt: finalExhaustedAt,
+                          timestamp: now,
+                        });
+                      }
+
+                      // Schedule native OS push alarm for the exact refill moment
+                      NotificationService.scheduleLikesReplenishedAlarm(
+                        replenishTimestamp,
+                      ).catch(() => {});
+
+                      const hoursLeft = Math.max(
+                        1,
+                        Math.round((replenishTimestamp - now) / 3600000),
+                      );
+                      addLog(
+                        `⚡ Free likes quota exhausted (Refills in ~${hoursLeft}h). Wingman engaged: Pivoting to match messaging.`,
+                        "warn",
+                      );
+                      trackingService.trackEvent("like_quota_exhausted", {
+                        exhausted_at: new Date(now).toISOString(),
+                        replenish_timestamp: new Date(
+                          replenishTimestamp,
+                        ).toISOString(),
+                        wingman_pivot: true,
+                      });
+                      pushProgressFeedEvent(
+                        "rate_limit",
+                        `Daily like quota reached. Wingman engaged (chatting). Refills in ~${hoursLeft}h.`,
+                        null,
+                        10,
+                      );
+                    } else {
+                      saveOnDeviceSessionState({
+                        likesExhaustedAt: finalExhaustedAt,
+                        likesReplenishTimestamp: replenishTimestamp,
+                        waitingReason: "likes_exhausted",
+                        isRunning: false,
+                        currentPhase: "idle",
+                        nextRunTimestamp: replenishTimestamp,
+                      });
+
+                      const worker = getOnDeviceWorker();
+                      if (
+                        worker &&
+                        typeof worker.handleMessage === "function"
+                      ) {
+                        worker.handleMessage({
+                          action: "updateAgentState",
+                          state: {
+                            isRunning: false,
+                            currentPhase: "idle",
+                            waitingReason: "likes_exhausted",
+                            likesReplenishTimestamp: replenishTimestamp,
+                            nextRunTimestamp: replenishTimestamp,
+                          },
+                        });
+                      }
+
+                      NotificationService.scheduleLikesReplenishedAlarm(
+                        replenishTimestamp,
+                      ).catch(() => {});
+                      const hoursLeft = Math.max(
+                        1,
+                        Math.round((replenishTimestamp - now) / 3600000),
+                      );
+                      addLog(
+                        `⚡ Free likes quota exhausted (Refills in ~${hoursLeft}h). Auto-messaging is disabled — resting until refill.`,
+                        "warn",
+                      );
+                      trackingService.trackEvent("like_quota_exhausted", {
+                        exhausted_at: new Date(now).toISOString(),
+                        replenish_timestamp: new Date(
+                          replenishTimestamp,
+                        ).toISOString(),
+                        wingman_pivot: false,
+                      });
+                      pushProgressFeedEvent(
+                        "rate_limit",
+                        `Daily like quota reached. Next session in ~${hoursLeft}h.`,
+                        null,
+                        10,
+                      );
+                    }
+                  }
+                  if (msg.type === "FE_LIKES_STATUS") {
+                    const likesRemaining = msg.likesRemaining;
+                    let replenishTimestamp =
+                      msg.rateLimitedUntil || msg.replenishTimestamp;
+                    if (
+                      replenishTimestamp &&
+                      replenishTimestamp < 10000000000
+                    ) {
+                      replenishTimestamp *= 1000;
+                    }
+                    if (
+                      replenishTimestamp &&
+                      replenishTimestamp > Date.now() &&
+                      (!likesRemaining || likesRemaining <= 0)
+                    ) {
+                      const now = Date.now();
+                      const currentOnDevice = getOnDeviceSessionState();
+                      const existingReplenish =
+                        currentOnDevice?.likesReplenishTimestamp;
+                      const isExistingValid = Boolean(
+                        existingReplenish && existingReplenish > now,
+                      );
+                      let finalReplenish = replenishTimestamp;
+                      if (isExistingValid) {
+                        const incomingDeltaHours =
+                          (replenishTimestamp - now) / 3600000;
+                        if (
+                          incomingDeltaHours >= 11.0 &&
+                          existingReplenish < replenishTimestamp
+                        ) {
+                          finalReplenish = existingReplenish;
+                        }
+                      }
+                      saveOnDeviceSessionState({
+                        likesReplenishTimestamp: finalReplenish,
+                        waitingReason: "likes_exhausted",
+                      });
+                      setTinderAuthState({
+                        rateLimitedUntil: finalReplenish,
+                        likesRemaining: 0,
+                      });
+                      NotificationService.scheduleLikesReplenishedAlarm(
+                        finalReplenish,
+                      ).catch(() => {});
+                    } else if (
+                      typeof likesRemaining === "number" &&
+                      likesRemaining > 0
+                    ) {
+                      saveOnDeviceSessionState({
+                        likesReplenishTimestamp: null,
+                        likesExhaustedAt: 0,
+                        waitingReason: null,
+                      });
+                      setTinderAuthState({
+                        rateLimitedUntil: null,
+                        likesRemaining,
+                      });
+                    }
+                  }
+                  if (msg.type === "FE_SESSION_EXPIRED") {
+                    addLog(
+                      "⚠️ Tinder session expired (401 Unauthorized). Automation halted. Reconnect your account.",
+                      "error",
+                    );
+                    setOnDeviceSwiping(false);
+                    onDeviceSwipingRef.current = false;
+                    saveOnDeviceSessionState({ isRunning: false });
+                    clearTinderAuthState();
+                    trackingService.trackEvent("tinder_session_expired", {
+                      status: msg.status || 401,
+                      url: msg.url || null,
+                    });
+                    pushProgressFeedEvent(
+                      "session_expired",
+                      "Tinder session expired. Reconnect to continue.",
+                      null,
+                      15,
+                    );
+                    if (onRequestIntervention) {
+                      onRequestIntervention({
+                        reason: "session_expired",
+                        message:
+                          "Tinder session expired. Reconnect to continue.",
+                      });
+                    }
+                  }
+                  if (msg.type === "FE_INTERVENTION_NEEDED") {
+                    const reason = msg.reason || "verification";
+                    const message = msg.message || "User verification required";
+                    if (reason === "login_required") return;
+                    addLog(`⚠️ Intervention required: ${message}`, "warn");
+                    setOnDeviceSwiping(false);
+                    onDeviceSwipingRef.current = false;
+                    saveOnDeviceSessionState({
+                      isRunning: false,
+                      waitingReason: reason,
+                    });
+                    pushProgressFeedEvent("action_required", message, null, 15);
+                    if (onRequestIntervention) {
+                      onRequestIntervention({ reason, message, url: msg.url });
+                    }
+                  }
+                  if (msg.type === "FE_PLAN_DETECTED") {
+                    const plan = msg.plan || "free";
+                    const isPro = Boolean(msg.isPro);
+                    setTinderAuthState({
+                      tinderPlan: plan,
+                      isTinderPro: isPro,
+                    });
+                    const currentSettings = getSharedExtensionSettings();
+                    if (currentSettings) {
+                      const prevProfile = currentSettings.userProfile || {};
+                      const updatedProfile = {
+                        ...prevProfile,
+                        tinderPlan: plan,
+                        isTinderPro: isPro,
+                      };
+                      handleSaveOnDeviceSettings({
+                        userProfile: updatedProfile,
+                      });
+                    }
+                    const planLabel =
+                      plan === "platinum"
+                        ? "Platinum 💎"
+                        : plan === "gold"
+                          ? "Gold 👑"
+                          : plan === "plus"
+                            ? "Plus ⚡"
+                            : "Free";
+                    addLog(`Detected Tinder ${planLabel} tier.`, "info");
+                  }
+                  if (msg.type === "FE_CYCLE_DONE") {
+                    onDeviceSwipingRef.current = false;
+                    setOnDeviceSwiping(false);
+                    const count =
+                      typeof msg.count === "number"
+                        ? msg.count
+                        : onDeviceCycleLikesRef.current || 0;
+
+                    const canMessage =
+                      isAutoMessagingEnabled(extensionSettings) &&
+                      extensionSettings?.blockMessages !== true;
+
+                    if (canMessage) {
+                      addLog(
+                        `❤️ Swiping goal reached (${count} likes). Wingman checking & replying to matches...`,
+                        "info",
+                      );
+                      saveOnDeviceSessionState({
+                        isRunning: true,
+                        cycleLikes: count,
+                        currentPhase: "messaging",
+                        waitingReason: null,
+                      });
+                      const worker = backgroundWorkerRef.current;
+                      if (worker) {
+                        worker.handleMessage({
+                          action: "updateAgentState",
+                          state: {
+                            isRunning: true,
+                            currentPhase: "messaging",
+                            waitingReason: null,
+                          },
+                        });
+                      }
+                      pushProgressFeedEvent(
+                        "persona_update",
+                        "Swipes complete · Checking match conversations",
+                        null,
+                        5,
+                      );
+                      triggerProcessChats();
+                    } else {
+                      addLog(
+                        `❤️ Swiping goal reached (${count} likes). Auto-messaging is disabled — scheduling rest.`,
+                        "info",
+                      );
+                      const intervalMinutes =
+                        extensionSettings?.scheduleInterval || 60;
+                      const nextRun = Date.now() + intervalMinutes * 60000;
+                      const isSafetyOn =
+                        extensionSettings?.safetyMode !== false;
+                      let nextReset = nextRun;
+                      let waitReason = null;
+                      try {
+                        const rateStatus = getRateLimitStatus(isSafetyOn);
+                        if (rateStatus && rateStatus.isSafetyLocked) {
+                          waitReason = "safety_lock";
+                          nextReset = rateStatus.nextResetTimestamp;
+                        }
+                      } catch (_) {}
+
+                      saveOnDeviceSessionState({
+                        isRunning: false,
+                        currentPhase: "idle",
+                        cycleLikes: count,
+                        waitingReason: waitReason,
+                        nextRunTimestamp: nextReset,
+                      });
+
+                      const worker = backgroundWorkerRef.current;
+                      if (worker) {
+                        worker.handleMessage({
+                          action: "updateAgentState",
+                          state: {
+                            isRunning: false,
+                            currentPhase: "idle",
+                            cycleLikes: count,
+                            waitingReason: waitReason,
+                            nextRunTimestamp: nextReset,
+                          },
+                        });
+                      }
+
+                      trackingService.trackCycleEnd({ likes_sent: count });
+                      pushProgressFeedEvent(
+                        "cycle_complete",
+                        `Goal reached · ${count} swiped · Next session at ${new Date(nextReset).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+                        null,
+                        15,
+                      );
+                    }
+                  }
+                  if (msg.type === "FE_MESSAGING_CYCLE_DONE") {
+                    const processed = msg.processed || 0;
+                    const followUps = msg.followUps || 0;
+                    addLog(
+                      `💬 Messaging round complete (${processed} replied, ${followUps} follow-ups)`,
+                      "success",
+                    );
+
+                    const intervalMinutes =
+                      extensionSettings?.scheduleInterval || 60;
+                    const nextRun = Date.now() + intervalMinutes * 60000;
+
+                    saveOnDeviceSessionState({
+                      isRunning: false,
+                      currentPhase: "idle",
+                      waitingReason: null,
+                      nextRunTimestamp: nextRun,
+                    });
+
+                    const worker = backgroundWorkerRef.current;
+                    if (worker) {
+                      worker.handleMessage({
+                        action: "updateAgentState",
+                        state: {
+                          isRunning: false,
+                          currentPhase: "idle",
+                          waitingReason: null,
+                          nextRunTimestamp: nextRun,
+                        },
+                      });
+                    }
+
+                    trackingService.trackCycleEnd({
+                      messages_sent: processed + followUps,
+                    });
+                    pushProgressFeedEvent(
+                      "cycle_complete",
+                      `Messaging round finished · Next session at ${new Date(nextRun).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+                      null,
+                      15,
+                    );
+                  }
+                  if (msg.type === "FE_PAGE_STATUS") {
+                    // Ignore page status reports while a logout is actively executing or pending
+                    if (isLoggingOutRef.current || getPendingWebViewPurge())
+                      return;
+                    // ── Initial Page Status Report (fired on content.js inject) ──
+                    // Syncs the home screen to the live WebView page state on load.
+                    if (typeof msg.isLoggedIn === "boolean") {
+                      if (msg.isLoggedIn) {
+                        const capturedToken = msg.token || undefined;
+                        const isLandingOrLoginUrl =
+                          msg.url &&
+                          (!msg.url.includes("/app") ||
+                            msg.url.includes("/app/login"));
+                        if (isLandingOrLoginUrl) {
+                          if (capturedToken) {
+                            probeTinderSession(capturedToken)
+                              .then((res) => {
+                                if (res?.ok) {
+                                  setTinderAuthState({
+                                    isLoggedIn: true,
+                                    token: capturedToken,
+                                    accountName:
+                                      msg.accountName || "Tinder Account",
+                                  });
+                                  triggerAutoStartIfReady();
+                                } else {
+                                  setTinderAuthState({
+                                    isLoggedIn: false,
+                                    accountName: null,
+                                    token: null,
+                                  });
+                                }
+                              })
+                              .catch(() => {
+                                setTinderAuthState({
+                                  isLoggedIn: false,
+                                  accountName: null,
+                                  token: null,
+                                });
+                              });
+                          } else {
+                            setTinderAuthState({
+                              isLoggedIn: false,
+                              accountName: null,
+                              token: null,
+                            });
+                          }
+                        } else {
+                          setTinderAuthState({
+                            isLoggedIn: true,
+                            token: capturedToken,
+                            accountName: msg.accountName || "Tinder Account",
+                          });
+                          if (capturedToken) {
+                            probeTinderSession(capturedToken)
+                              .then((res) => {
+                                if (res?.ok && (res.profile || res.user)) {
+                                  const profile =
+                                    res.profile ||
+                                    parseTinderUserProfile(res.user, {
+                                      plan: res.plan,
+                                      isPro: res.isPro,
+                                      likesRemaining: res.likesRemaining,
+                                      rateLimitedUntil: res.rateLimitedUntil,
+                                    });
+                                  if (profile) {
+                                    handleSaveOnDeviceSettings({
+                                      userProfile: profile,
+                                      manualBio: profile.bio || undefined,
+                                    });
+                                  }
+                                }
+                              })
+                              .catch(() => {});
+                          }
+                          triggerAutoStartIfReady();
+                        }
                       } else {
                         const current = getTinderAuthState();
+                        const hasActiveToken = Boolean(
+                          (current?.token &&
+                            typeof current.token === "string" &&
+                            current.token.trim().length >= 16) ||
+                          (currentTinderAuth?.token &&
+                            typeof currentTinderAuth.token === "string" &&
+                            currentTinderAuth.token.trim().length >= 16),
+                        );
                         // Never clobber a believed-good session while the user is
                         // partway through entering a code or number, or while the page is still hydrating recs.
-                        const midLogin = loginStep === 'otp' || loginStep === 'phone';
-                        const isLandingOrLoginUrl = msg.url && (!msg.url.includes('/app') || msg.url.includes('/app/login'));
-                        if (!midLogin && isLandingOrLoginUrl && (!current?.lastUpdated || current.isLoggedIn)) {
-                          setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+                        const midLogin =
+                          loginStep === "otp" || loginStep === "phone";
+                        const isLandingOrLoginUrl =
+                          msg.url &&
+                          (!msg.url.includes("/app") ||
+                            msg.url.includes("/app/login"));
+                        if (
+                          !midLogin &&
+                          !hasActiveToken &&
+                          isLandingOrLoginUrl &&
+                          (!current?.lastUpdated || current.isLoggedIn)
+                        ) {
+                          setTinderAuthState({
+                            isLoggedIn: false,
+                            accountName: null,
+                            token: null,
+                          });
+                        }
+                        // If we have an active token and landed on the landing page, auto-redirect to /app/recs
+                        if (
+                          hasActiveToken &&
+                          isLandingOrLoginUrl &&
+                          !midLogin
+                        ) {
+                          webViewRef.current?.injectJavaScript(`
+                            (function() {
+                              if (window.location.pathname.indexOf('/app') === -1) {
+                                window.location.href = 'https://tinder.com/app/recs';
+                              }
+                            })(); true;
+                          `);
                         }
                       }
                     }
                   }
-                  if (msg.type === 'FE_AUTH_STEP') {
-                    if (msg.step === 'logged_in') {
-                      if (isLoggingOutRef.current || getPendingWebViewPurge()) return;
-                      setLoginStep('done');
+                  if (msg.type === "FE_AUTH_STEP") {
+                    if (msg.step === "logged_in") {
+                      if (isLoggingOutRef.current || getPendingWebViewPurge())
+                        return;
+                      if (
+                        msg.url &&
+                        (!msg.url.includes("/app") ||
+                          msg.url.includes("/app/login"))
+                      )
+                        return;
+                      setLoginStep("done");
                       const capturedToken = msg.token || undefined;
                       setTinderAuthState({
                         isLoggedIn: true,
                         token: capturedToken,
-                        accountName: msg.name || 'Tinder Account'
+                        accountName: msg.name || "Tinder Account",
                       });
                       if (capturedToken) {
-                        probeTinderSession(capturedToken).then((res) => {
-                          if (res?.ok && (res.profile || res.user)) {
-                            const profile = res.profile || parseTinderUserProfile(res.user, {
-                              plan: res.plan,
-                              isPro: res.isPro,
-                              likesRemaining: res.likesRemaining,
-                              rateLimitedUntil: res.rateLimitedUntil,
-                            });
-                            if (profile) {
-                              handleSaveOnDeviceSettings({
-                                userProfile: profile,
-                                manualBio: profile.bio || undefined,
-                              });
+                        probeTinderSession(capturedToken)
+                          .then((res) => {
+                            if (res?.ok && (res.profile || res.user)) {
+                              const profile =
+                                res.profile ||
+                                parseTinderUserProfile(res.user, {
+                                  plan: res.plan,
+                                  isPro: res.isPro,
+                                  likesRemaining: res.likesRemaining,
+                                  rateLimitedUntil: res.rateLimitedUntil,
+                                });
+                              if (profile) {
+                                handleSaveOnDeviceSettings({
+                                  userProfile: profile,
+                                  manualBio: profile.bio || undefined,
+                                });
+                              }
                             }
-                          }
-                        }).catch(() => {});
+                          })
+                          .catch(() => {});
                       }
-                      addLog('Logged into Tinder (Active Session)', 'success');
+                      addLog("Logged into Tinder (Active Session)", "success");
                       triggerAutoStartIfReady();
-                    } else if (msg.step === 'logged_out') {
+                    } else if (msg.step === "logged_out") {
                       // Fired both by the purge script and by the watchdog when
                       // the user logs out inside Tinder itself.
-                      setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
-                      setLoginStep('options');
+                      const current = getTinderAuthState();
+                      const hasActiveToken = Boolean(
+                        (current?.token &&
+                          typeof current.token === "string" &&
+                          current.token.trim().length >= 16) ||
+                        (currentTinderAuth?.token &&
+                          typeof currentTinderAuth.token === "string" &&
+                          currentTinderAuth.token.trim().length >= 16),
+                      );
+                      // If this was NOT an explicit user logout / purge, and a valid token is still present,
+                      // verify whether the token is genuinely dead via probe before wiping the session.
+                      if (!msg.purged && hasActiveToken && !msg.confirmed) {
+                        const tokenToTest =
+                          current?.token || currentTinderAuth?.token;
+                        probeTinderSession(tokenToTest)
+                          .then((res) => {
+                            if (res?.expired) {
+                              setTinderAuthState({
+                                isLoggedIn: false,
+                                accountName: null,
+                                token: null,
+                              });
+                              setLoginStep("options");
+                              addLog(
+                                "Tinder session expired — please sign in again",
+                                "warn",
+                              );
+                            }
+                          })
+                          .catch(() => {});
+                        return;
+                      }
+
+                      setTinderAuthState({
+                        isLoggedIn: false,
+                        accountName: null,
+                        token: null,
+                      });
+                      setLoginStep("options");
                       if (msg.purged) {
                         // The WebView confirmed a completed purge, so it is now
                         // clean and onLoadEnd must not purge it again. The
@@ -2905,20 +4392,32 @@ export default function BrowserScreen({ route, navigation }) {
                         hasExecutedPurgeRef.current = true;
                         setPendingStorageTeardown(true);
                       }
-                      addLog('Tinder session ended — user logged out', 'warn');
-                      // Resolves on the actual outcome instead of a fixed delay,
-                      // and closes the screen when this logout asked for it.
-                      // No-op for a manual in-page logout.
-                      finishLogoutAndExit();
+                      addLog("Tinder session ended — user logged out", "warn");
+                      if (logoutResolveRef.current) {
+                        logoutResolveRef.current();
+                        logoutResolveRef.current = null;
+                      }
+                      if (exitAfterLogoutRef.current) {
+                        finishLogoutAndExit();
+                      }
                     }
                   }
-                } catch (_) { }
+                } catch (_) {}
               }}
               onError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
-                console.warn('[Browser] WebView connection error:', nativeEvent);
-                addLog(`WebView connection warning: ${nativeEvent?.description || 'Code ' + nativeEvent?.code}`, 'error');
-                trackingService.trackError('webview_error', nativeEvent?.description || 'Code ' + nativeEvent?.code);
+                console.warn(
+                  "[Browser] WebView connection error:",
+                  nativeEvent,
+                );
+                addLog(
+                  `WebView connection warning: ${nativeEvent?.description || "Code " + nativeEvent?.code}`,
+                  "error",
+                );
+                trackingService.trackError(
+                  "webview_error",
+                  nativeEvent?.description || "Code " + nativeEvent?.code,
+                );
                 setLoading(false);
                 setConnectionError(nativeEvent);
               }}
@@ -2928,20 +4427,23 @@ export default function BrowserScreen({ route, navigation }) {
               // brings the session back on the landing page.
               onRenderProcessGone={(syntheticEvent) => {
                 const { didCrash } = syntheticEvent.nativeEvent;
-                console.warn('[Browser] WebView renderer gone. didCrash:', didCrash);
+                console.warn(
+                  "[Browser] WebView renderer gone. didCrash:",
+                  didCrash,
+                );
                 addLog(
                   didCrash
-                    ? 'Browser engine crashed — reloading session'
-                    : 'Browser engine was killed by the system — reloading session',
-                  'error'
+                    ? "Browser engine crashed — reloading session"
+                    : "Browser engine was killed by the system — reloading session",
+                  "error",
                 );
                 recoverFromRendererLoss();
                 return true;
               }}
               // iOS equivalent of the above.
               onContentProcessDidTerminate={() => {
-                console.warn('[Browser] WebView content process terminated.');
-                addLog('Browser engine restarted — reloading session', 'error');
+                console.warn("[Browser] WebView content process terminated.");
+                addLog("Browser engine restarted — reloading session", "error");
                 recoverFromRendererLoss();
               }}
               mediaCapturePermissionGrantType="grant"
@@ -2951,10 +4453,25 @@ export default function BrowserScreen({ route, navigation }) {
                   ? `${collectionCaptureScript}
                     ${generateChromeShim(SELECTORS_JSON, {
                       latitude: extensionSettings?.locationLatitude || 40.7128,
-                      longitude: extensionSettings?.locationLongitude || -74.0060,
+                      longitude:
+                        extensionSettings?.locationLongitude || -74.006,
                     })}
                     window.__flirteasyAutoStartRequested = ${Boolean(route.params?.autoStartAgent)};
                     window.__flirteasyAutoStartCount = ${Number(extensionSettings?.likesPerCycle || 50)};
+                    window.__flirtEasyLikesReplenishTimestamp = ${currentOnDeviceSession?.likesReplenishTimestamp && currentOnDeviceSession.likesReplenishTimestamp > Date.now() ? currentOnDeviceSession.likesReplenishTimestamp : 0};
+                    (function() {
+                      try {
+                        var activeToken = ${JSON.stringify(currentTinderAuth?.token || getTinderAuthState()?.token || "")};
+                        if (activeToken && activeToken.length >= 16) {
+                          window.__tinderAuthToken = activeToken;
+                          try {
+                            if (!localStorage.getItem('TinderWeb/APIToken')) {
+                              localStorage.setItem('TinderWeb/APIToken', activeToken);
+                            }
+                          } catch(e) {}
+                        }
+                      } catch(_) {}
+                    })();
                     true;`
                   : undefined
               }
@@ -3024,7 +4541,8 @@ export default function BrowserScreen({ route, navigation }) {
                 }, true);
               })();
               true;
-            `}
+            `
+              }
               overScrollMode="never"
               keyboardDisplayRequiresUserAction={false}
               startInLoadingState={false}
@@ -3034,39 +4552,62 @@ export default function BrowserScreen({ route, navigation }) {
           )}
           {lastCoord && (
             <View style={styles.coordHudBadge} pointerEvents="box-none">
-              <Ionicons name="locate" size={13} color={uiTheme.colors.success} />
+              <Ionicons
+                name="locate"
+                size={13}
+                color={uiTheme.colors.success}
+              />
               <Text style={styles.coordHudText}>
-                X: {lastCoord.x}  |  Y: {lastCoord.y}
+                X: {lastCoord.x} | Y: {lastCoord.y}
               </Text>
-              <TouchableOpacity accessibilityRole="button"
+              <TouchableOpacity
+                accessibilityRole="button"
                 onPress={() => setLastCoord(null)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="close-circle" size={14} color={uiTheme.colors.muted} />
+                <Ionicons
+                  name="close-circle"
+                  size={14}
+                  color={uiTheme.colors.muted}
+                />
               </TouchableOpacity>
             </View>
           )}
           {startingHyperbeam && (
             <View style={styles.loaderContainer} pointerEvents="none">
               <ActivityIndicator size="large" color={uiTheme.colors.primary} />
-              <Text style={styles.loaderText}>Starting Cloud Connection...</Text>
+              <Text style={styles.loaderText}>
+                Starting Cloud Connection...
+              </Text>
             </View>
           )}
           {!startingHyperbeam && (!finalUrl || connectionError) && (
             <View style={styles.errorOverlay}>
-              <Ionicons name="cloud-offline-outline" size={44} color={uiTheme.colors.primary} />
+              <Ionicons
+                name="cloud-offline-outline"
+                size={44}
+                color={uiTheme.colors.primary}
+              />
               <Text style={styles.errorTitle}>Cannot Connect to Tinder</Text>
               <Text style={styles.errorDetail}>
                 {!finalUrl
-                  ? 'A secure session could not be established. Please check your internet connection or switch mode in Connection Settings.'
-                  : (connectionError?.code === -2 || connectionError?.description?.includes('ERR_NAME_NOT_RESOLVED')
-                    ? 'Connection failed. Please check your internet connection and try again.'
-                    : 'Could not establish connection to Tinder. Check your connection and try again.')}
+                  ? "A secure session could not be established. Please check your internet connection or switch mode in Connection Settings."
+                  : connectionError?.code === -2 ||
+                      connectionError?.description?.includes(
+                        "ERR_NAME_NOT_RESOLVED",
+                      )
+                    ? "Connection failed. Please check your internet connection and try again."
+                    : "Could not establish connection to Tinder. Check your connection and try again."}
               </Text>
-              {Boolean(finalUrl) && <Text style={styles.errorUrl} numberOfLines={2}>Target: {finalUrl}</Text>}
+              {Boolean(finalUrl) && (
+                <Text style={styles.errorUrl} numberOfLines={2}>
+                  Target: {finalUrl}
+                </Text>
+              )}
               <View style={styles.errorActions}>
                 {Boolean(finalUrl) && (
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
                     style={styles.retryBtn}
                     onPress={() => {
                       setConnectionError(null);
@@ -3074,18 +4615,26 @@ export default function BrowserScreen({ route, navigation }) {
                       if (webViewRef.current) webViewRef.current.reload();
                     }}
                   >
-                    <Ionicons name="refresh" size={15} color="#FFF" style={{ marginRight: 6 }} />
+                    <Ionicons
+                      name="refresh"
+                      size={15}
+                      color="#FFF"
+                      style={{ marginRight: 6 }}
+                    />
                     <Text style={styles.retryBtnText}>Retry</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.backToSetupBtn}
                   onPress={() => {
                     cleanupCurrentSession();
                     navigation.goBack();
                   }}
                 >
-                  <Text style={styles.backToSetupBtnText}>Connection Settings</Text>
+                  <Text style={styles.backToSetupBtnText}>
+                    Connection Settings
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -3093,91 +4642,130 @@ export default function BrowserScreen({ route, navigation }) {
         </View>
 
         {/* ─── Bottom Controls / Wizard Section (Neko / Remote Stream Only) ─── */}
-        {!isOnDevice && loginStep !== 'done' && (
-          <View style={[styles.wizardPanel, !showNeko && styles.wizardPanelFull]}>
-            {loginStep === 'options' && (
+        {!isOnDevice && loginStep !== "done" && (
+          <View
+            style={[styles.wizardPanel, !showNeko && styles.wizardPanelFull]}
+          >
+            {loginStep === "options" && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardOptionsHeader}>
-                  <Text style={styles.wizardOptionsTitle}>Choose Login Method</Text>
+                  <Text style={styles.wizardOptionsTitle}>
+                    Choose Login Method
+                  </Text>
                   <Text style={styles.wizardOptionsSubtitle}>
                     Select how you want to log into your Tinder account
                   </Text>
                 </View>
 
                 {/* Primary Tinder Pink Gradient Card */}
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.tinderPrimaryCard}
                   disabled={sendingText}
                   activeOpacity={0.88}
                   onPress={async () => {
                     setSendingText(true);
-                    await sendBrowserCommand('CLICK_EMAIL_LOGIN');
+                    await sendBrowserCommand("CLICK_EMAIL_LOGIN");
                     setSendingText(false);
-                    setLoginStep('email');
+                    setLoginStep("email");
                   }}
                 >
                   <View style={styles.cardLeftGroup}>
                     <View style={styles.tinderIconSquare}>
                       <Ionicons name="mail" size={20} color="#FFF" />
                     </View>
-                    <Text style={styles.tinderPrimaryCardText}>Log in with Email</Text>
+                    <Text style={styles.tinderPrimaryCardText}>
+                      Log in with Email
+                    </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.6)" />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color="rgba(255, 255, 255, 0.6)"
+                  />
                 </TouchableOpacity>
 
                 {/* Secondary Google Glass Card */}
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.googleGlassCard}
                   disabled={sendingText}
                   activeOpacity={0.88}
                   onPress={async () => {
                     setSendingText(true);
-                    await sendBrowserCommand('CLICK_GOOGLE_LOGIN');
+                    await sendBrowserCommand("CLICK_GOOGLE_LOGIN");
                     setSendingText(false);
-                    setLoginStep('google_email');
+                    setLoginStep("google_email");
                   }}
                 >
                   <View style={styles.cardLeftGroup}>
                     <View style={styles.glassIconSquare}>
-                      <Ionicons name="logo-google" size={18} color="rgba(255, 255, 255, 0.9)" />
+                      <Ionicons
+                        name="logo-google"
+                        size={18}
+                        color="rgba(255, 255, 255, 0.9)"
+                      />
                     </View>
-                    <Text style={styles.googleCardText}>Log in with Google</Text>
+                    <Text style={styles.googleCardText}>
+                      Log in with Google
+                    </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.3)" />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color="rgba(255, 255, 255, 0.3)"
+                  />
                 </TouchableOpacity>
 
                 {/* Tertiary Trouble Logging In Link */}
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.troubleLinkBtn}
                   disabled={sendingText}
                   activeOpacity={0.7}
                   onPress={async () => {
                     setSendingText(true);
-                    await sendBrowserCommand('CLICK_PHONE_LOGIN');
+                    await sendBrowserCommand("CLICK_PHONE_LOGIN");
                     setSendingText(false);
-                    setLoginStep('phone');
+                    setLoginStep("phone");
                   }}
                 >
-                  <Text style={styles.wizardBtnSecondaryText}>📱 Log in with Phone Number</Text>
+                  <Text style={styles.wizardBtnSecondaryText}>
+                    📱 Log in with Phone Number
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            {loginStep === 'google_email' && (
+            {loginStep === "google_email" && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardBackBtn}
+                    onPress={handleGoBack}
+                  >
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Google Sign-In 🌐</Text>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardDoneBtn}
+                    onPress={() => setLoginStep("done")}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={13}
+                      color={uiTheme.colors.success}
+                    />
                     <Text style={styles.wizardDoneBtnText}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.wizardDesc}>
-                  Enter your Google Email Address or Phone Number to log into Tinder.
+                  Enter your Google Email Address or Phone Number to log into
+                  Tinder.
                 </Text>
 
                 <TextInput
@@ -3190,7 +4778,8 @@ export default function BrowserScreen({ route, navigation }) {
                   autoCapitalize="none"
                 />
 
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.wizardBtn}
                   disabled={sendingText}
                   activeOpacity={0.88}
@@ -3200,13 +4789,13 @@ export default function BrowserScreen({ route, navigation }) {
                     try {
                       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
                       await fetch(`${orchestratorUrl}/submit-google-email`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ email: inputText.trim() }),
                       });
-                      setInputText('');
+                      setInputText("");
                     } catch (e) {
-                      console.error('Error submitting Google email:', e);
+                      console.error("Error submitting Google email:", e);
                     }
                     setSendingText(false);
                   }}
@@ -3220,16 +4809,31 @@ export default function BrowserScreen({ route, navigation }) {
               </View>
             )}
 
-            {loginStep === 'google_password' && (
+            {loginStep === "google_password" && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardBackBtn}
+                    onPress={handleGoBack}
+                  >
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Enter Google Password 🔒</Text>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
+                  <Text style={styles.wizardTitle}>
+                    Enter Google Password 🔒
+                  </Text>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardDoneBtn}
+                    onPress={() => setLoginStep("done")}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={13}
+                      color={uiTheme.colors.success}
+                    />
                     <Text style={styles.wizardDoneBtnText}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
@@ -3246,7 +4850,8 @@ export default function BrowserScreen({ route, navigation }) {
                   secureTextEntry
                 />
 
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.wizardBtn}
                   disabled={sendingText}
                   activeOpacity={0.88}
@@ -3256,13 +4861,13 @@ export default function BrowserScreen({ route, navigation }) {
                     try {
                       const orchestratorUrl = getOrchestratorUrl(vpsUrl);
                       await fetch(`${orchestratorUrl}/submit-google-password`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ password: inputText.trim() }),
                       });
-                      setInputText('');
+                      setInputText("");
                     } catch (e) {
-                      console.error('Error submitting Google password:', e);
+                      console.error("Error submitting Google password:", e);
                     }
                     setSendingText(false);
                   }}
@@ -3276,24 +4881,27 @@ export default function BrowserScreen({ route, navigation }) {
               </View>
             )}
 
-            {loginStep === 'email' && (
+            {loginStep === "email" && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardBackBtn}
+                    onPress={handleGoBack}
+                  >
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Enter Email Address</Text>
                 </View>
                 <Text style={styles.wizardDesc}>
-                  Enter the email address associated with your account to receive your login code.
+                  Enter the email address associated with your account to
+                  receive your login code.
                 </Text>
 
                 {emailErrorText ? (
                   <View style={styles.wizardErrorBox}>
-                    <Text style={styles.wizardErrorText}>
-                      {emailErrorText}
-                    </Text>
+                    <Text style={styles.wizardErrorText}>{emailErrorText}</Text>
                   </View>
                 ) : null}
 
@@ -3304,7 +4912,7 @@ export default function BrowserScreen({ route, navigation }) {
                   value={inputText}
                   onChangeText={(txt) => {
                     setInputText(txt);
-                    if (emailErrorText) setEmailErrorText('');
+                    if (emailErrorText) setEmailErrorText("");
                   }}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -3313,38 +4921,59 @@ export default function BrowserScreen({ route, navigation }) {
 
                 {/* Domain Quick Fill Chips */}
                 <View style={{ marginBottom: 14 }}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                    {['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'].map((domain) => (
-                      <TouchableOpacity accessibilityRole="button"
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 6 }}
+                  >
+                    {[
+                      "@gmail.com",
+                      "@icloud.com",
+                      "@outlook.com",
+                      "@yahoo.com",
+                    ].map((domain) => (
+                      <TouchableOpacity
+                        accessibilityRole="button"
                         key={domain}
                         style={styles.wizardDomainChip}
                         onPress={() => {
                           let base = inputText.trim();
-                          if (base.includes('@')) base = base.split('@')[0];
-                          if (!base) base = 'user';
+                          if (base.includes("@")) base = base.split("@")[0];
+                          if (!base) base = "user";
                           setInputText(`${base}${domain}`);
-                          if (emailErrorText) setEmailErrorText('');
+                          if (emailErrorText) setEmailErrorText("");
                         }}
                         activeOpacity={0.75}
                       >
-                        <Text style={styles.wizardDomainChipText}>{domain}</Text>
+                        <Text style={styles.wizardDomainChipText}>
+                          {domain}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
                 </View>
 
                 <View style={styles.wizardActionRow}>
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.wizardBtnSecondary, { flex: 1 }]}
                     onPress={() => {
-                      setInputText('');
-                      setEmailErrorText('');
+                      setInputText("");
+                      setEmailErrorText("");
                     }}
                   >
-                    <Text style={[styles.wizardBtnSecondaryText, { color: uiTheme.colors.muted }]}>🧹 Clear</Text>
+                    <Text
+                      style={[
+                        styles.wizardBtnSecondaryText,
+                        { color: uiTheme.colors.muted },
+                      ]}
+                    >
+                      🧹 Clear
+                    </Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.wizardBtn, { flex: 1, marginTop: 0 }]}
                     disabled={sendingText}
                     activeOpacity={0.88}
@@ -3352,7 +4981,9 @@ export default function BrowserScreen({ route, navigation }) {
                       if (!inputText.trim()) return;
                       setSubmittedEmail(inputText.trim());
                       setSendingText(true);
-                      await sendBrowserCommand('SUBMIT_EMAIL', { email: inputText.trim() });
+                      await sendBrowserCommand("SUBMIT_EMAIL", {
+                        email: inputText.trim(),
+                      });
                       setSendingText(false);
                     }}
                   >
@@ -3364,7 +4995,7 @@ export default function BrowserScreen({ route, navigation }) {
                       </Text>
                     ) : (
                       <Text style={styles.wizardBtnText}>
-                        {emailErrorText ? '🔄 Retry Next' : 'Submit Email ➔'}
+                        {emailErrorText ? "🔄 Retry Next" : "Submit Email ➔"}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -3372,21 +5003,35 @@ export default function BrowserScreen({ route, navigation }) {
               </View>
             )}
 
-            {loginStep === 'phone' && (
+            {loginStep === "phone" && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardBackBtn}
+                    onPress={handleGoBack}
+                  >
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Enter Mobile Number</Text>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardDoneBtn}
+                    onPress={() => setLoginStep("done")}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={13}
+                      color={uiTheme.colors.success}
+                    />
                     <Text style={styles.wizardDoneBtnText}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.wizardDesc}>
-                  Enter your country code and mobile number to log into your account.
+                  Enter your country code and mobile number to log into your
+                  account.
                 </Text>
 
                 <View style={styles.phoneInputRow}>
@@ -3409,21 +5054,24 @@ export default function BrowserScreen({ route, navigation }) {
                   />
                 </View>
 
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.wizardBtn}
                   disabled={sendingText}
                   activeOpacity={0.88}
                   onPress={async () => {
                     if (!inputText.trim()) return;
-                    setSubmittedPhone(`${countryCode.trim()} ${inputText.trim()}`);
+                    setSubmittedPhone(
+                      `${countryCode.trim()} ${inputText.trim()}`,
+                    );
                     setSendingText(true);
-                    await sendBrowserCommand('SUBMIT_PHONE', {
+                    await sendBrowserCommand("SUBMIT_PHONE", {
                       phone: inputText.trim(),
-                      countryCode: countryCode.trim()
+                      countryCode: countryCode.trim(),
                     });
-                    setInputText('');
+                    setInputText("");
                     setSendingText(false);
-                    setLoginStep('waiting_otp');
+                    setLoginStep("waiting_otp");
                   }}
                 >
                   {sendingText ? (
@@ -3435,23 +5083,31 @@ export default function BrowserScreen({ route, navigation }) {
               </View>
             )}
 
-            {loginStep === 'waiting_email' && (
+            {loginStep === "waiting_email" && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardBackBtn}
+                    onPress={handleGoBack}
+                  >
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Check Your Email! 📩</Text>
                 </View>
                 <Text style={styles.wizardDesc}>
-                  If we found an account with your email, an email has been sent. Please check your email inbox to log in.
+                  If we found an account with your email, an email has been
+                  sent. Please check your email inbox to log in.
                 </Text>
 
                 <View style={styles.wizardHelpBox}>
-                  <Text style={styles.wizardHelpLabel}>Didn't receive a link?</Text>
+                  <Text style={styles.wizardHelpLabel}>
+                    Didn't receive a link?
+                  </Text>
 
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
                     disabled={sendingText}
                     onPress={async () => {
@@ -3459,19 +5115,22 @@ export default function BrowserScreen({ route, navigation }) {
                       try {
                         const orchestratorUrl = getOrchestratorUrl(vpsUrl);
                         await fetch(`${orchestratorUrl}/click-text`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ text: 'different email' }),
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ text: "different email" }),
                         });
-                      } catch (e) { }
+                      } catch (e) {}
                       setSendingText(false);
-                      setLoginStep('email');
+                      setLoginStep("email");
                     }}
                   >
-                    <Text style={styles.wizardBtnSecondaryText}>✉️ Use a different email</Text>
+                    <Text style={styles.wizardBtnSecondaryText}>
+                      ✉️ Use a different email
+                    </Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
                     style={styles.wizardBtnSecondary}
                     disabled={sendingText}
                     onPress={async () => {
@@ -3479,66 +5138,95 @@ export default function BrowserScreen({ route, navigation }) {
                       try {
                         const orchestratorUrl = getOrchestratorUrl(vpsUrl);
                         await fetch(`${orchestratorUrl}/click-text`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ text: 'phone' }),
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ text: "phone" }),
                         });
-                      } catch (e) { }
+                      } catch (e) {}
                       setSendingText(false);
-                      setLoginStep('phone');
+                      setLoginStep("phone");
                     }}
                   >
-                    <Text style={styles.wizardBtnSecondaryText}>📱 Log in with phone number</Text>
+                    <Text style={styles.wizardBtnSecondaryText}>
+                      📱 Log in with phone number
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
 
-            {loginStep === 'waiting_otp' && (
+            {loginStep === "waiting_otp" && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardBackBtn}
+                    onPress={handleGoBack}
+                  >
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Sending OTP...</Text>
                 </View>
-                <ActivityIndicator size="large" color="#FFCB37" style={{ marginVertical: 10 }} />
+                <ActivityIndicator
+                  size="large"
+                  color="#FFCB37"
+                  style={{ marginVertical: 10 }}
+                />
                 <Text style={styles.wizardDesc}>
-                  A verification code is being sent to your phone. This may take a few seconds.
+                  A verification code is being sent to your phone. This may take
+                  a few seconds.
                 </Text>
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.wizardGhostBtn}
-                  onPress={() => setLoginStep('otp')}
+                  onPress={() => setLoginStep("otp")}
                 >
-                  <Text style={styles.wizardGhostBtnText}>I already got the code →</Text>
+                  <Text style={styles.wizardGhostBtnText}>
+                    I already got the code →
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            {loginStep === 'otp' && (
+            {loginStep === "otp" && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardBackBtn}
+                    onPress={handleGoBack}
+                  >
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>
-                    {otpSubtype === 'sms' ? 'Device Verification 📱' : 'Email Verification 📧'}
+                    {otpSubtype === "sms"
+                      ? "Device Verification 📱"
+                      : "Email Verification 📧"}
                   </Text>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardDoneBtn}
+                    onPress={() => setLoginStep("done")}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={13}
+                      color={uiTheme.colors.success}
+                    />
                     <Text style={styles.wizardDoneBtnText}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.wizardDesc}>
-                  {otpSubtype === 'sms'
-                    ? (submittedPhone
+                  {otpSubtype === "sms"
+                    ? submittedPhone
                       ? `We don't recognize your device. Enter the 6-digit passcode sent to ${submittedPhone} (SMS).`
-                      : "We don't recognize your device. Enter the 6-digit passcode sent to your phone (SMS).")
-                    : (submittedEmail
+                      : "We don't recognize your device. Enter the 6-digit passcode sent to your phone (SMS)."
+                    : submittedEmail
                       ? `Enter the 6-digit passcode sent to ${submittedEmail}.`
-                      : "Enter the 6-digit passcode sent to your email address.")}
+                      : "Enter the 6-digit passcode sent to your email address."}
                 </Text>
 
                 <TextInput
@@ -3552,84 +5240,116 @@ export default function BrowserScreen({ route, navigation }) {
                 />
 
                 <View style={styles.wizardActionRow}>
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
                     style={styles.resendBtn}
                     disabled={sendingText || resendingCode}
                     onPress={async () => {
                       setResendingCode(true);
-                      setResendStatusText('Requesting new code...');
-                      await sendBrowserCommand('RESEND_OTP');
+                      setResendStatusText("Requesting new code...");
+                      await sendBrowserCommand("RESEND_OTP");
                       setResendingCode(false);
-                      setResendStatusText(`✅ New ${otpSubtype === 'sms' ? 'SMS' : 'email'} code requested! Check your inbox.`);
-                      setTimeout(() => setResendStatusText(''), 6000);
+                      setResendStatusText(
+                        `✅ New ${otpSubtype === "sms" ? "SMS" : "email"} code requested! Check your inbox.`,
+                      );
+                      setTimeout(() => setResendStatusText(""), 6000);
                     }}
                   >
                     <Text style={styles.resendBtnText}>
-                      {resendingCode ? '🔄 Resending...' : (otpSubtype === 'sms' ? '📩 Resend via SMS' : '📩 Resend via Email')}
+                      {resendingCode
+                        ? "🔄 Resending..."
+                        : otpSubtype === "sms"
+                          ? "📩 Resend via SMS"
+                          : "📩 Resend via Email"}
                     </Text>
                   </TouchableOpacity>
 
-                  {otpSubtype === 'sms' && (
-                    <TouchableOpacity accessibilityRole="button"
+                  {otpSubtype === "sms" && (
+                    <TouchableOpacity
+                      accessibilityRole="button"
                       style={styles.wizardTroubleBtn}
                       disabled={sendingText}
                       onPress={async () => {
                         setSendingText(true);
-                        setInputText('');
-                        await sendBrowserCommand('CLICK_TROUBLE');
+                        setInputText("");
+                        await sendBrowserCommand("CLICK_TROUBLE");
                         setSendingText(false);
-                        setLoginStep('email');
+                        setLoginStep("email");
                       }}
                     >
-                      <Text style={styles.wizardTroubleBtnText}>❓ Trouble Logging In?</Text>
+                      <Text style={styles.wizardTroubleBtnText}>
+                        ❓ Trouble Logging In?
+                      </Text>
                     </TouchableOpacity>
                   )}
                 </View>
 
                 {resendStatusText ? (
-                  <Text style={[styles.resendStatusText, { color: resendStatusText.includes('✅') ? uiTheme.colors.success : '#FFCB37' }]}>
+                  <Text
+                    style={[
+                      styles.resendStatusText,
+                      {
+                        color: resendStatusText.includes("✅")
+                          ? uiTheme.colors.success
+                          : "#FFCB37",
+                      },
+                    ]}
+                  >
                     {resendStatusText}
                   </Text>
                 ) : null}
 
                 <View style={styles.wizardBtnRow}>
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.wizardBtnPrimary, { flex: 1 }]}
                     disabled={sendingText || !inputText.trim()}
                     activeOpacity={0.88}
                     onPress={async () => {
                       if (!inputText.trim()) return;
                       setSendingText(true);
-                      await sendBrowserCommand('SUBMIT_OTP', { otp: inputText.trim() });
+                      await sendBrowserCommand("SUBMIT_OTP", {
+                        otp: inputText.trim(),
+                      });
                       setSendingText(false);
                     }}
                   >
                     {sendingText ? (
                       <ActivityIndicator size="small" color="#FFF" />
                     ) : (
-                      <Text style={styles.wizardBtnText}>Verify & Log In ✓</Text>
+                      <Text style={styles.wizardBtnText}>
+                        Verify & Log In ✓
+                      </Text>
                     )}
                   </TouchableOpacity>
                 </View>
               </View>
             )}
 
-            {loginStep === 'captcha' && (
+            {loginStep === "captcha" && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.wizardBackBtn}
+                    onPress={handleGoBack}
+                  >
                     <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
                     <Text style={styles.wizardBackBtnText}>Back</Text>
                   </TouchableOpacity>
                   <Text style={styles.wizardTitle}>Solve Security Puzzle</Text>
                 </View>
                 <View style={styles.puzzleWarningBox}>
-                  <Text style={styles.puzzleWarningTitle}>🧩 Please Solve Puzzle First</Text>
+                  <Text style={styles.puzzleWarningTitle}>
+                    🧩 Please Solve Puzzle First
+                  </Text>
                   <Text style={styles.puzzleWarningDesc}>
-                    Security verification detected ("Protecting your account" / "Start Puzzle").
+                    Security verification detected ("Protecting your account" /
+                    "Start Puzzle").
                   </Text>
                   <Text style={styles.puzzleInstructionText}>
-                    👉 The live browser screen is visible above. Tap "Start Puzzle" on the browser screen above to solve it manually.
+                    👉 The live browser screen is visible above. Tap "Start
+                    Puzzle" on the browser screen above to solve it manually.
                   </Text>
                 </View>
 
@@ -3646,17 +5366,21 @@ export default function BrowserScreen({ route, navigation }) {
                 </View>
 
                 <View style={styles.wizardBtnRow}>
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.wizardBtnSecondary, { flex: 1 }]}
                     disabled={sendingText}
                     onPress={() => {
-                      setCaptchaText('');
-                      setLoginStep('otp');
+                      setCaptchaText("");
+                      setLoginStep("otp");
                     }}
                   >
-                    <Text style={styles.wizardBtnSecondaryText}>Skip to OTP ➔</Text>
+                    <Text style={styles.wizardBtnSecondaryText}>
+                      Skip to OTP ➔
+                    </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.wizardBtn, { flex: 1 }]}
                     disabled={sendingText}
                     activeOpacity={0.88}
@@ -3666,25 +5390,29 @@ export default function BrowserScreen({ route, navigation }) {
                         try {
                           const orchestratorUrl = getOrchestratorUrl(vpsUrl);
                           await fetch(`${orchestratorUrl}/type-text`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ text: captchaText.trim() }),
                           });
-                          await fetch(`${orchestratorUrl}/press-enter`, { method: 'POST' });
-                          setCaptchaText('');
+                          await fetch(`${orchestratorUrl}/press-enter`, {
+                            method: "POST",
+                          });
+                          setCaptchaText("");
                         } catch (e) {
-                          console.error('Error sending captcha:', e);
+                          console.error("Error sending captcha:", e);
                         } finally {
                           setSendingText(false);
                         }
                       }
-                      setLoginStep('otp');
+                      setLoginStep("otp");
                     }}
                   >
                     {sendingText ? (
                       <ActivityIndicator size="small" color="#FFF" />
                     ) : (
-                      <Text style={styles.wizardBtnText}>I Solved the Puzzle ✓</Text>
+                      <Text style={styles.wizardBtnText}>
+                        I Solved the Puzzle ✓
+                      </Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -3692,7 +5420,6 @@ export default function BrowserScreen({ route, navigation }) {
             )}
           </View>
         )}
-
 
         <TextInput
           ref={inputRef}
@@ -3703,25 +5430,31 @@ export default function BrowserScreen({ route, navigation }) {
           autoCapitalize="none"
           autoCorrect={false}
           blurOnSubmit={false}
-          onSubmitEditing={() => injectKeyEvent('\n')}
+          onSubmitEditing={() => injectKeyEvent("\n")}
         />
       </KeyboardAvoidingView>
 
       {/* ─── FULL-SCREEN IMMERSIVE LAZY LOADER ─── */}
-      {/* Completely covers 100% of the screen (status bar to nav bar) via native Modal until 3 login buttons appear */}
-      <Modal
-        visible={Boolean(loading && !startingHyperbeam && !connectionError && Boolean(finalUrl))}
-        transparent={false}
-        animationType="none"
-        statusBarTranslucent={true}
-        onRequestClose={() => {
-          cleanupCurrentSession();
-          navigation.goBack();
-        }}
-      >
-        <View style={styles.modalRootContainer}>
+      {Boolean(
+        !isHeadless &&
+        (loading || revealActive) &&
+        !startingHyperbeam &&
+        !connectionError &&
+        Boolean(finalUrl),
+      ) && (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.modalRootContainer,
+            {
+              zIndex: 99999,
+              opacity: veilOpacity,
+            },
+          ]}
+          pointerEvents={revealActive || loading ? "auto" : "none"}
+        >
           <LinearGradient
-            colors={['#11071B', '#09050D', '#040206']}
+            colors={["#11071B", "#09050D", "#040206"]}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
             style={{ flex: 1 }}
@@ -3731,8 +5464,12 @@ export default function BrowserScreen({ route, navigation }) {
                 <TouchableOpacity
                   style={styles.closeBtnCircular}
                   onPress={() => {
-                    cleanupCurrentSession();
-                    navigation.goBack();
+                    if (onClose) {
+                      onClose();
+                    } else {
+                      cleanupCurrentSession();
+                      navigation?.goBack?.();
+                    }
                   }}
                   accessibilityRole="button"
                   accessibilityLabel="Cancel"
@@ -3757,7 +5494,7 @@ export default function BrowserScreen({ route, navigation }) {
                   {/* Pulsing Tinder flame badge */}
                   <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                     <LinearGradient
-                      colors={['#2B1224', '#170919']}
+                      colors={["#2B1224", "#170919"]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.loaderIconBadge}
@@ -3767,7 +5504,11 @@ export default function BrowserScreen({ route, navigation }) {
                   </Animated.View>
                 </View>
 
-                <ActivityIndicator size="large" color="#FE3C72" style={{ marginTop: 28 }} />
+                <ActivityIndicator
+                  size="large"
+                  color="#FE3C72"
+                  style={{ marginTop: 28 }}
+                />
                 <Text style={styles.loaderTitle}>{loaderTitle}</Text>
                 <Text style={styles.loaderSubtitle}>{loaderSubtitle}</Text>
               </View>
@@ -3775,17 +5516,26 @@ export default function BrowserScreen({ route, navigation }) {
               {/* Bottom security and privacy trust indicator */}
               <View style={styles.lazyLoaderFooter}>
                 <View style={styles.trustBadge}>
-                  <Ionicons name="shield-checkmark" size={15} color="#10B981" style={{ marginRight: 7 }} />
-                  <Text style={styles.trustBadgeText}>Private & Secure Connection</Text>
+                  <Ionicons
+                    name="shield-checkmark"
+                    size={15}
+                    color="#10B981"
+                    style={{ marginRight: 7 }}
+                  />
+                  <Text style={styles.trustBadgeText}>
+                    Private & Secure Connection
+                  </Text>
                 </View>
               </View>
             </SafeAreaView>
           </LinearGradient>
-        </View>
-      </Modal>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
-}
+});
+
+export default BrowserScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -3797,11 +5547,11 @@ const styles = StyleSheet.create({
     // fixed 56 left an 8px content box for 38px-tall children, so the row
     // squeezed and spilled into the WebView.
     minHeight: 56,
-    marginTop: Platform.OS === 'android' ? 6 : 0,
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: Platform.OS === "android" ? 6 : 0,
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 14,
-    paddingTop: Platform.OS === 'android' ? 38 : 6,
+    paddingTop: Platform.OS === "android" ? 38 : 6,
     paddingBottom: 10,
   },
   // The flexible zone between the fixed close button and the fixed action group.
@@ -3811,29 +5561,29 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     marginHorizontal: uiTheme.spacing.sm,
-    flexDirection: 'column',
+    flexDirection: "column",
   },
   headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   // Keeps its intrinsic width; headerLeft is what gives way.
   headerActions: {
     flexShrink: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   // Same footprint as the icon buttons, so all three session states are identical
   // in width.
   headerActionSlot: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
   },
   statusIndicatorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     marginBottom: 2,
   },
@@ -3841,48 +5591,51 @@ const styles = StyleSheet.create({
     width: 6.5,
     height: 6.5,
     borderRadius: 3.5,
-    backgroundColor: '#22C55E',
-    shadowColor: '#22C55E',
+    backgroundColor: "#22C55E",
+    shadowColor: "#22C55E",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 6,
     elevation: 4,
   },
-  statusIndicatorText: { fontFamily: 'Inter_800ExtraBold',
-    color: 'rgba(255, 255, 255, 0.45)',
+  statusIndicatorText: {
+    fontFamily: "Inter_800ExtraBold",
+    color: "rgba(255, 255, 255, 0.45)",
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: 1.5,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
-  headerTitle: { fontFamily: 'Manrope_800ExtraBold',
+  headerTitle: {
+    fontFamily: "Manrope_800ExtraBold",
     flexShrink: 1,
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 21,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: -0.3,
   },
   headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: uiTheme.spacing.sm,
   },
   headerLogoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.32)',
+    borderColor: "rgba(239, 68, 68, 0.32)",
     borderRadius: 19,
     paddingHorizontal: uiTheme.spacing.md,
     height: 44,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
-  headerLogoutBtnText: { fontFamily: 'Inter_700Bold',
+  headerLogoutBtnText: {
+    fontFamily: "Inter_700Bold",
     color: uiTheme.colors.error,
     fontSize: 12.5,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: 0.2,
   },
   closeBtnCircular: {
@@ -3890,28 +5643,28 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   actionBarGrid: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: uiTheme.spacing.xl,
     marginBottom: 10,
     gap: uiTheme.spacing.sm,
   },
   actionBtn: {
     height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: "rgba(255, 255, 255, 0.08)",
     borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
   },
   actionBtnExpand: {
@@ -3921,17 +5674,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionBtnActive: {
-    backgroundColor: 'rgba(253, 41, 123, 0.12)',
-    borderColor: 'rgba(253, 41, 123, 0.3)',
+    backgroundColor: "rgba(253, 41, 123, 0.12)",
+    borderColor: "rgba(253, 41, 123, 0.3)",
   },
-  actionBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.85)',
+  actionBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255, 255, 255, 0.85)",
     fontSize: 13,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   webviewContainer: {
     marginHorizontal: uiTheme.spacing.lg,
-    position: 'relative',
+    position: "relative",
   },
   webviewContainerSplit: {
     flex: 0.62,
@@ -3945,15 +5699,15 @@ const styles = StyleSheet.create({
     // login buttons.
     flex: 1,
     minHeight: 0,
-    width: '100%',
+    width: "100%",
     marginHorizontal: 0,
     paddingHorizontal: 0,
   },
   onDeviceWebview: {
-    width: '100%',
+    width: "100%",
   },
   hiddenInput: {
-    position: 'absolute',
+    position: "absolute",
     width: 0,
     height: 0,
     opacity: 0,
@@ -3967,11 +5721,11 @@ const styles = StyleSheet.create({
   browserFrame: {
     flex: 1,
     borderRadius: 22,
-    overflow: 'hidden',
-    backgroundColor: '#000000',
+    overflow: "hidden",
+    backgroundColor: "#000000",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    shadowColor: '#000',
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.5,
     shadowRadius: 20,
@@ -3979,148 +5733,150 @@ const styles = StyleSheet.create({
   },
   webviewInnerContainer: {
     borderRadius: 21,
-    overflow: 'hidden',
-    backgroundColor: '#000000',
+    overflow: "hidden",
+    backgroundColor: "#000000",
   },
   webview: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: "#000000",
   },
   loaderContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#08050B',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#08050B",
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 9999,
     paddingHorizontal: 24,
   },
   modalRootContainer: {
     flex: 1,
-    backgroundColor: '#08050B',
+    backgroundColor: "#08050B",
   },
   modalContentContainer: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   lazyLoaderHeader: {
     paddingHorizontal: 18,
     paddingTop: 10,
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   lazyLoaderCenter: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 28,
   },
   loaderBadgeContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     width: 120,
     height: 120,
   },
   loaderAuraGlow: {
-    position: 'absolute',
+    position: "absolute",
     width: 116,
     height: 116,
     borderRadius: 58,
-    backgroundColor: 'rgba(254, 60, 114, 0.22)',
+    backgroundColor: "rgba(254, 60, 114, 0.22)",
   },
   loaderIconBadge: {
     width: 86,
     height: 86,
     borderRadius: 43,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1.5,
-    borderColor: 'rgba(254, 60, 114, 0.42)',
-    shadowColor: '#FE3C72',
+    borderColor: "rgba(254, 60, 114, 0.42)",
+    shadowColor: "#FE3C72",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 16,
     elevation: 8,
   },
   loaderTitle: {
-    fontFamily: 'Manrope_700Bold',
-    color: '#FFFFFF',
+    fontFamily: "Manrope_700Bold",
+    color: "#FFFFFF",
     fontSize: 20,
     marginTop: 20,
-    textAlign: 'center',
+    textAlign: "center",
     letterSpacing: -0.3,
   },
   loaderSubtitle: {
-    fontFamily: 'Inter_400Regular',
-    color: 'rgba(255, 255, 255, 0.68)',
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255, 255, 255, 0.68)",
     fontSize: 14,
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 21,
     paddingHorizontal: 20,
   },
   lazyLoaderFooter: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingBottom: 24,
   },
   trustBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderColor: "rgba(255, 255, 255, 0.09)",
     borderRadius: 22,
     paddingVertical: 8,
     paddingHorizontal: 16,
   },
   trustBadgeText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.62)',
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255, 255, 255, 0.62)",
     fontSize: 12.5,
     letterSpacing: 0.1,
   },
   loaderText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: "Inter_600SemiBold",
     color: uiTheme.colors.muted,
     marginTop: 15,
     fontSize: 13.5,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   wizardPanel: {
     flex: 0.38,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     paddingHorizontal: uiTheme.spacing.xl,
     paddingTop: uiTheme.spacing.lg,
     paddingBottom: uiTheme.spacing.xl,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   wizardPanelFull: {
     flex: 1,
   },
   wizardStep: {
-    width: '100%',
+    width: "100%",
   },
   wizardOptionsHeader: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 14,
   },
-  wizardOptionsTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
+  wizardOptionsTitle: {
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFFFFF",
     fontSize: 21,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: -0.2,
   },
-  wizardOptionsSubtitle: { fontFamily: 'Inter_400Regular',
-    color: 'rgba(255, 255, 255, 0.45)',
+  wizardOptionsSubtitle: {
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255, 255, 255, 0.45)",
     fontSize: 12.5,
     marginTop: 3,
-    textAlign: 'center',
+    textAlign: "center",
   },
   tinderPrimaryCard: {
-    width: '100%',
+    width: "100%",
     height: 60,
     borderRadius: uiTheme.radius.card,
     backgroundColor: uiTheme.colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 18,
     marginBottom: 10,
     shadowColor: uiTheme.colors.primary,
@@ -4130,34 +5886,35 @@ const styles = StyleSheet.create({
     elevation: 7,
   },
   cardLeftGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: uiTheme.spacing.md,
   },
   tinderIconSquare: {
     width: 36,
     height: 36,
     borderRadius: uiTheme.radius.input,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  tinderPrimaryCardText: { fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
+  tinderPrimaryCardText: {
+    fontFamily: "Inter_700Bold",
+    color: "#FFFFFF",
     fontSize: 15.5,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: 0.2,
   },
   googleGlassCard: {
-    width: '100%',
+    width: "100%",
     height: 60,
     borderRadius: uiTheme.radius.card,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 18,
     marginBottom: 6,
   },
@@ -4165,177 +5922,189 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: uiTheme.radius.input,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  googleCardText: { fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.92)',
+  googleCardText: {
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255, 255, 255, 0.92)",
     fontSize: 15.5,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: 0.1,
   },
   troubleLinkBtn: {
     height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
-  troubleLinkText: { fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.45)',
+  troubleLinkText: {
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255, 255, 255, 0.45)",
     fontSize: 13,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: 0.1,
   },
   wizardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: uiTheme.spacing.sm,
   },
   wizardDoneBtn: {
-    marginLeft: 'auto',
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
     gap: uiTheme.spacing.xs,
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(16, 185, 129, 0.10)',
+    backgroundColor: "rgba(16, 185, 129, 0.10)",
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
+    borderColor: "rgba(16, 185, 129, 0.25)",
   },
-  wizardDoneBtnText: { fontFamily: 'Inter_700Bold',
+  wizardDoneBtnText: {
+    fontFamily: "Inter_700Bold",
     color: uiTheme.colors.success,
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   wizardBackBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: uiTheme.spacing.xs,
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 9,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     marginRight: uiTheme.spacing.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  wizardBackBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#E0E0E6',
+  wizardBackBtnText: {
+    fontFamily: "Inter_700Bold",
+    color: "#E0E0E6",
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
-  wizardTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
+  wizardTitle: {
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFFFFF",
     fontSize: 15.5,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: 0.15,
     flexShrink: 1,
   },
-  wizardDesc: { fontFamily: 'Inter_400Regular',
+  wizardDesc: {
+    fontFamily: "Inter_400Regular",
     color: uiTheme.colors.muted,
     fontSize: uiTheme.type.caption.fontSize,
     marginBottom: 10,
     lineHeight: 16.5,
   },
-  wizardInput: { fontFamily: 'Inter_400Regular',
+  wizardInput: {
+    fontFamily: "Inter_400Regular",
     height: 46,
     backgroundColor: uiTheme.colors.surface,
     borderRadius: 14,
     paddingHorizontal: 14,
-    color: '#FFF',
+    color: "#FFF",
     fontSize: uiTheme.type.label.fontSize,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: "rgba(255, 255, 255, 0.08)",
     marginBottom: 10,
   },
   wizardDomainChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: "rgba(255, 255, 255, 0.08)",
     borderRadius: uiTheme.radius.small,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  wizardDomainChipText: { fontFamily: 'Inter_700Bold',
+  wizardDomainChipText: {
+    fontFamily: "Inter_700Bold",
     color: uiTheme.colors.text,
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   phoneInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 10,
     gap: uiTheme.spacing.sm,
   },
-  countryCodeInput: { fontFamily: 'Inter_600SemiBold',
+  countryCodeInput: {
+    fontFamily: "Inter_600SemiBold",
     width: 72,
     height: 46,
     backgroundColor: uiTheme.colors.surface,
     borderRadius: 14,
     paddingHorizontal: 10,
-    color: '#FFF',
+    color: "#FFF",
     fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    textAlign: 'center',
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    textAlign: "center",
   },
-  phoneNumberInput: { fontFamily: 'Inter_400Regular',
+  phoneNumberInput: {
+    fontFamily: "Inter_400Regular",
     flex: 1,
     height: 46,
     backgroundColor: uiTheme.colors.surface,
     borderRadius: 14,
     paddingHorizontal: 14,
-    color: '#FFF',
+    color: "#FFF",
     fontSize: uiTheme.type.label.fontSize,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
   wizardBtn: {
     height: 48,
     backgroundColor: uiTheme.colors.primary,
     borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 5,
   },
-  wizardBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
+  wizardBtnText: {
+    fontFamily: "Inter_700Bold",
+    color: "#FFF",
     fontSize: 13.5,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: 0.2,
   },
   wizardBtnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: uiTheme.spacing.sm,
   },
   wizardBtnSecondary: {
     height: 48,
     paddingHorizontal: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  wizardBtnSecondaryText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
+  wizardBtnSecondaryText: {
+    fontFamily: "Inter_700Bold",
+    color: "#FFF",
     fontSize: 13.5,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   wizardBtnPrimary: {
     height: 48,
     backgroundColor: uiTheme.colors.primary,
     borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     shadowColor: uiTheme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -4343,24 +6112,25 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   wizardActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: uiTheme.spacing.sm,
     marginTop: uiTheme.spacing.xs,
   },
   wizardErrorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.10)',
+    backgroundColor: "rgba(239, 68, 68, 0.10)",
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.30)',
+    borderColor: "rgba(239, 68, 68, 0.30)",
     padding: 10,
     borderRadius: 10,
     marginBottom: 10,
   },
-  wizardErrorText: { fontFamily: 'Inter_600SemiBold',
+  wizardErrorText: {
+    fontFamily: "Inter_600SemiBold",
     color: uiTheme.colors.error,
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    textAlign: 'center',
+    fontWeight: "normal",
+    textAlign: "center",
   },
   wizardHelpBox: {
     backgroundColor: uiTheme.colors.background,
@@ -4368,42 +6138,45 @@ const styles = StyleSheet.create({
     padding: uiTheme.spacing.md,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: "rgba(255, 255, 255, 0.06)",
   },
-  wizardHelpLabel: { fontFamily: 'Inter_700Bold',
+  wizardHelpLabel: {
+    fontFamily: "Inter_700Bold",
     color: uiTheme.colors.muted,
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     marginBottom: uiTheme.spacing.sm,
   },
   wizardGhostBtn: {
     height: 46,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  wizardGhostBtnText: { fontFamily: 'Inter_600SemiBold',
+  wizardGhostBtnText: {
+    fontFamily: "Inter_600SemiBold",
     color: uiTheme.colors.muted,
     fontSize: 13,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   wizardTroubleBtn: {
     flex: 1,
     height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: 'rgba(255, 203, 55, 0.20)',
+    borderColor: "rgba(255, 203, 55, 0.20)",
   },
-  wizardTroubleBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFCB37',
+  wizardTroubleBtnText: {
+    fontFamily: "Inter_700Bold",
+    color: "#FFCB37",
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   // ── Dashboard Modal ──
   modalContainer: {
@@ -4412,104 +6185,113 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: uiTheme.spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E1E2E',
-    backgroundColor: '#16161E',
+    borderBottomColor: "#1E1E2E",
+    backgroundColor: "#16161E",
   },
-  modalTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#F1F1F5',
+  modalTitle: {
+    fontFamily: "Manrope_700Bold",
+    color: "#F1F1F5",
     fontSize: 16,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   modalCloseBtn: {
     paddingVertical: 6,
     paddingHorizontal: uiTheme.spacing.md,
     borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(253, 41, 123, 0.10)',
+    backgroundColor: "rgba(253, 41, 123, 0.10)",
     borderWidth: 1,
-    borderColor: 'rgba(253, 41, 123, 0.25)',
+    borderColor: "rgba(253, 41, 123, 0.25)",
   },
   puzzleWarningBox: {
-    backgroundColor: 'rgba(255, 203, 55, 0.08)',
+    backgroundColor: "rgba(255, 203, 55, 0.08)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 203, 55, 0.25)',
+    borderColor: "rgba(255, 203, 55, 0.25)",
     borderRadius: 14,
     padding: 14,
     marginBottom: uiTheme.spacing.md,
   },
-  puzzleWarningTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFCB37',
+  puzzleWarningTitle: {
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFCB37",
     fontSize: 16,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     marginBottom: uiTheme.spacing.xs,
   },
-  puzzleWarningDesc: { fontFamily: 'Inter_400Regular',
-    color: '#C8C8D0',
+  puzzleWarningDesc: {
+    fontFamily: "Inter_400Regular",
+    color: "#C8C8D0",
     fontSize: 12.5,
     lineHeight: 18,
     marginBottom: 6,
   },
-  puzzleInstructionText: { fontFamily: 'Inter_600SemiBold',
-    color: '#FFF',
+  puzzleInstructionText: {
+    fontFamily: "Inter_600SemiBold",
+    color: "#FFF",
     fontSize: 12.5,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     lineHeight: 18,
   },
   resendBtn: {
     flex: 1,
     height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  resendBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFCB37',
+  resendBtnText: {
+    fontFamily: "Inter_700Bold",
+    color: "#FFCB37",
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
-  resendStatusText: { fontFamily: 'Inter_600SemiBold',
+  resendStatusText: {
+    fontFamily: "Inter_600SemiBold",
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0F0F13F5',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#0F0F13F5",
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 28,
     zIndex: 100,
   },
-  errorTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#FFF',
+  errorTitle: {
+    fontFamily: "Manrope_700Bold",
+    color: "#FFF",
     fontSize: uiTheme.type.section.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     marginTop: uiTheme.spacing.lg,
     marginBottom: uiTheme.spacing.sm,
-    textAlign: 'center',
+    textAlign: "center",
   },
-  errorDetail: { fontFamily: 'Inter_400Regular',
-    color: '#9E9EB0',
+  errorDetail: {
+    fontFamily: "Inter_400Regular",
+    color: "#9E9EB0",
     fontSize: 13,
     lineHeight: 18,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: uiTheme.spacing.md,
   },
-  errorUrl: { fontFamily: 'Inter_400Regular',
-    color: '#65657A',
+  errorUrl: {
+    fontFamily: "Inter_400Regular",
+    color: "#65657A",
     fontSize: uiTheme.type.caption.fontSize,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: uiTheme.spacing.xxl,
     paddingHorizontal: uiTheme.spacing.lg,
   },
   errorActions: {
-    width: '100%',
+    width: "100%",
     maxWidth: 280,
     gap: 10,
   },
@@ -4517,127 +6299,145 @@ const styles = StyleSheet.create({
     backgroundColor: uiTheme.colors.primary,
     height: 44,
     borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  retryBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
+  retryBtnText: {
+    fontFamily: "Inter_700Bold",
+    color: "#FFF",
     fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   backToSetupBtn: {
-    backgroundColor: '#222230',
+    backgroundColor: "#222230",
     height: 44,
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: '#343448',
+    borderColor: "#343448",
   },
-  backToSetupBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: '#C4C4D6',
+  backToSetupBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    color: "#C4C4D6",
     fontSize: 13,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
-
 
   coordHudBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 12,
-    alignSelf: 'center',
+    alignSelf: "center",
     zIndex: 9999,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 7,
-    backgroundColor: 'rgba(18, 16, 28, 0.95)',
+    backgroundColor: "rgba(18, 16, 28, 0.95)",
     borderWidth: 1,
     borderColor: uiTheme.colors.success,
     paddingVertical: 6,
     paddingHorizontal: uiTheme.spacing.md,
     borderRadius: uiTheme.radius.card,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 8,
   },
-  coordHudText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
+  coordHudText: {
+    fontFamily: "Inter_800ExtraBold",
+    color: "#FFFFFF",
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: 0.4,
   },
 
   // ── On-Device Header Controls ──
   onDeviceDashboardBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
     paddingHorizontal: 11,
     paddingVertical: 6,
     borderRadius: uiTheme.radius.small,
   },
   onDeviceDashboardBtnIdle: {
-    backgroundColor: 'rgba(254, 60, 114, 0.16)',
+    backgroundColor: "rgba(254, 60, 114, 0.16)",
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.4)',
+    borderColor: "rgba(254, 60, 114, 0.4)",
   },
   onDeviceDashboardBtnActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.16)',
+    backgroundColor: "rgba(16, 185, 129, 0.16)",
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.4)',
+    borderColor: "rgba(16, 185, 129, 0.4)",
     shadowColor: uiTheme.colors.success,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 2,
   },
-  onDeviceDashboardBtnText: { fontFamily: 'Inter_700Bold',
+  onDeviceDashboardBtnText: {
+    fontFamily: "Inter_700Bold",
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: 0.2,
   },
   onDeviceLogsBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(16, 185, 129, 0.3)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   onDeviceControlsBox: {
     paddingVertical: uiTheme.spacing.xs,
   },
   onDeviceQuickChatsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: uiTheme.spacing.sm,
-    backgroundColor: 'rgba(99, 102, 241, 0.16)',
+    backgroundColor: "rgba(99, 102, 241, 0.16)",
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.4)',
+    borderColor: "rgba(99, 102, 241, 0.4)",
     borderRadius: uiTheme.radius.input,
     paddingVertical: uiTheme.spacing.md,
     paddingHorizontal: uiTheme.spacing.lg,
   },
-  onDeviceQuickChatsBtnText: { fontFamily: 'Inter_700Bold',
+  onDeviceQuickChatsBtnText: {
+    fontFamily: "Inter_700Bold",
     color: uiTheme.colors.info,
     fontSize: 13,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
 
   // ── Header ──
   headerBtnDisabled: {
     opacity: 0.4,
   },
-  subtitle: { fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.45)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  subtitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 2,
+    minWidth: 0,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+    flexShrink: 0,
+  },
+  subtitle: {
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255, 255, 255, 0.45)",
+    fontSize: uiTheme.type.caption.fontSize,
+    fontWeight: "normal",
+    flexShrink: 1,
   },
   // Square icon button used for the header action row (dashboard, logs, logout).
   // Callers layer their own backgroundColor / borderColor on top, so the base
@@ -4646,11 +6446,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // ── Header chips (remote / Neko session controls) ──
@@ -4658,70 +6458,75 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 10,
     borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  toggleNekoBtnText: { fontFamily: 'Inter_700Bold',
-    color: 'rgba(255, 255, 255, 0.85)',
+  toggleNekoBtnText: {
+    fontFamily: "Inter_700Bold",
+    color: "rgba(255, 255, 255, 0.85)",
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   menuBtn: {
     height: 44,
     paddingHorizontal: 10,
     borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  menuBtnText: { fontFamily: 'Inter_700Bold',
-    color: 'rgba(255, 255, 255, 0.85)',
+  menuBtnText: {
+    fontFamily: "Inter_700Bold",
+    color: "rgba(255, 255, 255, 0.85)",
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   skipBtn: {
     height: 44,
     paddingHorizontal: uiTheme.spacing.md,
     borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(253, 41, 123, 0.12)',
+    backgroundColor: "rgba(253, 41, 123, 0.12)",
     borderWidth: 1,
-    borderColor: 'rgba(253, 41, 123, 0.30)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(253, 41, 123, 0.30)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  skipBtnText: { fontFamily: 'Inter_700Bold',
+  skipBtnText: {
+    fontFamily: "Inter_700Bold",
     color: uiTheme.colors.primary,
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
-  modalCloseBtnText: { fontFamily: 'Inter_700Bold',
+  modalCloseBtnText: {
+    fontFamily: "Inter_700Bold",
     color: uiTheme.colors.primary,
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
 
   // ── Manual text input panel (remote / Neko session) ──
   inputPanel: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: uiTheme.spacing.sm,
     paddingHorizontal: uiTheme.spacing.lg,
     paddingVertical: 10,
   },
-  textInput: { fontFamily: 'Inter_400Regular',
+  textInput: {
+    fontFamily: "Inter_400Regular",
     flex: 1,
     height: 42,
     borderRadius: uiTheme.radius.input,
     paddingHorizontal: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    color: '#FFFFFF',
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    color: "#FFFFFF",
     fontSize: uiTheme.type.label.fontSize,
   },
   sendBtn: {
@@ -4729,28 +6534,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: uiTheme.radius.input,
     backgroundColor: uiTheme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
-  sendBtnText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
+  sendBtnText: {
+    fontFamily: "Inter_800ExtraBold",
+    color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   enterBtn: {
     height: 44,
     paddingHorizontal: 14,
     borderRadius: uiTheme.radius.input,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  enterBtnText: { fontFamily: 'Inter_700Bold',
-    color: 'rgba(255, 255, 255, 0.85)',
+  enterBtnText: {
+    fontFamily: "Inter_700Bold",
+    color: "rgba(255, 255, 255, 0.85)",
     fontSize: 13,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
 
   // ── Logout Confirmation Modal ──
@@ -4760,20 +6567,20 @@ const styles = StyleSheet.create({
   // every touch. Values mirror the identical dialog in PlatformSelectScreen.
   logoutModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(5, 4, 10, 0.80)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(5, 4, 10, 0.80)",
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: uiTheme.spacing.xxl,
   },
   logoutModalCard: {
-    width: '100%',
+    width: "100%",
     maxWidth: 340,
-    backgroundColor: '#141220',
+    backgroundColor: "#141220",
     borderRadius: uiTheme.radius.sheet,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.28)',
+    borderColor: "rgba(239, 68, 68, 0.28)",
     padding: uiTheme.spacing.xxl,
-    alignItems: 'center',
+    alignItems: "center",
     shadowColor: uiTheme.colors.error,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
@@ -4784,57 +6591,60 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.32)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "rgba(239, 68, 68, 0.32)",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: uiTheme.spacing.lg,
   },
-  logoutModalTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
+  logoutModalTitle: {
+    fontFamily: "Manrope_800ExtraBold",
+    color: "#FFFFFF",
     fontSize: uiTheme.type.section.fontSize,
-    fontWeight: 'normal',
+    fontWeight: "normal",
     letterSpacing: -0.3,
     marginBottom: uiTheme.spacing.sm,
-    textAlign: 'center',
+    textAlign: "center",
   },
-  logoutModalSubtitle: { fontFamily: 'Inter_400Regular',
+  logoutModalSubtitle: {
+    fontFamily: "Inter_400Regular",
     color: uiTheme.colors.muted,
     fontSize: 12.5,
     lineHeight: 18,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 22,
   },
   logoutModalBtnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
-    width: '100%',
+    width: "100%",
   },
   logoutModalCancelBtn: {
     flex: 1,
     height: 44,
     borderRadius: uiTheme.radius.input,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  logoutModalCancelText: { fontFamily: 'Inter_700Bold',
+  logoutModalCancelText: {
+    fontFamily: "Inter_700Bold",
     color: uiTheme.colors.text,
     fontSize: 13,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
   logoutModalConfirmBtn: {
     flex: 1,
     height: 44,
     borderRadius: uiTheme.radius.input,
     backgroundColor: uiTheme.colors.error,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 6,
     shadowColor: uiTheme.colors.error,
     shadowOffset: { width: 0, height: 4 },
@@ -4842,9 +6652,10 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
-  logoutModalConfirmText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
+  logoutModalConfirmText: {
+    fontFamily: "Inter_800ExtraBold",
+    color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: 'normal',
+    fontWeight: "normal",
   },
 });

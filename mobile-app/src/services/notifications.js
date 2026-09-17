@@ -90,6 +90,14 @@ export const NOTIFICATION_CATEGORIES = {
     sound: 'default',
     priority: 'normal',
   },
+  LIKES_REPLENISHED: {
+    id: 'likes_replenished',
+    title: 'Free Likes Replenished',
+    badgeColor: '#10B981',
+    icon: 'flash-outline',
+    sound: 'default',
+    priority: 'high',
+  },
 };
 
 // ── Storage Keys ──
@@ -601,6 +609,33 @@ export const NotificationService = {
         await Linking.openURL(fallbackWebUrl);
         return { success: true, target: 'web_fallback' };
       } catch (_) {}
+    }
+  },
+
+  /**
+   * Schedule native OS alarm when Tinder free likes replenish
+   */
+  async scheduleLikesReplenishedAlarm(replenishTimestamp) {
+    if (!replenishTimestamp || replenishTimestamp <= Date.now()) return;
+    const seconds = Math.max(1, Math.round((replenishTimestamp - Date.now()) / 1000));
+    if (Notifications && Notifications.scheduleNotificationAsync) {
+      try {
+        await Notifications.cancelScheduledNotificationAsync('tinder_likes_replenished').catch(() => {});
+        await Notifications.scheduleNotificationAsync({
+          identifier: 'tinder_likes_replenished',
+          content: {
+            title: '⚡ Tinder Likes Replenished',
+            body: 'Your free daily likes are back! Ready to find new matches.',
+            data: { type: 'likes_replenished' },
+            sound: true,
+            badge: 1,
+          },
+          trigger: { seconds },
+        });
+        console.log(`[Notifications] Scheduled likes replenishment alarm in ${Math.round(seconds / 60)} minutes.`);
+      } catch (err) {
+        console.log('[Notifications] Could not schedule likes replenish alarm:', err.message);
+      }
     }
   },
 };

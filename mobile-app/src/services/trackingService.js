@@ -270,9 +270,24 @@ class TrackingService {
 
     try {
       // 1. Batch insert into user_events table
-      const insertResult = await SupabaseService.insertUserEvents(batch);
+      let insertResult = await SupabaseService.insertUserEvents(batch);
+      if (!insertResult || !insertResult.ok) {
+        // If it failed with 409 / constraint violation (e.g. guest or unseeded dev user), retry once with null user_id
+        if (insertResult?.status === 409 || String(insertResult?.error).includes('foreign key') || String(insertResult?.error).includes('23503')) {
+          const sanitizedBatch = batch.map(ev => ({ ...ev, user_id: null }));
+          insertResult = await SupabaseService.insertUserEvents(sanitizedBatch);
+        }
+      }
+
       if (!insertResult || !insertResult.ok) {
         const errMsg = insertResult?.error || `Insert events failed with status ${insertResult?.status || 500}`;
+        // If 4xx client error (conflict / schema), discard poison batch to prevent infinite retry loops
+        if (insertResult?.status >= 400 && insertResult?.status < 500) {
+          console.warn('[TrackingService Flush] Discarding invalid client batch:', errMsg);
+          this._consecutiveFailures = 0;
+          await this._persistQueue();
+          return;
+        }
         throw new Error(errMsg);
       }
 

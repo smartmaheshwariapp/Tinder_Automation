@@ -25,21 +25,37 @@
   "navigation": {
     "explore": [
       "a[href='/app/recs']",
-      "button[aria-label*='Explore' i]",
-      "a[aria-label*='Explore' i]",
-      "svg[aria-label*='Explore' i]",
+      "a[href*='/app/recs']",
       "a[href*='/recs']",
+      "button[aria-label*='Recommendations' i]",
+      "a[aria-label*='Recommendations' i]",
+      "button[aria-label*='Tinder' i]",
+      "a[aria-label*='Tinder' i]",
+      "button[aria-label*='Discover' i]",
+      "a[aria-label*='Discover' i]",
       "nav a:nth-child(1)"
     ],
     "messages": [
       "a[href='/app/messages']",
+      "a[href*='/app/messages']",
+      "a[href='/app/my-matches']",
+      "a[href*='/app/my-matches']",
+      "a[href='/app/matches']",
+      "a[href*='/app/matches']",
+      "a[href*='/messages']",
+      "a[href*='/my-matches']",
       "button[aria-label*='Messages' i]",
       "a[aria-label*='Messages' i]",
       "button[aria-label*='Matches' i]",
       "a[aria-label*='Matches' i]",
+      "button[aria-label*='Chat' i]",
+      "a[aria-label*='Chat' i]",
       "svg[aria-label*='Messages' i]",
-      "a[href*='/messages']",
-      "nav a:nth-child(2)"
+      "svg[aria-label*='Matches' i]",
+      "svg[aria-label*='Chat' i]",
+      "nav a[href*='messages']",
+      "nav a[href*='my-matches']",
+      "nav a:nth-child(4)"
     ],
     "profile": [
       "a[href='/app/profile']",

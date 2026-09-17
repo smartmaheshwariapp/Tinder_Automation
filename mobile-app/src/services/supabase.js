@@ -28,17 +28,19 @@ async function getLocalAccounts() {
 
 async function saveLocalAccount(user) {
   try {
-    if (!user || !user.email) return;
-    const cleanEmail = user.email.trim().toLowerCase();
+    if (!user || (!user.email && !user.id)) return;
+    const cleanEmail = (user.email || `${user.id}@guest.flint.ai`).trim().toLowerCase();
     const accounts = await getLocalAccounts();
     accounts[cleanEmail] = {
       id: user.id || generateUUID(),
       email: cleanEmail,
-      fullName: user.fullName || user.full_name || cleanEmail.split('@')[0],
+      fullName: user.fullName || user.full_name || user.name || cleanEmail.split('@')[0],
       registeredAt: user.createdAt || user.created_at || new Date().toISOString(),
+      isGuest: Boolean(user.isGuest),
     };
     await AsyncStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
     await AsyncStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(accounts[cleanEmail]));
+    await AsyncStorage.removeItem('@flint_explicit_logout');
   } catch (err) {
     console.warn('[Account Storage Warning]', err.message);
   }
@@ -300,6 +302,7 @@ export const SupabaseService = {
     if (localAccounts[cleanEmail]) {
       const user = localAccounts[cleanEmail];
       await AsyncStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(user));
+      await AsyncStorage.removeItem('@flint_explicit_logout');
 
       // Sync updated calibration if returning user went through onboarding
       if (onboardingData && user.id) {
@@ -328,6 +331,7 @@ export const SupabaseService = {
       if (result.ok && Array.isArray(result.data) && result.data.length > 0) {
         const user = result.data[0];
         await saveLocalAccount(user);
+        await AsyncStorage.removeItem('@flint_explicit_logout');
 
         // Sync updated calibration if returning user went through onboarding
         if (onboardingData && user.id) {
@@ -368,18 +372,50 @@ export const SupabaseService = {
   },
 
   /**
+   * Save a guest user session so the user can use the app without repeated auth prompts
+   */
+  async saveGuestSession(guestUser) {
+    try {
+      const user = guestUser || {
+        id: generateUUID(),
+        email: 'guest@flint.ai',
+        fullName: 'Guest User',
+        isGuest: true,
+      };
+      await saveLocalAccount(user);
+      return user;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  /**
+   * Log out the current Flint user and prevent auto-login until next explicit sign-in
+   */
+  async logoutUser() {
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+      await AsyncStorage.setItem('@flint_explicit_logout', 'true');
+    } catch (_) {}
+  },
+
+  /**
    * Get current authenticated Flint user from local storage or persistent registry
    */
   async getCurrentUser() {
     try {
+      const explicitLogout = await AsyncStorage.getItem('@flint_explicit_logout');
+      if (explicitLogout === 'true') {
+        return null;
+      }
       const raw = await AsyncStorage.getItem(STORAGE_KEY_CURRENT_USER);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed?.email) {
+        if (parsed?.email || parsed?.id) {
           return {
             ...parsed,
-            fullName: parsed.fullName || parsed.full_name || parsed.name || parsed.email.split('@')[0],
-            name: parsed.fullName || parsed.full_name || parsed.name || parsed.email.split('@')[0],
+            fullName: parsed.fullName || parsed.full_name || parsed.name || (parsed.email ? parsed.email.split('@')[0] : 'User'),
+            name: parsed.fullName || parsed.full_name || parsed.name || (parsed.email ? parsed.email.split('@')[0] : 'User'),
           };
         }
       }
@@ -390,8 +426,8 @@ export const SupabaseService = {
         await AsyncStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(lastUser));
         return {
           ...lastUser,
-          fullName: lastUser.fullName || lastUser.full_name || lastUser.name || lastUser.email.split('@')[0],
-          name: lastUser.fullName || lastUser.full_name || lastUser.name || lastUser.email.split('@')[0],
+          fullName: lastUser.fullName || lastUser.full_name || lastUser.name || (lastUser.email ? lastUser.email.split('@')[0] : 'User'),
+          name: lastUser.fullName || lastUser.full_name || lastUser.name || (lastUser.email ? lastUser.email.split('@')[0] : 'User'),
         };
       }
       return null;
@@ -467,6 +503,116 @@ export const SupabaseService = {
       payload,
       client_ts: new Date().toISOString(),
     });
+  },
+
+  /**
+   * Broadcasts a Tinder rate-limit lock or 429 replenish timer to the cloud.
+   * Enables cross-device ban synchronization.
+   */
+  async syncCloudTinderRateLimit(tinderUserId, rateLimitPayload = {}, userId = null) {
+    if (!tinderUserId) return { success: false, error: 'No tinderUserId provided' };
+    const rateLimitedUntil = rateLimitPayload.rateLimitedUntil || null;
+    const likesRemaining = rateLimitPayload.likesRemaining !== undefined ? rateLimitPayload.likesRemaining : 0;
+    const reason = rateLimitPayload.reason || 'hourly_limit';
+
+    // 1. Record immutable audit/event row
+    const eventPayload = {
+      tinderUserId: String(tinderUserId),
+      rateLimitedUntil,
+      likesRemaining,
+      reason,
+      syncedAt: Date.now(),
+    };
+
+    const targetUserId = (userId && typeof userId === 'string' && userId.length >= 30)
+      ? userId
+      : null;
+
+    try {
+      await apiRequest('/user_events', 'POST', {
+        user_id: targetUserId,
+        event_type: 'tinder_rate_limit',
+        platform: 'tinder',
+        payload: eventPayload,
+        client_ts: new Date().toISOString(),
+      });
+    } catch (_) {}
+
+    // 2. If userId is provided, also update user_snapshots profile
+    if (userId && typeof userId === 'string' && userId.length >= 30) {
+      try {
+        await this.saveUserSnapshot(userId, {
+          platform: 'tinder',
+          profile: {
+            tinderUserId: String(tinderUserId),
+            rateLimitedUntil,
+            likesRemaining,
+          }
+        });
+      } catch (_) {}
+    }
+
+    return { success: true };
+  },
+
+  /**
+   * Checks Supabase cloud for active rate-limit locks on this Tinder account.
+   * Detects if another device exhausted the quota or received a 429 lock.
+   */
+  async checkCloudTinderRateLimit(tinderUserId) {
+    if (!tinderUserId) return { isLocked: false, rateLimitedUntil: null };
+    const cleanId = String(tinderUserId).trim();
+    const now = Date.now();
+
+    try {
+      // Check latest tinder_rate_limit events
+      const res = await apiRequest(
+        `/user_events?event_type=eq.tinder_rate_limit&payload->>tinderUserId=eq.${encodeURIComponent(cleanId)}&order=created_at.desc&limit=1`,
+        'GET',
+        null,
+        false
+      );
+
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        const payload = res.data[0].payload;
+        let lockUntil = payload?.rateLimitedUntil;
+        if (lockUntil && lockUntil < 10000000000) lockUntil *= 1000;
+        if (lockUntil && lockUntil > now) {
+          return {
+            isLocked: true,
+            rateLimitedUntil: lockUntil,
+            reason: payload?.reason || 'hourly_limit',
+            source: 'cloud_event',
+          };
+        }
+      }
+
+      // Fallback: Check user_snapshots
+      const snapRes = await apiRequest(
+        `/user_snapshots?profile->>tinderUserId=eq.${encodeURIComponent(cleanId)}&order=updated_at.desc&limit=1`,
+        'GET',
+        null,
+        false
+      );
+
+      if (snapRes.ok && Array.isArray(snapRes.data) && snapRes.data.length > 0) {
+        const profile = snapRes.data[0].profile;
+        let lockUntil = profile?.rateLimitedUntil;
+        if (lockUntil && lockUntil < 10000000000) lockUntil *= 1000;
+        if (lockUntil && lockUntil > now) {
+          return {
+            isLocked: true,
+            rateLimitedUntil: lockUntil,
+            reason: 'cloud_snapshot',
+            source: 'cloud_snapshot',
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('[SupabaseService] checkCloudTinderRateLimit error:', err?.message);
+    }
+
+    return { isLocked: false, rateLimitedUntil: null };
   },
 
   /**

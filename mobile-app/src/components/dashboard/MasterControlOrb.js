@@ -5,11 +5,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme as uiTheme } from '../../theme';
 
-function formatCountdown(ms) {
+function formatCountdown(ms, includeSeconds = false) {
   if (!ms || ms <= 0) return null;
   const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
+  if (h > 0) {
+    return includeSeconds
+      ? `${h}h ${m}m ${String(s).padStart(2, '0')}s`
+      : `${h}h ${m}m`;
+  }
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
@@ -23,23 +29,37 @@ export default function MasterControlOrb({
 }) {
   const agentState = stats?.agentState || stats || {};
   const isRunning = Boolean(
-    isLoggedIn &&
-    (agentState?.isRunning ||
-      (agentState?.currentPhase && !['stopped', 'idle'].includes(agentState.currentPhase)))
+    (isLoggedIn || agentState?.isRunning === true) &&
+    (agentState?.isRunning === true ||
+      (agentState?.isRunning !== false &&
+        agentState?.currentPhase &&
+        !['stopped', 'idle', 'waiting', 'paused'].includes(agentState.currentPhase)))
   );
 
+  const swipingEnabled = settings?.autoSwipe !== false && (settings?.likesPerCycle ?? 50) > 0;
+  const messagingEnabled = settings?.autoMessage !== false && (settings?.messagesPerCycle ?? 50) > 0;
+
   // ── 1. Phase Determination (1:1 with desktop activity-tab-bridge.js) ──
-  const currentPhase = (agentState?.currentPhase || (isRunning ? 'swiping' : 'idle')).toLowerCase();
+  const rawPhase = (agentState?.currentPhase || (isRunning ? (swipingEnabled ? 'swiping' : 'messaging') : 'idle')).toLowerCase();
+  const currentPhase = (!swipingEnabled && (rawPhase === 'swiping' || rawPhase === 'liking'))
+    ? (messagingEnabled ? 'messaging' : 'idle')
+    : rawPhase;
   const subPhase = (agentState?.activeSubPhase || '').toLowerCase();
   const waitingReason = agentState?.waitingReason || '';
+  const likesReplenishTimestamp = agentState?.likesReplenishTimestamp;
+  const isLikesReplenished = Boolean(likesReplenishTimestamp && Date.now() >= likesReplenishTimestamp);
 
   const isSafetyLocked = waitingReason === 'safety_lock';
-  const isPartialLimit = waitingReason === 'like_limit' || waitingReason === 'message_limit';
+  const isPartialLimit = (
+    waitingReason === 'like_limit' ||
+    waitingReason === 'message_limit' ||
+    (waitingReason === 'likes_exhausted' && !isLikesReplenished)
+  );
   const isStarting = busy || (!isRunning && agentState?.currentPhase === 'starting') || (isRunning && ['starting', 'initializing', 'checking', 'connecting'].includes(currentPhase));
 
   // Determine active orb state
   const orbState = useMemo(() => {
-    if (!isLoggedIn) return 'disconnected';
+    if (!isLoggedIn && !isRunning) return 'disconnected';
     if (isSafetyLocked) return 'locked';
     if (isStarting) return 'initializing';
     if (isPartialLimit) return 'exhausted';
@@ -50,14 +70,16 @@ export default function MasterControlOrb({
         return 'lead_scan';
       }
       if (subPhase.includes('like') || subPhase.includes('swipe')) {
-        return 'swiping';
+        return swipingEnabled ? 'swiping' : (messagingEnabled ? 'messaging' : 'idle');
       }
       if (subPhase.includes('message') || subPhase.includes('rizz') || subPhase.includes('reply')) {
         return 'messaging';
       }
 
       // Phase fallbacks
-      if (currentPhase === 'liking' || currentPhase === 'swiping') return 'swiping';
+      if (currentPhase === 'liking' || currentPhase === 'swiping') {
+        return swipingEnabled ? 'swiping' : (messagingEnabled ? 'messaging' : 'idle');
+      }
       if (currentPhase === 'messaging') return 'messaging';
       if (currentPhase === 'transitioning') return 'transitioning';
       if (currentPhase === 'waiting') return waitingReason === 'searching' ? 'polling' : 'waiting';
@@ -65,26 +87,39 @@ export default function MasterControlOrb({
       if (['checking', 'connecting', 'initializing', 'starting'].includes(currentPhase)) return 'initializing';
 
       // Default running phase fallback
+      if (!swipingEnabled && messagingEnabled) return 'messaging';
+      if (swipingEnabled && !messagingEnabled) return 'swiping';
       if ((agentState?.currentCycle?.messagesProcessed || 0) > 0) return 'messaging';
-      return 'swiping';
+      return swipingEnabled ? 'swiping' : 'messaging';
     }
 
     return 'idle';
-  }, [isLoggedIn, isSafetyLocked, isStarting, isPartialLimit, isRunning, subPhase, currentPhase, waitingReason, agentState]);
+  }, [isLoggedIn, isSafetyLocked, isStarting, isPartialLimit, isRunning, subPhase, currentPhase, waitingReason, agentState, swipingEnabled, messagingEnabled]);
 
   // ── 2. Live Countdown Timer ──
   const [countdown, setCountdown] = useState(null);
+  const [countdownLong, setCountdownLong] = useState(null);
   useEffect(() => {
-    const ts = agentState?.nextRunTimestamp;
-    if (!ts) { setCountdown(null); return; }
+    const ts = agentState?.likesReplenishTimestamp || agentState?.nextRunTimestamp;
+    if (!ts) {
+      setCountdown(null);
+      setCountdownLong(null);
+      return;
+    }
     const tick = () => {
       const remaining = ts - Date.now();
-      setCountdown(remaining > 0 ? formatCountdown(remaining) : null);
+      if (remaining > 0) {
+        setCountdown(formatCountdown(remaining, false));
+        setCountdownLong(formatCountdown(remaining, true));
+      } else {
+        setCountdown(null);
+        setCountdownLong(null);
+      }
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [agentState?.nextRunTimestamp]);
+  }, [agentState?.likesReplenishTimestamp, agentState?.nextRunTimestamp]);
 
   // ── 3. Staggered Triple Pulse Rings Animation ──
   const pulse1 = useRef(new Animated.Value(0)).current;
@@ -223,12 +258,57 @@ export default function MasterControlOrb({
     }).start();
   };
 
-  // ── 8. Orb Theme Configuration per State ──
+  // ── 8. Visual State Configurations (1:1 with desktop activity-tab-bridge.js) ──
   const currentLikes = agentState?.currentCycle?.likesCompleted ?? agentState?.stats?.swipes ?? 0;
   const targetLikes = settings?.likesPerCycle || 50;
   const currentMsgs = ((agentState?.currentCycle?.messagesProcessed || 0) + (agentState?.currentCycle?.followUpsSent || 0)) || (agentState?.stats?.messages ?? 0);
   const matchName = agentState?.currentCycle?.currentName || '';
   const transitionTimeLeft = agentState?.cycleProgress?.timeLeft ?? 12;
+
+  // ── 7. Pulsing Stop Button Animation (Active in ANY running state) ──
+  const stopPulseAnim = useRef(new Animated.Value(1)).current;
+  const stopGlowAnim = useRef(new Animated.Value(0.5)).current;
+  useEffect(() => {
+    if (isRunning && !isSafetyLocked) {
+      const pulseLoop = Animated.loop(
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(stopPulseAnim, {
+              toValue: 1.06,
+              duration: 750,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(stopGlowAnim, {
+              toValue: 1.0,
+              duration: 750,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.parallel([
+            Animated.timing(stopPulseAnim, {
+              toValue: 1.0,
+              duration: 750,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(stopGlowAnim, {
+              toValue: 0.5,
+              duration: 750,
+              easing: Easing.inOut(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ]),
+        ])
+      );
+      pulseLoop.start();
+      return () => pulseLoop.stop();
+    } else {
+      stopPulseAnim.setValue(1);
+      stopGlowAnim.setValue(0.5);
+    }
+  }, [isRunning, isSafetyLocked]);
 
   const config = useMemo(() => {
     switch (orbState) {
@@ -270,10 +350,11 @@ export default function MasterControlOrb({
           ),
           label: 'Swiping',
           sublabel: `${currentLikes} / ${targetLikes}`,
-          hint: 'AI targeting active · Tap to pause',
+          hint: 'AI targeting active · Tap to stop',
         };
 
-      case 'messaging':
+      case 'messaging': {
+        const targetMsgs = typeof settings?.messagesPerCycle === 'number' && settings.messagesPerCycle > 0 ? settings.messagesPerCycle : 50;
         return {
           gradient: ['#7C3AED', '#9333EA', '#A855F7'],
           ringColor: 'rgba(168, 85, 247, 0.28)',
@@ -289,9 +370,14 @@ export default function MasterControlOrb({
             </View>
           ),
           label: 'Messaging',
-          sublabel: matchName ? `M: ${matchName}` : `${currentMsgs} chats`,
-          hint: 'Generating personalized wingman rizz',
+          sublabel: matchName
+            ? `M: ${matchName}`
+            : (currentMsgs > 0 ? `${currentMsgs} / ${targetMsgs} chats` : 'Active'),
+          hint: matchName
+            ? `Chatting with ${matchName} · Tap to stop`
+            : 'AI Wingman chatting with matches · Tap to stop',
         };
+      }
 
       case 'lead_scan':
         return {
@@ -301,7 +387,7 @@ export default function MasterControlOrb({
           icon: <Ionicons name="sparkles" size={34} color="#FFFFFF" />,
           label: 'Scanning',
           sublabel: 'Finding Dates',
-          hint: 'Analyzing bios and conversation signals',
+          hint: 'Analyzing bios and conversation signals · Tap to stop',
         };
 
       case 'transitioning':
@@ -316,7 +402,7 @@ export default function MasterControlOrb({
           ),
           label: 'Cooldown',
           sublabel: `${transitionTimeLeft}s`,
-          hint: 'Resting between batches to protect account',
+          hint: 'Resting between batches · Tap to stop',
         };
 
       case 'polling':
@@ -328,7 +414,7 @@ export default function MasterControlOrb({
           icon: <Ionicons name="radio" size={34} color="#FFFFFF" />,
           label: 'Awaiting Replies',
           sublabel: countdown ? countdown : 'Rechecking soon',
-          hint: 'Monitoring active conversations for new replies',
+          hint: 'Monitoring active conversations · Tap to stop',
         };
 
       case 'locked':
@@ -336,36 +422,91 @@ export default function MasterControlOrb({
           gradient: ['#D97706', '#B45309', '#92400E'],
           ringColor: 'rgba(245, 158, 11, 0.25)',
           pulseColor: 'rgba(245, 158, 11, 0.35)',
-          icon: <Ionicons name="lock-closed" size={34} color="#FFFFFF" />,
-          label: 'Safety Lock',
-          sublabel: countdown ? `Resumes in ${countdown}` : 'Hourly limit',
-          hint: 'Hourly rate limit reached · Pacing automation',
+          icon: <Ionicons name="shield-checkmark" size={34} color="#FFFFFF" />,
+          label: 'Safety Pause',
+          sublabel: countdown ? `Resumes in ${countdown}` : 'Safety break',
+          hint: 'Hourly swipe safety limit · Taking a short break to protect your profile',
         };
 
       case 'exhausted':
         return {
-          gradient: ['#EA580C', '#C2410C', '#9A3412'],
-          ringColor: 'rgba(234, 88, 12, 0.25)',
-          pulseColor: 'rgba(234, 88, 12, 0.35)',
-          icon: <Ionicons name="swap-horizontal" size={36} color="#FFFFFF" />,
-          label: 'Likes Done',
-          sublabel: 'Switching to chat',
-          hint: 'Daily like quota reached · Continuing messages',
+          gradient: isRunning
+            ? ['#F97316', '#EA580C', '#8B5CF6']
+            : ['#4F46E5', '#6366F1', '#4338CA'],
+          ringColor: isRunning ? 'rgba(249, 115, 22, 0.28)' : 'rgba(99, 102, 241, 0.28)',
+          pulseColor: isRunning ? 'rgba(249, 115, 22, 0.38)' : 'rgba(99, 102, 241, 0.38)',
+          icon: isRunning
+            ? <Ionicons name="chatbubbles" size={36} color="#FFFFFF" />
+            : <Ionicons name="hourglass-outline" size={36} color="#FFFFFF" />,
+          label: isRunning ? 'WINGMAN' : 'LIKES REFILL',
+          sublabel: countdown ? `Refills in ${countdown}` : (isRunning ? 'Chatting' : '12h Refill'),
+          hint: isRunning
+            ? (countdownLong
+                ? `Swipes refilling in ${countdownLong} · Wingman is chatting with matches! Tap to stop`
+                : 'Swipes refilling · Wingman is chatting with matches! Tap to stop')
+            : (countdownLong
+                ? `Daily swipes refill in ${countdownLong} · Tap to chat with existing matches`
+                : 'Daily swipes refilling · Tap to chat with existing matches'),
         };
 
       case 'idle':
-      default:
+      default: {
+        const swipingEnabled = settings?.autoSwipe !== false && (settings?.likesPerCycle ?? 50) > 0;
+        const messagingEnabled = settings?.autoMessage !== false && (settings?.messagesPerCycle ?? 50) > 0;
+        const hasPausedLikesProgress = swipingEnabled && currentLikes > 0 && currentLikes < targetLikes;
+
+        if (!swipingEnabled && !messagingEnabled) {
+          return {
+            gradient: ['#4B5563', '#6B7280', '#9CA3AF'],
+            ringColor: 'rgba(107, 114, 128, 0.25)',
+            pulseColor: 'rgba(107, 114, 128, 0.35)',
+            icon: <Ionicons name="pause" size={38} color="#FFFFFF" />,
+            label: 'OFF',
+            sublabel: 'Turn on in Settings',
+            hint: 'Swiping & Messaging are both disabled · Turn one on in Automation tab',
+          };
+        }
+
+        if (!swipingEnabled && messagingEnabled) {
+          return {
+            gradient: ['#7C3AED', '#8B5CF6', '#A855F7'],
+            ringColor: 'rgba(139, 92, 246, 0.25)',
+            pulseColor: 'rgba(139, 92, 246, 0.35)',
+            icon: <Ionicons name="chatbubbles" size={38} color="#FFFFFF" />,
+            label: 'START',
+            sublabel: 'Messaging Only',
+            hint: 'Swiping disabled · Tap to chat with existing matches',
+          };
+        }
+
+        if (swipingEnabled && !messagingEnabled) {
+          return {
+            gradient: ['#FE3C72', '#FF655B', '#FF8E53'],
+            ringColor: 'rgba(254, 60, 114, 0.2)',
+            pulseColor: 'rgba(254, 60, 114, 0.3)',
+            icon: <Ionicons name="heart" size={38} color="#FFFFFF" />,
+            label: hasPausedLikesProgress ? 'RESUME' : 'START',
+            sublabel: hasPausedLikesProgress ? `${currentLikes} / ${targetLikes}` : 'Swiping Only',
+            hint: hasPausedLikesProgress
+              ? `Paused at ${currentLikes}/${targetLikes} likes · Tap to resume`
+              : 'Auto-messaging disabled · Tap to swipe profiles',
+          };
+        }
+
         return {
-          gradient: ['#FE3C72', '#FF655B', '#FF8E53'],
-          ringColor: 'rgba(254, 60, 114, 0.2)',
-          pulseColor: 'rgba(254, 60, 114, 0.3)',
+          gradient: ['#10B981', '#059669', '#047857'],
+          ringColor: 'rgba(16, 185, 129, 0.2)',
+          pulseColor: 'rgba(16, 185, 129, 0.3)',
           icon: <Ionicons name="play" size={38} color="#FFFFFF" style={{ marginLeft: 4 }} />,
-          label: 'START',
-          sublabel: 'Tap to launch',
-          hint: 'Your next connection starts here',
+          label: hasPausedLikesProgress ? 'RESUME' : 'START',
+          sublabel: hasPausedLikesProgress ? `${currentLikes} / ${targetLikes}` : 'Full Auto',
+          hint: hasPausedLikesProgress
+            ? `Paused at ${currentLikes}/${targetLikes} likes · Tap to resume`
+            : 'Your next connection starts here · Swiping & Messaging',
         };
+      }
     }
-  }, [orbState, spinInterpolate, heartAnim, dot1, dot2, dot3, currentLikes, targetLikes, currentMsgs, matchName, transitionTimeLeft, countdown]);
+  }, [orbState, spinInterpolate, heartAnim, dot1, dot2, dot3, currentLikes, targetLikes, currentMsgs, matchName, transitionTimeLeft, countdown, countdownLong, isRunning, settings]);
 
   // ── 9. Interactive Action Handler ──
   const handlePress = () => {
@@ -420,16 +561,83 @@ export default function MasterControlOrb({
               </View>
 
               <View style={styles.labelGroup}>
-                <Text style={styles.orbLabel} numberOfLines={1}>
+                <Text
+                  style={styles.orbLabel}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
                   {config.label}
                 </Text>
-                <Text style={styles.orbSublabel} numberOfLines={1}>
+                <Text
+                  style={styles.orbSublabel}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
                   {config.sublabel}
                 </Text>
               </View>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
+
+        {/* Floating Pulsing Stop Pill (Anchored under the Orb in any running state) */}
+        {isRunning && !isSafetyLocked && (
+          <Animated.View
+            style={[
+              styles.stopPillWrapper,
+              {
+                transform: [{ scale: stopPulseAnim }],
+                opacity: stopGlowAnim.interpolate({
+                  inputRange: [0.5, 1],
+                  outputRange: [0.92, 1.0],
+                }),
+              },
+            ]}
+          >
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Stop Automation"
+              onPress={handlePress}
+              activeOpacity={0.82}
+              style={styles.stopPill}
+            >
+              <LinearGradient
+                colors={['#EF4444', '#DC2626', '#991B1B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.stopPillGradient}
+              >
+                <View style={styles.stopIconSquare} />
+                <Text style={styles.stopPillText}>TAP TO STOP</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Floating Start Wingman Pill when paused/stopped during likes refill period */}
+        {!isRunning && !isSafetyLocked && orbState === 'exhausted' && (
+          <View style={styles.stopPillWrapper}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Start Wingman"
+              onPress={handlePress}
+              activeOpacity={0.82}
+              style={styles.stopPill}
+            >
+              <LinearGradient
+                colors={['#EA580C', '#C2410C', '#9A3412']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.stopPillGradient}
+              >
+                <Ionicons name="play" size={13} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.stopPillText}>START WINGMAN</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Dynamic Status Hint Subtitle */}
@@ -517,6 +725,8 @@ const styles = StyleSheet.create({
   labelGroup: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
+    paddingHorizontal: 8,
   },
   orbLabel: {
     fontFamily: 'Inter_800ExtraBold',
@@ -525,6 +735,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     textAlign: 'center',
+    maxWidth: '100%',
   },
   orbSublabel: {
     fontFamily: 'Inter_600SemiBold',
@@ -533,6 +744,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.2,
     textAlign: 'center',
+    maxWidth: '100%',
   },
   chatIconWrapper: {
     position: 'relative',
@@ -561,5 +773,47 @@ const styles = StyleSheet.create({
     marginTop: 14,
     letterSpacing: 0.1,
     paddingHorizontal: 20,
+  },
+  stopPillWrapper: {
+    position: 'absolute',
+    bottom: -6,
+    zIndex: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#EF4444',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.65,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
+  },
+  stopPill: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
+  },
+  stopPillGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    gap: 6,
+  },
+  stopIconSquare: {
+    width: 8,
+    height: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 2,
+  },
+  stopPillText: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 11,
+    color: '#FFFFFF',
+    letterSpacing: 0.8,
   },
 });

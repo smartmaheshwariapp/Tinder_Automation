@@ -1475,6 +1475,10 @@ function buildUserPrompt(matchData, settings, isFollowUp) {
     // Job and school — useful conversation hooks
     if (matchData.job) prompt += `JOB: ${matchData.job}\n`;
     if (matchData.school) prompt += `SCHOOL: ${matchData.school}\n`;
+    if (matchData.city) prompt += `CITY: ${matchData.city}\n`;
+    if (matchData.descriptors && matchData.descriptors.length > 0) {
+      prompt += `DETAILS: ${matchData.descriptors.join(', ')}\n`;
+    }
 
     // Looking for — useful for tone calibration
     if (matchData.intentions) prompt += `LOOKING FOR: ${matchData.intentions}\n`;
@@ -1489,7 +1493,19 @@ function buildUserPrompt(matchData, settings, isFollowUp) {
       prompt += `\nIMPORTANT: Do NOT address the match by name in your opening message. Start with "hey" or a natural opener without any name.`;
     }
 
-    prompt += '\nGenerate a natural opening message.';
+    const hasProfileDetails = Boolean(
+      bio ||
+      (interests && interests.length > 0) ||
+      (qaFiltered && qaFiltered.length > 0) ||
+      matchData.job ||
+      matchData.school
+    );
+
+    if (hasProfileDetails) {
+      prompt += '\nGenerate a natural, compelling opening message referencing one specific detail from their profile above. CRITICAL RULE: ONLY reference details explicitly listed above. NEVER invent, assume, or hallucinate hobbies, activities, places, or interests that are not mentioned in the profile.';
+    } else {
+      prompt += '\nTheir profile has no bio or details listed. Generate a charming, witty, and natural opening message. CRITICAL RULE: Do NOT claim you saw anything in their profile, and NEVER invent or guess any hobbies or activities.';
+    }
     // No language enforcement needed for intros - system prompt is sufficient
   }
 

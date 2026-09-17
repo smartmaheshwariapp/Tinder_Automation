@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import SupabaseService from '../services/supabase';
 import { API_CONFIG } from '../config/api';
 import trackingService from '../services/trackingService';
+import { switchUserSession } from '../utils/sessionManager';
 
 // Optional safe haptics
 let Haptics;
@@ -102,6 +103,30 @@ export default function AuthScreen({ navigation, route }) {
   useEffect(() => {
     trackingService.trackEvent('landing_page_viewed', { initial_mode: route?.params?.initialMode || 'welcome' });
   }, []);
+
+  // ── Auto-resolve authenticated Flint session ──
+  useEffect(() => {
+    if (route?.params?.logout || route?.params?.forceAuth) return;
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const user = await SupabaseService.getCurrentUser();
+        if (user && (user.email || user.id) && isMounted) {
+          console.log('[AuthScreen] Active Flint user session found, auto-navigating to PlatformSelect:', user.email || user.id);
+          await switchUserSession(user.id);
+          navigation.replace('PlatformSelect', {
+            user,
+            userId: user.id,
+          });
+        }
+      } catch (_) {}
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [route?.params?.logout, route?.params?.forceAuth]);
 
   // Sync route params when pushed from Onboarding screen
   useEffect(() => {
@@ -845,6 +870,7 @@ export default function AuthScreen({ navigation, route }) {
 
       const resolvedUserId = result?.user?.id;
       if (resolvedUserId) {
+        await switchUserSession(resolvedUserId);
         trackingService.init(resolvedUserId, 'tinder');
       }
       trackingService.trackEvent('otp_verified', { mode: authMode });
@@ -1029,9 +1055,16 @@ export default function AuthScreen({ navigation, route }) {
         {/* Continue as Guest at the very bottom (Apple HIG 44pt Target & HitSlop) */}
         <TouchableOpacity
           style={styles.guestLink}
-          onPress={() => {
+          onPress={async () => {
             safeHaptic('light');
-            navigation.replace('PlatformSelect');
+            let guestUser = null;
+            try {
+              guestUser = await SupabaseService.saveGuestSession();
+            } catch (_) {}
+            navigation.replace('PlatformSelect', {
+              user: guestUser || { id: 'guest_user', email: 'guest@flint.ai', fullName: 'Guest User', isGuest: true },
+              userId: guestUser?.id || 'guest_user',
+            });
           }}
           activeOpacity={0.6}
           hitSlop={{ top: 14, bottom: 20, left: 24, right: 24 }}
@@ -1627,9 +1660,16 @@ export default function AuthScreen({ navigation, route }) {
           {/* Guest Link in Form mode */}
           <TouchableOpacity
             style={styles.formGuestLink}
-            onPress={() => {
+            onPress={async () => {
               safeHaptic('light');
-              navigation.replace('PlatformSelect');
+              let guestUser = null;
+              try {
+                guestUser = await SupabaseService.saveGuestSession();
+              } catch (_) {}
+              navigation.replace('PlatformSelect', {
+                user: guestUser || { id: 'guest_user', email: 'guest@flint.ai', fullName: 'Guest User', isGuest: true },
+                userId: guestUser?.id || 'guest_user',
+              });
             }}
             activeOpacity={0.6}
             hitSlop={{ top: 12, bottom: 12, left: 20, right: 20 }}

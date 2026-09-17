@@ -1,13 +1,14 @@
 import { theme as uiTheme } from "../../theme";
 import React from "react";
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { MotionTouchable as TouchableOpacity } from '../common/Motion';
+import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { MotionTouchable as TouchableOpacity } from "../common/Motion";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ActivityIndicator from "../common/SafeActivityIndicator";
 import MasterControlOrb from "./MasterControlOrb";
 import TinderCollections from "./TinderCollections";
+import { getLikesReplenishStatus } from "../../utils/sessionManager";
 
 const titleCase = (value) =>
   String(value || "")
@@ -23,10 +24,12 @@ const GOALS = {
 
 export default function HomeOverview({
   stats,
+  agentState,
   settings,
   isLoggedIn,
   starting,
   checking,
+  checkingAuth,
   latencyMs,
   onOpenBrowser,
   onToggleAgent,
@@ -34,14 +37,44 @@ export default function HomeOverview({
   onSettings,
   onActivity,
 }) {
-  const state = stats?.agentState || {};
-  const running = Boolean(
-    isLoggedIn &&
-    (state.isRunning ??
-      (state.currentPhase &&
-        !["stopped", "idle"].includes(state.currentPhase))),
+  const effectiveStats = stats || agentState || {};
+  const state = effectiveStats?.agentState || effectiveStats || {};
+  const totals = effectiveStats?.lifetimeStats || state?.stats || {};
+  const isChecking = checking ?? checkingAuth ?? false;
+  const isStarting = Boolean(starting);
+  const busy = isStarting || isChecking;
+
+  const [likesStatus, setLikesStatus] = React.useState(() =>
+    getLikesReplenishStatus(state),
   );
-  const totals = stats?.lifetimeStats || state.stats || {};
+  React.useEffect(() => {
+    const update = () => setLikesStatus(getLikesReplenishStatus(state));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [
+    state?.likesReplenishTimestamp,
+    state?.likesExhaustedAt,
+    state?.waitingReason,
+    effectiveStats,
+  ]);
+
+  const plan = settings?.userProfile?.tinderPlan || settings?.tinderPlan;
+  const isPaidPlan =
+    plan === "platinum" ||
+    plan === "gold" ||
+    plan === "plus" ||
+    settings?.userProfile?.isTinderPro;
+
+  const running = Boolean(
+    (isLoggedIn || state?.isRunning === true) &&
+    (state?.isRunning === true ||
+      (state?.isRunning !== false &&
+        state?.currentPhase &&
+        !["stopped", "idle", "waiting", "paused"].includes(
+          state.currentPhase,
+        ))),
+  );
   const goal =
     settings?.goal ||
     settings?.primaryGoal ||
@@ -54,11 +87,13 @@ export default function HomeOverview({
     settings?.personalityStyle ||
     "freestyle";
   const safe = settings?.safetyMode ?? settings?.safeModeEnabled ?? true;
-  const busy = starting || checking;
   const metrics = [
     {
       label: "SWIPES",
-      value: totals.totalSwipes ?? totals.totalLikes ?? totals.swipes ?? 0,
+      value: Math.max(
+        totals.totalSwipes ?? totals.totalLikes ?? totals.swipes ?? 0,
+        state?.currentCycle?.likesCompleted ?? 0,
+      ),
       icon: "heart-outline",
       color: uiTheme.colors.primary,
     },
@@ -84,9 +119,13 @@ export default function HomeOverview({
       contentContainerStyle={styles.content}
     >
       <View style={styles.introduction}>
-        <Text style={styles.welcomeLabel}>A LITTLE SPARK. MORE POSSIBILITY.</Text>
+        <Text style={styles.welcomeLabel}>
+          A LITTLE SPARK. MORE POSSIBILITY.
+        </Text>
         <Text style={styles.welcomeTitle}>Make room for connection.</Text>
-        <Text style={styles.welcomeBody}>Your assistant takes care of the introductions.</Text>
+        <Text style={styles.welcomeBody}>
+          Your assistant takes care of the introductions.
+        </Text>
       </View>
       <TouchableOpacity
         style={styles.instance}
@@ -132,17 +171,23 @@ export default function HomeOverview({
               <View
                 style={[
                   styles.planBadge,
-                  settings?.userProfile?.tinderPlan === "platinum" && styles.planBadgePlatinum,
-                  settings?.userProfile?.tinderPlan === "gold" && styles.planBadgeGold,
-                  settings?.userProfile?.tinderPlan === "plus" && styles.planBadgePlus,
+                  settings?.userProfile?.tinderPlan === "platinum" &&
+                    styles.planBadgePlatinum,
+                  settings?.userProfile?.tinderPlan === "gold" &&
+                    styles.planBadgeGold,
+                  settings?.userProfile?.tinderPlan === "plus" &&
+                    styles.planBadgePlus,
                 ]}
               >
                 <Text
                   style={[
                     styles.planBadgeText,
-                    settings?.userProfile?.tinderPlan === "platinum" && styles.planTextPlatinum,
-                    settings?.userProfile?.tinderPlan === "gold" && styles.planTextGold,
-                    settings?.userProfile?.tinderPlan === "plus" && styles.planTextPlus,
+                    settings?.userProfile?.tinderPlan === "platinum" &&
+                      styles.planTextPlatinum,
+                    settings?.userProfile?.tinderPlan === "gold" &&
+                      styles.planTextGold,
+                    settings?.userProfile?.tinderPlan === "plus" &&
+                      styles.planTextPlus,
                   ]}
                 >
                   {settings?.userProfile?.tinderPlan === "platinum"
@@ -156,6 +201,17 @@ export default function HomeOverview({
               </View>
             )}
           </View>
+          {isLoggedIn &&
+            likesStatus.isExhausted &&
+            !isPaidPlan &&
+            (!checking || !likesStatus.isFallback) && (
+              <View style={styles.refillPill}>
+                <Ionicons name="time" size={10} color="#FB923C" />
+                <Text style={styles.refillPillText} numberOfLines={1}>
+                  Refills in {likesStatus.formattedCountdown}
+                </Text>
+              </View>
+            )}
         </View>
         <View style={styles.latency}>
           <Text style={styles.latencyLabel}>LATENCY</Text>
@@ -186,23 +242,36 @@ export default function HomeOverview({
                 : !isLoggedIn
                   ? "Not Connected"
                   : state?.waitingReason === "safety_lock"
-                    ? "Safety Lock"
-                    : running
-                      ? (state?.currentPhase === "messaging"
-                          ? "Agent Messaging"
+                    ? "Safety Pause"
+                    : state?.waitingReason === "likes_exhausted"
+                      ? running
+                        ? "Wingman Chatting"
+                        : "Daily Likes Refill"
+                      : running
+                        ? state?.currentPhase === "messaging"
+                          ? "Wingman Messaging"
                           : state?.currentPhase === "transitioning"
-                            ? "Agent Cooldown"
-                            : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
+                            ? "Wingman Resting"
+                            : state?.currentPhase === "waiting" ||
+                                state?.currentPhase === "polling"
                               ? "Awaiting Replies"
-                              : "Agent Active")
-                      : "Agent Standby"}
+                              : "Wingman Active"
+                        : "Wingman Standby"}
             </Text>
           </View>
           <View style={styles.readyBadge}>
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: running ? "#48CB8D" : (!isLoggedIn ? uiTheme.colors.muted : "#FE3C72") },
+                {
+                  backgroundColor: running
+                    ? "#48CB8D"
+                    : !isLoggedIn
+                      ? uiTheme.colors.muted
+                      : state?.waitingReason === "likes_exhausted"
+                        ? "#6366F1"
+                        : "#FE3C72",
+                },
               ]}
             />
             <Text style={styles.readyText}>
@@ -211,22 +280,33 @@ export default function HomeOverview({
                 : !isLoggedIn
                   ? "Connect to Start"
                   : state?.waitingReason === "safety_lock"
-                    ? "Pacing"
-                    : running
-                      ? (state?.currentPhase === "messaging"
+                    ? "Safety Pause"
+                    : state?.waitingReason === "likes_exhausted"
+                      ? running
+                        ? "Messaging"
+                        : "Refilling"
+                      : running
+                        ? state?.currentPhase === "messaging"
                           ? "Replying"
                           : state?.currentPhase === "transitioning"
                             ? "Resting"
-                            : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
-                              ? "Watchdog"
-                              : "Swiping")
-                      : "Ready for Batch"}
+                            : state?.currentPhase === "waiting" ||
+                                state?.currentPhase === "polling"
+                              ? "Checking"
+                              : settings?.autoSwipe === false ||
+                                  settings?.likesPerCycle <= 0
+                                ? "Messaging"
+                                : "Swiping"
+                        : settings?.autoSwipe === false ||
+                            settings?.likesPerCycle <= 0
+                          ? "Ready to Chat"
+                          : "Ready to Swipe"}
             </Text>
           </View>
         </View>
 
         <MasterControlOrb
-          stats={stats}
+          stats={effectiveStats}
           settings={settings}
           isLoggedIn={isLoggedIn}
           busy={busy}
@@ -235,49 +315,49 @@ export default function HomeOverview({
         />
 
         {
-        // <View style={styles.tiles}>
-        //           {[
-        //             {
-        //               label: "GOAL",
-        //               value: GOALS[goal] || titleCase(goal),
-        //               icon: "flag-outline",
-        //               action: onAutomation,
-        //             },
-        //             {
-        //               label: "TONE",
-        //               value: titleCase(tone),
-        //               icon: "mic-outline",
-        //               action: onAutomation,
-        //             },
-        //             {
-        //               label: "SPEED",
-        //               value: safe ? "Human" : "Fast",
-        //               icon: "timer-outline",
-        //               action: onSettings,
-        //             },
-        //           ].map((tile) => (
-        //             <TouchableOpacity
-        //               key={tile.label}
-        //               style={styles.tile}
-        //               onPress={tile.action}
-        //               activeOpacity={0.7}
-        //               accessibilityRole="button"
-        //               accessibilityLabel={`Edit ${tile.label.toLowerCase()}: ${tile.value}`}
-        //             >
-        //               <View style={styles.tileHeader}>
-        //                 <Ionicons
-        //                   name={tile.icon}
-        //                   size={18}
-        //                   color={uiTheme.colors.textSecondary}
-        //                 />
-        //                 <Text style={styles.tileLabel}>{tile.label}</Text>
-        //               </View>
-        //               <Text style={styles.tileValue} numberOfLines={1}>
-        //                 {tile.value}
-        //               </Text>
-        //             </TouchableOpacity>
-        //           ))}
-        //         </View>
+          // <View style={styles.tiles}>
+          //           {[
+          //             {
+          //               label: "GOAL",
+          //               value: GOALS[goal] || titleCase(goal),
+          //               icon: "flag-outline",
+          //               action: onAutomation,
+          //             },
+          //             {
+          //               label: "TONE",
+          //               value: titleCase(tone),
+          //               icon: "mic-outline",
+          //               action: onAutomation,
+          //             },
+          //             {
+          //               label: "SPEED",
+          //               value: safe ? "Human" : "Fast",
+          //               icon: "timer-outline",
+          //               action: onSettings,
+          //             },
+          //           ].map((tile) => (
+          //             <TouchableOpacity
+          //               key={tile.label}
+          //               style={styles.tile}
+          //               onPress={tile.action}
+          //               activeOpacity={0.7}
+          //               accessibilityRole="button"
+          //               accessibilityLabel={`Edit ${tile.label.toLowerCase()}: ${tile.value}`}
+          //             >
+          //               <View style={styles.tileHeader}>
+          //                 <Ionicons
+          //                   name={tile.icon}
+          //                   size={18}
+          //                   color={uiTheme.colors.textSecondary}
+          //                 />
+          //                 <Text style={styles.tileLabel}>{tile.label}</Text>
+          //               </View>
+          //               <Text style={styles.tileValue} numberOfLines={1}>
+          //                 {tile.value}
+          //               </Text>
+          //             </TouchableOpacity>
+          //           ))}
+          //         </View>
         }
       </View>
 
@@ -301,7 +381,7 @@ export default function HomeOverview({
         //           </TouchableOpacity>
         //         ))}
         //       </View>
-        }
+      }
       {/* <TouchableOpacity
         style={styles.activityLink}
         onPress={onActivity}
@@ -353,7 +433,11 @@ export function HomeBottomNavigation({ activeTab, onSelect }) {
           // },
           { id: "automation", icon: "compass-outline", label: "Automation" },
           { id: "activity", icon: "analytics-outline", label: "Activity" },
-          { id: "appSettings", icon: "settings-outline", label: "App settings" },
+          {
+            id: "appSettings",
+            icon: "settings-outline",
+            label: "App settings",
+          },
         ].map((tab) => (
           <TouchableOpacity
             key={tab.id}
@@ -393,8 +477,16 @@ export function HomeBottomNavigation({ activeTab, onSelect }) {
 
 const styles = StyleSheet.create({
   introduction: { gap: 10, paddingTop: 4, paddingBottom: 4 },
-  welcomeLabel: { ...uiTheme.type.caption, color: uiTheme.colors.secondary, letterSpacing: 1.2 },
-  welcomeTitle: { ...uiTheme.type.display, color: uiTheme.colors.text, letterSpacing: -0.7 },
+  welcomeLabel: {
+    ...uiTheme.type.caption,
+    color: uiTheme.colors.secondary,
+    letterSpacing: 1.2,
+  },
+  welcomeTitle: {
+    ...uiTheme.type.display,
+    color: uiTheme.colors.text,
+    letterSpacing: -0.7,
+  },
   welcomeBody: { ...uiTheme.type.body, color: uiTheme.colors.muted },
   content: {
     width: "100%",
@@ -435,7 +527,7 @@ const styles = StyleSheet.create({
     borderColor: uiTheme.colors.surface,
   },
   offlineDot: { backgroundColor: "#727277" },
-  instanceInfo: { flex: 1, minWidth: 0 },
+  instanceInfo: { flex: 1, minWidth: 0, overflow: "hidden" },
   instanceTitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -510,7 +602,32 @@ const styles = StyleSheet.create({
   planTextPlus: {
     color: "#C084FC",
   },
-  latency: { alignItems: "flex-end", gap: uiTheme.spacing.xs, flexShrink: 0 },
+  refillPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    backgroundColor: "rgba(234, 88, 12, 0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(234, 88, 12, 0.42)",
+    alignSelf: "flex-start",
+  },
+  refillPillText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: "#FB923C",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  latency: {
+    alignItems: "flex-end",
+    gap: uiTheme.spacing.xs,
+    flexShrink: 0,
+    marginLeft: 10,
+  },
   latencyLabel: {
     fontFamily: "Inter_700Bold",
     color: uiTheme.colors.muted,

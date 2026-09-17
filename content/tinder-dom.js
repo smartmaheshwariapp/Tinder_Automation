@@ -206,17 +206,72 @@ function hasSubscriptionPopup() {
   return false;
 }
 
+function extractTinderLikesResetTimestamp() {
+  // If we already have a confirmed future reset timestamp cached in window, use it as baseline
+  if (typeof window !== 'undefined' && window.__flirtEasyLikesReplenishTimestamp && window.__flirtEasyLikesReplenishTimestamp > Date.now()) {
+    return window.__flirtEasyLikesReplenishTimestamp;
+  }
+
+  try {
+    const dialogs = Array.from(document.querySelectorAll('[role="dialog"], div[aria-modal="true"]'));
+    for (const d of dialogs) {
+      if (d.id === 'rebrand-mobile-menu') continue;
+      const text = d.innerText || d.textContent || '';
+
+      // Match HH:MM:SS countdown e.g. "11:42:15"
+      const matchClock = text.match(/\b(\d{1,2}):(\d{2}):(\d{2})\b/);
+      if (matchClock) {
+        const hours = parseInt(matchClock[1], 10);
+        const mins = parseInt(matchClock[2], 10);
+        const secs = parseInt(matchClock[3], 10);
+        const ts = Date.now() + (hours * 3600 + mins * 60 + secs) * 1000;
+        if (typeof window !== 'undefined') window.__flirtEasyLikesReplenishTimestamp = ts;
+        return ts;
+      }
+
+      // Match HH:MM countdown e.g. "11:42"
+      const matchShortClock = text.match(/\b(\d{1,2}):(\d{2})\b/);
+      if (matchShortClock) {
+        const hours = parseInt(matchShortClock[1], 10);
+        const mins = parseInt(matchShortClock[2], 10);
+        const ts = Date.now() + (hours * 3600 + mins * 60) * 1000;
+        if (typeof window !== 'undefined') window.__flirtEasyLikesReplenishTimestamp = ts;
+        return ts;
+      }
+
+      // Match "in X hours Y mins" or "in Xh Ym"
+      const matchWords = text.match(/(\d+)\s*(?:hours?|hrs?|h)\s*(?:(\d+)\s*(?:minutes?|mins?|m))?/i);
+      if (matchWords) {
+        const hours = parseInt(matchWords[1], 10);
+        const mins = matchWords[2] ? parseInt(matchWords[2], 10) : 0;
+        const ts = Date.now() + (hours * 3600 + mins * 60) * 1000;
+        if (typeof window !== 'undefined') window.__flirtEasyLikesReplenishTimestamp = ts;
+        return ts;
+      }
+    }
+  } catch (_) {}
+
+  // Fallback: use window cache if still future, else 12h default
+  if (typeof window !== 'undefined' && window.__flirtEasyLikesReplenishTimestamp && window.__flirtEasyLikesReplenishTimestamp > Date.now()) {
+    return window.__flirtEasyLikesReplenishTimestamp;
+  }
+  return Date.now() + 12 * 60 * 60 * 1000;
+}
+
 function detectTinderAccountTier() {
   // Layer 1: API-sourced tier cached by api-interceptor.js (most reliable)
   if (window.__flirtEasyAccountTier) return window.__flirtEasyAccountTier;
 
-  // Layer 2: Inspect subscription cards on profile / settings page (e.g. tinder.com/app/profile)
+  // Layer 2: Definitive free signal — paywall / out-of-likes popup is currently visible
+  if (hasSubscriptionPopup()) return 'free';
+
+  // Layer 3: Inspect subscription cards on profile / settings page (e.g. tinder.com/app/profile)
   // On Tinder's profile screen, upsell cards exist for other tiers, but ONLY the active tier says "Manage Your Subscription"
   try {
     const candidates = Array.from(document.querySelectorAll('div, a, button, [role="button"]'));
     for (const el of candidates) {
       const text = (el.innerText || el.textContent || '').toLowerCase();
-      if (text.includes('manage your subscription') || text.includes('manage subscription')) {
+      if (text.includes('manage your subscription') || text.includes('manage subscription') || text.includes('current subscription') || text.includes('active subscription')) {
         let current = el;
         for (let i = 0; i < 6 && current; i++) {
           const cText = (current.innerText || current.textContent || '').toLowerCase();
@@ -230,19 +285,25 @@ function detectTinderAccountTier() {
     }
   } catch (_) {}
 
-  // Layer 3: Specific DOM badge selectors
-  if (document.querySelector('[data-testid*="platinum"], [class*="platinumBadge" i], img[alt*="platinum" i], svg[aria-label*="platinum" i]')) {
-    return 'platinum';
-  }
-  if (document.querySelector('[data-testid*="gold"], [class*="goldBadge" i], img[alt*="gold" i], svg[aria-label*="gold" i]')) {
-    return 'gold';
-  }
-  if (document.querySelector('[data-testid*="plus"], [class*="plusBadge" i], img[alt*="plus" i]')) {
-    return 'plus';
-  }
+  // Layer 4: Specific active subscriber DOM badge (must NOT be an upsell / purchase button / pricing promo)
+  try {
+    const badgeCandidates = document.querySelectorAll(
+      '[data-testid="subscriber-badge-platinum"], [data-testid="member-badge-platinum"], [class*="platinumBadge" i], ' +
+      '[data-testid="subscriber-badge-gold"], [data-testid="member-badge-gold"], [class*="goldBadge" i], ' +
+      '[data-testid="subscriber-badge-plus"], [data-testid="member-badge-plus"], [class*="plusBadge" i]'
+    );
+    for (const el of badgeCandidates) {
+      const parent = el.closest('button, a, [role="button"], [data-testid*="upsell" i], [data-testid*="paywall" i], [class*="upsell" i]');
+      const contextText = ((parent || el).innerText || (parent || el).textContent || '').toLowerCase();
+      const isUpsell = /get |upgrade|unlock|subscribe|pricing|promo|offer|save|\$|€|£|₹|choose|select/.test(contextText);
+      if (isUpsell) continue;
 
-  // Layer 4: Definitive free signal — paywall popup is visible
-  if (hasSubscriptionPopup()) return 'free';
+      const badgeText = ((el.getAttribute('data-testid') || '') + ' ' + (el.className || '')).toLowerCase();
+      if (badgeText.includes('platinum')) return 'platinum';
+      if (badgeText.includes('gold')) return 'gold';
+      if (badgeText.includes('plus')) return 'plus';
+    }
+  } catch (_) {}
 
   return 'unknown';
 }
@@ -538,45 +599,80 @@ function handleLocationModal() {
 }
 
 function isLoggedIn() {
-  if (!window.location.pathname.includes('/app')) {
+  // 0. If logout is actively underway, never report logged in
+  if (window.__feLogoutInProgress) {
     return false;
   }
 
-  // Never report logged in on login or landing paths
-  const path = window.location.pathname.toLowerCase();
-  if (path.includes('/app/login') || path === '/app' || path === '/app/') {
+  // 1. Never report logged in on marketing landing or login entry URLs
+  const path = (window.location.pathname || '').toLowerCase();
+  if (!path.includes('/app') || path === '/app' || path === '/app/' || path.includes('/app/login')) {
     return false;
   }
 
-  // If login form inputs or login dialogs are visible, user is NOT logged in
-  if (document.querySelector('input[type="tel"], input[name="phone_number"], input[autocomplete="one-time-code"], input[name="code"]')) {
+  // 2. If an error boundary/toast ("Uh Oh! Something went wrong") is visible, user is in an unauthenticated/crashed state
+  const pageText = (document.body ? (document.body.innerText || '') : '');
+  if (pageText.includes('Uh Oh! Something went wrong') || document.querySelector('.UhOh, [role="alert"][aria-live="assertive"]')) {
     return false;
   }
 
-  const loginIndicators = [
-    () => window.SELECTORS?.navigation?.explore && findElement(window.SELECTORS.navigation.explore),
-    () => window.SELECTORS?.navigation?.messages && findElement(window.SELECTORS.navigation.messages),
-    () => window.SELECTORS?.buttons?.like && findElement(window.SELECTORS.buttons.like),
-    () => window.SELECTORS?.profile?.card && findElement(window.SELECTORS.profile.card),
-    () => document.querySelector('[data-testid="gamepad-like"], button[aria-label*="Like" i], a[href*="/app/recs"], a[href*="/app/messages"]'),
-    () => {
-      try {
-        const token = localStorage.getItem('TinderWeb/APIToken');
-        if (token && typeof token === 'string' && token.length > 20) return true;
-        const apiStore = localStorage.getItem('TinderWeb/APIStore');
-        if (apiStore) {
-          const parsed = JSON.parse(apiStore);
-          const tok = parsed && (parsed.token || parsed.auth_token || (parsed.user && parsed.user.api_token));
-          if (tok && typeof tok === 'string' && tok.length > 20) return true;
-        }
-        return false;
-      } catch(_) { return false; }
+  // 3. If login form inputs, login modal, or 3-button login sheet are visible, user is NOT logged in
+  if (
+    document.querySelector('input[type="tel"], input[name="phone_number"], input[autocomplete="one-time-code"], input[name="code"]') ||
+    (typeof isLoginSheetOpen === 'function' && isLoginSheetOpen()) ||
+    document.querySelector('div[role="dialog"] button[aria-label*="Log in" i], [data-testid*="login" i]')
+  ) {
+    return false;
+  }
+
+  // 4. Check for genuine active auth token
+  const rawTok = (typeof _extractTinderAuthToken === 'function' ? _extractTinderAuthToken() : null) ||
+                 localStorage.getItem('TinderWeb/APIToken') ||
+                 window.__tinderAuthToken;
+  if (rawTok && typeof rawTok === 'string' && rawTok.replace(/['"]/g, '').trim().length >= 16) {
+    return true;
+  }
+
+  // 5. Without a valid token, residual DOM elements must NOT deceive the state
+  return false;
+}
+
+function detectInterventionNeeded() {
+  try {
+    // 1. CAPTCHA / Arkose Labs / Puzzle detection
+    const captchaIframe = document.querySelector('iframe[src*="arkoselabs"], iframe[src*="funcaptcha"], iframe[src*="recaptcha"], iframe[src*="turnstile"], iframe[title*="challenge" i], iframe[title*="captcha" i], #challenge, #arkose, div[data-testid="challenge"]');
+    if (captchaIframe) {
+      return { needed: true, reason: 'captcha', message: 'Tinder CAPTCHA puzzle detected' };
     }
-  ];
 
-  return loginIndicators.some(check => {
-    try { return Boolean(check()); } catch(_) { return false; }
-  });
+    // 2. Dialog / Modal verification scans
+    const dialogs = Array.from(document.querySelectorAll('[role="dialog"], div[aria-modal="true"], div[data-testid="modal"]'));
+    for (let i = 0; i < dialogs.length; i++) {
+      const d = dialogs[i];
+      const text = (d.innerText || d.textContent || '').trim().toLowerCase();
+      if (!text) continue;
+
+      if (text.includes('solve this puzzle') || text.includes('solve this challenge') || text.includes('confirm you are human')) {
+        return { needed: true, reason: 'captcha', message: 'Security puzzle verification detected' };
+      }
+      if (text.includes("identify it's you") || text.includes("identify its you") || text.includes('verify your identity') || text.includes("verify it's you") || text.includes("verify its you")) {
+        return { needed: true, reason: 'identity_verification', message: '"Identify It\'s You" verification detected' };
+      }
+      if (text.includes('take a video selfie') || text.includes('selfie verification') || text.includes('face verification') || text.includes('video selfie')) {
+        return { needed: true, reason: 'selfie_verification', message: 'Selfie face verification required' };
+      }
+      if ((text.includes('enter the code') || text.includes('we sent a code')) && d.querySelector('input')) {
+        return { needed: true, reason: 'otp_verification', message: '2FA / SMS code verification required' };
+      }
+    }
+  } catch (e) {
+    console.warn('[FlirtEasy] detectInterventionNeeded error:', e);
+  }
+  return { needed: false };
+}
+
+if (typeof window !== 'undefined') {
+  window.detectInterventionNeeded = detectInterventionNeeded;
 }
 
 function waitRandom(min, max) {
@@ -1312,5 +1408,15 @@ function getMatchDistanceKm() {
 }
 
 window.getMatchDistanceKm = getMatchDistanceKm;
-
-
+if (typeof window !== 'undefined') {
+  window.extractTinderLikesResetTimestamp = extractTinderLikesResetTimestamp;
+  window.detectTinderAccountTier = detectTinderAccountTier;
+  window.hasSubscriptionPopup = hasSubscriptionPopup;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    extractTinderLikesResetTimestamp,
+    detectTinderAccountTier,
+    hasSubscriptionPopup,
+  };
+}

@@ -871,6 +871,16 @@ export default function AutomationV2Panel({
         cloned.locationLongitude = -74.006;
       if (!cloned.locationCity) cloned.locationCity = "New York, USA";
 
+      // Enforce invariant: At least one of autoSwipe or autoMessage must be active
+      const isSwipeOn =
+        cloned.autoSwipe !== false && (cloned.likesPerCycle ?? 50) > 0;
+      const isMsgOn =
+        cloned.autoMessage !== false && (cloned.messagesPerCycle ?? 50) > 0;
+      if (!isSwipeOn && !isMsgOn) {
+        cloned.autoSwipe = true;
+        cloned.likesPerCycle = cloned.lastNonZeroLikes || 50;
+      }
+
       setForm(cloned);
       formRef.current = cloned;
       setHasUnsavedChanges(false);
@@ -1006,6 +1016,26 @@ export default function AutomationV2Panel({
         current = current[keys[i]];
       }
       current[keys[keys.length - 1]] = value;
+      nextState = next;
+      formRef.current = next;
+      return next;
+    });
+    showSaveBar();
+  };
+
+  const updateFields = (updates) => {
+    let nextState = null;
+    setForm((prev) => {
+      const next = { ...prev };
+      Object.entries(updates).forEach(([path, value]) => {
+        const keys = path.split(".");
+        let current = next;
+        for (let i = 0; i < keys.length - 1; i++) {
+          if (!current[keys[i]]) current[keys[i]] = {};
+          current = current[keys[i]];
+        }
+        current[keys[keys.length - 1]] = value;
+      });
       nextState = next;
       formRef.current = next;
       return next;
@@ -1853,6 +1883,11 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
   };
 
   const getMessagingSummary = () => {
+    const messaging = !isAutoMessagingOn
+      ? "Messaging Off"
+      : isSafetyOn
+        ? "Auto Messaging (Safe)"
+        : "Auto Messaging On";
     const toneVal = form?.tone || form?.chattingStyle || "Freestyle";
     const tone = `${toneVal.charAt(0).toUpperCase() + toneVal.slice(1)}`;
     const intentionObj = INTENTIONS_OPTIONS.find(
