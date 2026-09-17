@@ -12,6 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ActivityIndicator from "../common/SafeActivityIndicator";
 import MasterControlOrb from "./MasterControlOrb";
+import { getLikesReplenishStatus } from "../../utils/sessionManager";
 
 const titleCase = (value) =>
   String(value || "")
@@ -27,10 +28,12 @@ const GOALS = {
 
 export default function HomeOverview({
   stats,
+  agentState,
   settings,
   isLoggedIn,
   starting,
   checking,
+  checkingAuth,
   latencyMs,
   onOpenBrowser,
   onToggleAgent,
@@ -38,14 +41,31 @@ export default function HomeOverview({
   onSettings,
   onActivity,
 }) {
-  const state = stats?.agentState || {};
+  const effectiveStats = stats || agentState || {};
+  const state = effectiveStats?.agentState || effectiveStats || {};
+  const totals = effectiveStats?.lifetimeStats || state?.stats || {};
+  const isChecking = checking ?? checkingAuth ?? false;
+  const isStarting = Boolean(starting);
+  const busy = isStarting || isChecking;
+
+  const [likesStatus, setLikesStatus] = React.useState(() => getLikesReplenishStatus(state));
+  React.useEffect(() => {
+    const update = () => setLikesStatus(getLikesReplenishStatus(state));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [state?.likesReplenishTimestamp, state?.likesExhaustedAt, state?.waitingReason, effectiveStats]);
+
+  const plan = settings?.userProfile?.tinderPlan || settings?.tinderPlan;
+  const isPaidPlan = plan === "platinum" || plan === "gold" || plan === "plus" || settings?.userProfile?.isTinderPro;
+
   const running = Boolean(
-    isLoggedIn &&
-    (state.isRunning ??
-      (state.currentPhase &&
-        !["stopped", "idle"].includes(state.currentPhase))),
+    (isLoggedIn || state?.isRunning === true) &&
+    (state?.isRunning === true ||
+      (state?.isRunning !== false &&
+        state?.currentPhase &&
+        !["stopped", "idle", "waiting", "paused"].includes(state.currentPhase))),
   );
-  const totals = stats?.lifetimeStats || state.stats || {};
   const goal =
     settings?.goal ||
     settings?.primaryGoal ||
@@ -58,11 +78,13 @@ export default function HomeOverview({
     settings?.personalityStyle ||
     "freestyle";
   const safe = settings?.safetyMode ?? settings?.safeModeEnabled ?? true;
-  const busy = starting || checking;
   const metrics = [
     {
       label: "SWIPES",
-      value: totals.totalSwipes ?? totals.totalLikes ?? totals.swipes ?? 0,
+      value: Math.max(
+        totals.totalSwipes ?? totals.totalLikes ?? totals.swipes ?? 0,
+        state?.currentCycle?.likesCompleted ?? 0
+      ),
       icon: "heart-outline",
       color: uiTheme.colors.primary,
     },
@@ -155,6 +177,14 @@ export default function HomeOverview({
               </View>
             )}
           </View>
+          {isLoggedIn && likesStatus.isExhausted && !isPaidPlan && (!checking || !likesStatus.isFallback) && (
+            <View style={styles.refillPill}>
+              <Ionicons name="time" size={10} color="#FB923C" />
+              <Text style={styles.refillPillText} numberOfLines={1}>
+                Refills in {likesStatus.formattedCountdown}
+              </Text>
+            </View>
+          )}
         </View>
         <View style={styles.latency}>
           <Text style={styles.latencyLabel}>LATENCY</Text>
@@ -185,23 +215,25 @@ export default function HomeOverview({
                 : !isLoggedIn
                   ? "Not Connected"
                   : state?.waitingReason === "safety_lock"
-                    ? "Safety Lock"
+                    ? "Safety Pause"
+                    : state?.waitingReason === "likes_exhausted"
+                      ? (running ? "Wingman Chatting" : "Daily Likes Refill")
                     : running
                       ? (state?.currentPhase === "messaging"
-                          ? "Agent Messaging"
+                          ? "Wingman Messaging"
                           : state?.currentPhase === "transitioning"
-                            ? "Agent Cooldown"
+                            ? "Wingman Resting"
                             : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
                               ? "Awaiting Replies"
-                              : "Agent Active")
-                      : "Agent Standby"}
+                              : "Wingman Active")
+                      : "Wingman Standby"}
             </Text>
           </View>
           <View style={styles.readyBadge}>
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: running ? "#48CB8D" : (!isLoggedIn ? uiTheme.colors.muted : "#FE3C72") },
+                { backgroundColor: running ? "#48CB8D" : (!isLoggedIn ? uiTheme.colors.muted : (state?.waitingReason === "likes_exhausted" ? "#6366F1" : "#FE3C72")) },
               ]}
             />
             <Text style={styles.readyText}>
@@ -210,16 +242,18 @@ export default function HomeOverview({
                 : !isLoggedIn
                   ? "Connect to Start"
                   : state?.waitingReason === "safety_lock"
-                    ? "Pacing"
+                    ? "Safety Pause"
+                    : state?.waitingReason === "likes_exhausted"
+                      ? (running ? "Messaging" : "Refilling")
                     : running
                       ? (state?.currentPhase === "messaging"
                           ? "Replying"
                           : state?.currentPhase === "transitioning"
                             ? "Resting"
                             : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
-                              ? "Watchdog"
-                              : "Swiping")
-                      : "Ready for Batch"}
+                              ? "Checking"
+                              : (settings?.autoSwipe === false || settings?.likesPerCycle <= 0 ? "Messaging" : "Swiping"))
+                      : (settings?.autoSwipe === false || settings?.likesPerCycle <= 0 ? "Ready to Chat" : "Ready to Swipe")}
             </Text>
           </View>
         </View>
@@ -228,7 +262,7 @@ export default function HomeOverview({
         </View>
 
         <MasterControlOrb
-          stats={stats}
+          stats={effectiveStats}
           settings={settings}
           isLoggedIn={isLoggedIn}
           busy={busy}
@@ -428,7 +462,7 @@ const styles = StyleSheet.create({
     borderColor: uiTheme.colors.surface,
   },
   offlineDot: { backgroundColor: "#727277" },
-  instanceInfo: { flex: 1, minWidth: 0 },
+  instanceInfo: { flex: 1, minWidth: 0, overflow: "hidden" },
   instanceTitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -503,7 +537,32 @@ const styles = StyleSheet.create({
   planTextPlus: {
     color: "#C084FC",
   },
-  latency: { alignItems: "flex-end", gap: uiTheme.spacing.xs, flexShrink: 0 },
+  refillPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    backgroundColor: "rgba(234, 88, 12, 0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(234, 88, 12, 0.42)",
+    alignSelf: "flex-start",
+  },
+  refillPillText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: "#FB923C",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  latency: {
+    alignItems: "flex-end",
+    gap: uiTheme.spacing.xs,
+    flexShrink: 0,
+    marginLeft: 10,
+  },
   latencyLabel: {
     fontFamily: "Inter_700Bold",
     color: uiTheme.colors.muted,

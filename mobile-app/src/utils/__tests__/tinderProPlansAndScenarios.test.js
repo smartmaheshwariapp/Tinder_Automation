@@ -98,6 +98,85 @@ describe('Tinder Pro Plan Extraction (parseTinderPlan)', () => {
     expect(result.plan).toBe('platinum');
     expect(result.isPro).toBe(true);
   });
+
+  it('correctly classifies free account with store catalog products and 100 likes as free', () => {
+    const { parseTinderPlan } = loadSessionManager();
+    const result = parseTinderPlan({
+      data: {
+        user: { name: 'Sanket' },
+        account: { account_email: 'sanket.sp.patil@gmail.com' },
+        likes: { likes_remaining: 100 },
+        // In-app store products should NEVER be confused with active purchases
+        products: [
+          { product_type: 'platinum', name: 'Tinder Platinum - 6 Months' },
+          { product_type: 'gold', name: 'Tinder Gold - 1 Month' }
+        ]
+      }
+    });
+
+    expect(result.plan).toBe('free');
+    expect(result.isPro).toBe(false);
+    expect(result.likesRemaining).toBe(100);
+  });
+
+  it('correctly classifies account with expired platinum subscription as free', () => {
+    const { parseTinderPlan } = loadSessionManager();
+    const result = parseTinderPlan({
+      data: {
+        user: { name: 'Sanket' },
+        account: { account_email: 'sanket.sp.patil@gmail.com' },
+        likes: { likes_remaining: 100 },
+        purchases: [
+          {
+            product_type: 'platinum',
+            expire_date: Date.now() - 86400000, // expired yesterday
+            status: 'expired'
+          }
+        ]
+      }
+    });
+
+    expect(result.plan).toBe('free');
+    expect(result.isPro).toBe(false);
+    expect(result.likesRemaining).toBe(100);
+  });
+
+  it('correctly classifies account with active future subscription as platinum', () => {
+    const { parseTinderPlan } = loadSessionManager();
+    const result = parseTinderPlan({
+      data: {
+        user: { name: 'VIP User' },
+        purchases: [
+          {
+            product_type: 'platinum',
+            expire_date: Date.now() + 86400000 * 30, // 30 days remaining
+            status: 'active'
+          }
+        ]
+      }
+    });
+
+    expect(result.plan).toBe('platinum');
+    expect(result.isPro).toBe(true);
+  });
+});
+
+describe('isPurchaseActive Validation', () => {
+  it('returns true for active or undated purchases', () => {
+    const { isPurchaseActive } = loadSessionManager();
+    expect(isPurchaseActive({ product_type: 'platinum' })).toBe(true);
+    expect(isPurchaseActive({ product_type: 'gold', status: 'active' })).toBe(true);
+    expect(isPurchaseActive({ product_type: 'plus', expire_date: Date.now() + 50000 })).toBe(true);
+  });
+
+  it('returns false for expired or canceled purchases', () => {
+    const { isPurchaseActive } = loadSessionManager();
+    expect(isPurchaseActive({ product_type: 'platinum', expire_date: Date.now() - 1000 })).toBe(false);
+    expect(isPurchaseActive({ product_type: 'gold', status: 'expired' })).toBe(false);
+    expect(isPurchaseActive({ product_type: 'gold', status: 'canceled' })).toBe(false);
+    expect(isPurchaseActive({ product_type: 'gold', status: 'cancelled' })).toBe(false);
+    expect(isPurchaseActive({ product_type: 'plus', is_active: false })).toBe(false);
+  });
 });
 
 describe('probeTinderSession Plan & Session Expiry', () => {

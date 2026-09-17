@@ -78,7 +78,7 @@ const CAROUSEL_SLIDES = [
 const FLINT_EMBLEM_URI =
   'https://lh3.googleusercontent.com/aida/AEtjO1XBLBCvT6YG6NjEQtmsjtWA5j_uCps04hYP22UuacAxVsDbTJ-8aEt7FTCHe54G4532OO4W9mUziOo89_l3f1s4bw-AKSf13KLGKYwV1JM7egtBa0zRtTlt6WR24SfQmVAI4KU4-pfv8GOxG7PNQAIU6vvTe82hpcB8hAGX_4vQVn3Yns7nE5T3vr7KmRLK5K2FWS_pPKMg3gmSBbNJvIWyqdTTRyPdOnrkGYitlXO70H45WmmZI8svYw';
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -87,6 +87,26 @@ export default function LoginScreen({ navigation }) {
   const [isFocusedEmail, setIsFocusedEmail] = useState(false);
   const [isFocusedPassword, setIsFocusedPassword] = useState(false);
   const [emblemFailed, setEmblemFailed] = useState(false);
+
+  // ── Auto-resolve authenticated Flint session ──
+  useEffect(() => {
+    if (route?.params?.logout || route?.params?.forceAuth) return;
+    let isMounted = true;
+    (async () => {
+      try {
+        const user = await SupabaseService.getCurrentUser();
+        if (user && (user.email || user.id) && isMounted) {
+          navigation.replace('PlatformSelect', {
+            user,
+            userId: user.id,
+          });
+        }
+      } catch (_) {}
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [route?.params?.logout, route?.params?.forceAuth]);
 
   // ── Legal & Support In-App Sheet States (App Store & HIG Compliance) ──
   const [legalModalVisible, setLegalModalVisible] = useState(false);
@@ -693,9 +713,16 @@ export default function LoginScreen({ navigation }) {
           {/* Continue as Guest at Bottom (Apple HIG 44pt Touch Target & HitSlop) */}
           <TouchableOpacity
             style={styles.guestBottomLink}
-            onPress={() => {
+            onPress={async () => {
               safeHaptic('light');
-              navigation.replace('PlatformSelect');
+              let guestUser = null;
+              try {
+                guestUser = await SupabaseService.saveGuestSession();
+              } catch (_) {}
+              navigation.replace('PlatformSelect', {
+                user: guestUser || { id: 'guest_user', email: 'guest@flint.ai', fullName: 'Guest User', isGuest: true },
+                userId: guestUser?.id || 'guest_user',
+              });
             }}
             activeOpacity={0.6}
             hitSlop={{ top: 14, bottom: 20, left: 24, right: 24 }}

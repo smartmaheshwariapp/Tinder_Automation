@@ -11,7 +11,7 @@ const FEED_META = {
   profile_liked:    { icon: 'heart',                 label: 'Profile Liked',      color: uiTheme.colors.primary },
   match_detected:   { icon: 'sparkles',              label: 'New Match',          color: '#FFB800' },
   handoff_detected: { icon: 'star',                  label: 'Match Moment',       color: uiTheme.colors.success },
-  cycle_complete:   { icon: 'checkmark-done',        label: 'Batch Completed',    color: uiTheme.colors.success },
+  cycle_complete:   { icon: 'checkmark-done',        label: 'Cycle Completed',    color: uiTheme.colors.success },
   persona_update:   { icon: 'options-outline',       label: 'AI Tone Calibrated', color: uiTheme.colors.info },
   swipe_progress:   { icon: 'trending-up-outline',   label: 'Swiping Session',    color: uiTheme.colors.primary },
   msg_progress:     { icon: 'chatbox-ellipses',      label: 'Messaging Queue',    color: '#EC4899' },

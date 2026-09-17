@@ -33,6 +33,10 @@ import {
   updateOnDeviceWorkerCallbacks,
   getProgressFeed,
   pushProgressFeedEvent,
+  getRateLimitStatus,
+  subscribeRateLimit,
+  isAutoSwipeEnabled,
+  isAutoMessagingEnabled,
 } from '../utils/sessionManager';
 import { generateChromeShim } from '../utils/chromeShim';
 import { SELECTORS_JSON } from '../utils/selectorsData';
@@ -40,6 +44,7 @@ import { CONTENT_SCRIPT_BUNDLE } from '../utils/contentScriptBundle';
 import { DashboardPanel } from '../components/dashboard';
 import { useExtensionStats } from '../hooks/useExtensionStats';
 import trackingService from '../services/trackingService';
+import NotificationService from '../services/notifications';
 
 // Maximum time the UI waits for the WebView to confirm a purge before it
 // releases the logout modal on its own. Covers the purge script's own bounded
@@ -198,10 +203,8 @@ const MASTER_PURGE_SCRIPT = `
   // with the document, and the fresh one starts with no flag at all.
   setTimeout(function() { window.__feLogoutInProgress = false; }, 5000);
 
-  // Navigate in the same task that wiped storage. IndexedDB, CacheStorage and
-  // service workers are torn down afterwards by STORAGE_TEARDOWN_SCRIPT on the
-  // landing page, where no SPA holds those handles open.
-  goToLanding();
+  // Allow postMessage bridge to flush to React Native before replacing document location
+  setTimeout(goToLanding, 150);
 })();
 true;
 `;
@@ -315,7 +318,14 @@ const maskProxy = (proxy) => {
 
 const persistentLoginCache = {};
 
-export default function BrowserScreen({ route, navigation }) {
+export default function BrowserScreen({
+  route = {},
+  navigation,
+  isOverlay = false,
+  isHeadless = false,
+  onClose,
+  onRequestIntervention,
+}) {
   const { platform, vpsUrl: rawVpsUrl, proxyIp, extensionSettings: initialSettings, orchestratorUrl: paramOrchestratorUrl, userId: paramUserId } = route.params || {};
   const [extensionSettings, setExtensionSettings] = useState(() => initialSettings || getSharedExtensionSettings());
 
@@ -387,6 +397,14 @@ export default function BrowserScreen({ route, navigation }) {
       clearTimeout(loginSheetTimeoutRef.current);
       loginSheetTimeoutRef.current = null;
     }
+    if (veilTimeoutRef.current) {
+      clearTimeout(veilTimeoutRef.current);
+      veilTimeoutRef.current = null;
+    }
+    if (veilFadeAnimRef.current) {
+      veilFadeAnimRef.current.stop();
+      veilFadeAnimRef.current = null;
+    }
   }, []);
 
   const profileSyncCallbacksRef = useRef(new Map());
@@ -433,9 +451,107 @@ export default function BrowserScreen({ route, navigation }) {
     return () => pulse.stop();
   }, [pulseAnim, glowAnim]);
 
+  // ── Smooth reveal transition state (veil) ──
+  const [prevIsHeadless, setPrevIsHeadless] = useState(isHeadless);
+  const [revealActive, setRevealActive] = useState(!isHeadless);
+  const prevLoadingRef = useRef(loading);
+  const veilOpacity = useRef(new Animated.Value(1)).current;
+  const veilTimeoutRef = useRef(null);
+  const veilFadeAnimRef = useRef(null);
+
+  // Synchronously activate reveal veil during render when opening so there is zero 1-frame flash
+  if (isHeadless !== prevIsHeadless) {
+    setPrevIsHeadless(isHeadless);
+    if (!isHeadless) {
+      setRevealActive(true);
+      veilOpacity.setValue(1);
+    } else {
+      setRevealActive(false);
+      veilOpacity.setValue(1);
+    }
+  }
+
+  // Handle timed fade-out once visible
+  useEffect(() => {
+    if (!isHeadless && revealActive) {
+      if (veilTimeoutRef.current) {
+        clearTimeout(veilTimeoutRef.current);
+        veilTimeoutRef.current = null;
+      }
+      if (veilFadeAnimRef.current) {
+        veilFadeAnimRef.current.stop();
+        veilFadeAnimRef.current = null;
+      }
+
+      // If already loaded in background, hold the sleek transition for ~550ms, then fade out smoothly
+      if (!loading) {
+        veilTimeoutRef.current = setTimeout(() => {
+          veilFadeAnimRef.current = Animated.timing(veilOpacity, {
+            toValue: 0,
+            duration: 240,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          });
+          veilFadeAnimRef.current.start(({ finished }) => {
+            if (finished) {
+              setRevealActive(false);
+              veilOpacity.setValue(1);
+            }
+          });
+        }, 550);
+      }
+    } else if (isHeadless) {
+      if (veilTimeoutRef.current) {
+        clearTimeout(veilTimeoutRef.current);
+        veilTimeoutRef.current = null;
+      }
+      if (veilFadeAnimRef.current) {
+        veilFadeAnimRef.current.stop();
+        veilFadeAnimRef.current = null;
+      }
+      if (revealActive) {
+        setRevealActive(false);
+      }
+      veilOpacity.setValue(1);
+    }
+  }, [isHeadless, revealActive, loading, veilOpacity]);
+
+  // When loading finishes while BrowserScreen is visible (e.g. cold load or opening while still loading)
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current;
+    prevLoadingRef.current = loading;
+
+    if (wasLoading && !loading && !isHeadless) {
+      if (veilTimeoutRef.current) {
+        clearTimeout(veilTimeoutRef.current);
+        veilTimeoutRef.current = null;
+      }
+      if (veilFadeAnimRef.current) {
+        veilFadeAnimRef.current.stop();
+        veilFadeAnimRef.current = null;
+      }
+
+      // Ensure at least 350ms display so it doesn't flash abruptly
+      veilTimeoutRef.current = setTimeout(() => {
+        veilFadeAnimRef.current = Animated.timing(veilOpacity, {
+          toValue: 0,
+          duration: 240,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        });
+        veilFadeAnimRef.current.start(({ finished }) => {
+          if (finished) {
+            setRevealActive(false);
+            veilOpacity.setValue(1);
+          }
+        });
+      }, 350);
+    }
+  }, [loading, isHeadless, veilOpacity]);
+
   // Dynamic user-facing progress hints (zero technical jargon)
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !revealActive) {
       setLoadingStage(0);
       return;
     }
@@ -447,7 +563,7 @@ export default function BrowserScreen({ route, navigation }) {
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [loading]);
+  }, [loading, revealActive]);
 
   const loaderTitle = useMemo(() => {
     if (isOnDevice && getTinderAuthState()?.isLoggedIn) {
@@ -487,12 +603,14 @@ export default function BrowserScreen({ route, navigation }) {
   // Drives the header's auth-dependent controls. Kept in React state (rather than
   // read imperatively) so the header actually re-renders when the session changes.
   const [sessionStatus, setSessionStatus] = useState(readSessionStatus);
+  const [currentTinderAuth, setCurrentTinderAuth] = useState(getTinderAuthState);
 
   // Two-way auth synchronization: if home page or background logs out, reset UI state
   useEffect(() => {
     const unsub = subscribeTinderAuthState((state) => {
       setTimeout(() => {
         if (isMountedRef.current) {
+          setCurrentTinderAuth(state);
           setSessionStatus(readSessionStatus());
           if (!state?.isLoggedIn) {
             setLoginStep('options');
@@ -515,17 +633,63 @@ export default function BrowserScreen({ route, navigation }) {
   const [emailErrorText, setEmailErrorText] = useState('');
   const [submittedEmail, setSubmittedEmail] = useState('');
   const [submittedPhone, setSubmittedPhone] = useState('');
+  const [rateLimitTimer, setRateLimitTimer] = useState(0);
+  useEffect(() => {
+    if (rateLimitTimer <= 0) return;
+    const t = setInterval(() => {
+      setRateLimitTimer(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [rateLimitTimer]);
   const initialSwiping = Boolean(route.params?.autoStartAgent);
   const [onDeviceSwiping, setOnDeviceSwiping] = useState(initialSwiping);
-  const [onDeviceSwipes, setOnDeviceSwipes] = useState(() => getOnDeviceSessionState().swipes);
+  const [onDeviceSwipes, setOnDeviceSwipes] = useState(() => {
+    const s = getOnDeviceSessionState();
+    return Math.max(s.swipes || 0, s.cycleLikes || 0);
+  });
+  const [onDeviceCycleLikes, setOnDeviceCycleLikes] = useState(() => getOnDeviceSessionState().cycleLikes || 0);
   const [onDeviceMatches, setOnDeviceMatches] = useState(() => getOnDeviceSessionState().matches);
   const [onDeviceMessages, setOnDeviceMessages] = useState(() => getOnDeviceSessionState().messages);
+  const [onDeviceCycleMessages, setOnDeviceCycleMessages] = useState(() => getOnDeviceSessionState().cycleMessages || 0);
   const onDeviceSwipesRef = useRef(onDeviceSwipes);
   useEffect(() => { onDeviceSwipesRef.current = onDeviceSwipes; }, [onDeviceSwipes]);
+  const onDeviceCycleLikesRef = useRef(onDeviceCycleLikes);
+  useEffect(() => { onDeviceCycleLikesRef.current = onDeviceCycleLikes; }, [onDeviceCycleLikes]);
   const onDeviceMatchesRef = useRef(onDeviceMatches);
   useEffect(() => { onDeviceMatchesRef.current = onDeviceMatches; }, [onDeviceMatches]);
   const onDeviceMessagesRef = useRef(onDeviceMessages);
   useEffect(() => { onDeviceMessagesRef.current = onDeviceMessages; }, [onDeviceMessages]);
+  const onDeviceCycleMessagesRef = useRef(onDeviceCycleMessages);
+  useEffect(() => { onDeviceCycleMessagesRef.current = onDeviceCycleMessages; }, [onDeviceCycleMessages]);
+
+  const [rateLimitStatusState, setRateLimitStatusState] = useState(() => {
+    try {
+      const isSafetyOn = extensionSettings?.safetyMode !== false;
+      return getRateLimitStatus(isSafetyOn, {
+        likesPerHour: extensionSettings?.likesPerCycle || 50,
+        messagesPerHour: extensionSettings?.messagesPerCycle || 50,
+      });
+    } catch (_) {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const isSafetyOn = extensionSettings?.safetyMode !== false;
+      setRateLimitStatusState(getRateLimitStatus(isSafetyOn, {
+        likesPerHour: extensionSettings?.likesPerCycle || 50,
+        messagesPerHour: extensionSettings?.messagesPerCycle || 50,
+      }));
+    } catch (_) {}
+    const unsub = subscribeRateLimit((status) => {
+      if (isMountedRef.current) {
+        setRateLimitStatusState(status);
+      }
+    });
+    return unsub;
+  }, [extensionSettings?.safetyMode, extensionSettings?.likesPerCycle, extensionSettings?.messagesPerCycle]);
+
   const canGoBackWebState = useState(false);
   const [canGoBackWeb, setCanGoBackWeb] = canGoBackWebState;
 
@@ -542,6 +706,12 @@ export default function BrowserScreen({ route, navigation }) {
   // that left the screen with no way out at all.
   useEffect(() => {
     const onBackPress = () => {
+      if (!isHeadless && (revealActive || loading)) {
+        if (onClose) {
+          onClose();
+          return true;
+        }
+      }
       if (showLogoutConfirm) {
         // Deliberately inert while the logout is running so the purge is not
         // abandoned halfway; it is time-bounded by LOGOUT_CONFIRM_TIMEOUT_MS.
@@ -561,7 +731,7 @@ export default function BrowserScreen({ route, navigation }) {
 
     const backSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => backSub.remove();
-  }, [canGoBackWeb, showLogoutConfirm, showDashboard, loggingOut]);
+  }, [canGoBackWeb, showLogoutConfirm, showDashboard, loggingOut, isHeadless, revealActive, loading, onClose]);
   const [hyperbeamEmbedUrl, setHyperbeamEmbedUrl] = useState(
     vpsUrl && vpsUrl.includes('hyperbeam.com') ? vpsUrl : ''
   );
@@ -573,11 +743,17 @@ export default function BrowserScreen({ route, navigation }) {
   ]);
 
   const logCounterRef = useRef(0);
+  const lastLogRef = useRef({ text: '', time: 0 });
 
   const addLog = useCallback((text, type = 'info') => {
+    const now = Date.now();
+    if (lastLogRef.current.text === text && now - lastLogRef.current.time < 1000) {
+      return;
+    }
+    lastLogRef.current = { text, time: now };
     const time = new Date().toLocaleTimeString();
     logCounterRef.current += 1;
-    const uniqueId = `log_${Date.now()}_${logCounterRef.current}_${Math.random().toString(36).slice(2, 8)}`;
+    const uniqueId = `log_${now}_${logCounterRef.current}_${Math.random().toString(36).slice(2, 8)}`;
     console.log(`[FE-LOG ${time}] [${type.toUpperCase()}] ${text}`);
     setLogs(prev => [{ id: uniqueId, time, text, type }, ...prev].slice(0, 80));
   }, []);
@@ -596,6 +772,12 @@ export default function BrowserScreen({ route, navigation }) {
           setOnDeviceSwipes(state.stats.swipes || 0);
           setOnDeviceMatches(state.stats.matches || 0);
           setOnDeviceMessages(state.stats.messages || 0);
+        }
+        if (state.currentCycle?.likesCompleted !== undefined) {
+          setOnDeviceCycleLikes(state.currentCycle.likesCompleted);
+        }
+        if (state.currentCycle?.messagesProcessed !== undefined) {
+          setOnDeviceCycleMessages(state.currentCycle.messagesProcessed);
         }
         if (state.isRunning !== undefined) {
           setOnDeviceSwiping(state.isRunning);
@@ -628,6 +810,12 @@ export default function BrowserScreen({ route, navigation }) {
           setOnDeviceSwipes(state.stats.swipes || 0);
           setOnDeviceMatches(state.stats.matches || 0);
           setOnDeviceMessages(state.stats.messages || 0);
+        }
+        if (state.currentCycle?.likesCompleted !== undefined) {
+          setOnDeviceCycleLikes(state.currentCycle.likesCompleted);
+        }
+        if (state.currentCycle?.messagesProcessed !== undefined) {
+          setOnDeviceCycleMessages(state.currentCycle.messagesProcessed);
         }
         if (state.isRunning !== undefined) setOnDeviceSwiping(state.isRunning);
       },
@@ -819,19 +1007,101 @@ export default function BrowserScreen({ route, navigation }) {
   }, [onDeviceSwiping]);
   const isTogglingRef = useRef(false);
 
-  // Helper to reliably dispatch auto-like start command into WebView DOM
+  // Trigger processing match chats using FlirtEasy AI
+  const triggerProcessChats = useCallback(() => {
+    if (!webViewRef.current) return;
+    const worker = backgroundWorkerRef.current;
+    const settings = worker?.settings || extensionSettings || {};
+    const maxMsgs = typeof settings.messagesPerCycle === 'number' && settings.messagesPerCycle > 0 ? settings.messagesPerCycle : 50;
+    webViewRef.current.injectJavaScript(`
+      (function() {
+        var isOnMessages = window.location.pathname.includes('/app/messages') ||
+          window.location.pathname.includes('/app/my-matches') ||
+          window.location.pathname.includes('/app/matches');
+        if (!isOnMessages) {
+          var msgLink = document.querySelector('a[href*="/app/messages"], a[href*="/app/my-matches"], a[href*="/app/matches"], [aria-label*="Messages" i], [aria-label*="Matches" i], [aria-label*="Chat" i], nav a:nth-child(4)');
+          if (msgLink) {
+            msgLink.click();
+          } else {
+            window.location.href = 'https://tinder.com/app/messages';
+          }
+        }
+        if (typeof window.__flirteasyStartMessaging === 'function') {
+          window.__flirteasyStartMessaging(${maxMsgs}, ${JSON.stringify(settings)});
+        } else if (window.__chromeDispatchMessage) {
+          window.__chromeDispatchMessage({
+            action: 'processChats',
+            settings: ${JSON.stringify(settings)},
+            maxMessages: ${maxMsgs}
+          });
+        }
+      })();
+      true;
+    `);
+    addLog('💬 Processing unread match chats with AI...', 'action');
+  }, [extensionSettings, addLog]);
+
+  // Helper to reliably dispatch automation start command into WebView DOM (Swiping or Messaging)
   const dispatchStartToDOM = useCallback((targetCount = null) => {
     if (!webViewRef.current) return;
     const worker = backgroundWorkerRef.current;
     if (worker) {
       worker.handleMessage({ action: 'startAgent' });
     }
-    const count = targetCount || extensionSettings?.likesPerCycle || 50;
+
+    const swipingEnabled = isAutoSwipeEnabled(extensionSettings);
+    const messagingEnabled = isAutoMessagingEnabled(extensionSettings);
+    const sessionState = getOnDeviceSessionState();
+    const isLikesExhausted = sessionState?.waitingReason === 'likes_exhausted' && (sessionState?.likesReplenishTimestamp || 0) > Date.now();
+
+    // If both are disabled, warn user and do not proceed
+    if (!swipingEnabled && !messagingEnabled) {
+      addLog('⚠️ Both Auto-Swipe and Auto-Messaging are disabled in settings. Enable at least one to start.', 'warn');
+      return;
+    }
+
+    // If Auto-Swipe is OFF or daily likes are refilling, pivot directly to messaging (if enabled)
+    if (!swipingEnabled || isLikesExhausted) {
+      if (!messagingEnabled) {
+        addLog('⚠️ Swiping is disabled/exhausted and Auto-Messaging is turned off in settings.', 'warn');
+        return;
+      }
+      const reasonText = !swipingEnabled ? 'Auto-Swipe is disabled' : 'Tinder daily likes refilling';
+      addLog(`💬 ${reasonText} — Wingman starting in Messaging Only mode`, 'action');
+      saveOnDeviceSessionState({
+        isRunning: true,
+        currentPhase: 'messaging',
+        waitingReason: isLikesExhausted ? 'likes_exhausted' : null,
+      });
+      if (worker) {
+        worker.handleMessage({
+          action: 'updateAgentState',
+          state: { isRunning: true, currentPhase: 'messaging', waitingReason: isLikesExhausted ? 'likes_exhausted' : null }
+        });
+      }
+      triggerProcessChats();
+      return;
+    }
+
+    const count = targetCount !== null
+      ? targetCount
+      : (typeof extensionSettings?.likesPerCycle === 'number' && extensionSettings.likesPerCycle > 0
+          ? extensionSettings.likesPerCycle
+          : 50);
+
+    if (onDeviceCycleLikesRef.current >= count) {
+      onDeviceCycleLikesRef.current = 0;
+      setOnDeviceCycleLikes(0);
+      saveOnDeviceSessionState({ cycleLikes: 0, waitingReason: null, nextRunTimestamp: null });
+    }
+    const currentProgress = onDeviceCycleLikesRef.current || 0;
     webViewRef.current.injectJavaScript(`
       (function() {
         var targetCount = ${count};
+        var initialProgress = ${currentProgress};
         window.__flirteasyAutoStartRequested = true;
         window.__flirteasyAutoStartCount = targetCount;
+        window.__flirteasyAutoStartProgress = initialProgress;
         window.__flirteasy_stop = false;
         if (window.chrome && window.chrome.runtime && window.chrome.runtime.sendMessage) {
           try { window.chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }); } catch(_) {}
@@ -842,14 +1112,14 @@ export default function BrowserScreen({ route, navigation }) {
           try {
             // 1. Direct global hook if content script is loaded
             if (typeof window.__flirteasyStartAutomation === 'function') {
-              window.__flirteasyStartAutomation(targetCount);
-              console.log('[FlirtEasy Bridge] Started automation via direct global hook');
+              window.__flirteasyStartAutomation(targetCount, initialProgress);
+              console.log('[FlirtEasy Bridge] Started automation via direct global hook (progress: ' + initialProgress + '/' + targetCount + ')');
               return true;
             }
 
             // 2. Dispatch via content script message bridge
             if (typeof window.__chromeDispatchMessage === 'function') {
-              var countDispatched = window.__chromeDispatchMessage({ action: 'autoLike', count: targetCount });
+              var countDispatched = window.__chromeDispatchMessage({ action: 'autoLike', count: targetCount, initialProgress: initialProgress });
               if (countDispatched > 0) {
                 console.log('[FlirtEasy Bridge] Dispatched autoLike to ' + countDispatched + ' listener(s)');
                 return true;
@@ -858,7 +1128,7 @@ export default function BrowserScreen({ route, navigation }) {
 
             // 3. If not on recs deck, attempt navigation
             if (!window.location.pathname.includes('/app/recs')) {
-              var recsLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Explore" i]');
+              var recsLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Recommendations" i], [aria-label*="Tinder" i], nav a:nth-child(1)');
               if (recsLink) recsLink.click();
             }
           } catch(e) {
@@ -875,7 +1145,7 @@ export default function BrowserScreen({ route, navigation }) {
       })();
       true;
     `);
-  }, [extensionSettings]);
+  }, [extensionSettings, triggerProcessChats, addLog]);
 
   // Auto-start coordination: ensures automation reliably engages once Tinder DOM is loaded and logged in
   const pendingAutoStartRef = useRef(Boolean(route.params?.autoStartAgent));
@@ -907,14 +1177,18 @@ export default function BrowserScreen({ route, navigation }) {
     const shouldStart = forceStart !== null ? forceStart : !onDeviceSwipingRef.current;
 
     // Guard: already in the requested state — abort to prevent redundant calls & infinite loops
-    if (forceStart === null && shouldStart === onDeviceSwipingRef.current) return;
+    if (shouldStart === onDeviceSwipingRef.current) return;
 
     isTogglingRef.current = true;
     try {
-      // Synchronously update the ref immediately so state listeners never re-enter recursively
+      const swipingEnabled = isAutoSwipeEnabled(extensionSettings);
+      const messagingEnabled = isAutoMessagingEnabled(extensionSettings);
+      const initialPhase = shouldStart
+        ? (swipingEnabled ? 'swiping' : (messagingEnabled ? 'messaging' : 'idle'))
+        : 'idle';
       onDeviceSwipingRef.current = shouldStart;
       setOnDeviceSwiping(shouldStart);
-      saveOnDeviceSessionState({ isRunning: shouldStart });
+      saveOnDeviceSessionState({ isRunning: shouldStart, currentPhase: initialPhase });
 
       // Only block if explicitly confirmed logged out
       if (shouldStart && sessionStatus === SESSION_SIGNED_OUT) {
@@ -948,32 +1222,28 @@ export default function BrowserScreen({ route, navigation }) {
       } else {
         if (worker) worker.handleMessage({ action: 'startAgent' });
         dispatchStartToDOM();
-        const count = extensionSettings?.likesPerCycle || 50;
-        addLog(`🚀 FlirtEasy AI Automation started (${count} profiles target)`, 'success');
+        const swipingEnabled = isAutoSwipeEnabled(extensionSettings);
+        const messagingEnabled = isAutoMessagingEnabled(extensionSettings);
+        if (swipingEnabled && messagingEnabled) {
+          const count = typeof extensionSettings?.likesPerCycle === 'number' && extensionSettings.likesPerCycle > 0
+            ? extensionSettings.likesPerCycle
+            : 50;
+          addLog(`🚀 FlirtEasy AI Automation started (${count} profiles target · Full Auto)`, 'success');
+        } else if (swipingEnabled) {
+          const count = typeof extensionSettings?.likesPerCycle === 'number' && extensionSettings.likesPerCycle > 0
+            ? extensionSettings.likesPerCycle
+            : 50;
+          addLog(`🚀 FlirtEasy AI Swiper started (${count} profiles target · Swiping Only)`, 'success');
+        } else if (messagingEnabled) {
+          addLog('💬 FlirtEasy AI Wingman started (Messaging Only)', 'success');
+        } else {
+          addLog('⚠️ Both Auto-Swipe and Auto-Messaging are disabled in settings.', 'warn');
+        }
       }
     } finally {
       isTogglingRef.current = false;
     }
   }, [addLog, extensionSettings, dispatchStartToDOM, sessionStatus]);
-
-  // Manually trigger processing match chats using FlirtEasy AI
-  const triggerProcessChats = useCallback(() => {
-    if (!webViewRef.current) return;
-    const worker = backgroundWorkerRef.current;
-    const settings = worker?.settings || extensionSettings || {};
-    const maxMsgs = settings.messagesPerCycle || 50;
-    webViewRef.current.injectJavaScript(`
-      if (window.__chromeDispatchMessage) {
-        window.__chromeDispatchMessage({
-          action: 'processChats',
-          settings: ${JSON.stringify(settings)},
-          maxMessages: ${maxMsgs}
-        });
-      }
-      true;
-    `);
-    addLog('💬 Processing unread match chats with AI...', 'action');
-  }, [extensionSettings, addLog]);
 
   // Start / stop FlirtEasy AI swiping & messaging agent (local on-device or remote orchestrator CDP bridge)
   const handleToggleAgent = useCallback(async () => {
@@ -1413,13 +1683,13 @@ export default function BrowserScreen({ route, navigation }) {
         swipes: onDeviceSwipes,
         matches: onDeviceMatches,
         messages: onDeviceMessages,
-        likesCompleted: onDeviceSwipes,
+        likesCompleted: onDeviceCycleLikes,
         matchesCreated: onDeviceMatches,
         messagesSent: onDeviceMessages,
       },
       currentCycle: {
-        likesCompleted: onDeviceSwipes,
-        messagesProcessed: onDeviceMessages,
+        likesCompleted: onDeviceCycleLikes,
+        messagesProcessed: onDeviceCycleMessages,
         followUpsSent: 0,
       }
     },
@@ -1449,7 +1719,7 @@ export default function BrowserScreen({ route, navigation }) {
       }));
     })(),
     settings: extensionSettings
-  }), [onDeviceSwiping, onDeviceSwipes, onDeviceMatches, onDeviceMessages, logs, extensionSettings]);
+  }), [onDeviceSwiping, onDeviceSwipes, onDeviceCycleLikes, onDeviceMatches, onDeviceMessages, onDeviceCycleMessages, logs, extensionSettings]);
 
   // Two-way sync: listen to external / worker shared agent updates
   useEffect(() => {
@@ -1469,13 +1739,20 @@ export default function BrowserScreen({ route, navigation }) {
             setOnDeviceMessages(stats.messages);
           }
         }
+        const cycle = shared?.agentState?.currentCycle;
+        if (typeof cycle?.likesCompleted === 'number' && cycle.likesCompleted !== onDeviceCycleLikes) {
+          setOnDeviceCycleLikes(cycle.likesCompleted);
+        }
+        if (typeof cycle?.messagesProcessed === 'number' && cycle.messagesProcessed !== onDeviceCycleMessages) {
+          setOnDeviceCycleMessages(cycle.messagesProcessed);
+        }
         if (typeof shared?.agentState?.isRunning === 'boolean' && shared.agentState.isRunning !== onDeviceSwiping) {
           setOnDeviceSwiping(shared.agentState.isRunning);
         }
       }, 0);
     });
     return unsub;
-  }, [isOnDevice, onDeviceSwipes, onDeviceMatches, onDeviceMessages, onDeviceSwiping]);
+  }, [isOnDevice, onDeviceSwipes, onDeviceCycleLikes, onDeviceMatches, onDeviceMessages, onDeviceCycleMessages, onDeviceSwiping]);
 
   // Persist session counters so they survive back-navigation, force-close, and
   // app restart. Debounced at 1 s so a rapid swipe burst doesn't hammer
@@ -1485,12 +1762,14 @@ export default function BrowserScreen({ route, navigation }) {
     const timer = setTimeout(() => {
       saveOnDeviceSessionState({
         swipes: onDeviceSwipes,
+        cycleLikes: onDeviceCycleLikes,
         matches: onDeviceMatches,
         messages: onDeviceMessages,
+        cycleMessages: onDeviceCycleMessages,
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [isOnDevice, onDeviceSwipes, onDeviceMatches, onDeviceMessages]);
+  }, [isOnDevice, onDeviceSwipes, onDeviceCycleLikes, onDeviceMatches, onDeviceMessages, onDeviceCycleMessages]);
 
   // Auto-start agent trigger: launches swiping on Tinder DOM when launched with autoStartAgent
   useEffect(() => {
@@ -1507,11 +1786,19 @@ export default function BrowserScreen({ route, navigation }) {
     }
   }, [isOnDevice, route.params?.autoStartAgent, dispatchStartToDOM, addLog]);
 
-  // Sync external stop/pause command from Home Screen
+  // Sync external start / stop commands from Home Screen
   useEffect(() => {
     const unsub = subscribeSharedAgentState((state) => {
-      if (state?.agentState?.source === 'home_screen' && state?.agentState?.isRunning === false && onDeviceSwipingRef.current && !isTogglingRef.current) {
-        toggleOnDeviceSwiping(false);
+      if (state?.agentState?.source === 'home_screen') {
+        if (state?.agentState?.isRunning === true) {
+          if (!onDeviceSwipingRef.current && !isTogglingRef.current) {
+            toggleOnDeviceSwiping(true);
+          }
+        } else if (state?.agentState?.isRunning === false) {
+          if (onDeviceSwipingRef.current && !isTogglingRef.current) {
+            toggleOnDeviceSwiping(false);
+          }
+        }
       }
     });
     return unsub;
@@ -1782,17 +2069,15 @@ export default function BrowserScreen({ route, navigation }) {
 
 
   /**
-   * The single exit point of the logout flow. Cancels the failsafe timer,
-   * releases the re-entrancy lock and closes the modal. Idempotent, and safe to
-   * call after unmount — the on-device path is resolved by a WebView message
-   * that can arrive at any time, including never.
+   * The single exit point of the logout flow. Cancels any failsafe timer,
+   * releases the re-entrancy lock, and guarantees the confirmation modal and
+   * spinner are dismissed.
    */
   const finishLogout = useCallback(() => {
     if (logoutFailsafeRef.current) {
       clearTimeout(logoutFailsafeRef.current);
       logoutFailsafeRef.current = null;
     }
-    if (!isLoggingOutRef.current) return;
     isLoggingOutRef.current = false;
     if (!isMountedRef.current) return;
     setLoggingOut(false);
@@ -1800,23 +2085,21 @@ export default function BrowserScreen({ route, navigation }) {
   }, []);
 
   /**
-   * Ends the logout flow and, when the logout came from this screen's own
-   * controls in on-device mode, returns to the home screen.
-   *
-   * Signing back in on-device happens through Tinder's own page, and the browser
-   * re-opens straight into it. Leaving the user parked in a session they just
-   * ended means the landing-page helper immediately reopens Tinder's signup
-   * sheet — the app would answer "log me out" with "let's sign up".
+   * Ends the logout flow, ensures all dialogs and spinners are closed, and
+   * dismisses the session view (either via onClose overlay callback or stack navigation).
    */
   const finishLogoutAndExit = useCallback(() => {
-    const shouldExit = exitAfterLogoutRef.current;
     exitAfterLogoutRef.current = false;
     finishLogout();
-    if (!shouldExit || !isMountedRef.current) return;
+    if (!isMountedRef.current) return;
     isExitingRef.current = true;
     cleanupCurrentSession();
-    navigation.navigate('PlatformSelect', { justSignedOut: true });
-  }, [finishLogout, navigation]);
+    if (typeof onClose === 'function') {
+      onClose({ justSignedOut: true });
+    } else if (navigation?.navigate) {
+      navigation.navigate('PlatformSelect', { justSignedOut: true });
+    }
+  }, [finishLogout, navigation, onClose]);
 
   /**
    * Brings the WebView back after its renderer process died. The old instance is
@@ -1835,70 +2118,52 @@ export default function BrowserScreen({ route, navigation }) {
   }, [finishLogout]);
 
   const handleLogout = async () => {
-    // `disabled={loggingOut}` is driven by async state, so a double tap within
-    // the same frame can still reach this twice. The ref is the real lock.
+    // Re-entrancy guard against double-taps
     if (isLoggingOutRef.current) return;
     isLoggingOutRef.current = true;
     setLoggingOut(true);
 
-    // Local surfaces are reset first: if any later step fails, the app must
-    // never be left showing a logged-in view of a dead session.
-    setShowDashboard(false);
-    setLoginStep('options');
-    delete persistentLoginCache[sessionKey];
-    setInputText('');
-    setSubmittedEmail('');
-    setSubmittedPhone('');
-    setEmailErrorText('');
+    try {
+      // Local surfaces are reset first: if any later step fails, the app must
+      // never be left showing a logged-in view of a dead session.
+      setShowDashboard(false);
+      setLoginStep('options');
+      delete persistentLoginCache[sessionKey];
+      setInputText('');
+      setSubmittedEmail('');
+      setSubmittedPhone('');
+      setEmailErrorText('');
 
-    // Also arms pendingWebViewPurge, which is what makes an interrupted logout
-    // recoverable on the next launch.
-    await clearTinderAuthState();
-    setSharedExtensionSettings({ userProfile: null });
+      // Also arms pendingWebViewPurge in AsyncStorage for durable hygiene
+      await clearTinderAuthState();
+      setSharedExtensionSettings({ userProfile: null });
 
-    if (isOnDevice) {
-      // On-device the session lives entirely in the WebView, so there is no
-      // orchestrator to notify. Purge the native caches, then hand off to the
-      // in-page purge which reports back via FE_AUTH_STEP { purged: true }.
-      // pendingWebViewPurge is deliberately left armed until that confirmation
-      // arrives; clearing it up front would mark a failed purge as done.
-      // Close the session screen once the purge settles. Navigating on tap
-      // instead would unmount the WebView before the in-page purge could revoke
-      // the token, leaving the app "signed out" while the Tinder session lived on.
-      exitAfterLogoutRef.current = true;
-
-      if (webViewRef.current) {
-        // Native cache/history clearing is deliberately deferred until the
-        // WebView has reached the landing page. Doing it here, against a loaded
-        // authenticated document that is about to be purged and navigated, is
-        // needless pressure on the renderer.
-        webViewRef.current.injectJavaScript(MASTER_PURGE_SCRIPT);
-        // injectJavaScript is fire-and-forget, so the UI cannot depend on the
-        // page answering. If it stays silent, the purge stays armed and
-        // onLoadEnd retries it on the next load. The user still leaves: local
-        // auth is already cleared, so keeping them in the session is the exact
-        // confusion this flow exists to remove.
-        logoutFailsafeRef.current = setTimeout(finishLogoutAndExit, LOGOUT_CONFIRM_TIMEOUT_MS);
-        return;
+      if (isOnDevice) {
+        exitAfterLogoutRef.current = true;
+        if (webViewRef.current) {
+          try {
+            webViewRef.current.injectJavaScript(MASTER_PURGE_SCRIPT);
+          } catch (_) {}
+        }
+      } else {
+        await setPendingWebViewPurge(true);
+        const orchestratorUrl = getOrchestratorUrl(vpsUrl);
+        if (orchestratorUrl) {
+          await postJsonWithTimeout(`${orchestratorUrl}/logout`, {
+            userId: route?.params?.userId || 'dev_user_1',
+            platform: 'tinder',
+          });
+          if (webViewRef.current) {
+            try { webViewRef.current.reload(); } catch (_) {}
+          }
+        }
       }
+    } catch (err) {
+      console.error('[Browser] handleLogout error:', err);
+    } finally {
+      // Unconditionally dismiss modal, stop spinner, and return to Home Screen
       finishLogoutAndExit();
-      return;
     }
-
-    // Neko / Hyperbeam: the browser session lives on the orchestrator. Keep the
-    // purge armed so the WebView is cleaned the next time one is mounted.
-    await setPendingWebViewPurge(true);
-    const orchestratorUrl = getOrchestratorUrl(vpsUrl);
-    if (orchestratorUrl) {
-      // Best-effort and bounded: an unreachable orchestrator must not hold the
-      // modal open with both buttons disabled.
-      await postJsonWithTimeout(`${orchestratorUrl}/logout`, {
-        userId: route?.params?.userId || 'dev_user_1',
-        platform: 'tinder',
-      });
-      if (webViewRef.current) webViewRef.current.reload();
-    }
-    finishLogout();
   };
 
   const confirmLogout = () => {
@@ -2159,7 +2424,15 @@ export default function BrowserScreen({ route, navigation }) {
 
   const finalUrl = React.useMemo(() => {
     if (isOnDevice) {
-      return (getTinderAuthState()?.isLoggedIn || route.params?.autoStartAgent)
+      const auth = getTinderAuthState();
+      const hasAuth = Boolean(
+        auth?.isLoggedIn ||
+        currentTinderAuth?.isLoggedIn ||
+        (auth?.token && typeof auth.token === 'string' && auth.token.length >= 16) ||
+        (currentTinderAuth?.token && typeof currentTinderAuth.token === 'string' && currentTinderAuth.token.length >= 16) ||
+        route.params?.autoStartAgent
+      );
+      return hasAuth
         ? 'https://tinder.com/app/recs'
         : 'https://tinder.com/';
     }
@@ -2196,7 +2469,72 @@ export default function BrowserScreen({ route, navigation }) {
       }
     }
     return `${clean}${clean.includes('?') ? '&' : '?'}t=${Date.now()}`;
-  }, [vpsUrl, isHyperbeam, hyperbeamEmbedUrl]);
+  }, [vpsUrl, isHyperbeam, hyperbeamEmbedUrl, isOnDevice, currentTinderAuth?.isLoggedIn, currentTinderAuth?.token, route.params?.autoStartAgent]);
+
+  // ── On-Device Telemetry: Likes and Messages Remaining for Header ──
+  const isTinderPaid = Boolean(
+    currentTinderAuth?.isTinderPro ||
+    currentTinderAuth?.tinderPlan === 'plus' ||
+    currentTinderAuth?.tinderPlan === 'gold' ||
+    currentTinderAuth?.tinderPlan === 'platinum' ||
+    extensionSettings?.userProfile?.isTinderPro
+  );
+
+  const likesBudget = typeof extensionSettings?.likesPerCycle === 'number' && extensionSettings.likesPerCycle > 0
+    ? extensionSettings.likesPerCycle
+    : 50;
+
+  const currentOnDeviceSession = getOnDeviceSessionState();
+  const isLikesExhausted = Boolean(
+    (currentOnDeviceSession?.likesReplenishTimestamp && currentOnDeviceSession.likesReplenishTimestamp > Date.now()) ||
+    (currentOnDeviceSession?.likesExhaustedAt > 0 && (Date.now() - currentOnDeviceSession.likesExhaustedAt < 12 * 3600 * 1000)) ||
+    currentTinderAuth?.likesRemaining === 0
+  );
+
+  const currentLikes = onDeviceCycleLikes || 0;
+  const currentTargetLikes = likesBudget || 50;
+  const currentMessages = onDeviceCycleMessages || 0;
+  const currentTargetMessages = typeof extensionSettings?.messagesPerCycle === 'number' && extensionSettings.messagesPerCycle > 0
+    ? extensionSettings.messagesPerCycle
+    : 50;
+  const isSafetyLocked = Boolean(
+    rateLimitStatusState?.isSafetyLocked ||
+    currentOnDeviceSession?.waitingReason === 'safety_lock'
+  );
+  const cooldownMin = rateLimitStatusState?.resetIn || 12;
+  const swipingActive = isAutoSwipeEnabled(extensionSettings);
+  const messagingActive = isAutoMessagingEnabled(extensionSettings);
+  const currentPhase = currentOnDeviceSession?.currentPhase || (onDeviceSwiping ? (swipingActive ? 'swiping' : 'messaging') : 'idle');
+  const isMessagingMode = !swipingActive || currentPhase === 'messaging';
+
+  let onDeviceHeaderSubtitle = '';
+  let onDeviceStatusColor = 'rgba(255, 255, 255, 0.35)';
+
+  if (sessionStatus !== SESSION_SIGNED_IN) {
+    onDeviceHeaderSubtitle = sessionStatus === SESSION_SIGNED_OUT ? 'Not signed in' : 'Checking session…';
+    onDeviceStatusColor = 'rgba(255, 255, 255, 0.35)';
+  } else if (isLikesExhausted) {
+    onDeviceHeaderSubtitle = 'Wingman active · Daily quota reached';
+    onDeviceStatusColor = '#EA580C';
+  } else if (isSafetyLocked) {
+    onDeviceHeaderSubtitle = `${currentLikes}/${currentTargetLikes} likes · Cooldown (${cooldownMin}m)`;
+    onDeviceStatusColor = '#F59E0B';
+  } else if (onDeviceSwiping) {
+    if (isMessagingMode) {
+      onDeviceHeaderSubtitle = `${currentMessages}/${currentTargetMessages} msgs · Chatting…`;
+      onDeviceStatusColor = '#EC4899';
+    } else {
+      onDeviceHeaderSubtitle = `${currentLikes}/${currentTargetLikes} likes · Swiping…`;
+      onDeviceStatusColor = uiTheme.colors.success || '#10B981';
+    }
+  } else {
+    if (!swipingActive && messagingActive) {
+      onDeviceHeaderSubtitle = `${currentMessages}/${currentTargetMessages} msgs · Standby`;
+    } else {
+      onDeviceHeaderSubtitle = `${currentLikes}/${currentTargetLikes} likes · Standby`;
+    }
+    onDeviceStatusColor = '#FE3C72';
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -2210,8 +2548,12 @@ export default function BrowserScreen({ route, navigation }) {
           <TouchableOpacity accessibilityRole="button"
             style={styles.closeBtnCircular}
             onPress={() => {
-              cleanupCurrentSession();
-              navigation.goBack();
+              if (onClose) {
+                onClose();
+              } else {
+                cleanupCurrentSession();
+                navigation?.goBack?.();
+              }
             }}
           >
             <Ionicons name="close" size={18} color={uiTheme.colors.text} />
@@ -2222,15 +2564,21 @@ export default function BrowserScreen({ route, navigation }) {
                 {isOnDevice ? 'Tinder' : `${platform} Session`}
               </Text>
             </View>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {isOnDevice
-                ? (sessionStatus === SESSION_SIGNED_IN
-                    ? `${onDeviceSwipes} swipes · ${onDeviceMatches} matches`
-                    : sessionStatus === SESSION_SIGNED_OUT
-                      ? 'Not signed in'
-                      : 'Checking session…')
-                : (isHyperbeam ? '⚡ Hyperbeam Cloud Stream' : (proxyIp ? `IP: ${maskProxy(proxyIp)}` : 'Direct Connection'))}
-            </Text>
+            <View style={styles.subtitleRow}>
+              {isOnDevice && sessionStatus === SESSION_SIGNED_IN && (
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: onDeviceStatusColor },
+                  ]}
+                />
+              )}
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {isOnDevice
+                  ? onDeviceHeaderSubtitle
+                  : (isHyperbeam ? '⚡ Hyperbeam Cloud Stream' : (proxyIp ? `IP: ${maskProxy(proxyIp)}` : 'Direct Connection'))}
+              </Text>
+            </View>
           </View>
           {isOnDevice ? (
             <View style={styles.headerActions}>
@@ -2247,7 +2595,15 @@ export default function BrowserScreen({ route, navigation }) {
                 disabled={sessionStatus !== SESSION_SIGNED_IN}
                 activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel={onDeviceSwiping ? `AI automation active, ${onDeviceSwipes} swipes` : 'AI controls'}
+                accessibilityLabel={
+                  onDeviceSwiping
+                    ? (isMessagingMode
+                        ? `AI automation active, ${currentMessages} of ${currentTargetMessages} messages completed`
+                        : `AI automation active, ${currentLikes} of ${currentTargetLikes} likes completed`)
+                    : (isMessagingMode
+                        ? `AI controls, ${currentMessages} of ${currentTargetMessages} messages completed`
+                        : `AI controls, ${currentLikes} of ${currentTargetLikes} likes completed`)
+                }
                 accessibilityHint={
                   sessionStatus === SESSION_SIGNED_IN ? undefined : 'Sign in to Tinder to enable AI controls'
                 }
@@ -2712,18 +3068,76 @@ export default function BrowserScreen({ route, navigation }) {
                     addLog(`📍 Tap Coordinate: X=${msg.x}, Y=${msg.y}`, 'action');
                   }
                   if (msg.type === 'FE_SWIPE') {
-                    const prev = onDeviceSwipesRef.current || 0;
-                    const updated = Math.max(prev + 1, msg.swipeCount || (prev + 1));
-                    onDeviceSwipesRef.current = updated;
-                    setOnDeviceSwipes(updated);
+                    const prevCycle = onDeviceCycleLikesRef.current || 0;
+                    const cycleTarget = msg.total || extensionSettings?.likesPerCycle || 50;
+                    let updatedCycle;
+                    if (typeof msg.swipeCount === 'number' && msg.swipeCount > 0) {
+                      if (msg.swipeCount > prevCycle) {
+                        updatedCycle = msg.swipeCount;
+                      } else if (prevCycle >= cycleTarget) {
+                        updatedCycle = msg.swipeCount;
+                      } else {
+                        updatedCycle = prevCycle + 1;
+                      }
+                    } else {
+                      updatedCycle = prevCycle + 1;
+                    }
+                    onDeviceCycleLikesRef.current = updatedCycle;
+                    setOnDeviceCycleLikes(updatedCycle);
+
+                    const prevCumulative = Math.max(onDeviceSwipesRef.current || 0, prevCycle);
+                    const updatedCumulative = Math.max(prevCumulative + 1, updatedCycle);
+                    onDeviceSwipesRef.current = updatedCumulative;
+                    setOnDeviceSwipes(updatedCumulative);
+
                     setOnDeviceSwiping(true);
-                    saveOnDeviceSessionState({ swipes: updated, isRunning: true });
+                    saveOnDeviceSessionState({
+                      swipes: updatedCumulative,
+                      cycleLikes: updatedCycle,
+                      cycleTarget: cycleTarget,
+                      isRunning: true,
+                    });
                     setTinderAuthState({ isLoggedIn: true, accountName: 'Tinder Account' });
                     const targetName = msg.name || 'Someone New';
                     const detail = msg.detail || (msg.age ? `Age ${msg.age} · Verified Profile` : 'AI Target Match · Safe Paced');
-                    addLog(`❤️ Swiped profile: ${targetName} (${msg.swipeCount || updated}/${msg.total || 50})`, 'action');
+                    addLog(`❤️ Swiped profile: ${targetName} (${updatedCycle}/${cycleTarget})`, 'action');
                     trackingService.trackLike(1);
                     pushProgressFeedEvent('profile_liked', detail, targetName, 5);
+                  }
+                  if (msg.type === 'FE_MESSAGE') {
+                    const prevMsgs = onDeviceMessagesRef.current || 0;
+                    const updatedMsgs = prevMsgs + 1;
+                    onDeviceMessagesRef.current = updatedMsgs;
+                    setOnDeviceMessages(updatedMsgs);
+
+                    const prevCycleMsgs = onDeviceCycleMessagesRef.current || 0;
+                    const msgTarget = extensionSettings?.messagesPerCycle || 50;
+                    let updatedCycleMsgs;
+                    if (typeof msg.messageCount === 'number' && msg.messageCount > 0) {
+                      if (msg.messageCount > prevCycleMsgs) {
+                        updatedCycleMsgs = msg.messageCount;
+                      } else if (prevCycleMsgs >= msgTarget) {
+                        updatedCycleMsgs = msg.messageCount;
+                      } else {
+                        updatedCycleMsgs = prevCycleMsgs + 1;
+                      }
+                    } else {
+                      updatedCycleMsgs = prevCycleMsgs + 1;
+                    }
+                    onDeviceCycleMessagesRef.current = updatedCycleMsgs;
+                    setOnDeviceCycleMessages(updatedCycleMsgs);
+
+                    saveOnDeviceSessionState({
+                      messages: updatedMsgs,
+                      cycleMessages: updatedCycleMsgs,
+                      cycleMessagesTarget: msgTarget,
+                      isRunning: true,
+                    });
+                    const targetName = msg.currentName || 'Match';
+                    const detail = (msg.currentMessage || '').trim() || `Replied to ${targetName}`;
+                    addLog(`💬 Wingman replied to ${targetName} (${updatedCycleMsgs}/${msgTarget})`, 'action');
+                    trackingService.trackMessage({ count: 1 });
+                    pushProgressFeedEvent('message_replied', detail, targetName, 10);
                   }
                   if (msg.type === 'FE_MATCH') {
                     const prev = onDeviceMatchesRef.current || 0;
@@ -2753,15 +3167,147 @@ export default function BrowserScreen({ route, navigation }) {
                     }
                   }
                   if (msg.type === 'FE_OUT_OF_LIKES') {
-                    const now = msg.timestamp || Date.now();
-                    saveOnDeviceSessionState({ likesExhaustedAt: now, isRunning: false });
+                    const now = Date.now();
+                    const currentOnDevice = getOnDeviceSessionState();
+                    const existingReplenish = currentOnDevice?.likesReplenishTimestamp;
+                    const isExistingValid = Boolean(existingReplenish && existingReplenish > now);
+
+                    let rawIncoming = msg.replenishTimestamp || msg.rateLimitedUntil || (msg.timestamp && msg.timestamp > now + 60000 ? msg.timestamp : null);
+                    if (rawIncoming && rawIncoming < 10000000000) {
+                      rawIncoming *= 1000;
+                    }
+
+                    // Determine replenish timestamp. Never allow a generic 12h fallback to overwrite an active countdown!
+                    let replenishTimestamp;
+                    if (rawIncoming && rawIncoming > now) {
+                      if (isExistingValid) {
+                        const incomingDeltaHours = (rawIncoming - now) / 3600000;
+                        if (incomingDeltaHours >= 11.0 && existingReplenish < rawIncoming) {
+                          replenishTimestamp = existingReplenish;
+                        } else {
+                          replenishTimestamp = rawIncoming;
+                        }
+                      } else {
+                        replenishTimestamp = rawIncoming;
+                      }
+                    } else {
+                      replenishTimestamp = isExistingValid ? existingReplenish : (now + 12 * 60 * 60 * 1000);
+                    }
+
+                    const existingExhaustedAt = currentOnDevice?.likesExhaustedAt;
+                    const finalExhaustedAt = (existingExhaustedAt > 0 && (now - existingExhaustedAt < 12 * 3600 * 1000))
+                      ? existingExhaustedAt
+                      : now;
+
+                    // Stop swiping on device, but keep session active for intelligent Wingman pivot (messaging matches)
                     onDeviceSwipingRef.current = false;
                     setOnDeviceSwiping(false);
-                    addLog('Daily like quota exhausted (12h reset countdown active). Paused.', 'warn');
-                    trackingService.trackEvent('like_quota_exhausted', {
-                      exhausted_at: new Date(now).toISOString()
-                    });
-                    pushProgressFeedEvent('rate_limit', 'Daily like limit reached. Refills in 12h.', null, 10);
+
+                    const messagingEnabled = isAutoMessagingEnabled(extensionSettings);
+                    if (messagingEnabled) {
+                      saveOnDeviceSessionState({
+                        likesExhaustedAt: finalExhaustedAt,
+                        likesReplenishTimestamp: replenishTimestamp,
+                        waitingReason: 'likes_exhausted',
+                        isRunning: true,
+                        currentPhase: 'messaging',
+                      });
+
+                      // Signal background worker to pivot directly to match conversations
+                      const worker = getOnDeviceWorker();
+                      if (worker && typeof worker.handleMessage === 'function') {
+                        worker.handleMessage({
+                          action: 'likesExhausted',
+                          replenishTimestamp,
+                          exhaustedAt: finalExhaustedAt,
+                          timestamp: now,
+                        });
+                      }
+
+                      // Schedule native OS push alarm for the exact refill moment
+                      NotificationService.scheduleLikesReplenishedAlarm(replenishTimestamp).catch(() => {});
+
+                      const hoursLeft = Math.max(1, Math.round((replenishTimestamp - now) / 3600000));
+                      addLog(`⚡ Free likes quota exhausted (Refills in ~${hoursLeft}h). Wingman engaged: Pivoting to match messaging.`, 'warn');
+                      trackingService.trackEvent('like_quota_exhausted', {
+                        exhausted_at: new Date(now).toISOString(),
+                        replenish_timestamp: new Date(replenishTimestamp).toISOString(),
+                        wingman_pivot: true,
+                      });
+                      pushProgressFeedEvent('rate_limit', `Daily like quota reached. Wingman engaged (chatting). Refills in ~${hoursLeft}h.`, null, 10);
+                    } else {
+                      saveOnDeviceSessionState({
+                        likesExhaustedAt: finalExhaustedAt,
+                        likesReplenishTimestamp: replenishTimestamp,
+                        waitingReason: 'likes_exhausted',
+                        isRunning: false,
+                        currentPhase: 'idle',
+                        nextRunTimestamp: replenishTimestamp,
+                      });
+
+                      const worker = getOnDeviceWorker();
+                      if (worker && typeof worker.handleMessage === 'function') {
+                        worker.handleMessage({
+                          action: 'updateAgentState',
+                          state: {
+                            isRunning: false,
+                            currentPhase: 'idle',
+                            waitingReason: 'likes_exhausted',
+                            likesReplenishTimestamp: replenishTimestamp,
+                            nextRunTimestamp: replenishTimestamp,
+                          }
+                        });
+                      }
+
+                      NotificationService.scheduleLikesReplenishedAlarm(replenishTimestamp).catch(() => {});
+                      const hoursLeft = Math.max(1, Math.round((replenishTimestamp - now) / 3600000));
+                      addLog(`⚡ Free likes quota exhausted (Refills in ~${hoursLeft}h). Auto-messaging is disabled — resting until refill.`, 'warn');
+                      trackingService.trackEvent('like_quota_exhausted', {
+                        exhausted_at: new Date(now).toISOString(),
+                        replenish_timestamp: new Date(replenishTimestamp).toISOString(),
+                        wingman_pivot: false,
+                      });
+                      pushProgressFeedEvent('rate_limit', `Daily like quota reached. Next session in ~${hoursLeft}h.`, null, 10);
+                    }
+                  }
+                  if (msg.type === 'FE_LIKES_STATUS') {
+                    const likesRemaining = msg.likesRemaining;
+                    let replenishTimestamp = msg.rateLimitedUntil || msg.replenishTimestamp;
+                    if (replenishTimestamp && replenishTimestamp < 10000000000) {
+                      replenishTimestamp *= 1000;
+                    }
+                    if (replenishTimestamp && replenishTimestamp > Date.now() && (!likesRemaining || likesRemaining <= 0)) {
+                      const now = Date.now();
+                      const currentOnDevice = getOnDeviceSessionState();
+                      const existingReplenish = currentOnDevice?.likesReplenishTimestamp;
+                      const isExistingValid = Boolean(existingReplenish && existingReplenish > now);
+                      let finalReplenish = replenishTimestamp;
+                      if (isExistingValid) {
+                        const incomingDeltaHours = (replenishTimestamp - now) / 3600000;
+                        if (incomingDeltaHours >= 11.0 && existingReplenish < replenishTimestamp) {
+                          finalReplenish = existingReplenish;
+                        }
+                      }
+                      saveOnDeviceSessionState({
+                        likesReplenishTimestamp: finalReplenish,
+                        waitingReason: 'likes_exhausted',
+                      });
+                      setTinderAuthState({
+                        rateLimitedUntil: finalReplenish,
+                        likesRemaining: 0,
+                      });
+                      NotificationService.scheduleLikesReplenishedAlarm(finalReplenish).catch(() => {});
+                    } else if (typeof likesRemaining === 'number' && likesRemaining > 0) {
+                      saveOnDeviceSessionState({
+                        likesReplenishTimestamp: null,
+                        likesExhaustedAt: 0,
+                        waitingReason: null,
+                      });
+                      setTinderAuthState({
+                        rateLimitedUntil: null,
+                        likesRemaining,
+                      });
+                    }
                   }
                   if (msg.type === 'FE_SESSION_EXPIRED') {
                     addLog('⚠️ Tinder session expired (401 Unauthorized). Automation halted. Reconnect your account.', 'error');
@@ -2774,16 +3320,32 @@ export default function BrowserScreen({ route, navigation }) {
                       url: msg.url || null,
                     });
                     pushProgressFeedEvent('session_expired', 'Tinder session expired. Reconnect to continue.', null, 15);
+                    if (onRequestIntervention) {
+                      onRequestIntervention({ reason: 'session_expired', message: 'Tinder session expired. Reconnect to continue.' });
+                    }
+                  }
+                  if (msg.type === 'FE_INTERVENTION_NEEDED') {
+                    const reason = msg.reason || 'verification';
+                    const message = msg.message || 'User verification required';
+                    if (reason === 'login_required') return;
+                    addLog(`⚠️ Intervention required: ${message}`, 'warn');
+                    setOnDeviceSwiping(false);
+                    onDeviceSwipingRef.current = false;
+                    saveOnDeviceSessionState({ isRunning: false, waitingReason: reason });
+                    pushProgressFeedEvent('action_required', message, null, 15);
+                    if (onRequestIntervention) {
+                      onRequestIntervention({ reason, message, url: msg.url });
+                    }
                   }
                   if (msg.type === 'FE_PLAN_DETECTED') {
                     const plan = msg.plan || 'free';
                     const isPro = Boolean(msg.isPro);
                     setTinderAuthState({ tinderPlan: plan, isTinderPro: isPro });
-                    if (onDeviceSettingsRef.current) {
-                      const prevProfile = onDeviceSettingsRef.current.userProfile || {};
+                    const currentSettings = getSharedExtensionSettings();
+                    if (currentSettings) {
+                      const prevProfile = currentSettings.userProfile || {};
                       const updatedProfile = { ...prevProfile, tinderPlan: plan, isTinderPro: isPro };
-                      onDeviceSettingsRef.current = { ...onDeviceSettingsRef.current, userProfile: updatedProfile };
-                      setSharedExtensionSettings(onDeviceSettingsRef.current);
+                      handleSaveOnDeviceSettings({ userProfile: updatedProfile });
                     }
                     const planLabel = plan === 'platinum' ? 'Platinum 💎' : plan === 'gold' ? 'Gold 👑' : plan === 'plus' ? 'Plus ⚡' : 'Free';
                     addLog(`Detected Tinder ${planLabel} tier.`, 'info');
@@ -2791,11 +3353,98 @@ export default function BrowserScreen({ route, navigation }) {
                   if (msg.type === 'FE_CYCLE_DONE') {
                     onDeviceSwipingRef.current = false;
                     setOnDeviceSwiping(false);
-                    saveOnDeviceSessionState({ isRunning: false });
-                    const count = typeof msg.count === 'number' ? msg.count : onDeviceSwipesRef.current;
-                    addLog(`Cycle target reached (${count} likes). Paused.`, 'info');
-                    trackingService.trackCycleEnd({ likes_sent: count });
-                    pushProgressFeedEvent('cycle_complete', `Batch complete · ${count} swiped`, null, 15);
+                    const count = typeof msg.count === 'number' ? msg.count : (onDeviceCycleLikesRef.current || 0);
+
+                    const canMessage = isAutoMessagingEnabled(extensionSettings) && extensionSettings?.blockMessages !== true;
+
+                    if (canMessage) {
+                      addLog(`❤️ Swiping goal reached (${count} likes). Wingman checking & replying to matches...`, 'info');
+                      saveOnDeviceSessionState({
+                        isRunning: true,
+                        cycleLikes: count,
+                        currentPhase: 'messaging',
+                        waitingReason: null,
+                      });
+                      const worker = backgroundWorkerRef.current;
+                      if (worker) {
+                        worker.handleMessage({
+                          action: 'updateAgentState',
+                          state: { isRunning: true, currentPhase: 'messaging', waitingReason: null }
+                        });
+                      }
+                      pushProgressFeedEvent('persona_update', 'Swipes complete · Checking match conversations', null, 5);
+                      triggerProcessChats();
+                    } else {
+                      addLog(`❤️ Swiping goal reached (${count} likes). Auto-messaging is disabled — scheduling rest.`, 'info');
+                      const intervalMinutes = extensionSettings?.scheduleInterval || 60;
+                      const nextRun = Date.now() + intervalMinutes * 60000;
+                      const isSafetyOn = extensionSettings?.safetyMode !== false;
+                      let nextReset = nextRun;
+                      let waitReason = null;
+                      try {
+                        const rateStatus = getRateLimitStatus(isSafetyOn);
+                        if (rateStatus && rateStatus.isSafetyLocked) {
+                          waitReason = 'safety_lock';
+                          nextReset = rateStatus.nextResetTimestamp;
+                        }
+                      } catch (_) {}
+
+                      saveOnDeviceSessionState({
+                        isRunning: false,
+                        currentPhase: 'idle',
+                        cycleLikes: count,
+                        waitingReason: waitReason,
+                        nextRunTimestamp: nextReset,
+                      });
+
+                      const worker = backgroundWorkerRef.current;
+                      if (worker) {
+                        worker.handleMessage({
+                          action: 'updateAgentState',
+                          state: {
+                            isRunning: false,
+                            currentPhase: 'idle',
+                            cycleLikes: count,
+                            waitingReason: waitReason,
+                            nextRunTimestamp: nextReset,
+                          }
+                        });
+                      }
+
+                      trackingService.trackCycleEnd({ likes_sent: count });
+                      pushProgressFeedEvent('cycle_complete', `Goal reached · ${count} swiped · Next session at ${new Date(nextReset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, null, 15);
+                    }
+                  }
+                  if (msg.type === 'FE_MESSAGING_CYCLE_DONE') {
+                    const processed = msg.processed || 0;
+                    const followUps = msg.followUps || 0;
+                    addLog(`💬 Messaging round complete (${processed} replied, ${followUps} follow-ups)`, 'success');
+
+                    const intervalMinutes = extensionSettings?.scheduleInterval || 60;
+                    const nextRun = Date.now() + intervalMinutes * 60000;
+
+                    saveOnDeviceSessionState({
+                      isRunning: false,
+                      currentPhase: 'idle',
+                      waitingReason: null,
+                      nextRunTimestamp: nextRun,
+                    });
+
+                    const worker = backgroundWorkerRef.current;
+                    if (worker) {
+                      worker.handleMessage({
+                        action: 'updateAgentState',
+                        state: {
+                          isRunning: false,
+                          currentPhase: 'idle',
+                          waitingReason: null,
+                          nextRunTimestamp: nextRun,
+                        }
+                      });
+                    }
+
+                    trackingService.trackCycleEnd({ messages_sent: processed + followUps });
+                    pushProgressFeedEvent('cycle_complete', `Messaging round finished · Next session at ${new Date(nextRun).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, null, 15);
                   }
                   if (msg.type === 'FE_PAGE_STATUS') {
                     // Ignore page status reports while a logout is actively executing or pending
@@ -2805,38 +3454,74 @@ export default function BrowserScreen({ route, navigation }) {
                     if (typeof msg.isLoggedIn === 'boolean') {
                       if (msg.isLoggedIn) {
                         const capturedToken = msg.token || undefined;
-                        setTinderAuthState({
-                          isLoggedIn: true,
-                          token: capturedToken,
-                          accountName: msg.accountName || 'Tinder Account'
-                        });
-                        if (capturedToken) {
-                          probeTinderSession(capturedToken).then((res) => {
-                            if (res?.ok && (res.profile || res.user)) {
-                              const profile = res.profile || parseTinderUserProfile(res.user, {
-                                plan: res.plan,
-                                isPro: res.isPro,
-                                likesRemaining: res.likesRemaining,
-                                rateLimitedUntil: res.rateLimitedUntil,
-                              });
-                              if (profile) {
-                                handleSaveOnDeviceSettings({
-                                  userProfile: profile,
-                                  manualBio: profile.bio || undefined,
+                        const isLandingOrLoginUrl = msg.url && (!msg.url.includes('/app') || msg.url.includes('/app/login'));
+                        if (isLandingOrLoginUrl) {
+                          if (capturedToken) {
+                            probeTinderSession(capturedToken).then((res) => {
+                              if (res?.ok) {
+                                setTinderAuthState({
+                                  isLoggedIn: true,
+                                  token: capturedToken,
+                                  accountName: msg.accountName || 'Tinder Account'
                                 });
+                                triggerAutoStartIfReady();
+                              } else {
+                                setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
                               }
-                            }
-                          }).catch(() => {});
+                            }).catch(() => {
+                              setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+                            });
+                          } else {
+                            setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+                          }
+                        } else {
+                          setTinderAuthState({
+                            isLoggedIn: true,
+                            token: capturedToken,
+                            accountName: msg.accountName || 'Tinder Account'
+                          });
+                          if (capturedToken) {
+                            probeTinderSession(capturedToken).then((res) => {
+                              if (res?.ok && (res.profile || res.user)) {
+                                const profile = res.profile || parseTinderUserProfile(res.user, {
+                                  plan: res.plan,
+                                  isPro: res.isPro,
+                                  likesRemaining: res.likesRemaining,
+                                  rateLimitedUntil: res.rateLimitedUntil,
+                                });
+                                if (profile) {
+                                  handleSaveOnDeviceSettings({
+                                    userProfile: profile,
+                                    manualBio: profile.bio || undefined,
+                                  });
+                                }
+                              }
+                            }).catch(() => {});
+                          }
+                          triggerAutoStartIfReady();
                         }
-                        triggerAutoStartIfReady();
                       } else {
                         const current = getTinderAuthState();
+                        const hasActiveToken = Boolean(
+                          (current?.token && typeof current.token === 'string' && current.token.trim().length >= 16) ||
+                          (currentTinderAuth?.token && typeof currentTinderAuth.token === 'string' && currentTinderAuth.token.trim().length >= 16)
+                        );
                         // Never clobber a believed-good session while the user is
                         // partway through entering a code or number, or while the page is still hydrating recs.
                         const midLogin = loginStep === 'otp' || loginStep === 'phone';
                         const isLandingOrLoginUrl = msg.url && (!msg.url.includes('/app') || msg.url.includes('/app/login'));
-                        if (!midLogin && isLandingOrLoginUrl && (!current?.lastUpdated || current.isLoggedIn)) {
+                        if (!midLogin && !hasActiveToken && isLandingOrLoginUrl && (!current?.lastUpdated || current.isLoggedIn)) {
                           setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+                        }
+                        // If we have an active token and landed on the landing page, auto-redirect to /app/recs
+                        if (hasActiveToken && isLandingOrLoginUrl && !midLogin) {
+                          webViewRef.current?.injectJavaScript(`
+                            (function() {
+                              if (window.location.pathname.indexOf('/app') === -1) {
+                                window.location.href = 'https://tinder.com/app/recs';
+                              }
+                            })(); true;
+                          `);
                         }
                       }
                     }
@@ -2844,6 +3529,7 @@ export default function BrowserScreen({ route, navigation }) {
                   if (msg.type === 'FE_AUTH_STEP') {
                     if (msg.step === 'logged_in') {
                       if (isLoggingOutRef.current || getPendingWebViewPurge()) return;
+                      if (msg.url && (!msg.url.includes('/app') || msg.url.includes('/app/login'))) return;
                       setLoginStep('done');
                       const capturedToken = msg.token || undefined;
                       setTinderAuthState({
@@ -2874,6 +3560,25 @@ export default function BrowserScreen({ route, navigation }) {
                     } else if (msg.step === 'logged_out') {
                       // Fired both by the purge script and by the watchdog when
                       // the user logs out inside Tinder itself.
+                      const current = getTinderAuthState();
+                      const hasActiveToken = Boolean(
+                        (current?.token && typeof current.token === 'string' && current.token.trim().length >= 16) ||
+                        (currentTinderAuth?.token && typeof currentTinderAuth.token === 'string' && currentTinderAuth.token.trim().length >= 16)
+                      );
+                      // If this was NOT an explicit user logout / purge, and a valid token is still present,
+                      // verify whether the token is genuinely dead via probe before wiping the session.
+                      if (!msg.purged && hasActiveToken && !msg.confirmed) {
+                        const tokenToTest = current?.token || currentTinderAuth?.token;
+                        probeTinderSession(tokenToTest).then((res) => {
+                          if (res?.expired) {
+                            setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+                            setLoginStep('options');
+                            addLog('Tinder session expired — please sign in again', 'warn');
+                          }
+                        }).catch(() => {});
+                        return;
+                      }
+
                       setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
                       setLoginStep('options');
                       if (msg.purged) {
@@ -2934,6 +3639,20 @@ export default function BrowserScreen({ route, navigation }) {
                     })}
                     window.__flirteasyAutoStartRequested = ${Boolean(route.params?.autoStartAgent)};
                     window.__flirteasyAutoStartCount = ${Number(extensionSettings?.likesPerCycle || 50)};
+                    window.__flirtEasyLikesReplenishTimestamp = ${currentOnDeviceSession?.likesReplenishTimestamp && currentOnDeviceSession.likesReplenishTimestamp > Date.now() ? currentOnDeviceSession.likesReplenishTimestamp : 0};
+                    (function() {
+                      try {
+                        var activeToken = ${JSON.stringify(currentTinderAuth?.token || getTinderAuthState()?.token || '')};
+                        if (activeToken && activeToken.length >= 16) {
+                          window.__tinderAuthToken = activeToken;
+                          try {
+                            if (!localStorage.getItem('TinderWeb/APIToken')) {
+                              localStorage.setItem('TinderWeb/APIToken', activeToken);
+                            }
+                          } catch(e) {}
+                        }
+                      } catch(_) {}
+                    })();
                     true;`
                   : undefined
               }
@@ -3687,18 +4406,18 @@ export default function BrowserScreen({ route, navigation }) {
       </KeyboardAvoidingView>
 
       {/* ─── FULL-SCREEN IMMERSIVE LAZY LOADER ─── */}
-      {/* Completely covers 100% of the screen (status bar to nav bar) via native Modal until 3 login buttons appear */}
-      <Modal
-        visible={Boolean(loading && !startingHyperbeam && !connectionError && Boolean(finalUrl))}
-        transparent={false}
-        animationType="none"
-        statusBarTranslucent={true}
-        onRequestClose={() => {
-          cleanupCurrentSession();
-          navigation.goBack();
-        }}
-      >
-        <View style={styles.modalRootContainer}>
+      {Boolean(!isHeadless && (loading || revealActive) && !startingHyperbeam && !connectionError && Boolean(finalUrl)) && (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.modalRootContainer,
+            {
+              zIndex: 99999,
+              opacity: veilOpacity,
+            },
+          ]}
+          pointerEvents={revealActive || loading ? 'auto' : 'none'}
+        >
           <LinearGradient
             colors={['#11071B', '#09050D', '#040206']}
             start={{ x: 0.5, y: 0 }}
@@ -3710,8 +4429,12 @@ export default function BrowserScreen({ route, navigation }) {
                 <TouchableOpacity
                   style={styles.closeBtnCircular}
                   onPress={() => {
-                    cleanupCurrentSession();
-                    navigation.goBack();
+                    if (onClose) {
+                      onClose();
+                    } else {
+                      cleanupCurrentSession();
+                      navigation?.goBack?.();
+                    }
                   }}
                   accessibilityRole="button"
                   accessibilityLabel="Cancel"
@@ -3760,8 +4483,8 @@ export default function BrowserScreen({ route, navigation }) {
               </View>
             </SafeAreaView>
           </LinearGradient>
-        </View>
-      </Modal>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -3807,8 +4530,8 @@ const styles = StyleSheet.create({
   // Same footprint as the icon buttons, so all three session states are identical
   // in width.
   headerActionSlot: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
   },
   statusIndicatorRow: {
     flexDirection: 'row',
@@ -4578,9 +5301,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   onDeviceLogsBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: uiTheme.radius.small,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
@@ -4612,11 +5335,25 @@ const styles = StyleSheet.create({
   headerBtnDisabled: {
     opacity: 0.4,
   },
-  subtitle: { fontFamily: 'Inter_600SemiBold',
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    minWidth: 0,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+    flexShrink: 0,
+  },
+  subtitle: {
+    fontFamily: 'Inter_600SemiBold',
     color: 'rgba(255, 255, 255, 0.45)',
     fontSize: uiTheme.type.caption.fontSize,
     fontWeight: 'normal',
-    marginTop: 2,
+    flexShrink: 1,
   },
   // Square icon button used for the header action row (dashboard, logs, logout).
   // Callers layer their own backgroundColor / borderColor on top, so the base

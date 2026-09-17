@@ -223,9 +223,14 @@ function stopAllAutomation() {
 // Global hooks for direct invocation via React Native WebView bridge
 window.__flirteasyStopAutomation = stopAllAutomation;
 window.__linksyStopSwiping = stopAllAutomation;
-window.__flirteasyStartAutomation = function(count) {
+window.__flirteasyStartAutomation = function(count, initialProgress) {
   try { chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }, () => {}); } catch (_) {}
-  return autoLike(count || 50);
+  return autoLike(count || 50, initialProgress);
+};
+window.__flirteasyStartMessaging = function(maxMessages, customSettings) {
+  try { chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }, () => {}); } catch (_) {}
+  const effectiveSettings = customSettings || userSettings || {};
+  return processChats(effectiveSettings, maxMessages || effectiveSettings.messagesPerCycle || 50);
 };
 window.__linksyStartSwiping = window.__flirteasyStartAutomation;
 window.__flirteasyContentScriptReady = true;
@@ -353,6 +358,12 @@ document.addEventListener('flirteasy:matchDetected', (event) => {
       console.warn('[FlirtEasy] Failed to update match stats:', chrome.runtime.lastError.message);
     }
   });
+});
+
+let isOutOfLikesActive = false;
+document.addEventListener('flirteasy:outOfLikes', () => {
+  console.log('[FlirtEasy] ⚠️ flirteasy:outOfLikes received from API interceptor');
+  isOutOfLikesActive = true;
 });
 
 async function injectStopChatButton() {
@@ -804,7 +815,7 @@ async function handlePortMessage(message) {
 
   try {
     if (action === 'autoLike') {
-      response = await autoLike(message.count || 50);
+      response = await autoLike(message.count || 50, message.initialProgress);
     } else if (action === 'checkLogin') {
       response = { loggedIn: isLoggedIn() };
     }
@@ -874,7 +885,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'autoLike') {
-      autoLike(request.count || 50).then(sendResponse).catch(err => {
+      autoLike(request.count || 50, request.initialProgress).then(sendResponse).catch(err => {
         console.error('[FlirtEasy] autoLike error:', err);
         sendResponse({ success: false, error: err.message });
       });
@@ -923,7 +934,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.action === 'getProfileData') {
       (async () => {
-        const profile = parseCurrentProfile();
+        const matchId = request.matchId || (typeof getMatchIdFromUrl === 'function' ? getMatchIdFromUrl(window.location.href) : null);
+        const profile = typeof fetchOrParseMatchProfile === 'function'
+          ? await fetchOrParseMatchProfile(matchId)
+          : parseCurrentProfile();
         const history = await getConversationHistory();
         sendResponse({ success: true, profile, history });
       })();
@@ -1050,7 +1064,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return false;
 });
 
-async function autoLike(count) {
+async function autoLike(count = 50, initialProgress = undefined) {
   if (autoLikeRunning) {
     console.log('[FlirtEasy] Auto-like already running, skipping duplicate request');
     return { success: false, likesCompleted: 0, errors: ['Auto-like already in progress'] };
@@ -1133,10 +1147,9 @@ async function autoLike(count) {
 
     if (!window.location.pathname.includes('/app/recs')) {
       console.log('[FlirtEasy] Not on explore page, auto-navigating to /app/recs...');
-      try { sessionStorage.setItem('flirteasy_auto_resume', 'true'); } catch(_) {}
       const navigated = await navigateToSwipingPage();
       if (!navigated && !window.location.pathname.includes('/app/recs')) {
-        const swipingLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Explore" i]');
+        const swipingLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Recommendations" i], [aria-label*="Tinder" i], nav a:nth-child(1)');
         if (swipingLink) {
           swipingLink.click();
           await waitRandom(2500, 3500);
@@ -1153,7 +1166,49 @@ async function autoLike(count) {
 
     await waitRandom(2000, 3000);
 
+    const isAlreadyExhausted = Boolean(
+      isOutOfLikesActive ||
+      hasSubscriptionPopup() ||
+      (typeof window !== 'undefined' && window.__flirtEasyLikesReplenishTimestamp && window.__flirtEasyLikesReplenishTimestamp > Date.now())
+    );
+    if (isAlreadyExhausted) {
+      console.log('[FlirtEasy] Likes are exhausted / paywall active. Skipping swiping loop and pivoting to Wingman messaging.');
+      const resetTime = typeof extractTinderLikesResetTimestamp === 'function'
+        ? extractTinderLikesResetTimestamp()
+        : (Date.now() + 12 * 60 * 60 * 1000);
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FE_OUT_OF_LIKES',
+            timestamp: Date.now(),
+            replenishTimestamp: resetTime,
+            rateLimitedUntil: resetTime,
+            likesRemaining: 0,
+          }));
+        }
+      } catch (_) {}
+      return { success: true, likesCompleted: 0, reason: 'likes_exhausted' };
+    }
+
+    isOutOfLikesActive = false;
     let likesCompleted = 0;
+    if (typeof initialProgress === 'number' && initialProgress > 0 && initialProgress < count) {
+      likesCompleted = initialProgress;
+      console.log(`[FlirtEasy] Resuming auto-like from provided cycle progress: ${likesCompleted}/${count}`);
+    } else {
+      try {
+        const stateCheck = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ action: 'getAgentState' }, (response) => {
+            resolve(response);
+          });
+        });
+        const prevLikes = stateCheck?.currentCycle?.likesCompleted;
+        if (typeof prevLikes === 'number' && prevLikes > 0 && prevLikes < count) {
+          likesCompleted = prevLikes;
+          console.log(`[FlirtEasy] Resumed auto-like from agent state cycle progress: ${likesCompleted}/${count}`);
+        }
+      } catch (_) {}
+    }
     let errors = [];
     let profilesChecked = 0;
     let consecutiveLikeFailures = 0;
@@ -1227,14 +1282,20 @@ async function autoLike(count) {
           await waitRandom(800, 1500);
         }
 
-        if (hasSubscriptionPopup()) {
+        if (hasSubscriptionPopup() || isOutOfLikesActive) {
           console.log('[FlirtEasy] Subscription popup / Out of likes detected, stopping cycle');
           errors.push('Out of likes / Subscription popup');
+          const resetTime = typeof extractTinderLikesResetTimestamp === 'function'
+            ? extractTinderLikesResetTimestamp()
+            : (Date.now() + 12 * 60 * 60 * 1000);
           try {
             if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'FE_OUT_OF_LIKES',
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                replenishTimestamp: resetTime,
+                rateLimitedUntil: resetTime,
+                likesRemaining: 0,
               }));
             }
           } catch (_) {}
@@ -1412,11 +1473,17 @@ async function autoLike(count) {
           if (consecutiveLikeFailures >= 3 && blockingDialog) {
             console.log('[FlirtEasy] Modal blocking viewport detected after repeated click failures — treating as out-of-likes paywall');
             errors.push('Out of likes / Blocking modal');
+            const resetTime = typeof extractTinderLikesResetTimestamp === 'function'
+              ? extractTinderLikesResetTimestamp()
+              : (Date.now() + 12 * 60 * 60 * 1000);
             try {
               if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'FE_OUT_OF_LIKES',
-                  timestamp: Date.now()
+                  timestamp: Date.now(),
+                  replenishTimestamp: resetTime,
+                  rateLimitedUntil: resetTime,
+                  likesRemaining: 0,
                 }));
               }
             } catch (_) {}
@@ -1431,14 +1498,20 @@ async function autoLike(count) {
 
         await getSwipeDelay();
 
-        if (hasSubscriptionPopup()) {
+        if (hasSubscriptionPopup() || isOutOfLikesActive) {
           console.log('[FlirtEasy] Subscription popup / Out of likes appeared after like click, stopping cycle');
           errors.push('Out of likes / Subscription popup');
+          const resetTime = typeof extractTinderLikesResetTimestamp === 'function'
+            ? extractTinderLikesResetTimestamp()
+            : (Date.now() + 12 * 60 * 60 * 1000);
           try {
             if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'FE_OUT_OF_LIKES',
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                replenishTimestamp: resetTime,
+                rateLimitedUntil: resetTime,
+                likesRemaining: 0,
               }));
             }
           } catch (_) {}
@@ -1481,8 +1554,11 @@ async function getUnreadMatches(isAborted = () => false) {
 
   const pathParts = window.location.pathname.split('/');
   const onSpecificMatch = pathParts.length >= 4 && pathParts[3] !== '';
+  const isOnMessagesPage = window.location.pathname.includes('/app/messages') ||
+    window.location.pathname.includes('/app/my-matches') ||
+    window.location.pathname.includes('/app/matches');
 
-  if (!window.location.pathname.includes('/app/messages') || onSpecificMatch) {
+  if (!isOnMessagesPage || onSpecificMatch) {
     console.log('[FlirtEasy] Navigating to main messages list page...');
 
     const navigated = await navigateToMessagesPage();
@@ -1496,7 +1572,7 @@ async function getUnreadMatches(isAborted = () => false) {
 
   await waitRandom(1000, 2000);
 
-  console.log('[FlirtEasy] Checking Matches tab for new matches...');
+  console.log('[FlirtEasy] Checking for new matches (grid / row)...');
   const tabsElements = Array.from(document.querySelectorAll('button[role="tab"]'));
   const matchesTabButton = tabsElements.length > 0 ? tabsElements[0] : null;
 
@@ -1512,13 +1588,17 @@ async function getUnreadMatches(isAborted = () => false) {
 
     newMatches = getNewMatchesFromGrid();
     console.log(`[FlirtEasy] Found ${newMatches.length} new matches in Matches tab`);
-  }
 
-  console.log('[FlirtEasy] Switching to Messages tab...');
-  const messagesTabButton = tabsElements.length > 1 ? tabsElements[1] : null;
-  if (messagesTabButton) {
-    messagesTabButton.click();
-    await waitRandom(1000, 1500);
+    console.log('[FlirtEasy] Switching to Messages tab...');
+    const messagesTabButton = tabsElements.length > 1 ? tabsElements[1] : null;
+    if (messagesTabButton) {
+      messagesTabButton.click();
+      await waitRandom(1000, 1500);
+    }
+  } else {
+    // Mobile view: "New matches" row is directly visible on the page
+    newMatches = getNewMatchesFromGrid();
+    console.log(`[FlirtEasy] Found ${newMatches.length} new matches in New matches section`);
   }
 
   chrome.runtime.sendMessage({
@@ -1678,10 +1758,26 @@ async function getUnreadMatches(isAborted = () => false) {
   console.log(`[FlirtEasy] 📜 Scanning messages for potential dates: Discovered ${existingMatches.length} (Cap: ${MAX_SCAN_LIMIT})`);
   console.log(`[FlirtEasy] Found ${existingMatches.length} existing conversations in Messages tab`);
 
-  const allMatches = [...newMatches, ...existingMatches.map(m => ({
-    ...m,
-    isNew: false
-  }))];
+  // Promote any uncontacted match from existingMatches (no snippet, no unread, no replies) to newMatches
+  existingMatches.forEach(m => {
+    const hasSnippet = m.snippet && m.snippet.trim().length > 0;
+    if (!hasSnippet && !m.hasUnread && !m.sheRepliedLast) {
+      if (!newMatches.some(nm => nm.matchId === m.matchId)) {
+        console.log(`[FlirtEasy] Auto-promoting uncontacted match from list to new matches: ${m.name} (${m.matchId})`);
+        newMatches.push({
+          ...m,
+          isNew: true
+        });
+      }
+    }
+  });
+
+  const allMatches = [
+    ...newMatches.map(m => ({ ...m, isNew: true })),
+    ...existingMatches
+      .filter(m => !newMatches.some(nm => nm.matchId === m.matchId))
+      .map(m => ({ ...m, isNew: false }))
+  ];
 
   // Deduplicate by matchId (same match can appear in both Matches and Messages tabs)
   const seenIds = new Set();
@@ -1704,14 +1800,18 @@ async function getUnreadMatches(isAborted = () => false) {
 
 async function navigateToSwipingPage() {
   if (window.location.pathname.includes('/app/recs')) {
-    console.log('[FlirtEasy] Already on explore page');
+    console.log('[FlirtEasy] Already on swiping page');
     return true;
   }
 
   const swipingLinkSelectors = window.SELECTORS?.navigation?.explore || [
     'a[href="/app/recs"]',
-    'button[aria-label*="Explore" i]',
-    'a[aria-label*="Explore" i]'
+    'a[href*="/app/recs"]',
+    'button[aria-label*="Recommendations" i]',
+    'a[aria-label*="Recommendations" i]',
+    'button[aria-label*="Tinder" i]',
+    'a[aria-label*="Tinder" i]',
+    'nav a:nth-child(1)'
   ];
 
   for (let selectorAttempt = 0; selectorAttempt < 2; selectorAttempt++) {
@@ -1747,22 +1847,40 @@ async function navigateToSwipingPage() {
     }
   }
 
-  logAction('Click navigation failed, will let background handle direct URL navigation', {}, 'warn');
+  logAction('Click navigation failed, navigating directly to /app/recs URL', {}, 'warn');
+  if (!window.location.pathname.includes('/app/recs')) {
+    window.location.href = 'https://tinder.com/app/recs';
+  }
   return false;
 }
 
 async function navigateToMessagesPage() {
-  // Check if messages list is already visible in sidebar
-  const hasMessagesVisible = !!document.querySelector('a[href^="/app/messages/"]');
-  if (hasMessagesVisible || window.location.pathname.includes('/app/messages')) {
+  // Check if messages list is already visible or on messages URL
+  const hasMessagesVisible = !!document.querySelector('a[href*="/app/messages/"]') || !!document.querySelector('a[href*="/app/my-matches/"]');
+  const isOnMessagesPath = window.location.pathname.includes('/app/messages') ||
+    window.location.pathname.includes('/app/my-matches') ||
+    window.location.pathname.includes('/app/matches');
+
+  if (hasMessagesVisible || (isOnMessagesPath && !window.location.pathname.split('/')[3])) {
     logAction('Messages list already visible or on messages path');
     return true;
   }
 
   const messagesLinkSelectors = window.SELECTORS?.navigation?.messages || [
+    'a[href="/app/messages"]',
+    'a[href*="/app/messages"]',
+    'a[href="/app/my-matches"]',
+    'a[href*="/app/my-matches"]',
+    'a[href*="/messages"]',
     'button[aria-label*="Messages" i]',
     'a[aria-label*="Messages" i]',
-    'a[href="/app/messages"]'
+    'button[aria-label*="Matches" i]',
+    'a[aria-label*="Matches" i]',
+    'button[aria-label*="Chat" i]',
+    'a[aria-label*="Chat" i]',
+    'nav a[href*="messages"]',
+    'nav a[href*="my-matches"]',
+    'nav a:nth-child(4)'
   ];
 
   for (let selectorAttempt = 0; selectorAttempt < 2; selectorAttempt++) {
@@ -1778,16 +1896,27 @@ async function navigateToMessagesPage() {
         link.click();
 
         let retries = 0;
-        // Navigation successful if URL changes OR message links appear
-        while (!window.location.pathname.includes('/app/messages') &&
-          !document.querySelector('a[href^="/app/messages/"]') &&
-          retries < 15) {
+        // Navigation successful if URL changes to messages/my-matches OR message links appear
+        while (
+          !window.location.pathname.includes('/app/messages') &&
+          !window.location.pathname.includes('/app/my-matches') &&
+          !window.location.pathname.includes('/app/matches') &&
+          !document.querySelector('a[href*="/app/messages/"]') &&
+          !document.querySelector('a[href*="/app/my-matches/"]') &&
+          retries < 15
+        ) {
           logAction(`Waiting for messages to appear... (${retries + 1}/15)`);
           await waitRandom(400, 700);
           retries++;
         }
 
-        if (window.location.pathname.includes('/app/messages') || document.querySelector('a[href^="/app/messages/"]')) {
+        const isReached = window.location.pathname.includes('/app/messages') ||
+          window.location.pathname.includes('/app/my-matches') ||
+          window.location.pathname.includes('/app/matches') ||
+          document.querySelector('a[href*="/app/messages/"]') ||
+          document.querySelector('a[href*="/app/my-matches/"]');
+
+        if (isReached) {
           logAction('Successfully reached messages view');
           await waitRandom(1000, 2000);
           return true;
@@ -1800,23 +1929,33 @@ async function navigateToMessagesPage() {
     }
   }
 
-  logAction('Click navigation failed, using Recs page as fallback (messages are usually in the sidebar)...', {}, 'warn');
-  if (!window.location.pathname.includes('/app/recs')) {
-    window.location.href = 'https://tinder.com/app/recs';
+  logAction('Click navigation failed, navigating directly to /app/messages URL...', {}, 'warn');
+  if (!window.location.pathname.includes('/app/messages') && !window.location.pathname.includes('/app/my-matches')) {
+    window.location.href = 'https://tinder.com/app/messages';
   }
 
-  // Poll for message links to actually appear in the sidebar — do NOT return true just
-  // because the URL is /app/recs. The sidebar must be confirmed populated.
+  // Poll for messages page or message links to actually appear
   let fallbackRetries = 0;
   const FALLBACK_MAX_RETRIES = 20; // up to ~10s total
-  while (!document.querySelector('a[href^="/app/messages/"]') && fallbackRetries < FALLBACK_MAX_RETRIES) {
-    logAction(`Fallback: waiting for message links in sidebar... (${fallbackRetries + 1}/${FALLBACK_MAX_RETRIES})`);
+  while (
+    !window.location.pathname.includes('/app/messages') &&
+    !window.location.pathname.includes('/app/my-matches') &&
+    !document.querySelector('a[href*="/app/messages/"]') &&
+    !document.querySelector('a[href*="/app/my-matches/"]') &&
+    fallbackRetries < FALLBACK_MAX_RETRIES
+  ) {
+    logAction(`Fallback: waiting for messages page to load... (${fallbackRetries + 1}/${FALLBACK_MAX_RETRIES})`);
     await waitRandom(400, 600);
     fallbackRetries++;
   }
 
-  if (document.querySelector('a[href^="/app/messages/"]')) {
-    logAction('Fallback succeeded: message links visible in sidebar');
+  if (
+    window.location.pathname.includes('/app/messages') ||
+    window.location.pathname.includes('/app/my-matches') ||
+    document.querySelector('a[href*="/app/messages/"]') ||
+    document.querySelector('a[href*="/app/my-matches/"]')
+  ) {
+    logAction('Fallback succeeded: messages view active');
     await waitRandom(500, 1000);
     return true;
   }
@@ -1929,6 +2068,16 @@ async function processChats(settings, maxMessagesOverride = null) {
       return { success: true, processed: 0, followUps: 0, errors: [] };
     }
 
+    let startingProcessedCount = 0;
+    if (stateCheck && stateCheck.currentCycle && typeof stateCheck.currentCycle.messagesProcessed === 'number') {
+      const prevMsgs = stateCheck.currentCycle.messagesProcessed;
+      const msgTarget = settings.messagesPerCycle || 50;
+      if (prevMsgs > 0 && prevMsgs < msgTarget) {
+        startingProcessedCount = prevMsgs;
+        logAction(`Resuming chat processing cycle from previous progress: ${startingProcessedCount}/${msgTarget}`);
+      }
+    }
+
     // Cleanup old pending messages (>24h) to prevent storage bloat
     await cleanupOldPendingMessages();
 
@@ -1968,20 +2117,15 @@ async function processChats(settings, maxMessagesOverride = null) {
     for (const match of matchesResult.matches) {
       // Check if match has metadata with creation time
       const matchData = await getStoredMatchData(match.matchId);
-      const matchCreatedAt = matchData?.createdAt || 0;
+      const lastMessageTime = matchData?.lastMessageTimestamp || 0;
 
-      // If match was created after we completed likes, it's new from this cycle
-      // OR if it's marked as isNew from Matches tab and we have a recent likes timestamp
-      const isNewFromThisCycle = match.isNew && likesCompletedAt > 0 && matchCreatedAt === 0;
-
-      if (isNewFromThisCycle) {
-        // Store creation time for future reference
-        await saveMatchMetadata(match.matchId, { createdAt: Date.now() });
+      // Any match marked as isNew that has not been messaged yet belongs in newMatches
+      if (match.isNew && lastMessageTime === 0) {
+        await saveMatchMetadata(match.matchId, { createdAt: matchData?.createdAt || Date.now() });
         newMatches.push(match);
-      } else if (match.isNew && likesCompletedAt === 0) {
-        // No timestamp available, trust isNew flag
-        await saveMatchMetadata(match.matchId, { createdAt: Date.now() });
-        newMatches.push(match);
+      } else if (match.isNew) {
+        // Marked isNew but has previous message history
+        existingMatches.push(match);
       } else {
         existingMatches.push(match);
       }
@@ -2004,17 +2148,21 @@ async function processChats(settings, maxMessagesOverride = null) {
       const pausedUntil = storedData?.pausedUntil || 0;
       const isPaused = pausedUntil > Date.now();
 
+      // Uncontacted match fallback (in case it ended up in existingMatches):
+      // No stored history, empty snippet or isYourMove or isNew
+      const isUncontactedOpener = lastMessageTime === 0 && (!match.snippet || match.snippet.trim() === '' || match.isYourMove || match.isNew);
+
       // Match is ready if:
       // 1. Has unread message (IMMEDIATE PRIORITY)
       // 2. She replied last (no "←" prefix in snippet) — catches cases where Tinder cleared the
       //    unread dot after the bot opened the conversation, but she still sent the most recent msg.
-      // 3. No stored history AND Tinder "Your Move" badge (new match, first opener needed)
-      //    — DO NOT use lastMessageTime===0 alone: ghost matches with no DOM signal would flood queue.
+      // 3. Uncontacted opener needed (no stored history + empty snippet / your move)
       // 4. Enough time passed for follow-up, not hard-stopped, not in 1-week pause
       const isFollowupReady = (lastMessageTime > 0 && !hardStopped && !isPaused && timeSince >= followupDelay && followupCount < FOLLOWUP_HARD_STOP_COUNT);
-      const isReady = match.hasUnread || match.sheRepliedLast || (lastMessageTime === 0 && match.isYourMove) || isFollowupReady;
+      const isReady = match.hasUnread || match.sheRepliedLast || isUncontactedOpener || isFollowupReady;
       if (isReady) {
         match.lastScannedAt = storedData?.lastScannedAt || 0;
+        match.isUncontactedOpener = isUncontactedOpener;
         readyMatches.push(match);
       }
 
@@ -2024,28 +2172,28 @@ async function processChats(settings, maxMessagesOverride = null) {
 
     // Advanced 3-Tier Recency Sort (Tinder Edition):
     // TIER 1: Unread (She replied) -> sorted by RECENCY (sidebar position)
-    // TIER 2: Your Move (Her turn/badge) -> sorted by RECENCY
+    // TIER 2: Your Move / Uncontacted Opener (Her turn/opener) -> sorted by RECENCY
     // TIER 3: Followups -> Fairness rotation + 14-day Stale Guard
     const STALE_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
     readyMatches.sort((a, b) => {
       const isUnreadA = a.hasUnread;
       const isUnreadB = b.hasUnread;
-      const isYourMoveA = !a.hasUnread && a.isYourMove;
-      const isYourMoveB = !b.hasUnread && b.isYourMove;
-      const isFollowupA = !a.hasUnread && !a.isYourMove;
-      const isFollowupB = !b.hasUnread && !b.isYourMove;
+      const isPriorityA = !a.hasUnread && (a.isYourMove || a.isUncontactedOpener);
+      const isPriorityB = !b.hasUnread && (b.isYourMove || b.isUncontactedOpener);
+      const isFollowupA = !a.hasUnread && !isPriorityA;
+      const isFollowupB = !b.hasUnread && !isPriorityB;
 
       // Tier 1 vs others
       if (isUnreadA && !isUnreadB) return -1;
       if (!isUnreadA && isUnreadB) return 1;
 
       // Tier 2 vs Tier 3
-      if (isYourMoveA && isFollowupB) return -1;
-      if (isFollowupA && isYourMoveB) return 1;
+      if (isPriorityA && isFollowupB) return -1;
+      if (isFollowupA && isPriorityB) return 1;
 
       // Within Tier 1/2: Sort by sidebar position (recency)
-      if ((isUnreadA && isUnreadB) || (isYourMoveA && isYourMoveB)) {
+      if ((isUnreadA && isUnreadB) || (isPriorityA && isPriorityB)) {
         return (a.sidebarIndex || 0) - (b.sidebarIndex || 0);
       }
 
@@ -2057,7 +2205,7 @@ async function processChats(settings, maxMessagesOverride = null) {
 
     const filteredReadyMatches = [];
     for (const match of readyMatches) {
-      const isFollowup = !match.hasUnread && !match.isYourMove;
+      const isFollowup = !match.hasUnread && !match.isYourMove && !match.isUncontactedOpener;
       if (!isFollowup) {
         filteredReadyMatches.push(match);
         continue;
@@ -2223,7 +2371,7 @@ async function processChats(settings, maxMessagesOverride = null) {
           continue;
         }
 
-        if (match.isNew) {
+        if (match.isNew || match.isUncontactedOpener) {
           logAction(`Navigating to new match from Matches grid...`);
 
           const tabsElements = Array.from(document.querySelectorAll('button[role="tab"]'));
@@ -2243,6 +2391,14 @@ async function processChats(settings, maxMessagesOverride = null) {
             targetCard = matchCards.find(m => m.name === match.name);
           }
 
+          // Fallback: search direct anchor in DOM
+          if (!targetCard || !targetCard.element) {
+            const directEl = document.querySelector(`a[href*="${match.matchId}"]`);
+            if (directEl) {
+              targetCard = { matchId: match.matchId, name: match.name, element: directEl };
+            }
+          }
+
           if (!targetCard || !targetCard.element) {
             logAction(`Could not find card for ${match.name}`, {}, 'error');
             errors.push(`${match.name}: Card not found`);
@@ -2252,7 +2408,8 @@ async function processChats(settings, maxMessagesOverride = null) {
           // If we already know the matchId from the card href, navigate directly
           if (targetCard.matchId) {
             matchId = targetCard.matchId;
-            const directLink = document.querySelector(`a[href="/app/messages/${matchId}"]`);
+            const directLink = document.querySelector(`a[href="/app/messages/${matchId}"]`) ||
+                               document.querySelector(`a[href*="${matchId}"]`);
             if (directLink) {
               directLink.click();
             } else {
@@ -2264,10 +2421,18 @@ async function processChats(settings, maxMessagesOverride = null) {
 
           await waitRandom(2000, 3000);
 
-          const currentPath = window.location.pathname;
-          const pathParts = currentPath.split('/');
+          let currentPath = window.location.pathname;
+          let pathParts = currentPath.split('/');
           if (!matchId) {
             matchId = pathParts.length >= 4 && currentPath.includes('/app/messages/') ? pathParts[3] : null;
+          }
+
+          // Fallback: if route didn't change, force navigate to the chat URL
+          if (matchId && (!currentPath.includes(matchId) || !currentPath.includes('/app/messages/'))) {
+            console.log(`[FlirtEasy] Direct click did not update route, forcing navigation to /app/messages/${matchId}`);
+            window.location.href = `https://tinder.com/app/messages/${matchId}`;
+            await waitRandom(2500, 3500);
+            currentPath = window.location.pathname;
           }
 
           if (!matchId || !currentPath.includes('/app/messages/')) {
@@ -2543,7 +2708,9 @@ async function processChats(settings, maxMessagesOverride = null) {
           } else if (timeSinceLastMessage >= followupDelay && followupCount < FOLLOWUP_HARD_STOP_COUNT) {
             logAction(`Match qualifies for follow-up (${followupCount + 1}/${FOLLOWUP_HARD_STOP_COUNT})`);
 
-            const profile = parseCurrentProfile();
+            const profile = typeof fetchOrParseMatchProfile === 'function'
+              ? await fetchOrParseMatchProfile(matchId)
+              : parseCurrentProfile();
             const messageData = { ...profile, conversationHistory: conversationHistory };
 
             // ── Kill-switch check before expensive AI call ──
@@ -2620,7 +2787,9 @@ async function processChats(settings, maxMessagesOverride = null) {
         if (!hasMessages) {
           logAction(`AI: Generating opening message...`);
 
-          const profile = parseCurrentProfile();
+          const profile = typeof fetchOrParseMatchProfile === 'function'
+            ? await fetchOrParseMatchProfile(matchId)
+            : parseCurrentProfile();
           const messageData = { ...profile, id: matchId, conversationHistory: [] };
 
           // Detect language for new match (check stored language)
@@ -2652,10 +2821,22 @@ async function processChats(settings, maxMessagesOverride = null) {
 
             // Achievement tracking removed from here - handled by generateAndSendMessage
 
+            const totalCycleProcessed = (typeof startingProcessedCount === 'number' ? startingProcessedCount : 0) + processed.length;
             chrome.runtime.sendMessage({
               action: 'updateCycleStats',
-              stats: { messagesProcessed: processed.length, currentName: match.name || 'Match', currentMessage: (result.message || '').trim() }
+              stats: { messagesProcessed: totalCycleProcessed, currentName: match.name || 'Match', currentMessage: (result.message || '').trim() }
             });
+
+            try {
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'FE_MESSAGE',
+                  messageCount: totalCycleProcessed,
+                  currentName: match.name || 'Match',
+                  currentMessage: (result.message || '').trim(),
+                }));
+              }
+            } catch (_) {}
 
             if (result.isTrialLimit) {
               logAction('Trial limit reached (final message sent), stopping Chat Processing.');
@@ -2829,7 +3010,9 @@ async function processChats(settings, maxMessagesOverride = null) {
           }
         }
 
-        const profile = parseCurrentProfile();
+        const profile = typeof fetchOrParseMatchProfile === 'function'
+          ? await fetchOrParseMatchProfile(matchId)
+          : parseCurrentProfile();
         const messageData = { ...profile, id: matchId, conversationHistory: conversationHistory };
 
         // 1. Check for stored language first (prioritize MANUAL overrides)
@@ -2912,10 +3095,22 @@ async function processChats(settings, maxMessagesOverride = null) {
             break;
           }
 
+          const totalCycleProcessed = (typeof startingProcessedCount === 'number' ? startingProcessedCount : 0) + processed.length;
           chrome.runtime.sendMessage({
             action: 'updateCycleStats',
-            stats: { messagesProcessed: processed.length, currentName: match.name || 'Match', currentMessage: (msgResult.message || '').trim() }
+            stats: { messagesProcessed: totalCycleProcessed, currentName: match.name || 'Match', currentMessage: (msgResult.message || '').trim() }
           });
+
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_MESSAGE',
+                messageCount: totalCycleProcessed,
+                currentName: match.name || 'Match',
+                currentMessage: (msgResult.message || '').trim(),
+              }));
+            }
+          } catch (_) {}
         } else if (msgResult.networkOffline) {
           logAction(`Network offline after reply send for ${match.name} — waiting for reconnect`);
           const recovered = await tinderWaitForNetworkOrAbort(90000);
@@ -3031,6 +3226,17 @@ async function processChats(settings, maxMessagesOverride = null) {
 
     logPhaseHeader('MESSAGING CYCLE COMPLETE');
     logAction(`Results: ${processed.length} sent, ${followUps.length} follow-ups, ${skipped.length} skipped`, { errors: errors.length });
+
+    try {
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'FE_MESSAGING_CYCLE_DONE',
+          processed: processed.length,
+          followUps: followUps.length,
+          skipped: skipped.length,
+        }));
+      }
+    } catch (_) {}
 
     return {
       success: true,
@@ -4739,10 +4945,11 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
         } catch (_) {}
       }
 
+      var tokenKeyRegex = /(?:api|auth).*token/i;
       var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       for (var i = 0; i < localStorage.length; i++) {
         var k = localStorage.key(i);
-        if (!k) continue;
+        if (!k || !tokenKeyRegex.test(k)) continue;
         var val = localStorage.getItem(k);
         if (!val) continue;
         var cleanVal = val.replace(/^["'](.*)["']$/, '$1').trim();
@@ -4755,7 +4962,8 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
   };
 
   // Seed initial state — if already logged in at inject time, mark as such
-  let _wasLoggedIn = typeof isLoggedIn === 'function' ? isLoggedIn() : false;
+  let _initialTok = _extractTinderAuthToken();
+  let _wasLoggedIn = (typeof isLoggedIn === 'function' ? isLoggedIn() : false);
 
   // Send initial status immediately so app gets the true state on WebView load
   try {
@@ -4764,35 +4972,45 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'FE_PAGE_STATUS',
           isLoggedIn: _wasLoggedIn,
-          token: _wasLoggedIn ? _extractTinderAuthToken() : null,
+          token: _wasLoggedIn ? (_initialTok || _extractTinderAuthToken()) : null,
           url: window.location.href,
         }));
       }
     }
   } catch (_) {}
 
+  let _consecutiveLoggedOutTicks = 0;
   setInterval(() => {
     if (window.__feLogoutInProgress) return;
     if (typeof isLoggedIn !== 'function') return;
     const nowLoggedIn = isLoggedIn();
+    const currentToken = _extractTinderAuthToken();
 
     if (_wasLoggedIn && !nowLoggedIn) {
-      // ── Transition: LOGGED IN → LOGGED OUT ──
-      console.log('[FlirtEasy] Logout detected! Notifying React Native app...');
+      _consecutiveLoggedOutTicks++;
+      // Require at least 3 consecutive ticks without token before reporting logged_out
+      if (_consecutiveLoggedOutTicks < 3) {
+        return;
+      }
+      _wasLoggedIn = false;
+      _consecutiveLoggedOutTicks = 0;
+      console.log('[FlirtEasy] Genuine logout confirmed. Notifying React Native app...');
       try {
         if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'FE_AUTH_STEP',
             step: 'logged_out',
+            confirmed: true,
             url: window.location.href,
           }));
         }
       } catch (_) {}
     } else if (!_wasLoggedIn && nowLoggedIn) {
       // ── Transition: LOGGED OUT → LOGGED IN ──
+      _wasLoggedIn = true;
+      _consecutiveLoggedOutTicks = 0;
       console.log('[FlirtEasy] Login detected by watchdog! Notifying React Native app...');
-      // Orchestrator notify for Neko / VPS mode (this used to live in the old
-      // multi-step login interval, which no longer exists).
+      // Orchestrator notify for Neko / VPS mode
       if (typeof window.ORCHESTRATOR_USER_ID !== 'undefined') {
         fetch(`http://host.docker.internal:3000/login-success?userId=${window.ORCHESTRATOR_USER_ID}&platform=tinder`)
           .catch(err => console.warn('[Content] Failed to notify orchestrator of login success:', err));
@@ -4802,14 +5020,38 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'FE_AUTH_STEP',
             step: 'logged_in',
-            token: _extractTinderAuthToken(),
+            token: currentToken || _extractTinderAuthToken(),
             url: window.location.href,
           }));
         }
       } catch (_) {}
+    } else if (nowLoggedIn) {
+      _consecutiveLoggedOutTicks = 0;
     }
 
     _wasLoggedIn = nowLoggedIn;
+
+    // ── Challenge & Verification Watchdog (CAPTCHA, "Identify It's You", Selfie) ──
+    try {
+      if (typeof detectInterventionNeeded === 'function') {
+        const check = detectInterventionNeeded();
+        if (check && check.needed) {
+          if (!window.__lastInterventionReason || window.__lastInterventionReason !== check.reason) {
+            window.__lastInterventionReason = check.reason;
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_INTERVENTION_NEEDED',
+                reason: check.reason,
+                message: check.message,
+                url: window.location.href,
+              }));
+            }
+          }
+        } else {
+          window.__lastInterventionReason = null;
+        }
+      }
+    } catch (_) {}
   }, 2000); // Poll every 2 seconds
 }
 
@@ -4821,10 +5063,11 @@ try {
     sessionStorage.removeItem('flirteasy_auto_resume');
     window.__flirteasyAutoStartRequested = false;
     const targetCount = window.__flirteasyAutoStartCount || 50;
+    const initialProgress = window.__flirteasyAutoStartProgress || undefined;
     console.log('[FlirtEasy] 🚀 AutoStart requested before page load — launching autoLike in DOM!');
     try { chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }, () => {}); } catch (_) {}
     setTimeout(() => {
-      autoLike(targetCount);
+      autoLike(targetCount, initialProgress);
     }, 800);
   }
 } catch (_) {}

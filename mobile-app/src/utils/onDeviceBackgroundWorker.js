@@ -17,7 +17,26 @@ import {
   getPersistedMatchesCache,
   savePersistedMatchesCache,
   getTinderAuthState,
+  isAutoSwipeEnabled,
+  isAutoMessagingEnabled,
 } from './sessionManager';
+import {
+  canPerformLikes,
+  canSendMessage,
+  recordLikes,
+  recordMessage,
+  getRateLimitStatus,
+} from './rateLimiter';
+import {
+  SMART_DEFAULT_PROMPTS,
+  STYLE_FORMALITY_LEVELS,
+  STYLE_ENHANCEMENTS,
+  LANGUAGE_SLANG_GUIDE,
+  LATIN_SCRIPT_CODES,
+  isNonLatinName,
+  normalizeGender,
+  getSlangGuidance,
+} from './promptConstants';
 
 /**
  * Default fallback responses if OpenAI API is completely unreachable.
@@ -113,12 +132,19 @@ export class OnDeviceBackgroundWorker {
         cycles: 0,
         draftingStep: ''
       },
+      currentCycle: {
+        likesCompleted: session?.cycleLikes || 0,
+        messagesProcessed: session?.cycleMessages || 0,
+        followUpsSent: 0,
+      },
+      waitingReason: session?.waitingReason || null,
+      nextRunTimestamp: session?.nextRunTimestamp || null,
       lastCycleAt: null,
       nextCycleAt: null
     };
 
-    this._currentRunLikes = 0;
-    this._currentRunMessages = 0;
+    this._currentRunLikes = session?.cycleLikes || 0;
+    this._currentRunMessages = session?.cycleMessages || 0;
 
     this.stoppedChats = new Map(); // matchId -> { reason, matchName, stoppedAt }
     this.matchLanguage = new Map(); // matchId -> { code, name, confidence, source }
@@ -181,7 +207,35 @@ export class OnDeviceBackgroundWorker {
     this.log('Settings updated', { style: this.settings.chattingStyle, goal: this.settings.intentions });
   }
 
+  checkAndResumeReplenishedLikes() {
+    if (this.agentState.waitingReason === 'likes_exhausted') {
+      const replenish = this.agentState.likesReplenishTimestamp || this.agentState.nextRunTimestamp;
+      if (replenish && Date.now() >= replenish) {
+        this.log('⚡ Tinder free likes replenished! Swiping resumed.');
+        this.agentState.waitingReason = null;
+        this.agentState.nextRunTimestamp = null;
+        this.agentState.likesReplenishTimestamp = null;
+        this._currentRunLikes = 0;
+        if (this.agentState.isRunning) {
+          const swipingEnabled = isAutoSwipeEnabled(this.settings);
+          const messagingEnabled = isAutoMessagingEnabled(this.settings);
+          this.agentState.currentPhase = swipingEnabled ? 'swiping' : (messagingEnabled ? 'messaging' : 'idle');
+        }
+        saveOnDeviceSessionState({
+          waitingReason: null,
+          nextRunTimestamp: null,
+          likesReplenishTimestamp: null,
+          likesExhaustedAt: 0,
+          cycleLikes: 0,
+        });
+        pushProgressFeedEvent('cycle_complete', 'Tinder free likes replenished! Swiping resumed.', null, 15);
+        this.notifyStateChange();
+      }
+    }
+  }
+
   getAgentState() {
+    this.checkAndResumeReplenishedLikes();
     return { ...this.agentState };
   }
 
@@ -200,6 +254,8 @@ export class OnDeviceBackgroundWorker {
     const action = message.action || message.payload?.action;
     const payload = message.payload || message;
 
+    this.checkAndResumeReplenishedLikes();
+
     switch (action) {
       // ── Settings & State ──
       case 'getSettings':
@@ -217,30 +273,117 @@ export class OnDeviceBackgroundWorker {
           isPaused: Boolean(this.agentState.isPaused),
           currentPhase: this.agentState.currentPhase || (this.agentState.isRunning ? 'swiping' : 'idle'),
           stats: this.agentState.stats || { swipes: 0, matches: 0, messages: 0 },
-          currentCycle: this.agentState.currentCycle || { likesCompleted: 0, messagesProcessed: 0 },
+          currentCycle: this.agentState.currentCycle || { likesCompleted: this._currentRunLikes || 0, messagesProcessed: 0 },
+          waitingReason: this.agentState.waitingReason || null,
+          nextRunTimestamp: this.agentState.nextRunTimestamp || null,
+          likesReplenishTimestamp: this.agentState.likesReplenishTimestamp || null,
           success: true
         };
+
+      case 'likesExhausted': {
+        const now = Date.now();
+        const currentOnDevice = getOnDeviceSessionState();
+        const existingReplenish = currentOnDevice?.likesReplenishTimestamp || this.agentState.likesReplenishTimestamp;
+        const isExistingValid = Boolean(existingReplenish && existingReplenish > now);
+
+        let incomingReplenish = payload.replenishTimestamp || payload.rateLimitedUntil;
+        if (incomingReplenish && incomingReplenish < 10000000000) {
+          incomingReplenish *= 1000;
+        }
+
+        let replenishTimestamp;
+        if (incomingReplenish && incomingReplenish > now) {
+          if (isExistingValid) {
+            const incomingDeltaHours = (incomingReplenish - now) / 3600000;
+            // Never let a generic ~12h fallback advance or reset an active countdown!
+            if (incomingDeltaHours >= 11.0 && existingReplenish < incomingReplenish) {
+              replenishTimestamp = existingReplenish;
+            } else {
+              replenishTimestamp = incomingReplenish;
+            }
+          } else {
+            replenishTimestamp = incomingReplenish;
+          }
+        } else {
+          replenishTimestamp = isExistingValid ? existingReplenish : (now + 12 * 60 * 60 * 1000);
+        }
+
+        const existingExhaustedAt = payload.exhaustedAt || currentOnDevice?.likesExhaustedAt || this.agentState.likesExhaustedAt;
+        const finalExhaustedAt = (existingExhaustedAt > 0 && (now - existingExhaustedAt < 12 * 3600 * 1000))
+          ? existingExhaustedAt
+          : now;
+
+        this.log(`⚡ Daily free likes exhausted. Refill at ${new Date(replenishTimestamp).toLocaleTimeString()}. Pivoting to Wingman messaging mode.`);
+
+        this.agentState.waitingReason = 'likes_exhausted';
+        this.agentState.nextRunTimestamp = replenishTimestamp;
+        this.agentState.likesReplenishTimestamp = replenishTimestamp;
+        this.agentState.likesExhaustedAt = finalExhaustedAt;
+
+        // If running, pivot to messaging instead of stopping!
+        if (this.agentState.isRunning) {
+          this.agentState.currentPhase = 'messaging';
+        }
+
+        saveOnDeviceSessionState({
+          waitingReason: 'likes_exhausted',
+          nextRunTimestamp: replenishTimestamp,
+          likesReplenishTimestamp: replenishTimestamp,
+          likesExhaustedAt: finalExhaustedAt,
+        });
+
+        pushProgressFeedEvent(
+          'wingman_pivot',
+          'Daily likes paused · AI Wingman chatting with matches until refill',
+          null,
+          10
+        );
+
+        this.notifyStateChange();
+        return { success: true, replenishTimestamp };
+      }
 
       case 'updateAgentState': {
         const updates = payload.state || payload;
         if (updates.isRunning !== undefined) this.agentState.isRunning = updates.isRunning;
         if (updates.isPaused !== undefined) this.agentState.isPaused = updates.isPaused;
         if (updates.currentPhase !== undefined) this.agentState.currentPhase = updates.currentPhase;
+        if (updates.waitingReason !== undefined) this.agentState.waitingReason = updates.waitingReason;
+        if (updates.nextRunTimestamp !== undefined) this.agentState.nextRunTimestamp = updates.nextRunTimestamp;
+        if (updates.likesReplenishTimestamp !== undefined) this.agentState.likesReplenishTimestamp = updates.likesReplenishTimestamp;
         this.notifyStateChange();
         return { success: true };
       }
 
       case 'updateCycleStats': {
         const stats = payload.stats || {};
+        const isSafetyOn = this.settings?.safetyMode !== false;
 
         // Swipes / Likes tracking
         if (stats.likesCompleted !== undefined) {
-          // Cycle-relative likes completed from autoLike (1, 2, 3...)
-          const deltaLikes = Math.max(0, stats.likesCompleted - this._currentRunLikes);
-          this._currentRunLikes = stats.likesCompleted;
+          const target = this.settings?.likesPerCycle || 50;
+          let deltaLikes = 0;
+          if (stats.likesCompleted > this._currentRunLikes) {
+            deltaLikes = stats.likesCompleted - this._currentRunLikes;
+            this._currentRunLikes = stats.likesCompleted;
+          } else if (this._currentRunLikes >= target) {
+            deltaLikes = stats.likesCompleted;
+            this._currentRunLikes = stats.likesCompleted;
+          } else {
+            deltaLikes = 1;
+            this._currentRunLikes = Math.min(target, this._currentRunLikes + 1);
+          }
           if (deltaLikes > 0) {
             this.agentState.stats.swipes = (this.agentState.stats.swipes || 0) + deltaLikes;
             this.agentState.stats.likesCompleted = this.agentState.stats.swipes;
+            this.agentState.currentCycle = {
+              ...(this.agentState.currentCycle || {}),
+              likesCompleted: this._currentRunLikes,
+            };
+
+            // Record in rate limiter sliding window
+            recordLikes(deltaLikes, isSafetyOn);
+
             trackingService.trackLike(deltaLikes);
 
             const targetName = stats.currentName || 'Someone New';
@@ -251,13 +394,15 @@ export class OnDeviceBackgroundWorker {
               const target = this.settings.likesPerCycle || 50;
               const completedInCycle = this._currentRunLikes;
               const remainingInCycle = Math.max(0, target - completedInCycle);
-              pushProgressFeedEvent('swipe_progress', `Batch progress: ${completedInCycle}/${target} · ${remainingInCycle} remaining`, null, 0);
+              pushProgressFeedEvent('swipe_progress', `Likes progress: ${completedInCycle}/${target} · ${remainingInCycle} remaining`, null, 0);
             }
           }
         } else if (stats.swipes !== undefined) {
           const prevSwipes = this.agentState.stats.swipes || 0;
           if (stats.swipes > prevSwipes) {
-            trackingService.trackLike(stats.swipes - prevSwipes);
+            const delta = stats.swipes - prevSwipes;
+            trackingService.trackLike(delta);
+            recordLikes(delta, isSafetyOn);
           }
           this.agentState.stats.swipes = stats.swipes;
           this.agentState.stats.likesCompleted = stats.swipes;
@@ -282,11 +427,26 @@ export class OnDeviceBackgroundWorker {
 
         // Messages tracking
         if (stats.messagesProcessed !== undefined) {
-          const deltaMessages = Math.max(0, stats.messagesProcessed - this._currentRunMessages);
-          this._currentRunMessages = stats.messagesProcessed;
+          const msgTarget = this.settings?.messagesPerCycle || 50;
+          let deltaMessages = 0;
+          if (stats.messagesProcessed > this._currentRunMessages) {
+            deltaMessages = stats.messagesProcessed - this._currentRunMessages;
+            this._currentRunMessages = stats.messagesProcessed;
+          } else if (this._currentRunMessages >= msgTarget) {
+            deltaMessages = stats.messagesProcessed;
+            this._currentRunMessages = stats.messagesProcessed;
+          } else {
+            deltaMessages = 1;
+            this._currentRunMessages = Math.min(msgTarget, this._currentRunMessages + 1);
+          }
           if (deltaMessages > 0) {
             this.agentState.stats.messages = (this.agentState.stats.messages || 0) + deltaMessages;
             this.agentState.stats.messagesSent = this.agentState.stats.messages;
+            this.agentState.currentCycle = {
+              ...(this.agentState.currentCycle || {}),
+              messagesProcessed: this._currentRunMessages,
+            };
+            recordMessage(isSafetyOn);
             const targetName = stats.currentName || 'Match';
             const feedDetail = (stats.currentMessage || '').trim() || `Replied to ${targetName}`;
             pushProgressFeedEvent('message_replied', feedDetail, targetName, 10);
@@ -298,14 +458,32 @@ export class OnDeviceBackgroundWorker {
 
         if (stats.draftingStep !== undefined) this.agentState.stats.draftingStep = stats.draftingStep;
 
+        if (stats.phase) {
+          this.agentState.currentPhase = stats.phase;
+        }
+        if (stats.currentName) {
+          this.agentState.currentCycle = {
+            ...(this.agentState.currentCycle || {}),
+            currentName: stats.currentName,
+          };
+        }
+        const swipingOn = isAutoSwipeEnabled(this.settings);
+        const messagingOn = isAutoMessagingEnabled(this.settings);
+        if (!swipingOn && (this.agentState.currentPhase === 'swiping' || this.agentState.currentPhase === 'liking')) {
+          this.agentState.currentPhase = messagingOn ? 'messaging' : 'idle';
+        }
+
         if (stats.currentName && (stats.likesCompleted !== undefined || stats.swipes !== undefined)) {
           this.log(`❤️ Liked ${stats.currentName} (${this.agentState.stats.swipes} profiles)`);
         }
 
         saveOnDeviceSessionState({
           swipes: this.agentState.stats.swipes,
+          cycleLikes: this._currentRunLikes,
           matches: this.agentState.stats.matches,
           messages: this.agentState.stats.messages,
+          cycleMessages: this._currentRunMessages,
+          currentPhase: this.agentState.currentPhase,
           isRunning: this.agentState.isRunning,
         });
 
@@ -470,7 +648,7 @@ export class OnDeviceBackgroundWorker {
       case 'getHandleSentStats':
         return { stats: this.handleSentStats };
 
-      // ── Trial & Rate Limits (DEV_MODE always Pro) ──
+      // ── Trial & Rate Limits (Sliding 60-min window rate limiting) ──
       case 'getTrialStatus':
         return {
           status: 'active',
@@ -482,18 +660,53 @@ export class OnDeviceBackgroundWorker {
           expired: false
         };
 
-      case 'canSendMessage':
-        return { allowed: true };
+      case 'canPerformLikes': {
+        const count = payload.count || 1;
+        const isSafetyOn = this.settings?.safetyMode !== false;
+        const customLimit = typeof this.settings?.likesPerCycle === 'number' ? this.settings.likesPerCycle : 50;
+        if (!isAutoSwipeEnabled(this.settings)) {
+          return { allowed: false, remaining: 0, reason: 'auto_swipe_disabled' };
+        }
+        return canPerformLikes(count, isSafetyOn, customLimit);
+      }
 
-      case 'getRateLimitStatus':
-        return {
-          allowed: true,
-          likesRemaining: 99999,
-          messagesRemaining: 99999
-        };
+      case 'canSendMessage': {
+        const isSafetyOn = this.settings?.safetyMode !== false;
+        const customLimit = typeof this.settings?.messagesPerCycle === 'number' ? this.settings.messagesPerCycle : 50;
+        if (!isAutoMessagingEnabled(this.settings)) {
+          return { allowed: false, remaining: 0, reason: 'auto_messaging_disabled' };
+        }
+        return canSendMessage(isSafetyOn, customLimit);
+      }
 
-      case 'recordMessage':
+      case 'recordLikes': {
+        const count = payload.count || 1;
+        const isSafetyOn = this.settings?.safetyMode !== false;
+        await recordLikes(count, isSafetyOn);
         return { success: true };
+      }
+
+      case 'recordMessage': {
+        const isSafetyOn = this.settings?.safetyMode !== false;
+        await recordMessage(isSafetyOn);
+        return { success: true };
+      }
+
+      case 'getRateLimitStatus': {
+        const isSafetyOn = this.settings?.safetyMode !== false;
+        const status = getRateLimitStatus(isSafetyOn, {
+          likesPerHour: this.settings?.likesPerCycle || 50,
+          messagesPerHour: this.settings?.messagesPerCycle || 50,
+        });
+        return {
+          success: true,
+          status,
+          ...status,
+          allowed: !status.isSafetyLocked,
+          likesRemaining: status.likes.remaining,
+          messagesRemaining: status.messages.remaining,
+        };
+      }
 
       case 'trialMessageLimitReached':
       case 'messagingRateLimitReached':
@@ -508,27 +721,122 @@ export class OnDeviceBackgroundWorker {
 
       // ── Agent Run Controls & State Query ──
 
-      case 'startAgent':
+      case 'startAgent': {
+        const swipingEnabled = isAutoSwipeEnabled(this.settings);
+        const messagingEnabled = isAutoMessagingEnabled(this.settings);
+
+        if (!swipingEnabled && !messagingEnabled) {
+          this.log('Cannot start agent: Both Auto-Swipe and Auto-Messaging are disabled in settings.');
+          return { success: false, reason: 'automation_disabled' };
+        }
+
+        const isSafetyOn = this.settings?.safetyMode !== false;
+        const rateStatus = getRateLimitStatus(isSafetyOn, {
+          likesPerHour: typeof this.settings?.likesPerCycle === 'number' ? this.settings.likesPerCycle : 50,
+        });
+        if (swipingEnabled && rateStatus.isSafetyLocked) {
+          this.log(`Cannot start agent: Safety rate limit reached (locked for ${rateStatus.likesResetIn || 60}m)`);
+          this.agentState.waitingReason = 'safety_lock';
+          this.agentState.nextRunTimestamp = rateStatus.nextResetTimestamp;
+          this.notifyStateChange();
+          return { success: false, reason: 'safety_lock', nextResetTimestamp: rateStatus.nextResetTimestamp };
+        }
+
+        const currentSession = typeof getOnDeviceSessionState === 'function' ? getOnDeviceSessionState() : null;
+        const effectiveWaitingReason = this.agentState.waitingReason || currentSession?.waitingReason;
+        const effectiveReplenish = this.agentState.likesReplenishTimestamp || currentSession?.likesReplenishTimestamp;
+        const isLikesExhausted = effectiveWaitingReason === 'likes_exhausted' && effectiveReplenish > Date.now();
+
+        // If swiping is disabled in settings OR likes are currently exhausted, start directly in messaging mode!
+        if (!swipingEnabled || isLikesExhausted) {
+          if (!messagingEnabled) {
+            this.log('Cannot start agent: Swiping is unavailable/disabled and Auto-Messaging is disabled.');
+            return { success: false, reason: 'automation_disabled' };
+          }
+          if (!swipingEnabled) {
+            this.agentState.waitingReason = null;
+            this.agentState.nextRunTimestamp = null;
+            this.agentState.likesReplenishTimestamp = null;
+          } else if (isLikesExhausted) {
+            this.agentState.waitingReason = 'likes_exhausted';
+            this.agentState.likesReplenishTimestamp = effectiveReplenish;
+          }
+          this.agentState.isRunning = true;
+          this.agentState.isPaused = false;
+          this.agentState.currentPhase = 'messaging';
+          const msgTarget = typeof this.settings?.messagesPerCycle === 'number' && this.settings.messagesPerCycle > 0 ? this.settings.messagesPerCycle : 50;
+          if (this._currentRunMessages >= msgTarget) {
+            this._currentRunMessages = 0;
+          }
+          this.agentState.currentCycle = {
+            ...(this.agentState.currentCycle || {}),
+            messagesProcessed: this._currentRunMessages,
+          };
+          saveOnDeviceSessionState({
+            isRunning: true,
+            cycleMessages: this._currentRunMessages,
+            currentPhase: 'messaging',
+            waitingReason: swipingEnabled && isLikesExhausted ? 'likes_exhausted' : null,
+            likesReplenishTimestamp: swipingEnabled && isLikesExhausted ? effectiveReplenish : null,
+          });
+          const bannerMsg = !swipingEnabled
+            ? 'AI Wingman Activated — Messaging Only Mode'
+            : 'AI Wingman Activated — Messaging Active Matches';
+          pushProgressFeedEvent('persona_update', bannerMsg, null, 0);
+          this.notifyStateChange();
+          trackingService.trackAgentStart(this.settings);
+          return { success: true, mode: 'messaging_only' };
+        }
+
         this.agentState.isRunning = true;
         this.agentState.isPaused = false;
         this.agentState.currentPhase = 'swiping';
-        this._currentRunLikes = 0;
-        this._currentRunMessages = 0;
-        pushProgressFeedEvent('persona_update', 'AI Wingman Activated — Swiping & Chatting', null, 0);
-        saveOnDeviceSessionState({ isRunning: true });
+        this.agentState.waitingReason = null;
+        this.agentState.nextRunTimestamp = null;
+
+        const target = typeof this.settings?.likesPerCycle === 'number' && this.settings.likesPerCycle > 0 ? this.settings.likesPerCycle : 50;
+        if (this._currentRunLikes >= target) {
+          this._currentRunLikes = 0;
+        }
+        const msgTarget = typeof this.settings?.messagesPerCycle === 'number' && this.settings.messagesPerCycle > 0 ? this.settings.messagesPerCycle : 50;
+        if (this._currentRunMessages >= msgTarget) {
+          this._currentRunMessages = 0;
+        }
+        this.agentState.currentCycle = {
+          likesCompleted: this._currentRunLikes,
+          messagesProcessed: this._currentRunMessages,
+          followUpsSent: 0,
+        };
+
+        const bannerMsg = !messagingEnabled
+          ? 'AI Swiper Activated — Swiping Only Mode'
+          : 'AI Wingman Activated — Swiping & Chatting';
+        pushProgressFeedEvent('persona_update', bannerMsg, null, 0);
+        saveOnDeviceSessionState({
+          cycleLikes: this._currentRunLikes,
+          cycleMessages: this._currentRunMessages,
+          currentPhase: 'swiping',
+          isRunning: true,
+          waitingReason: null,
+          nextRunTimestamp: null,
+        });
         this.notifyStateChange();
         trackingService.trackAgentStart(this.settings);
-        return { success: true };
+        return { success: true, mode: messagingEnabled ? 'full_auto' : 'swiping_only' };
+      }
 
       case 'stopAgent':
         this.agentState.isRunning = false;
         this.agentState.isPaused = true;
         this.agentState.currentPhase = 'idle';
-        this._currentRunLikes = 0;
         if ((this.agentState.stats.swipes || 0) > 0) {
           pushProgressFeedEvent('cycle_complete', `Automation paused · ${this.agentState.stats.swipes} total swiped`, null, 0);
         }
-        saveOnDeviceSessionState({ isRunning: false });
+        saveOnDeviceSessionState({
+          isRunning: false,
+          cycleLikes: this._currentRunLikes,
+          cycleMessages: this._currentRunMessages,
+        });
         this.notifyStateChange();
         trackingService.trackAgentStop('manual');
         return { success: true };
@@ -575,27 +883,53 @@ export class OnDeviceBackgroundWorker {
     this.log(`Generating AI message for ${matchData.name || 'match'} (followUp=${isFollowUp})`);
 
     try {
-      const message = await this.callOpenAI(systemPrompt, userPrompt, effectiveSettings);
-      const cleaned = this.cleanMessage(message);
-      this.log(`AI generated message: "${cleaned}"`);
+      const rawMessage = await this.callOpenAI(systemPrompt, userPrompt, effectiveSettings);
+
+      // Check for JSON consecutive messages response
+      let messageParts = null;
+      const rawTrimmed = (rawMessage || '').trim();
+      if (rawTrimmed.startsWith('{') && rawTrimmed.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(rawTrimmed);
+          if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+            messageParts = parsed.messages.map(m => this.cleanMessage(m)).filter(Boolean);
+          }
+        } catch (_) {}
+      }
+
+      const cleaned = this.cleanMessage(rawMessage);
+
+      const primaryMessage = (messageParts && messageParts.length > 0) ? messageParts[0] : cleaned;
+      this.log(`AI generated message: "${primaryMessage}"${messageParts ? ` (consecutive: ${messageParts.length} parts)` : ''}`);
 
       trackingService.trackMessage({
-        count: 1,
+        count: messageParts ? messageParts.length : 1,
         style: effectiveSettings.chattingStyle,
         language: effectiveSettings.conversationLanguage,
         isOpener: !isFollowUp,
         matchName: matchData.name,
       });
 
+      this._currentRunMessages = (this._currentRunMessages || 0) + 1;
       this.agentState.stats.messages = (this.agentState.stats.messages || 0) + 1;
       this.agentState.stats.messagesSent = this.agentState.stats.messages;
-      saveOnDeviceSessionState({ messages: this.agentState.stats.messages });
+      if (this.agentState.currentCycle) {
+        this.agentState.currentCycle.messagesProcessed = this._currentRunMessages;
+      }
+      saveOnDeviceSessionState({
+        messages: this.agentState.stats.messages,
+        cycleMessages: this._currentRunMessages,
+      });
+      recordMessage(effectiveSettings?.safetyMode !== false);
       this.notifyStateChange();
 
       const feedType = isFollowUp ? 'follow_up_sent' : (matchData.conversationHistory?.length ? 'message_replied' : 'opener_sent');
-      pushProgressFeedEvent(feedType, cleaned, matchData.name || null, isFollowUp ? 8 : 10);
+      pushProgressFeedEvent(feedType, primaryMessage, matchData.name || null, isFollowUp ? 8 : 10);
 
-      return { success: true, message: cleaned };
+      if (messageParts && messageParts.length > 0) {
+        return { success: true, messages: messageParts, message: primaryMessage };
+      }
+      return { success: true, message: primaryMessage };
     } catch (err) {
       this.log(`AI generation failed: ${err.message}. Using intelligent fallback.`);
       const fallback = this.getFallbackMessage(effectiveSettings, matchData, isFollowUp);
@@ -609,9 +943,17 @@ export class OnDeviceBackgroundWorker {
         isFallback: true,
       });
 
+      this._currentRunMessages = (this._currentRunMessages || 0) + 1;
       this.agentState.stats.messages = (this.agentState.stats.messages || 0) + 1;
       this.agentState.stats.messagesSent = this.agentState.stats.messages;
-      saveOnDeviceSessionState({ messages: this.agentState.stats.messages });
+      if (this.agentState.currentCycle) {
+        this.agentState.currentCycle.messagesProcessed = this._currentRunMessages;
+      }
+      saveOnDeviceSessionState({
+        messages: this.agentState.stats.messages,
+        cycleMessages: this._currentRunMessages,
+      });
+      recordMessage(effectiveSettings?.safetyMode !== false);
       this.notifyStateChange();
 
       const feedType = isFollowUp ? 'follow_up_sent' : (matchData.conversationHistory?.length ? 'message_replied' : 'opener_sent');
@@ -621,8 +963,12 @@ export class OnDeviceBackgroundWorker {
     }
   }
 
-  buildSystemPrompt(settings, isFollowUp, matchData) {
-    const { chattingStyle = 'freestyle', intentions = 'short_term', useEmojis = true } = settings;
+  buildSystemPrompt(settings, isFollowUp, matchData = {}) {
+    const chattingStyle = settings.chattingStyle || 'freestyle';
+    const intentions = settings.intentions || 'short_term';
+    const useEmojis = settings.useEmojis !== false;
+    const conversationLanguage = settings.conversationLanguage || 'auto';
+    const platformName = 'Tinder';
 
     const styleMap = {
       freestyle: 'casual and spontaneous',
@@ -648,49 +994,184 @@ export class OnDeviceBackgroundWorker {
 
     const style = styleMap[chattingStyle] || 'friendly';
     const goal = intentionsMap[intentions] || 'meeting new people';
+
+    // 1. Gender context
+    const userGender = normalizeGender(
+      (settings.userGenderOverride && settings.userGenderOverride !== 'auto')
+        ? settings.userGenderOverride
+        : settings.userGender
+          || settings.userProfile?.gender
+          || (settings.userProfile?.interestedIn?.toLowerCase().includes('women') ? 'male' :
+              settings.userProfile?.interestedIn?.toLowerCase().includes('men') ? 'female' : 'unknown')
+    );
+    const matchGender = normalizeGender(matchData?.gender);
+    const genderContext = `CONTEXT: You are a ${userGender} sender messaging a ${matchGender} match. Use appropriate gendered grammar for all verbs and adjectives.`;
+
+    const romanceLanguageCodes = new Set(['it', 'es', 'fr', 'pt', 'ro']);
+    const earlyLangCode = matchData?.detectedLanguage?.code || conversationLanguage || '';
+    const isRomanceLang = romanceLanguageCodes.has(earlyLangCode);
+    const genderContextEnhanced = isRomanceLang && userGender !== 'unknown'
+      ? `${genderContext} IMPORTANT for grammar: the sender is ${userGender} — all adjectives, past participles and self-referential words must use ${userGender === 'male' ? 'masculine' : userGender === 'female' ? 'feminine' : 'neutral'} agreement.`
+      : genderContext;
+
+    // 2. Mode determination
+    const hasConversation = matchData && matchData.conversationHistory && matchData.conversationHistory.length > 0;
+    let mode = 'intro';
+    if (isFollowUp) {
+      mode = 'followup';
+    } else if (hasConversation) {
+      mode = 'conversation';
+    }
+
+    // 3. Emoji Guidance
     const emojiGuidance = useEmojis
       ? 'Use only 1 simple, common emoji occasionally (like 🙂, 😊, 😉, 😅, 😂, ✨). Avoid excessive or symbolic emojis.'
       : 'Do not use emojis.';
 
-    // Contact details rules for Move Off App
-    let contactRules = '';
+    // 4. Style Enhancement
+    const styleEnhancement = STYLE_ENHANCEMENTS[chattingStyle] ? `\n\n${STYLE_ENHANCEMENTS[chattingStyle]}` : '';
+
+    // 5. Language instruction & slang guidance
+    const detectedLang = matchData?.detectedLanguage;
+    const isManualOverride = detectedLang?.source === 'manual';
+    const langCode = detectedLang?.code || conversationLanguage || 'auto';
+    const languageName = detectedLang?.name || LANGUAGE_CODE_MAP[langCode] || null;
+
+    let languageInstruction = '';
+    if (isManualOverride && languageName) {
+      languageInstruction = `\n\nIMPORTANT: Write your entire message in ${languageName}. Every word must be in ${languageName}.`;
+    } else if (languageName && langCode !== 'auto') {
+      languageInstruction = `\n\nLANGUAGE HINT: The match may be writing in ${languageName} — but read the conversation and reply in whatever language they're actually using.`;
+    } else {
+      languageInstruction = `\n\nIMPORTANT: Look at the conversation history and reply in the same language the match is using. Match their language exactly — do not switch.`;
+    }
+
+    const slangGuidance = getSlangGuidance(langCode, chattingStyle);
+
+    // 6. Texting & Placeholder Guard
+    const placeholderGuard = `\n\nSAFETY: NEVER use brackets [] or placeholders like [city], [name], [location] in your response. Real humans never text with brackets — skip the detail or be vague instead. Never use em dashes (—) or en dashes (–), use a comma instead. Do not end every sentence with a full stop — real texters skip the period at the end of a message or use minimal punctuation. Do NOT capitalize the first letter of every sentence — only capitalize proper nouns and 'I'. Write like one natural flowing message, not multiple formal sentences.`;
+
+    // 7. Conversation Arc Stages
+    const msgCount = matchData?.conversationHistory?.length || 0;
+    const conversationStage = msgCount <= 2
+      ? `[Stage: opening — keep it light and curious, build interest]`
+      : msgCount <= 6
+      ? `[Stage: building rapport — deepen the conversation, show personality]`
+      : msgCount <= 12
+      ? `[Stage: established — can suggest meeting or escalate naturally]`
+      : `[Stage: ongoing — keep momentum, push toward a meetup if not arranged yet]`;
+    const effectiveArcSignal = (mode === 'conversation') ? `\n${conversationStage}` : '';
+
+    // 8. Match Style Mirroring
+    let matchStyleMirror = '';
+    if (hasConversation) {
+      const matchMsgs = matchData.conversationHistory
+        .filter(m => (m.sender === 'match' || (m.sender !== 'user' && m.sender !== 'me')) && m.text && m.text.trim().length >= 2)
+        .slice(-4)
+        .map(m => m.text.trim());
+      if (matchMsgs.length > 0) {
+        const examples = matchMsgs.map(m => `"${m}"`).join(', ');
+        matchStyleMirror = `\n\nMATCH TEXTING STYLE:\nHere are the match's last messages: ${examples}\nStudy how they text — their message length, word count, whether they use slang or mix languages, how casual or punchy they are, their punctuation habits. Your reply must MATCH their delivery format exactly. If they send 3-word messages, you send 3-5 words. If they text in bursts of short lines, keep it short. Your personality stays yours — but the FORMAT and LENGTH must mirror theirs. Never write longer or more formally than they do.`;
+      }
+    }
+
+    // 9. Contact details & Move-off-app block
+    let contactDetailsBlock = '';
+    const isMoveToTelegram = (settings.stopConditions || []).includes('move_to_telegram');
+    const isMoveToInstagram = (settings.stopConditions || []).includes('move_to_instagram');
+    const isMoveToTango = (settings.stopConditions || []).includes('move_to_tango');
     const cd = settings.contactDetails || {};
-    const hasTg = cd.telegram?.enabled && cd.telegram?.value;
-    const hasIg = cd.instagram?.enabled && cd.instagram?.value;
-    const hasTango = cd.tango?.enabled && cd.tango?.value;
+    const contactLines = [];
+    if (cd.telegram?.enabled && cd.telegram?.value?.trim()) contactLines.push(`MY_TELEGRAM: @${cd.telegram.value.replace('@', '').trim()}`);
+    if (cd.instagram?.enabled && cd.instagram?.value?.trim()) contactLines.push(`MY_INSTAGRAM: @${cd.instagram.value.replace('@', '').trim()}`);
+    if (cd.tango?.enabled && cd.tango?.value?.trim()) contactLines.push(`MY_TANGO: ${cd.tango.value.trim()}`);
 
-    if (hasTg || hasIg || hasTango) {
-      const available = [];
-      if (hasTg) available.push(`Telegram: @${cd.telegram.value.replace('@', '')}`);
-      if (hasIg) available.push(`Instagram: @${cd.instagram.value.replace('@', '')}`);
-      if (hasTango) available.push(`Tango: ${cd.tango.value}`);
-
-      contactRules = `\n\nCONTACT DETAILS (share ONLY when naturally asked or when moving conversation off Tinder):\n${available.join('\n')}\nNever sound like an automated bot or ad. Slip it in conversationally.`;
+    if (contactLines.length > 0) {
+      if (mode === 'conversation' || isMoveToTelegram || isMoveToInstagram || isMoveToTango) {
+        contactDetailsBlock = `\n\nMY CONTACT DETAILS:\n${contactLines.join('\n')}\nShare ONLY when naturally asked or when moving conversation off Tinder. Phrase it like a real person texting, not a form. Never list more than one detail per message.`;
+      }
     }
 
-    // Language guidance
-    const langCode = matchData.detectedLanguage?.code || settings.conversationLanguage || 'auto';
-    let langInstruction = 'Reply in the same language the match is writing in.';
-    if (langCode !== 'auto' && LANGUAGE_CODE_MAP[langCode]) {
-      langInstruction = `Write your entire message in ${LANGUAGE_CODE_MAP[langCode]}.`;
+    // 10. Intro Length & Personality Rule (The High-Conversion Opener Formulas!)
+    let introLengthRule = '';
+    if (mode === 'intro') {
+      const matchName = matchData?.name || '';
+      const nameHint = matchName ? `Use their name naturally — "${matchName}" — at the start.` : 'Start with "hey" if you don\'t know their name.';
+
+      if (userGender === 'female') {
+        introLengthRule = `\n\nCRITICAL — OPENER RULE (female sender):\nJust send a short, casual, warm greeting. Men respond to almost anything — you don't need to craft the perfect opener. Keep it simple and human.\nGOOD EXAMPLES: "hey!", "hey how's it going", "heyy", "hi there", "hey what's up"\nIf something in their profile is genuinely funny or catches your eye, you can mention it — but keep it to one short line max. Max 6 words. Sound like a real person saying hi.\n\n`;
+      } else if (userGender === 'male') {
+        introLengthRule = `\n\nCRITICAL — OPENER PERSONALITY (male sender, read first):\n${nameHint}\nYou are a real man opening a conversation. She gets dozens of openers. Yours must feel like it came from someone who actually noticed something specific — not a copy-paste.\n\nYOUR ENERGY: Direct, confident, genuinely curious. Show real interest in something she said — not generic compliments. Be slightly bolder than average.\n\nHOW TO DO IT:\n- Find ONE thing in her profile that actually caught your attention\n- React with genuine curiosity or a bold take — not generic compliments\n- 8-14 words. Can include one natural question if it flows. No pickup lines.\n\nREAL MAN EXAMPLES (study these, don't copy):\n- "rooftop nights and last minute flights, I'm genuinely curious what that looks like"\n- "sleep as a hobby is actually the most honest thing I've seen on here"\n- "chai and long drives, I need to know if this is a daily thing or a special occasion"\n- "a woman who knows her Sunday routine, okay that's rare and I respect it"\n- "gym plus conspiracy theories, which ones — genuinely asking"\n- "that last photo though, where was that"\n\nNOTICE: Each one shows real attention, confidence, and opens a door for her to respond naturally. Not desperate, not pickup-line-y.\nBAD (never do this): "your love for chai and long drives is amazing, what's your favourite route?" — generic summary + forced question.\n\nWrite ONE message. 8-14 words. Start with their name. Sound like a real man who noticed something.\n\n`;
+      } else {
+        introLengthRule = `\n\nCRITICAL OUTPUT CONSTRAINT — READ FIRST: Your ENTIRE message must be 8-14 words maximum. Pick ONE or TWO specific things from their profile and react with a playful take or genuine curiosity. Do NOT use cheesy compliments or generic summaries. The opener must only make sense for THIS specific person.\n\n`;
+      }
     }
 
-    return `You are a real person on Tinder who is ${style}, looking for ${goal}.
-${emojiGuidance}
-${langInstruction}
-${contactRules}
+    // 11. Anti-Interview Guard (Questions Override)
+    let questionOverride = '';
+    if (mode === 'conversation') {
+      const lastUserMsg = matchData?.conversationHistory?.filter(m => m.sender === 'user').slice(-1)[0]?.text || '';
+      const lastWasQuestion = /\?$/.test(lastUserMsg.trim());
+      if (lastWasQuestion) {
+        questionOverride = '\n\nOVERRIDE: Your LAST message ended with a question. Do NOT end this one with a question. React, comment, or make a statement. Ending every message with "?" is robotic and kills attraction.';
+      }
+    }
 
-CRITICAL TEXTING RULES:
-- Keep it SHORT (1-2 sentences max). Real people on Tinder text briefly.
-- Be authentic, casual, and conversational.
-- Use natural contractions (I'm, that's, you're).
-- NEVER use brackets [] or placeholders like [name], [city].
-- NEVER sound robotic, like an interview, or overly eager.
-- Do not sign off with your name. Write only the message text itself.`;
+    // 12. Conversation Personality (Male vs Female)
+    let conversationPersonality = '';
+    if (mode === 'conversation') {
+      if (userGender === 'female') {
+        conversationPersonality = '\n\nFEMALE SENDER PERSONALITY — conversation mode: You are a real woman texting. Your replies have personality, not just politeness. Sometimes you agree, sometimes you push back lightly, sometimes you just react with a feeling. You don\'t answer every part of their message — pick what actually caught your attention. Real women don\'t text like customer service. Occasionally be slightly cheeky or tease them. If they say something unexpected, show genuine surprise or amusement. Never be flat or even-toned — that\'s what makes it feel fake.';
+      } else if (userGender === 'male') {
+        conversationPersonality = '\n\nMALE SENDER PERSONALITY — conversation mode: You are a real man texting. Be direct and confident, not a pushover. Show genuine curiosity about what she says — not fake interest. If something she said is funny, react like it actually is. If something is interesting, show it. Don\'t over-explain yourself. Real men text with intention — not every message needs to be a perfectly crafted reply. Sometimes short is powerful. Stay warm but not desperate.';
+      }
+    }
+
+    // 13. Consecutive Messages Mode Instruction
+    let consecutiveInstruction = '';
+    const consecutiveEnabled = settings.consecutiveMessagesEnabled === true;
+    if (consecutiveEnabled && mode === 'conversation') {
+      consecutiveInstruction = `\n\nCONSECUTIVE MESSAGES MODE: You may respond with 2-3 short messages instead of one, like a real person firing off thoughts as they come. Each message must be a COMPLETE STANDALONE THOUGHT — not a chopped sentence.\n\nFORMAT: Return ONLY valid JSON:\n{"messages": ["first complete thought", "second complete thought"]}\nor with 3:\n{"messages": ["first", "second", "third"]}\nor single:\n{"messages": ["single message"]}\n\nRULES:\n- Each part: 3-12 words, standalone meaning\n- Max 3 messages\n- Split ONLY if your response genuinely has 2-3 separate beats\n- If it's one flowing thought, keep it as 1: {"messages": ["single message"]}\n- NEVER chop one sentence into pieces\nReturn JSON only. No other text.`;
+    }
+
+    // 14. Custom prompt override (if user specified one)
+    if (settings.customPrompt && settings.customPrompt.trim().length > 0) {
+      return `You are on ${platformName}. ${settings.customPrompt.trim()}${effectiveArcSignal}${matchStyleMirror}${languageInstruction}${placeholderGuard}${contactDetailsBlock}\n\nIMPORTANT: Output ONLY the message text itself.`;
+    }
+
+    // Assemble full prompt
+    const basePrompt = (SMART_DEFAULT_PROMPTS[mode] || SMART_DEFAULT_PROMPTS.intro)
+      .replace(/{{Chatting style}}/g, style)
+      .replace(/{{My intention}}/g, goal)
+      .replace(/{{Platform}}/g, platformName)
+      .replace(/{{Gender context}}/g, genderContextEnhanced)
+      .replace(/{{Slang guidance}}/g, slangGuidance);
+
+    const fullPrompt = [
+      basePrompt,
+      styleEnhancement,
+      emojiGuidance ? `\n\nEMOJI RULE: ${emojiGuidance}` : '',
+      introLengthRule,
+      conversationPersonality,
+      questionOverride,
+      effectiveArcSignal,
+      matchStyleMirror,
+      languageInstruction,
+      placeholderGuard,
+      contactDetailsBlock,
+      consecutiveInstruction,
+      '\n\nIMPORTANT: Output ONLY the message text itself.'
+    ].filter(Boolean).join('');
+
+    return fullPrompt;
   }
 
-  buildUserPrompt(matchData, settings, isFollowUp) {
+  buildUserPrompt(matchData = {}, settings = {}, isFollowUp = false) {
     const { name, bio, interests, conversationHistory } = matchData;
+    const effectiveLangCode = matchData?.detectedLanguage?.code || settings.conversationLanguage || 'auto';
+    const _nameNonLatin = isNonLatinName(name);
+    const _langIsLatin = LATIN_SCRIPT_CODES.has(effectiveLangCode);
+    const _suppressName = _nameNonLatin && (_langIsLatin || effectiveLangCode === 'auto');
 
     if (isFollowUp) {
       const last = conversationHistory?.length ? conversationHistory[conversationHistory.length - 1].text : '';
@@ -698,22 +1179,76 @@ CRITICAL TEXTING RULES:
     }
 
     if (conversationHistory && conversationHistory.length > 0) {
-      let historyText = 'CONVERSATION SO FAR:\n';
-      const recent = conversationHistory.slice(-8);
+      const _displayName = (_suppressName ? 'Match' : (name || 'Match'));
+      let historyText = `### CONVERSATION HISTORY with ${_displayName} ###\n\n`;
+      const recent = conversationHistory.slice(-10);
       for (const msg of recent) {
-        const sender = msg.sender === 'user' ? 'You' : (name || 'Match');
+        const sender = msg.sender === 'user' ? 'You (The Sender)' : _displayName;
         historyText += `${sender}: ${msg.text}\n`;
       }
-      return `${historyText}\nRespond naturally to ${name || 'Match'}'s last message. Keep it 1-2 casual sentences.`;
+
+      // Add user context (sender's profile if available)
+      if (settings.userProfile && (settings.userProfile.bio || settings.userProfile.name)) {
+        historyText += `\n### YOUR PROFILE (SENDER) ###\nName: ${settings.userProfile.name || ''}\nBio: ${settings.userProfile.bio || ''}\n`;
+      }
+
+      historyText += `\nRespond naturally to ${_displayName}'s last message. Keep it conversational and human-like. Write ONLY your response text - do NOT include any name prefixes or "You:" in your response.`;
+      return historyText;
     }
 
     // Opening message
-    let profileText = `MATCH PROFILE:\nName: ${name || 'Unknown'}\n`;
-    if (matchData.age) profileText += `Age: ${matchData.age}\n`;
-    if (bio) profileText += `Bio: ${bio}\n`;
-    if (interests && interests.length) profileText += `Interests: ${interests.join(', ')}\n`;
+    let profileText = `### RECIPIENT PROFILE (The Match) ###\n`;
+    if (!_suppressName) {
+      profileText += `NAME: ${name || 'Unknown'}\n`;
+    }
+    if (matchData.age) profileText += `AGE: ${matchData.age}\n`;
+    if (bio) profileText += `BIO: ${bio}\n`;
 
-    return `${profileText}\nWrite a compelling, genuine opening message (1-2 sentences) referencing something specific from their profile.`;
+    // Question answers / prompts (e.g. "I can beat you in a game of...: Sudoku")
+    const qaList = matchData.questionAnswers || matchData.teasers || [];
+    if (qaList.length > 0) {
+      const formattedQAs = qaList
+        .map(qa => {
+          const q = qa.question || '';
+          const a = qa.answer || qa.description || qa;
+          return q ? `"${q}": ${a}` : String(a);
+        })
+        .filter(Boolean);
+      if (formattedQAs.length > 0) {
+        profileText += `PROMPTS: ${formattedQAs.join(' | ')}\n`;
+      }
+    }
+
+    if (interests && interests.length) profileText += `INTERESTS: ${interests.join(', ')}\n`;
+    if (matchData.job) profileText += `JOB: ${matchData.job}\n`;
+    if (matchData.school) profileText += `SCHOOL: ${matchData.school}\n`;
+    if (matchData.city) profileText += `CITY: ${matchData.city}\n`;
+    if (matchData.descriptors && matchData.descriptors.length) {
+      profileText += `DETAILS: ${matchData.descriptors.join(', ')}\n`;
+    }
+
+    // Add user context
+    if (settings.userProfile && (settings.userProfile.bio || settings.userProfile.name)) {
+      profileText += `\n### YOUR PROFILE (SENDER) ###\nNAME: ${settings.userProfile.name || ''}\nBIO: ${settings.userProfile.bio || ''}\n`;
+    }
+
+    if (_suppressName) {
+      profileText += `\nIMPORTANT: Do NOT address the match by name in your opening message. Start with "hey" or a natural opener without any name.`;
+    }
+
+    const hasProfileDetails = Boolean(
+      bio ||
+      (interests && interests.length > 0) ||
+      (qaList && qaList.length > 0) ||
+      matchData.job ||
+      matchData.school
+    );
+
+    if (hasProfileDetails) {
+      return `${profileText}\nGenerate a compelling, genuine opening message referencing one specific detail from their profile above. CRITICAL RULE: ONLY reference details explicitly listed above. NEVER invent, assume, or hallucinate hobbies, activities, places, or interests that are not mentioned in the profile.`;
+    }
+
+    return `${profileText}\nTheir profile has no bio or details listed. Generate a charming, witty, and natural opening message (1-2 sentences) to kick off a conversation. CRITICAL RULE: Do NOT claim you saw anything in their profile, and NEVER invent or guess any hobbies or activities.`;
   }
 
   /**
@@ -827,8 +1362,9 @@ CRITICAL TEXTING RULES:
     return msg
       .replace(/^["']|["']$/g, '') // remove surrounding quotes
       .replace(/\[.*?\]/g, '') // remove brackets
-      .replace(/\s—\s/g, ', ') // remove AI em-dash
+      .replace(/\s*—\s*/g, ', ') // remove AI em-dash
       .replace(/—/g, ' - ')
+      .replace(/^[,:;\s\-]+/, '') // trim leading punctuation/dashes
       .trim();
   }
 
@@ -842,7 +1378,7 @@ CRITICAL TEXTING RULES:
     const choice = list[Math.floor(Math.random() * list.length)];
 
     if (matchData.name) {
-      return choice.replace(/Hey!/i, `Hey ${matchData.name}!`);
+      return choice.replace(/Hey(\s+you)?!/i, `Hey ${matchData.name}!`);
     }
     return choice;
   }

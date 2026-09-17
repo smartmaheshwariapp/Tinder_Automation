@@ -25,9 +25,10 @@ const TELEMETRY_MAP = {
   messaging:    { action: 'MESSAGING',    detail: 'RIZZ LEVEL: MAXIMUM',                 color: '#EC4899' },
   polling:      { action: 'AWAITING REPLIES', detail: 'RECHECKING SOON',                 color: uiTheme.colors.info },
   network_wait: { action: 'INTERRUPTED',  detail: 'HOLDING — WILL RESUME ON RECONNECT',  color: uiTheme.colors.warning },
-  waiting:      { action: 'COMPLETE',     detail: 'COOLDOWN IN PROGRESS — NEXT CYCLE SOON', color: uiTheme.colors.warning },
-  safety_lock:  { action: 'SAFETY LOCK',  detail: 'HOURLY LIMIT REACHED — PACING AUTO',  color: uiTheme.colors.warning },
-  stopped:      { action: 'STANDBY',      detail: 'READY FOR ACTION',                    color: '#64748B' },
+  waiting:      { action: 'RESTING',      detail: 'RESTING BETWEEN SESSIONS — NEXT ROUND SOON', color: uiTheme.colors.warning },
+  safety_lock:    { action: 'SAFETY PAUSE', detail: 'TAKING A QUICK BREAK TO PROTECT YOUR ACCOUNT', color: uiTheme.colors.warning },
+  likes_exhausted:{ action: 'LIKES REFILL', detail: 'DAILY SWIPES REFILL IN PROGRESS', color: '#6366F1' },
+  stopped:        { action: 'STANDBY',      detail: 'READY FOR ACTION',                    color: '#64748B' },
 };
 
 function formatCountdown(ms) {
@@ -48,7 +49,13 @@ export default function MasterHeroController({
     (agentState?.currentPhase && agentState.currentPhase !== 'stopped')
   );
 
-  let phase = agentState?.currentPhase || (isRunning ? 'liking' : 'stopped');
+  const swipingEnabled = settings?.autoSwipe !== false && (settings?.likesPerCycle ?? 50) > 0;
+  const messagingEnabled = settings?.autoMessage !== false && (settings?.messagesPerCycle ?? 50) > 0;
+
+  let rawPhase = (agentState?.currentPhase || (isRunning ? (swipingEnabled ? 'liking' : 'messaging') : 'stopped')).toLowerCase();
+  let phase = (!swipingEnabled && (rawPhase === 'liking' || rawPhase === 'swiping'))
+    ? (messagingEnabled ? 'messaging' : 'stopped')
+    : rawPhase;
   const subPhase = (agentState?.activeSubPhase || '').toLowerCase();
   const waitingReason = agentState?.waitingReason;
 
@@ -56,7 +63,7 @@ export default function MasterHeroController({
     if (subPhase.includes('scan') || subPhase.includes('decode') || subPhase.includes('parse')) {
       phase = 'lead_scan';
     } else if (subPhase.includes('like') || subPhase.includes('swipe')) {
-      phase = 'liking';
+      phase = swipingEnabled ? 'liking' : (messagingEnabled ? 'messaging' : 'stopped');
     } else if (subPhase.includes('message') || subPhase.includes('rizz') || subPhase.includes('reply')) {
       phase = 'messaging';
     } else if (waitingReason === 'searching') {
@@ -64,7 +71,8 @@ export default function MasterHeroController({
     }
   }
 
-  const isSafetyLocked = waitingReason === 'safety_lock' || waitingReason === 'like_limit' || waitingReason === 'message_limit';
+  const isSafetyLocked = waitingReason === 'safety_lock';
+  const isLikesExhausted = waitingReason === 'likes_exhausted';
   const isStarting = isRunning && ['starting', 'initializing', 'checking', 'connecting'].includes(phase);
   const isWaitingCooldown = isRunning && phase === 'waiting' && !isSafetyLocked;
 
@@ -92,7 +100,7 @@ export default function MasterHeroController({
   const rippleScale = useRef(new Animated.Value(1)).current;
   const rippleOpacity = useRef(new Animated.Value(0.6)).current;
   useEffect(() => {
-    if (phase === 'liking' || (isRunning && !isStarting && !isSafetyLocked && !isWaitingCooldown)) {
+    if (phase === 'liking') {
       const loop = Animated.loop(
         Animated.parallel([
           Animated.sequence([
@@ -208,9 +216,16 @@ export default function MasterHeroController({
   const telemetry = useMemo(() => {
     if (isSafetyLocked) {
       return {
-        action: 'SAFETY LOCK',
-        detail: countdown ? `RESETS IN ${countdown} — HOURLY LIMIT` : 'HOURLY SWIPE LIMIT REACHED',
+        action: 'SAFETY PAUSE',
+        detail: countdown ? `RESETS IN ${countdown} — SAFETY BREAK` : 'HOURLY SWIPE SAFETY PAUSE',
         color: uiTheme.colors.warning,
+      };
+    }
+    if (isLikesExhausted) {
+      return {
+        action: 'LIKES REFILL',
+        detail: countdown ? `FREE SWIPES REFILL IN ${countdown}` : 'DAILY SWIPES REFILL IN PROGRESS',
+        color: '#6366F1',
       };
     }
     if (isStarting) {
@@ -222,8 +237,8 @@ export default function MasterHeroController({
     }
     if (isWaitingCooldown) {
       return {
-        action: 'COMPLETE',
-        detail: countdown ? `COOLDOWN ACTIVE — NEXT BATCH IN ${countdown}` : 'COOLDOWN IN PROGRESS — NEXT CYCLE SOON',
+        action: 'RESTING',
+        detail: countdown ? `RESTING — NEXT ROUND IN ${countdown}` : 'SESSION COMPLETE — NEXT ROUND SOON',
         color: uiTheme.colors.warning,
       };
     }
@@ -238,26 +253,37 @@ export default function MasterHeroController({
       if (phase === 'messaging') {
         return {
           action: `${currentMsgs} SENT`,
-          detail: 'RIZZ LEVEL: MAXIMUM',
+          detail: 'WINGMAN MESSAGING ACTIVE',
           color: '#EC4899',
         };
       }
-      return TELEMETRY_MAP[phase] || TELEMETRY_MAP.liking;
+      return TELEMETRY_MAP[phase] || (swipingEnabled ? TELEMETRY_MAP.liking : TELEMETRY_MAP.messaging);
     }
     return TELEMETRY_MAP.stopped;
-  }, [isRunning, phase, isStarting, isSafetyLocked, isWaitingCooldown, currentLikes, currentMsgs, countdown]);
+  }, [isRunning, phase, isStarting, isSafetyLocked, isLikesExhausted, isWaitingCooldown, currentLikes, currentMsgs, countdown, swipingEnabled]);
 
   // ─── Dynamic Button Styling & Labels (Desktop V2 1:1 Parity) ───
   const buttonConfig = useMemo(() => {
     if (isSafetyLocked) {
       return {
-        label: countdown ? `SAFETY LOCK: ${countdown}` : 'SAFETY LOCK',
-        sublabel: 'Hourly rate limit reached • Resets automatically',
-        icon: 'lock-closed',
+        label: countdown ? `SAFETY PAUSE: ${countdown}` : 'SAFETY PAUSE',
+        sublabel: 'Anti-ban safety break • Resumes automatically',
+        icon: 'shield-checkmark',
         bgColor: 'rgba(245, 158, 11, 0.15)',
         borderColor: 'rgba(245, 158, 11, 0.6)',
         textColor: '#FBBF24',
         shimmerColor: uiTheme.colors.warning,
+      };
+    }
+    if (isLikesExhausted && !isRunning) {
+      return {
+        label: countdown ? `LIKES REFILL: ${countdown}` : 'LIKES REFILL',
+        sublabel: 'Free swipes refilling • Tap to chat with existing matches',
+        icon: 'hourglass-outline',
+        bgColor: 'rgba(99, 102, 241, 0.15)',
+        borderColor: 'rgba(99, 102, 241, 0.5)',
+        textColor: '#A5B4FC',
+        shimmerColor: '#6366F1',
       };
     }
     if (isStarting) {
@@ -274,8 +300,8 @@ export default function MasterHeroController({
     }
     if (isWaitingCooldown) {
       return {
-        label: 'STOP AGENT',
-        sublabel: countdown ? `Resting between batches • Next cycle in ${countdown}` : 'Cycle complete • Pacing automation',
+        label: 'STOP WINGMAN',
+        sublabel: countdown ? `Resting between sessions • Next round in ${countdown}` : 'Session complete • Taking a quick break',
         icon: 'square',
         bgColor: 'rgba(239, 68, 68, 0.15)',
         borderColor: 'rgba(239, 68, 68, 0.45)',
@@ -284,9 +310,14 @@ export default function MasterHeroController({
       };
     }
     if (isRunning) {
+      const sub = !swipingEnabled
+        ? `${currentMsgs} DMs sent • Tap to pause`
+        : (!messagingEnabled
+            ? `${currentLikes} Likes • Tap to pause`
+            : `${currentLikes} Likes • ${currentMsgs} DMs • Tap to pause`);
       return {
-        label: 'STOP AGENT',
-        sublabel: `${currentLikes} Likes • ${currentMsgs} DMs • Tap to pause`,
+        label: !swipingEnabled ? 'STOP WINGMAN' : (!messagingEnabled ? 'STOP SWIPER' : 'STOP WINGMAN'),
+        sublabel: sub,
         icon: 'square',
         bgColor: 'rgba(239, 68, 68, 0.15)',
         borderColor: 'rgba(239, 68, 68, 0.45)',
@@ -294,8 +325,47 @@ export default function MasterHeroController({
         shimmerColor: uiTheme.colors.error,
       };
     }
+    const swipingEnabled = settings?.autoSwipe !== false && (settings?.likesPerCycle ?? 50) > 0;
+    const messagingEnabled = settings?.autoMessage !== false && (settings?.messagesPerCycle ?? 50) > 0;
+
+    if (!swipingEnabled && !messagingEnabled) {
+      return {
+        label: 'AUTOMATION OFF',
+        sublabel: 'Enable Swiping or Messaging in Automation tab',
+        icon: 'pause',
+        bgColor: 'rgba(107, 114, 128, 0.15)',
+        borderColor: 'rgba(107, 114, 128, 0.45)',
+        textColor: '#D1D5DB',
+        shimmerColor: '#9CA3AF',
+      };
+    }
+
+    if (swipingEnabled && !messagingEnabled) {
+      return {
+        label: 'START SWIPER',
+        sublabel: 'Auto-swiping on • Messaging is manual',
+        icon: 'play',
+        bgColor: 'rgba(254, 60, 114, 0.15)',
+        borderColor: 'rgba(254, 60, 114, 0.45)',
+        textColor: '#FDA4AF',
+        shimmerColor: '#FE3C72',
+      };
+    }
+
+    if (!swipingEnabled && messagingEnabled) {
+      return {
+        label: 'START WINGMAN',
+        sublabel: 'Auto-swiping off • Wingman chats with your matches',
+        icon: 'play',
+        bgColor: 'rgba(139, 92, 246, 0.15)',
+        borderColor: 'rgba(139, 92, 246, 0.45)',
+        textColor: '#C4B5FD',
+        shimmerColor: '#8B5CF6',
+      };
+    }
+
     return {
-      label: 'START AGENT',
+      label: 'START WINGMAN',
       sublabel: 'Auto-likes compatible matches & chats in your style',
       icon: 'play',
       bgColor: 'rgba(16, 185, 129, 0.15)',
@@ -303,7 +373,7 @@ export default function MasterHeroController({
       textColor: '#6EE7B7',
       shimmerColor: uiTheme.colors.success,
     };
-  }, [isRunning, isStarting, isSafetyLocked, isWaitingCooldown, countdown, currentLikes, currentMsgs]);
+  }, [isRunning, isStarting, isSafetyLocked, isLikesExhausted, isWaitingCooldown, countdown, currentLikes, currentMsgs, settings]);
 
   return (
     <View style={styles.container}>

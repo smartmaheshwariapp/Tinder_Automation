@@ -788,6 +788,14 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
       if (cloned.locationLongitude === undefined) cloned.locationLongitude = -74.0060;
       if (!cloned.locationCity) cloned.locationCity = 'New York, USA';
 
+      // Enforce invariant: At least one of autoSwipe or autoMessage must be active
+      const isSwipeOn = cloned.autoSwipe !== false && (cloned.likesPerCycle ?? 50) > 0;
+      const isMsgOn = cloned.autoMessage !== false && (cloned.messagesPerCycle ?? 50) > 0;
+      if (!isSwipeOn && !isMsgOn) {
+        cloned.autoSwipe = true;
+        cloned.likesPerCycle = cloned.lastNonZeroLikes || 50;
+      }
+
       setForm(cloned);
       formRef.current = cloned;
       setHasUnsavedChanges(false);
@@ -894,6 +902,14 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
         payload.endTime = payload.activeHours.endTime;
       }
 
+      // Ensure at least one of Auto-Swipe or Auto-Messaging is active in saved payload
+      const isSwipeOn = payload.autoSwipe !== false && (payload.likesPerCycle ?? 50) > 0;
+      const isMsgOn = payload.autoMessage !== false && (payload.messagesPerCycle ?? 50) > 0;
+      if (!isSwipeOn && !isMsgOn) {
+        payload.autoSwipe = true;
+        payload.likesPerCycle = payload.lastNonZeroLikes || 50;
+      }
+
       onSave(payload);
     }
   }, [onSave, form]);
@@ -909,6 +925,26 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
         current = current[keys[i]];
       }
       current[keys[keys.length - 1]] = value;
+      nextState = next;
+      formRef.current = next;
+      return next;
+    });
+    showSaveBar();
+  };
+
+  const updateFields = (updates) => {
+    let nextState = null;
+    setForm(prev => {
+      const next = { ...prev };
+      Object.entries(updates).forEach(([path, value]) => {
+        const keys = path.split('.');
+        let current = next;
+        for (let i = 0; i < keys.length - 1; i++) {
+          if (!current[keys[i]]) current[keys[i]] = {};
+          current = current[keys[i]];
+        }
+        current[keys[keys.length - 1]] = value;
+      });
       nextState = next;
       formRef.current = next;
       return next;
@@ -1498,16 +1534,18 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
   };
 
   const isSafetyOn = form?.safetyMode !== false;
-  const isAutoSwipeOn = isSafetyOn ? true : ((form?.likesPerCycle ?? 50) > 0);
+  const isAutoSwipeOn = form?.autoSwipe !== false && (form?.likesPerCycle ?? 50) > 0;
+  const isAutoMessagingOn = form?.autoMessage !== false && (form?.messagesPerCycle ?? 50) > 0;
 
   const getSwipingSummary = () => {
-    const likes = isSafetyOn ? 'Auto Swipe (Safe)' : (isAutoSwipeOn ? 'Auto Swipe On' : 'Auto Swipe Off');
+    const likes = !isAutoSwipeOn ? 'Auto Swipe Off' : (isSafetyOn ? 'Auto Swipe (Safe)' : 'Auto Swipe On');
     const pacing = (form?.scheduleInterval === 120) ? 'Every 2 Hours' : ((form?.scheduleInterval === 60) ? 'Every Hour' : 'Every 30 min');
     const age = form?.ageFilter?.enabled ? `Age: ${form?.ageFilter?.min ?? 20}-${form?.ageFilter?.max ?? 35}` : 'Age: All';
     return { likes, pacing, age };
   };
 
   const getMessagingSummary = () => {
+    const messaging = !isAutoMessagingOn ? 'Messaging Off' : (isSafetyOn ? 'Auto Messaging (Safe)' : 'Auto Messaging On');
     const toneVal = form?.tone || form?.chattingStyle || 'Freestyle';
     const tone = `${toneVal.charAt(0).toUpperCase() + toneVal.slice(1)}`;
     const intentionObj = INTENTIONS_OPTIONS.find(i => i.id === form?.intentions) || { label: 'Short term dating' };
@@ -1518,7 +1556,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
     const priority = priorityVal === 30 ? '70 : 30' : (priorityVal === 70 ? '30 : 70' : '50 : 50');
     const emojis = form?.useEmojis !== false ? 'Emojis On' : 'No Emojis';
     const consecutive = form?.consecutiveMessagesEnabled ? 'Multi-text' : null;
-    return { tone, intention, lang, priority, emojis, consecutive };
+    return { messaging, tone, intention, lang, priority, emojis, consecutive };
   };
 
   const getStyleSummary = () => {
@@ -1924,31 +1962,39 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   <View style={{ flex: 1, paddingRight: 10 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={styles.toggleTitle}>Auto Swipe</Text>
-                      {isSafetyOn && (
-                        <View style={styles.safetyChipBadge}>
-                          <Ionicons name="shield-checkmark" size={10} color={uiTheme.colors.success} />
-                          <Text style={styles.safetyChipBadgeText}>Safety Mode</Text>
-                        </View>
-                      )}
                     </View>
                     <Text style={styles.labelMuted}>
-                      {isSafetyOn
-                        ? 'Locked ON by Safety Mode for safe batches'
-                        : 'Automatically swipe profiles on schedule'}
+                      {isAutoSwipeOn
+                        ? (isSafetyOn ? 'Safe automated swiping active' : 'Automatically swipe profiles on schedule')
+                        : 'Swiping disabled — Auto Messaging active'}
                     </Text>
                   </View>
                   <Switch
-                    disabled={isSafetyOn}
-                    value={isSafetyOn ? true : ((form.likesPerCycle ?? 50) > 0)}
+                    value={isAutoSwipeOn}
                     onValueChange={v => {
                       if (v) {
-                        updateField('likesPerCycle', 50);
+                        updateFields({
+                          autoSwipe: true,
+                          likesPerCycle: form?.lastNonZeroLikes || 50,
+                        });
                       } else {
-                        updateField('likesPerCycle', 0);
+                        const lastLikes = (form?.likesPerCycle ?? 0) > 0 ? form.likesPerCycle : (form?.lastNonZeroLikes || 50);
+                        const updates = {
+                          autoSwipe: false,
+                          likesPerCycle: 0,
+                          lastNonZeroLikes: lastLikes,
+                        };
+                        // Invariant: At least one automation mode must always be active.
+                        // If Auto Messaging is currently off, turning off Auto Swipe MUST auto-enable Auto Messaging!
+                        if (!isAutoMessagingOn) {
+                          updates.autoMessage = true;
+                          updates.messagesPerCycle = form?.lastNonZeroMessages || 50;
+                        }
+                        updateFields(updates);
                       }
                     }}
                     trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
-                    thumbColor={(isSafetyOn || (form.likesPerCycle ?? 50) > 0) ? '#FFF' : uiTheme.colors.muted}
+                    thumbColor={isAutoSwipeOn ? '#FFF' : uiTheme.colors.muted}
                   />
                 </View>
 
@@ -1971,7 +2017,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
                     <Ionicons name="lock-closed" size={11} color={uiTheme.colors.muted} style={{ marginRight: 5 }} />
                     <Text style={{ fontFamily: 'Inter_400Regular', color: uiTheme.colors.muted, fontSize: 11, fontStyle: 'italic', flex: 1 }}>
-                      Auto Swipe & Speed are locked to safe defaults. Toggle Safety Mode OFF in Settings to customize.
+                      Activity Speed is locked to safe defaults. Toggle Safety Mode OFF in Settings to customize pacing.
                     </Text>
                   </View>
                 )}
@@ -2190,6 +2236,10 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           {!openCards.messaging && (
             <View style={styles.collapsedRow}>
               <View style={styles.v2Chip}>
+                <Ionicons name="chatbubble" size={11} color={isAutoMessagingOn ? "#EC4899" : uiTheme.colors.muted} />
+                <Text style={styles.v2ChipText}>{getMessagingSummary().messaging}</Text>
+              </View>
+              <View style={styles.v2Chip}>
                 <Ionicons name="sparkles" size={11} color="#EC4899" />
                 <Text style={styles.v2ChipText}>{getMessagingSummary().intention}</Text>
               </View>
@@ -2222,6 +2272,50 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           {openCards.messaging && (
             <View style={styles.v2CardBody}>
               <Text style={styles.fieldDesc}>Configure conversation style, intentions & priority balancing:</Text>
+
+              {/* Core Messaging Controls (Auto Messaging) */}
+              <View style={[styles.subBox, isSafetyOn && { borderColor: 'rgba(236, 72, 153, 0.2)' }]}>
+                {/* Auto Messaging Toggle */}
+                <View style={styles.rowBetween}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.toggleTitle}>Auto Messaging</Text>
+                    </View>
+                    <Text style={styles.labelMuted}>
+                      {isAutoMessagingOn
+                        ? (isSafetyOn ? 'Safe automated chat & openers active' : 'Automatically chat with matches & send openers')
+                        : 'Messaging disabled — Auto Swipe active'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={isAutoMessagingOn}
+                    onValueChange={v => {
+                      if (v) {
+                        updateFields({
+                          autoMessage: true,
+                          messagesPerCycle: form?.lastNonZeroMessages || 50,
+                        });
+                      } else {
+                        const lastMsgs = (form?.messagesPerCycle ?? 0) > 0 ? form.messagesPerCycle : (form?.lastNonZeroMessages || 50);
+                        const updates = {
+                          autoMessage: false,
+                          messagesPerCycle: 0,
+                          lastNonZeroMessages: lastMsgs,
+                        };
+                        // Invariant: At least one automation mode must always be active.
+                        // If Auto Swipe is currently off, turning off Auto Messaging MUST auto-enable Auto Swipe!
+                        if (!isAutoSwipeOn) {
+                          updates.autoSwipe = true;
+                          updates.likesPerCycle = form?.lastNonZeroLikes || 50;
+                        }
+                        updateFields(updates);
+                      }
+                    }}
+                    trackColor={{ false: uiTheme.colors.elevated, true: '#EC4899' }}
+                    thumbColor={isAutoMessagingOn ? '#FFF' : uiTheme.colors.muted}
+                  />
+                </View>
+              </View>
 
               {/* ─── Core Toggles (Smart Reactions, Use Emojis, Consecutive Messages) ─── */}
               <View style={styles.subBox}>

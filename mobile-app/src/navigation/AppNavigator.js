@@ -11,10 +11,10 @@ import CloudDashboardScreen from '../screens/CloudDashboardScreen';
 
 const Stack = createNativeStackNavigator();
 
-export default function AppNavigator() {
+export default function AppNavigator({ initialRouteName = 'Auth', initialUser = null }) {
   return (
     <Stack.Navigator
-      initialRouteName="Auth"
+      initialRouteName={initialRouteName}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: '#08050B', overflow: 'hidden' },
@@ -24,7 +24,11 @@ export default function AppNavigator() {
       <Stack.Screen name="Auth" component={AuthScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-      <Stack.Screen name="PlatformSelect" component={PlatformSelectScreen} />
+      <Stack.Screen
+        name="PlatformSelect"
+        component={PlatformSelectScreen}
+        initialParams={initialUser ? { user: initialUser, userId: initialUser.id } : undefined}
+      />
       <Stack.Screen name="CloudDashboard" component={CloudDashboardScreen} />
       <Stack.Screen name="PlatformConfig" component={PlatformConfigScreen} />
       <Stack.Screen name="Browser" component={BrowserScreen} />

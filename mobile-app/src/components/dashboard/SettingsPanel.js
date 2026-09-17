@@ -35,10 +35,11 @@ const TINDER_ICON = require('../../../assets/flirteasy/tinder.jpg');
 const SWIPE_PRESETS = [0, 10, 50, 100, 150];
 const MSG_PRESETS = [0, 10, 50, 100, 150];
 
-export { REGION_FILTERS, CITY_PRESETS } from '../../utils/locationHubs';
 import { REGION_FILTERS, CITY_PRESETS } from '../../utils/locationHubs';
 import LocationService from '../../services/locationService';
 import LocationNoticeModal from '../common/LocationNoticeModal';
+import { getRateLimitStatus, subscribeRateLimit, resetRateLimits } from '../../utils/rateLimiter';
+import { saveOnDeviceSessionState } from '../../utils/sessionManager';
 // ─── Feature Flags (Hidden in On-Device mode for clean UX, preserved for future cloud mode) ───
 const SHOW_LOCATION_FEATURE = false;
 
@@ -181,6 +182,29 @@ export default function SettingsPanel({
   const [syncError, setSyncError] = useState(null);
   const [lastSyncTime, setLastSyncTime] = useState('not synced yet');
   const [previewVisible, setPreviewVisible] = useState(false);
+
+  const isSafetyOn = form ? form.safetyMode !== false : true;
+  const [rateLimitStatus, setRateLimitStatus] = useState({
+    likes: { used: 0, limit: 50, remaining: 50 },
+    messages: { used: 0, limit: 50, remaining: 50 },
+    isSafetyLocked: false,
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    try {
+      const status = getRateLimitStatus(isSafetyOn);
+      if (mounted && status) setRateLimitStatus(status);
+    } catch (_) {}
+
+    const unsub = subscribeRateLimit((status) => {
+      if (mounted && status) setRateLimitStatus(status);
+    });
+    return () => {
+      mounted = false;
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [isSafetyOn]);
 
   // Magic Bio Generator state (0: idle, 1: loading, 2: result, 3: pushed)
   const [genStep, setGenStep] = useState(0);
@@ -652,8 +676,6 @@ export default function SettingsPanel({
     );
   }
 
-  const isSafetyOn = form.safetyMode !== false;
-
   // In Safety Mode ON, V2 enforces exact defaults: 50 swipes, 50 msgs
   const activeSwipes = isSafetyOn ? 50 : (form.likesPerCycle ?? 50);
   const activeMsgs = isSafetyOn ? 50 : (form.messagesPerCycle ?? 50);
@@ -702,7 +724,7 @@ export default function SettingsPanel({
           {/* Collapsible Inner Content (Hidden when collapsed) */}
           {!safetyCollapsed && (
             <View style={{ marginTop: 8 }}>
-              {/* 2 Independent Meter Boxes (Likes/hr: 0/50, Msgs/hr: 0/50) */}
+              {/* 2 Independent Meter Boxes (Likes/hr: used/limit, Msgs/hr: used/limit) */}
               <View style={styles.metersRow}>
                 <View style={styles.meterBox}>
                   <Text style={styles.meterLabel}>Likes/hr</Text>
@@ -712,7 +734,7 @@ export default function SettingsPanel({
                       !isSafetyOn && styles.meterValueDanger,
                     ]}
                   >
-                    {isSafetyOn ? '0/50' : 'No limit'}
+                    {isSafetyOn ? `${rateLimitStatus.likes?.used ?? 0}/${rateLimitStatus.likes?.limit ?? 50}` : 'No limit'}
                   </Text>
                 </View>
 
@@ -724,7 +746,7 @@ export default function SettingsPanel({
                       !isSafetyOn && styles.meterValueDanger,
                     ]}
                   >
-                    {isSafetyOn ? '0/50' : 'No limit'}
+                    {isSafetyOn ? `${rateLimitStatus.messages?.used ?? 0}/${rateLimitStatus.messages?.limit ?? 50}` : 'No limit'}
                   </Text>
                 </View>
               </View>
@@ -763,6 +785,30 @@ export default function SettingsPanel({
                   </Text>
                 </View>
               </View>
+
+              {/* Safety Lock Active Banner with manual reset override */}
+              {Boolean(rateLimitStatus?.isSafetyLocked) && (
+                <View style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(234, 88, 12, 0.12)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(234, 88, 12, 0.3)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, color: '#EA580C' }}>
+                      Safety Lock Active ({rateLimitStatus.resetIn || 59}m remaining)
+                    </Text>
+                    <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 11, color: uiTheme.colors.muted, marginTop: 2 }}>
+                      Hourly limit reached. Tap Reset to resume swiping now.
+                    </Text>
+                  </View>
+                  <TouchableOpacity accessibilityRole="button"
+                    style={{ backgroundColor: '#EA580C', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 6 }}
+                    onPress={async () => {
+                      await resetRateLimits();
+                      await saveOnDeviceSessionState({ waitingReason: null, nextRunTimestamp: null });
+                      Alert.alert('Safety Limits Reset', 'Hourly safety rate limits have been cleared. You can resume swiping.');
+                    }}
+                  >
+                    <Text style={{ color: '#FFF', fontFamily: 'Inter_600SemiBold', fontSize: 12 }}>Reset</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Speed & Batch Preset Controls (Locked with 55% opacity when Safety ON) */}
               <View

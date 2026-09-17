@@ -17,6 +17,7 @@
   log('[FlirtEasy] API Interceptor loaded');
 
   const messageCache = new Map();
+  const profileCache = new Map();
   let globalBotId = null;
 
   function detectGlobalBotId() {
@@ -139,6 +140,27 @@
         }
       }
 
+      // Intercept match profile details from /v2/matches/<matchId> (without /messages)
+      if (typeof url === 'string' && url.includes('/v2/matches/') && !url.includes('/messages')) {
+        const matchId = extractMatchId(url);
+        if (matchId) {
+          try {
+            const clone = response.clone();
+            const data = await clone.json();
+            const person = data?.data?.person;
+            if (person) {
+              profileCache.set(matchId, {
+                person,
+                timestamp: Date.now()
+              });
+              log(`[FlirtEasy] 👤 Cached match profile from API for ${matchId.substring(0, 8)}*** (${person.name})`);
+            }
+          } catch (e) {
+            warn('[FlirtEasy] Error parsing match profile payload:', e);
+          }
+        }
+      }
+
       // Intercept 401 Unauthorized responses to detect session expiration in-flight
       if (response.status === 401 && typeof url === 'string' && (url.includes('gotinder.com') || url.includes('/v2/') || url.includes('/recs') || url.includes('/like/'))) {
         warn('[FlirtEasy] 401 Unauthorized received from Tinder API! Session expired.');
@@ -154,7 +176,7 @@
         } catch (_) {}
       }
 
-      // Intercept profile API to extract subscription tier (ground truth)
+      // Intercept profile API to extract subscription tier and likes replenishment status (ground truth)
       if (typeof url === 'string' && /api\.gotinder\.com\/v2\/profile(\?|$)/.test(url) && (!args[1] || !args[1].method || args[1].method === 'GET')) {
         try {
           const clone = response.clone();
@@ -174,22 +196,87 @@
               }
             } catch (_) {}
           }
+
+          // Extract likes data from profile payload if available
+          const likesObj = data?.data?.likes || data?.likes || null;
+          if (likesObj) {
+            let rUntil = likesObj.rate_limited_until ? Number(likesObj.rate_limited_until) : null;
+            if (rUntil && rUntil < 10000000000) rUntil *= 1000;
+            if (rUntil && rUntil > Date.now() && typeof window !== 'undefined') {
+              window.__flirtEasyLikesReplenishTimestamp = rUntil;
+            }
+            const remaining = typeof likesObj.likes_remaining === 'number' ? likesObj.likes_remaining : null;
+            try {
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'FE_LIKES_STATUS',
+                  likesRemaining: remaining,
+                  rateLimitedUntil: rUntil,
+                  timestamp: Date.now()
+                }));
+              }
+            } catch (_) {}
+          }
         } catch (e) {
           error('[FlirtEasy] Error parsing profile tier:', e);
         }
       }
 
-      // Intercept like/pass API calls to detect matches
+      // Intercept like/pass API calls to detect matches and out-of-likes rate limits
       if (typeof url === 'string' && (url.includes('/like/') || url.includes('/pass/'))) {
         try {
-          const clone = response.clone();
-          const data = await clone.json();
+          let isOutOfLikes = response.status === 429;
+          let rateLimitedUntil = null;
+          let likesRemaining = null;
+          let data = null;
+
+          try {
+            const clone = response.clone();
+            data = await clone.json();
+          } catch (_) {}
+
+          if (url.includes('/like/')) {
+            if (data && typeof data.likes_remaining === 'number') {
+              likesRemaining = data.likes_remaining;
+              if (likesRemaining === 0) isOutOfLikes = true;
+            }
+            if (data && data.rate_limited_until) {
+              isOutOfLikes = true;
+              let rUntil = Number(data.rate_limited_until);
+              if (rUntil < 10000000000) rUntil *= 1000; // convert seconds to ms
+              rateLimitedUntil = rUntil;
+              if (rUntil > Date.now() && typeof window !== 'undefined') {
+                window.__flirtEasyLikesReplenishTimestamp = rUntil;
+              }
+            }
+            if (data && data.status === 429) {
+              isOutOfLikes = true;
+            }
+
+            if (isOutOfLikes) {
+              const cachedTime = (typeof window !== 'undefined' && window.__flirtEasyLikesReplenishTimestamp && window.__flirtEasyLikesReplenishTimestamp > Date.now())
+                ? window.__flirtEasyLikesReplenishTimestamp
+                : null;
+              const finalRefillTime = rateLimitedUntil || cachedTime || (Date.now() + 12 * 60 * 60 * 1000);
+              log('[FlirtEasy] ⚠️ Out of likes detected on /like/ API. Refill at:', new Date(finalRefillTime).toLocaleTimeString());
+              document.dispatchEvent(new CustomEvent('flirteasy:outOfLikes', { detail: { replenishTimestamp: finalRefillTime } }));
+              try {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'FE_OUT_OF_LIKES',
+                    timestamp: Date.now(),
+                    replenishTimestamp: finalRefillTime,
+                    rateLimitedUntil: finalRefillTime,
+                    likesRemaining: 0,
+                  }));
+                }
+              } catch (_) {}
+            }
+          }
 
           // Check if it's a match
-          if (data.match === true || (data.likes_you === true && data.is_match === true)) {
+          if (data && (data.match === true || (data.likes_you === true && data.is_match === true))) {
             log('[FlirtEasy] 🎉 Match detected via API!', data);
-
-            // Notify content script about the match
             document.dispatchEvent(new CustomEvent('flirteasy:matchDetected', {
               detail: {
                 matchId: data.match_id || data._id,
@@ -206,38 +293,68 @@
     });
   };
 
+  function _isPurchaseActive(p) {
+    if (!p || typeof p !== 'object') return false;
+    if (p.is_active === false) return false;
+    if (typeof p.status === 'string') {
+      const s = p.status.toLowerCase();
+      if (s === 'expired' || s === 'canceled' || s === 'cancelled' || s === 'inactive' || s === 'terminated') {
+        return false;
+      }
+    }
+    if (p.expire_date) {
+      let expTime = null;
+      if (typeof p.expire_date === 'number') {
+        expTime = p.expire_date < 1e11 ? p.expire_date * 1000 : p.expire_date;
+      } else if (typeof p.expire_date === 'string') {
+        const parsed = Date.parse(p.expire_date);
+        if (!isNaN(parsed)) expTime = parsed;
+      }
+      if (expTime !== null && expTime < Date.now()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   function _extractAccountTier(data) {
     try {
       const d = data?.data || data;
       if (!d) return 'free';
 
+      // 1. Explicit subscriber flags on account object (highest confidence)
+      if (d.account?.is_platinum_subscriber) return 'platinum';
+      if (d.account?.is_gold_subscriber) return 'gold';
+      if (d.account?.is_plus_subscriber) return 'plus';
+
+      // 2. Active user purchases (DO NOT include d.products - that is the store catalogue)
       const purchases = [
         ...(Array.isArray(d?.purchases) ? d.purchases : []),
         ...(Array.isArray(d?.purchase?.purchases) ? d.purchase.purchases : []),
         ...(Array.isArray(d?.account?.purchases) ? d.account.purchases : []),
         ...(Array.isArray(d?.user?.purchases) ? d.user.purchases : []),
-        ...(Array.isArray(d?.products) ? d.products : []),
       ];
 
       for (const p of purchases) {
+        if (!_isPurchaseActive(p)) continue;
         const sig = String(p?.product_type || p?.product_id || p?.product_name || p?.plan || p?.name || '').toLowerCase();
         if (sig.includes('platinum')) return 'platinum';
         if (sig.includes('gold')) return 'gold';
         if (sig.includes('plus')) return 'plus';
       }
 
-      if (d.account?.is_platinum_subscriber) return 'platinum';
-      if (d.account?.is_gold_subscriber) return 'gold';
-
-      const acctType = String(d.account?.account_type || '').toLowerCase();
+      // 3. Account membership / subscription fields
+      const acctType = String(
+        d.account?.account_type ||
+        d.account?.membership_type ||
+        d.account?.plan ||
+        d.purchase?.subscription?.plan ||
+        d.purchases?.subscription?.plan ||
+        ''
+      ).toLowerCase();
       if (acctType.includes('platinum')) return 'platinum';
       if (acctType.includes('gold')) return 'gold';
       if (acctType.includes('plus')) return 'plus';
-
-      const rawJson = JSON.stringify(d).toLowerCase();
-      if (rawJson.includes('tinder platinum') || rawJson.includes('"platinum"')) return 'platinum';
-      if (rawJson.includes('tinder gold') || rawJson.includes('"gold"')) return 'gold';
-      if (rawJson.includes('tinder plus') || rawJson.includes('"plus"')) return 'plus';
 
       return 'free';
     } catch (_) {}
@@ -269,6 +386,18 @@
       detail: {
         matchId: matchId,
         messages: messages
+      }
+    }));
+  });
+
+  // Expose function to get cached match profile
+  document.addEventListener('flirteasy:getMatchProfile', function (event) {
+    const matchId = event.detail.matchId;
+    const cached = profileCache.get(matchId);
+    document.dispatchEvent(new CustomEvent('flirteasy:matchProfileResponse', {
+      detail: {
+        matchId: matchId,
+        person: cached ? cached.person : null
       }
     }));
   });

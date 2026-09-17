@@ -30,9 +30,16 @@ describe('getOnDeviceSessionState', () => {
     const state = getOnDeviceSessionState();
     expect(state).toEqual({
       swipes: 0,
+      cycleLikes: 0,
+      cycleTarget: 50,
       matches: 0,
       messages: 0,
+      cycleMessages: 0,
+      cycleMessagesTarget: 50,
       likesExhaustedAt: 0,
+      likesReplenishTimestamp: null,
+      waitingReason: null,
+      nextRunTimestamp: null,
       isRunning: false,
       lastSavedAt: 0,
     });
