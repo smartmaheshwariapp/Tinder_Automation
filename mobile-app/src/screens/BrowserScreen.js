@@ -1,4 +1,6 @@
 import { theme as uiTheme } from '../theme';
+import { collectionCaptureScript, createSwipeEventFromDomMessage } from '../utils/tinderCollectionCapture';
+import { activateCollections, ingestCollectionEvent } from '../services/tinderCollections';
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View, Dimensions, AppState, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
 import { MotionTouchable as TouchableOpacity, FocusInput as TextInput } from '../components/common/Motion';
@@ -2600,6 +2602,16 @@ export default function BrowserScreen({ route, navigation }) {
                 try {
                   const msg = JSON.parse(event.nativeEvent.data);
 
+                  if (msg.type === 'FE_COLLECTION_EVENT') {
+                    const collectionToken = getTinderAuthState()?.token;
+                    if (collectionToken && msg.sessionToken === collectionToken) {
+                      activateCollections(collectionToken)
+                        .then(() => ingestCollectionEvent(msg.event, collectionToken))
+                        .catch(() => {});
+                    }
+                    return;
+                  }
+
                   // ── Sub-50ms login sheet ready signal (3 buttons visible) ──
                   if (msg.type === 'FE_LOGIN_SHEET_READY') {
                     loginSheetReadyRef.current = true;
@@ -2725,6 +2737,13 @@ export default function BrowserScreen({ route, navigation }) {
                     addLog(`❤️ Swiped profile: ${targetName} (${msg.swipeCount || updated}/${msg.total || 50})`, 'action');
                     trackingService.trackLike(1);
                     pushProgressFeedEvent('profile_liked', detail, targetName, 5);
+                    const collectionToken = getTinderAuthState()?.token;
+                    if (collectionToken) {
+                      const swipeEvent = createSwipeEventFromDomMessage(msg);
+                      activateCollections(collectionToken)
+                        .then(() => ingestCollectionEvent(swipeEvent, collectionToken))
+                        .catch(() => addLog('Swipe counted, but its profile could not be saved locally.', 'warn'));
+                    }
                   }
                   if (msg.type === 'FE_MATCH') {
                     const prev = onDeviceMatchesRef.current || 0;
@@ -2929,7 +2948,8 @@ export default function BrowserScreen({ route, navigation }) {
               mixedContentMode="always"
               injectedJavaScriptBeforeContentLoaded={
                 isOnDevice
-                  ? `${generateChromeShim(SELECTORS_JSON, {
+                  ? `${collectionCaptureScript}
+                    ${generateChromeShim(SELECTORS_JSON, {
                       latitude: extensionSettings?.locationLatitude || 40.7128,
                       longitude: extensionSettings?.locationLongitude || -74.0060,
                     })}
