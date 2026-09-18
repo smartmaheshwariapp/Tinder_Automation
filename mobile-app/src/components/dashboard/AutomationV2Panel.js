@@ -34,6 +34,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 // ─── Feature Flags (Hidden in On-Device mode for clean UX, preserved for future cloud mode) ───
 const SHOW_CHAT_STYLE_TRAINING = false;
 const SHOW_AI_ACTIVE_TIME = false;
+const SHOW_SWIPING_CONTROLS = false;
+const SHOW_MESSAGING_CONTROLS = false;
 const SHOW_LOCATION_FEATURE = false;
 const SHOW_DEFAULT_LANGUAGE = false;
 
@@ -1916,6 +1918,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
         </View>
 
         {/* ════════════════════ CARD 2: SWIPING & SAFETY LIMITS ════════════════════ */}
+        {SHOW_SWIPING_CONTROLS && (
         <View style={[styles.v2Card, openCards.swiping && styles.v2CardOpen]}>
           <TouchableOpacity accessibilityRole="button"
             style={styles.v2CardHeader}
@@ -2213,8 +2216,10 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             </View>
           )}
         </View>
+        )}
 
         {/* ════════════════════ CARD 3: MESSAGING (V2 DESKTOP PARITY) ════════════════════ */}
+        {SHOW_MESSAGING_CONTROLS && (
         <View style={[styles.v2Card, openCards.messaging && styles.v2CardOpen]}>
           <TouchableOpacity accessibilityRole="button"
             style={styles.v2CardHeader}
@@ -2504,6 +2509,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             </View>
           )}
         </View>
+        )}
 
         {/* ════════════════════ CARD 4: YOUR CHAT STYLE & AI TRAINING (V2 DESKTOP PARITY) ════════════════════ */}
         {SHOW_CHAT_STYLE_TRAINING && (

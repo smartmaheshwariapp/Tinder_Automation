@@ -5,14 +5,15 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
 } from "react-native";
+import { MotionTouchable as TouchableOpacity } from "../common/Motion";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ActivityIndicator from "../common/SafeActivityIndicator";
 import MasterControlOrb from "./MasterControlOrb";
 import { getLikesReplenishStatus } from "../../utils/sessionManager";
+import TinderCollections from "./TinderCollections";
 
 const titleCase = (value) =>
   String(value || "")
@@ -109,6 +110,11 @@ export default function HomeOverview({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
     >
+      <View style={styles.introduction}>
+        <Text style={styles.welcomeLabel}>A LITTLE SPARK. MORE POSSIBILITY.</Text>
+        <Text style={styles.welcomeTitle}>Make room for connection.</Text>
+        <Text style={styles.welcomeBody}>Your assistant takes care of the introductions.</Text>
+      </View>
       <TouchableOpacity
         style={styles.instance}
         onPress={onOpenBrowser}
@@ -270,7 +276,7 @@ export default function HomeOverview({
           onOpenBrowser={onOpenBrowser}
         />
 
-        <View style={styles.tiles}>
+        {false && <View style={styles.tiles}>
           {[
             {
               label: "GOAL",
@@ -312,10 +318,10 @@ export default function HomeOverview({
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </View>}
       </View>
 
-      <View style={styles.metrics}>
+      {false && <View style={styles.metrics}>
         {metrics.map((metric) => (
           <TouchableOpacity
             key={metric.label}
@@ -333,7 +339,7 @@ export default function HomeOverview({
             </View>
           </TouchableOpacity>
         ))}
-      </View>
+      </View>}
       {/* <TouchableOpacity
         style={styles.activityLink}
         onPress={onActivity}
@@ -352,6 +358,7 @@ export default function HomeOverview({
         </View>
         <Ionicons name="arrow-forward" size={18} color={uiTheme.colors.muted} />
       </TouchableOpacity> */}
+      <TinderCollections settings={settings} onConnect={onOpenBrowser} />
     </ScrollView>
   );
 }
@@ -423,6 +430,10 @@ export function HomeBottomNavigation({ activeTab, onSelect }) {
 }
 
 const styles = StyleSheet.create({
+  introduction: { gap: 10, paddingTop: 4, paddingBottom: 4 },
+  welcomeLabel: { ...uiTheme.type.caption, color: uiTheme.colors.secondary, letterSpacing: 1.2 },
+  welcomeTitle: { ...uiTheme.type.display, color: uiTheme.colors.text, letterSpacing: -0.7 },
+  welcomeBody: { ...uiTheme.type.body, color: uiTheme.colors.muted },
   content: {
     width: "100%",
     maxWidth: 600,

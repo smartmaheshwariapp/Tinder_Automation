@@ -18,6 +18,7 @@ import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
 import SupabaseService from './src/services/supabase';
+import { MotionProvider } from './src/components/common/Motion';
 
 const navigationTheme = {
   ...DarkTheme,
@@ -119,6 +120,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
+      <MotionProvider>
       <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <AppNavigator initialRouteName={initialRoute} initialUser={initialUser} />
         <InAppNotificationBanner
@@ -137,6 +139,7 @@ export default function App() {
           onClose={() => setRedirectNotif(null)}
         />
       </NavigationContainer>
+      </MotionProvider>
     </SafeAreaProvider>
   );
 }

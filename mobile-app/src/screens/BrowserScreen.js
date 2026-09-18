@@ -1,4 +1,6 @@
 import { theme as uiTheme } from '../theme';
+import { createSwipeEventFromDomMessage } from '../utils/tinderCollectionCapture';
+import { activateCollections, ingestCollectionEvent } from '../services/tinderCollections';
 import React, { useRef, useState, useEffect, useCallback, useMemo, useImperativeHandle } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -3004,6 +3006,13 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     addLog(`❤️ Swiped profile: ${targetName} (${updatedCycle}/${cycleTarget})`, 'action');
                     trackingService.trackLike(1);
                     pushProgressFeedEvent('profile_liked', detail, targetName, 5);
+                    const collectionToken = getTinderAuthState()?.token;
+                    if (collectionToken) {
+                      const swipeEvent = createSwipeEventFromDomMessage(msg);
+                      activateCollections(collectionToken)
+                        .then(() => ingestCollectionEvent(swipeEvent, collectionToken))
+                        .catch(() => addLog('Swipe counted, but its profile could not be saved locally.', 'warn'));
+                    }
                   }
                   if (msg.type === 'FE_MESSAGE') {
                     const prevMsgs = onDeviceMessagesRef.current || 0;
