@@ -8,6 +8,7 @@ import {
   Switch,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
 import ActivityIndicator from '../common/SafeActivityIndicator';
 import AppConfirmModal from '../common/AppConfirmModal';
@@ -25,11 +26,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../../utils/network';
 import TinderProfileCard from './TinderProfileCard';
-import { theme as uiTheme } from '../../theme';
-import { FocusInput } from '../common/Motion';
+import { theme as uiTheme, alpha } from '../../theme';
+import { FocusInput, MotionTouchable, FadeIn, ContentTransition, useMotionReduced } from '../common/Motion';
 import IconButton from '../ui/IconButton';
 import IconWell from '../ui/IconWell';
 import SectionHeader from '../ui/SectionHeader';
+import { AppText, AppButton, Card, Badge, LiveDot, CountUp, BottomSheet } from '../ui';
+import { LinearGradient } from 'expo-linear-gradient';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -53,6 +56,9 @@ const BIO_MODES = [
   { id: 'manual', label: 'Custom' },
   { id: 'ai', label: 'Generate' },
 ];
+
+// Tab icons for the bio mode switcher (display only).
+const BIO_MODE_ICONS = { tinder: 'sync-outline', manual: 'create-outline', ai: 'sparkles-outline' };
 
 import {
   generateBioWithAI,
@@ -126,6 +132,9 @@ export default function SettingsPanel({
       ? propIsLoggedIn
       : (stats?.tinderAccount?.isLoggedIn ?? tinderAuth?.isLoggedIn ?? false)
   );
+
+  const reducedMotion = useMotionReduced();
+  const { width: windowWidth } = useWindowDimensions();
 
   const handleConnectPress = () => {
     if (typeof onConnect === 'function') {
@@ -685,209 +694,293 @@ export default function SettingsPanel({
   const activeSwipes = isSafetyOn ? 50 : (form.likesPerCycle ?? 50);
   const activeMsgs = isSafetyOn ? 50 : (form.messagesPerCycle ?? 50);
 
+  // ── Control-centre display values (read-only; derived from existing state) ──
+  const likesUsed = rateLimitStatus.likes?.used ?? 0;
+  const likesLimit = rateLimitStatus.likes?.limit ?? 50;
+  const msgsUsed = rateLimitStatus.messages?.used ?? 0;
+  const msgsLimit = rateLimitStatus.messages?.limit ?? 50;
+  const isSafetyLocked = Boolean(rateLimitStatus?.isSafetyLocked);
+  const compactWidth = windowWidth < 360;
+  const accountName = isTinderLoggedIn
+    ? (form?.userProfile?.name
+      ? `${form.userProfile.name} (Tinder)`
+      : (stats?.tinderAccount?.name || tinderAuth?.accountName || 'Tinder Account'))
+    : 'Tinder Account';
+
+  // Layout animation for disclosure toggles, skipped when the OS asks for reduced motion.
+  const animateLayout = () => {
+    if (!reducedMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  };
+
+  const renderStatTile = ({ key, icon, label, value, numeric, caption, captionShort, dim, live }) => (
+    <View
+      key={key}
+      style={styles.statTile}
+      accessible
+      accessibilityLabel={`${label}: ${value}${caption ? `, ${caption}` : ''}`}
+    >
+      <View style={styles.statTileTop}>
+        <Ionicons name={icon} size={14} color={dim ? c.muted : c.accent} />
+        <AppText variant="caption" numberOfLines={1} style={styles.statTileLabel}>{label}</AppText>
+        {live ? <LiveDot size={7} /> : null}
+      </View>
+      {numeric ? (
+        <CountUp value={value} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome} style={styles.statTileValue} />
+      ) : (
+        <AppText variant="title2" color={dim ? 'muted' : 'text'} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome} style={styles.statTileValue}>
+          {value}
+        </AppText>
+      )}
+      <AppText variant="footnote" numberOfLines={1}>{compactWidth && captionShort ? captionShort : caption}</AppText>
+    </View>
+  );
+
+  const renderPresetRow = ({ label, noun, presets, active, field }) => (
+    <View style={styles.presetBlock}>
+      <View style={styles.presetBlockHeader}>
+        <AppText variant="label" color="textSecondary" numberOfLines={1} style={styles.presetBlockLabel}>{label}</AppText>
+        <AppText variant="subhead" color="text" style={styles.presetBlockValue}>{active === 0 ? 'Off' : active}</AppText>
+      </View>
+      <View style={styles.segTrack} accessibilityRole="radiogroup" accessibilityLabel={label}>
+        {presets.map(val => {
+          const selected = active === val;
+          return (
+            <MotionTouchable
+              accessibilityRole="button"
+              key={val}
+              accessibilityLabel={`${val} ${noun} per cycle`}
+              accessibilityState={{ selected, disabled: isSafetyOn }}
+              disabled={isSafetyOn}
+              pressScale={0.94}
+              activeOpacity={0.85}
+              style={[styles.segItem, selected && styles.segItemActive]}
+              onPress={() => updateField(field, val)}
+            >
+              {selected ? (
+                <LinearGradient
+                  colors={uiTheme.gradients.brandShort}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              ) : null}
+              <Text
+                style={[styles.segItemText, selected && styles.segItemTextActive]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+              >
+                {val}
+              </Text>
+            </MotionTouchable>
+          );
+        })}
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
 
-        {/* ════════════════════ CATEGORY 1: SAFETY ════════════════════ */}
-        <SectionHeader title="SAFETY" description="Hourly limits that keep your account looking natural." style={[styles.sectionHeader, styles.sectionHeaderFirst]} />
-
-        <View style={styles.card}>
-          {/* Section Header with Independent Safety Toggle & Chevron */}
-          <View style={styles.cardHeaderRow}>
-            <TouchableOpacity accessibilityRole="button"
-              accessibilityLabel="Safety Mode details"
-              accessibilityState={{ expanded: !safetyCollapsed }}
-              style={styles.headerLeftTouchable}
-              onPress={() => {
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                setSafetyCollapsed(!safetyCollapsed);
-              }}
-              activeOpacity={0.7}
-            >
-              <IconWell icon="shield-checkmark-outline" tone={isSafetyOn ? 'success' : 'warning'} size={36} />
-              <Text style={styles.cardTitle} numberOfLines={1}>Safety Mode</Text>
-              <Ionicons
-                name={safetyCollapsed ? 'chevron-down' : 'chevron-up'}
-                size={18}
-                color={uiTheme.colors.muted}
-                style={styles.headerChevron}
-              />
-            </TouchableOpacity>
-
-            <Switch
-              accessibilityLabel="Safety Mode"
-              value={isSafetyOn}
-              onValueChange={v => {
-                updateField('safetyMode', v);
-              }}
-              trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
-              thumbColor={uiTheme.colors.white}
-              ios_backgroundColor={uiTheme.colors.elevatedHigh}
+        {/* ════════════════════ AT A GLANCE: STATUS SUMMARY ════════════════════ */}
+        <FadeIn>
+          <View style={styles.statusCard}>
+            <LinearGradient
+              colors={uiTheme.gradients.hero}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
             />
+            <View style={styles.statusHeader}>
+              <IconWell
+                icon={isSafetyLocked ? 'time-outline' : (isSafetyOn ? 'shield-checkmark' : 'speedometer-outline')}
+                tone={isSafetyOn && !isSafetyLocked ? 'success' : 'warning'}
+                size={44}
+              />
+              <View style={styles.statusCopy}>
+                <AppText variant="headline" numberOfLines={1}>
+                  {isSafetyLocked ? 'Hourly limit reached' : (isSafetyOn ? 'Protected pace' : 'Manual pace')}
+                </AppText>
+                <AppText variant="footnote" numberOfLines={2} style={styles.statusSub}>
+                  {isSafetyOn ? 'Safety Mode on · limits auto-managed' : 'Safety Mode off · no hourly limits'}
+                </AppText>
+              </View>
+              <Badge
+                label={isSafetyOn ? 'Safe' : 'At risk'}
+                tone={isSafetyOn ? 'success' : 'warning'}
+                dot
+                style={styles.statusBadge}
+              />
+            </View>
+
+            <View style={styles.statGrid}>
+              {renderStatTile({
+                key: 'swipes',
+                icon: 'heart-outline',
+                label: 'Swiping',
+                value: activeSwipes === 0 ? 'Off' : activeSwipes,
+                numeric: activeSwipes !== 0,
+                caption: 'swipes / cycle',
+                dim: activeSwipes === 0,
+              })}
+              {renderStatTile({
+                key: 'messages',
+                icon: 'chatbubbles-outline',
+                label: 'Messaging',
+                value: activeMsgs === 0 ? 'Off' : activeMsgs,
+                numeric: activeMsgs !== 0,
+                caption: 'messages / cycle',
+                dim: activeMsgs === 0,
+              })}
+              {renderStatTile({
+                key: 'hour',
+                icon: 'time-outline',
+                label: 'This hour',
+                value: isSafetyOn ? `${likesUsed}/${likesLimit}` : 'No limit',
+                caption: isSafetyOn ? `likes · ${msgsUsed}/${msgsLimit} msgs` : 'Safety Mode off',
+                captionShort: isSafetyOn ? 'likes used' : 'Safety Mode off',
+                dim: !isSafetyOn,
+              })}
+              {renderStatTile({
+                key: 'tinder',
+                icon: 'flame-outline',
+                label: 'Tinder',
+                value: isTinderLoggedIn ? 'Live' : 'Offline',
+                caption: isTinderLoggedIn ? 'session connected' : 'not connected',
+                dim: !isTinderLoggedIn,
+                live: isTinderLoggedIn,
+              })}
+            </View>
           </View>
+        </FadeIn>
 
-          {/* Collapsible Inner Content (Hidden when collapsed) */}
-          {!safetyCollapsed && (
-            <View style={styles.cardBody}>
-              {/* 2 Independent Meter Boxes (Likes/hr: used/limit, Msgs/hr: used/limit) */}
-              <View style={styles.metersRow}>
-                <View style={styles.meterBox}>
-                  <Text style={styles.meterLabel} numberOfLines={1}>Likes/hr</Text>
-                  <Text
-                    style={[
-                      styles.meterValue,
-                      !isSafetyOn && styles.meterValueDanger,
-                    ]}
-                  >
-                    {isSafetyOn ? `${rateLimitStatus.likes?.used ?? 0}/${rateLimitStatus.likes?.limit ?? 50}` : 'No limit'}
-                  </Text>
-                </View>
-
-                <View style={styles.meterBox}>
-                  <Text style={styles.meterLabel} numberOfLines={1}>Msgs/hr</Text>
-                  <Text
-                    style={[
-                      styles.meterValue,
-                      !isSafetyOn && styles.meterValueDanger,
-                    ]}
-                  >
-                    {isSafetyOn ? `${rateLimitStatus.messages?.used ?? 0}/${rateLimitStatus.messages?.limit ?? 50}` : 'No limit'}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Badges Row (Auto-managed · Shadowban secure) */}
-              <View style={styles.safetyFeaturesRow}>
-                <View style={[styles.safetyFeatureChip, isSafetyOn ? styles.safetyFeatureChipOn : styles.safetyFeatureChipOff]}>
-                  <Ionicons
-                    name={isSafetyOn ? "checkmark" : "close"}
-                    size={13}
-                    color={isSafetyOn ? uiTheme.colors.success : uiTheme.colors.error}
-                  />
-                  <Text
-                    style={[
-                      styles.safetyFeatureText,
-                      { color: isSafetyOn ? uiTheme.colors.success : uiTheme.colors.error },
-                    ]}
-                  >
-                    {isSafetyOn ? "Auto-managed" : "Manual overrides"}
-                  </Text>
-                </View>
-
-                <View style={[styles.safetyFeatureChip, isSafetyOn ? styles.safetyFeatureChipOn : styles.safetyFeatureChipOff]}>
-                  <Ionicons
-                    name={isSafetyOn ? "checkmark" : "warning"}
-                    size={13}
-                    color={isSafetyOn ? uiTheme.colors.success : uiTheme.colors.error}
-                  />
-                  <Text
-                    style={[
-                      styles.safetyFeatureText,
-                      { color: isSafetyOn ? uiTheme.colors.success : uiTheme.colors.error },
-                    ]}
-                  >
-                    {isSafetyOn ? "Shadowban secure" : "Shadowban risk"}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Safety Lock Active Banner with manual reset override */}
-              {Boolean(rateLimitStatus?.isSafetyLocked) && (
-                <View style={styles.lockBanner} accessibilityRole="alert">
-                  <Ionicons name="time-outline" size={20} color={uiTheme.colors.warning} style={styles.lockBannerIcon} />
-                  <View style={styles.lockBannerCopy}>
-                    <Text style={styles.lockBannerTitle}>
-                      Safety Lock Active ({rateLimitStatus.resetIn || 59}m remaining)
-                    </Text>
-                    <Text style={styles.lockBannerText}>
-                      Hourly limit reached. Tap Reset to resume swiping now.
-                    </Text>
-                  </View>
-                  <TouchableOpacity accessibilityRole="button"
+        {/* Safety Lock Active callout with manual reset override */}
+        {isSafetyLocked && (
+          <FadeIn delay={50}>
+            <Card variant="warning" padding="md" style={styles.callout} accessibilityRole="alert">
+              <View style={styles.calloutRow}>
+                <IconWell icon="time-outline" tone="warning" size={36} />
+                <View style={styles.calloutCopy}>
+                  <AppText variant="label" color="warning">
+                    Safety Lock Active ({rateLimitStatus.resetIn || 59}m remaining)
+                  </AppText>
+                  <AppText variant="footnote" color="textSecondary" style={styles.calloutText}>
+                    Hourly limit reached. Tap Reset to resume swiping now.
+                  </AppText>
+                  <MotionTouchable accessibilityRole="button"
                     accessibilityLabel="Reset safety limits"
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    style={styles.lockResetBtn}
+                    style={styles.calloutAction}
                     onPress={async () => {
                       await resetRateLimits();
                       await saveOnDeviceSessionState({ waitingReason: null, nextRunTimestamp: null });
                       Alert.alert('Safety Limits Reset', 'Hourly safety rate limits have been cleared. You can resume swiping.');
                     }}
                   >
-                    <Text style={styles.lockResetText}>Reset</Text>
-                  </TouchableOpacity>
+                    <Ionicons name="refresh" size={15} color={c.background} />
+                    <Text style={styles.calloutActionText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Reset</Text>
+                  </MotionTouchable>
                 </View>
-              )}
+              </View>
+            </Card>
+          </FadeIn>
+        )}
 
-              {/* Speed & Batch Preset Controls (Locked with 55% opacity when Safety ON) */}
-              <View
-                style={[
-                  styles.presetSection,
-                  isSafetyOn && styles.presetSectionLocked,
-                ]}
-              >
-                {/* Swipes Preset Row */}
-                <View style={styles.presetRow}>
-                  <Text style={styles.presetLabel}>Swipes per cycle</Text>
-                  <View style={styles.presetButtonGroup} accessibilityRole="radiogroup" accessibilityLabel="Swipes per cycle">
-                    {SWIPE_PRESETS.map(val => (
-                      <TouchableOpacity accessibilityRole="button"
-                        key={val}
-                        accessibilityLabel={`${val} swipes per cycle`}
-                        accessibilityState={{ selected: activeSwipes === val, disabled: isSafetyOn }}
-                        disabled={isSafetyOn}
-                        style={[
-                          styles.presetBtn,
-                          activeSwipes === val && styles.presetBtnActive,
-                        ]}
-                        onPress={() => updateField('likesPerCycle', val)}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={[
-                            styles.presetBtnText,
-                            activeSwipes === val && styles.presetBtnTextActive,
-                          ]}
-                        >
-                          {val}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+        {/* ════════════════════ CATEGORY 1: PACE & SAFETY ════════════════════ */}
+        <FadeIn delay={100}>
+          <SectionHeader title="Pace & safety" description="Hourly limits that keep your account looking natural." style={styles.sectionHeader} />
+
+          <Card padding="none" style={styles.groupCard}>
+            {/* Safety Mode row: icon well · title/helper · switch */}
+            <View style={[styles.row, styles.rowDivider]}>
+              <IconWell icon="shield-checkmark-outline" tone={isSafetyOn ? 'success' : 'warning'} size={36} />
+              <View style={styles.rowCopy}>
+                <AppText variant="bodyStrong" numberOfLines={1}>Safety Mode</AppText>
+                <AppText variant="footnote" numberOfLines={2} style={styles.rowHelper}>
+                  {isSafetyOn ? 'Safe hourly limits, managed for you' : 'Custom pace, no hourly limits'}
+                </AppText>
+              </View>
+              <Switch
+                accessibilityLabel="Safety Mode"
+                value={isSafetyOn}
+                onValueChange={v => {
+                  updateField('safetyMode', v);
+                }}
+                trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                thumbColor={uiTheme.colors.white}
+                ios_backgroundColor={uiTheme.colors.elevatedHigh}
+              />
+            </View>
+
+            {/* Limits & presets disclosure row */}
+            <MotionTouchable accessibilityRole="button"
+              accessibilityLabel="Safety Mode details"
+              accessibilityState={{ expanded: !safetyCollapsed }}
+              pressScale={0.985}
+              activeOpacity={0.7}
+              style={styles.row}
+              onPress={() => {
+                animateLayout();
+                setSafetyCollapsed(!safetyCollapsed);
+              }}
+            >
+              <IconWell icon="options-outline" tone="primary" size={36} />
+              <View style={styles.rowCopy}>
+                <AppText variant="bodyStrong" numberOfLines={1}>Limits & presets</AppText>
+                <AppText variant="footnote" numberOfLines={2} style={styles.rowHelper}>
+                  {`${activeSwipes} swipes · ${activeMsgs} messages per cycle`}
+                </AppText>
+              </View>
+              {isSafetyOn ? <Ionicons name="lock-closed" size={14} color={c.muted} /> : null}
+              <Ionicons
+                name={safetyCollapsed ? 'chevron-down' : 'chevron-up'}
+                size={18}
+                color={c.muted}
+              />
+            </MotionTouchable>
+
+            {/* Collapsible Inner Content (Hidden when collapsed) */}
+            {!safetyCollapsed && (
+              <View style={styles.expandBody}>
+                {/* 2 Independent Meter Boxes (Likes/hr: used/limit, Msgs/hr: used/limit) */}
+                <View style={styles.meterGrid}>
+                  <View style={styles.meterTile}>
+                    <AppText variant="caption" numberOfLines={1}>Likes/hr</AppText>
+                    <Text style={[styles.meterTileValue, !isSafetyOn && styles.meterValueDanger]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                      {isSafetyOn ? `${rateLimitStatus.likes?.used ?? 0}/${rateLimitStatus.likes?.limit ?? 50}` : 'No limit'}
+                    </Text>
+                  </View>
+                  <View style={styles.meterTile}>
+                    <AppText variant="caption" numberOfLines={1}>Msgs/hr</AppText>
+                    <Text style={[styles.meterTileValue, !isSafetyOn && styles.meterValueDanger]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                      {isSafetyOn ? `${rateLimitStatus.messages?.used ?? 0}/${rateLimitStatus.messages?.limit ?? 50}` : 'No limit'}
+                    </Text>
                   </View>
                 </View>
 
-                {/* Messages Preset Row */}
-                <View style={styles.presetRow}>
-                  <Text style={styles.presetLabel}>Messages per cycle</Text>
-                  <View style={styles.presetButtonGroup} accessibilityRole="radiogroup" accessibilityLabel="Messages per cycle">
-                    {MSG_PRESETS.map(val => (
-                      <TouchableOpacity accessibilityRole="button"
-                        key={val}
-                        accessibilityLabel={`${val} messages per cycle`}
-                        accessibilityState={{ selected: activeMsgs === val, disabled: isSafetyOn }}
-                        disabled={isSafetyOn}
-                        style={[
-                          styles.presetBtn,
-                          activeMsgs === val && styles.presetBtnActive,
-                        ]}
-                        onPress={() => updateField('messagesPerCycle', val)}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={[
-                            styles.presetBtnText,
-                            activeMsgs === val && styles.presetBtnTextActive,
-                          ]}
-                        >
-                          {val}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                {/* Badges Row (Auto-managed · Shadowban secure) */}
+                <View style={styles.safetyFeaturesRow}>
+                  <Badge
+                    icon={isSafetyOn ? 'checkmark' : 'close'}
+                    tone={isSafetyOn ? 'success' : 'error'}
+                    label={isSafetyOn ? 'Auto-managed' : 'Manual overrides'}
+                  />
+                  <Badge
+                    icon={isSafetyOn ? 'checkmark' : 'warning'}
+                    tone={isSafetyOn ? 'success' : 'error'}
+                    label={isSafetyOn ? 'Shadowban secure' : 'Shadowban risk'}
+                  />
+                </View>
+
+                {/* Speed & Batch Preset Controls (Locked with 55% opacity when Safety ON) */}
+                <View style={[styles.presetStack, isSafetyOn && styles.presetSectionLocked]}>
+                  {renderPresetRow({ label: 'Swipes per cycle', noun: 'swipes', presets: SWIPE_PRESETS, active: activeSwipes, field: 'likesPerCycle' })}
+                  {renderPresetRow({ label: 'Messages per cycle', noun: 'messages', presets: MSG_PRESETS, active: activeMsgs, field: 'messagesPerCycle' })}
                 </View>
 
                 {isSafetyOn && (
@@ -899,9 +992,9 @@ export default function SettingsPanel({
                   </View>
                 )}
               </View>
-            </View>
-          )}
-        </View>
+            )}
+          </Card>
+        </FadeIn>
 
         {/* ════════════════════ CATEGORY: MATCHING LOCATION ════════════════════ */}
         {SHOW_LOCATION_FEATURE && (
@@ -1273,422 +1366,352 @@ export default function SettingsPanel({
         )}
 
         {/* ════════════════════ CATEGORY 2: AI PROFILE ════════════════════ */}
-        <SectionHeader title="AI PROFILE" description="What the AI knows about you when it writes." style={styles.sectionHeader} />
+        <FadeIn delay={150}>
+          <SectionHeader title="AI profile" description="What the AI knows about you when it writes." style={styles.sectionHeader} />
 
-        <View style={styles.card}>
-          {/* Card Title Row with Chevron */}
-          <TouchableOpacity accessibilityRole="button"
-            accessibilityLabel="Your Bio (Improve it with AI)"
-            accessibilityState={{ expanded: !bioCollapsed }}
-            style={styles.cardHeaderRow}
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setBioCollapsed(!bioCollapsed);
-            }}
-            activeOpacity={0.85}
-          >
-            <View style={styles.cardHeaderLeft}>
+          <Card padding="none" style={styles.groupCard}>
+            {/* Card Title Row with Chevron */}
+            <MotionTouchable accessibilityRole="button"
+              accessibilityLabel="Your Bio (Improve it with AI)"
+              accessibilityState={{ expanded: !bioCollapsed }}
+              pressScale={0.985}
+              activeOpacity={0.7}
+              style={styles.row}
+              onPress={() => {
+                animateLayout();
+                setBioCollapsed(!bioCollapsed);
+              }}
+            >
               <IconWell icon="document-text-outline" tone="primary" size={36} />
-              <Text style={styles.cardTitle} numberOfLines={2}>Your Bio (Improve it with AI)</Text>
-            </View>
-            <Ionicons
-              name={bioCollapsed ? 'chevron-down' : 'chevron-up'}
-              size={18}
-              color={uiTheme.colors.muted}
-            />
-          </TouchableOpacity>
+              <View style={styles.rowCopy}>
+                <AppText variant="bodyStrong" numberOfLines={1}>Your Bio</AppText>
+                <AppText variant="footnote" numberOfLines={2} style={styles.rowHelper}>Improve it with AI</AppText>
+              </View>
+              <Ionicons
+                name={bioCollapsed ? 'chevron-down' : 'chevron-up'}
+                size={18}
+                color={c.muted}
+              />
+            </MotionTouchable>
 
-          {/* Segmented Mode Selector: Sync | Custom | Generate */}
-          <View style={styles.segmentedSelector} accessibilityRole="tablist">
-            {BIO_MODES.map(bm => (
-              <TouchableOpacity accessibilityRole="tab"
-                key={bm.id}
-                accessibilityLabel={bm.label}
-                accessibilityState={{ selected: bioMode === bm.id }}
-                style={[
-                  styles.segBtn,
-                  bioMode === bm.id && styles.segBtnActive,
-                ]}
-                onPress={() => {
-                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                  setBioMode(bm.id);
-                  if (bioCollapsed) setBioCollapsed(false);
-                }}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.segBtnText,
-                    bioMode === bm.id && styles.segBtnTextActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {bm.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Collapsible Details Drawer */}
-          {!bioCollapsed && (
-            <View style={styles.bioDrawer}>
-
-              {/* ── Panel 1: Sync with Live Dating Profile ── */}
-              {bioMode === 'tinder' && (
-                <View style={styles.bioSubPanel}>
-                  <Text style={styles.bioPanelHint}>
-                    Uses your live dating profile.
-                  </Text>
-
-                  <View style={styles.syncRow}>
-                    <TouchableOpacity accessibilityRole="button"
-                      accessibilityLabel={syncSuccess ? 'Synced' : 'Sync Now'}
-                      accessibilityState={{ disabled: !!syncing, busy: !!syncing }}
-                      style={styles.syncBtn}
-                      onPress={handleSyncNow}
-                      disabled={syncing}
+            <View style={styles.bioBody}>
+              {/* Segmented Mode Selector: Sync | Custom | Generate */}
+              <View style={styles.bioTabs} accessibilityRole="tablist">
+                {BIO_MODES.map(bm => {
+                  const selected = bioMode === bm.id;
+                  return (
+                    <MotionTouchable accessibilityRole="tab"
+                      key={bm.id}
+                      accessibilityLabel={bm.label}
+                      accessibilityState={{ selected }}
+                      pressScale={0.96}
                       activeOpacity={0.85}
+                      style={[styles.bioTab, selected && styles.bioTabActive]}
+                      onPress={() => {
+                        animateLayout();
+                        setBioMode(bm.id);
+                        if (bioCollapsed) setBioCollapsed(false);
+                      }}
                     >
-                      {syncing ? (
-                        <ActivityIndicator size="small" color={uiTheme.colors.onPrimary} />
-                      ) : (
-                        <Text style={styles.syncBtnText} numberOfLines={1}>
-                          {syncSuccess ? '✓ Synced' : 'Sync Now'}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity accessibilityRole="button"
-                      style={styles.previewEyeBtn}
-                      onPress={() => setPreviewVisible(true)}
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons name="eye-outline" size={16} color={uiTheme.colors.accent} />
-                      <Text style={styles.previewEyeBtnText} numberOfLines={1}>How AI Sees You</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {syncError ? (
-                    <View style={styles.syncErrorCard}>
-                      <Ionicons name="alert-circle" size={16} color={uiTheme.colors.error} />
-                      <Text style={styles.syncErrorText}>{syncError}</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.syncStatusCard}>
-                      <View style={styles.syncStatusDot} />
-                      <Text style={styles.syncStatusText}>
-                        Synced from Tinder · {lastSyncTime}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* ── Panel 2: Custom Bio ── */}
-              {bioMode === 'manual' && (
-                <View style={styles.bioSubPanel}>
-                  <FocusInput
-                    style={styles.bioTextArea}
-                    multiline={true}
-                    placeholder="Enter your text here"
-                    accessibilityLabel="Custom bio"
-                    value={form.manualBio || ''}
-                    onChangeText={v => updateField('manualBio', v)}
-                  />
-                  <View style={styles.customBioFooter}>
-                    <Text style={styles.bioPanelHint}>
-                      AI only uses this description
-                    </Text>
-                    <Text style={styles.charCountText}>
-                      {(form.manualBio || '').length} chars
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {/* ── Panel 3: Magic Bio Studio (Step 0 - 3) ── */}
-              {bioMode === 'ai' && (
-                <View style={styles.bioSubPanel}>
-                  {genStep === 0 && (
-                    <View style={styles.genStepWrap}>
-                      <IconWell icon="sparkles" tone="primary" size={52} style={styles.magicIconWrap} />
-                      <Text style={styles.magicTitle}>Generate a Magic Bio</Text>
-                      <Text style={styles.magicDesc}>
-                        Let AI analyze your profile and craft the perfect bio to maximize your matches.
-                      </Text>
-                      <TouchableOpacity accessibilityRole="button"
-                        style={styles.magicCtaBtn}
-                        onPress={handleRunGenerate}
-                        activeOpacity={0.85}
+                      {!compactWidth ? (
+                        <Ionicons name={BIO_MODE_ICONS[bm.id]} size={14} color={selected ? c.accent : c.muted} />
+                      ) : null}
+                      <Text
+                        style={[styles.bioTabText, selected && styles.bioTabTextActive]}
+                        numberOfLines={1}
+                        maxFontSizeMultiplier={uiTheme.fontScale.chrome}
                       >
-                        <Ionicons name="sparkles" size={16} color={uiTheme.colors.onPrimary} />
-                        <Text style={styles.magicCtaBtnText}>Generate Bio Now</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {genStep === 1 && (
-                    <View style={styles.genLoadingWrap}>
-                      <ActivityIndicator size="small" color={uiTheme.colors.accent} />
-                      <Text style={styles.genLoadingText}>
-                        ✨ AI is crafting your personalized bio...
+                        {bm.label}
                       </Text>
-                    </View>
-                  )}
+                    </MotionTouchable>
+                  );
+                })}
+              </View>
 
-                  {genStep === 2 && (
-                    <View style={styles.genResultWrap}>
-                      {/* Quality Score Ring */}
-                      <View style={styles.scoreRow}>
-                        <View style={styles.scoreRing}>
-                          <Text style={styles.scoreNumber}>
-                            {generatedBioData.score}
-                          </Text>
-                        </View>
-                        <View style={styles.scoreCopy}>
-                          <View style={styles.scoreTitleRow}>
-                            <Text style={styles.scoreLabel}>Quality Score</Text>
-                            <View style={styles.activeScoreTag}>
-                              <Text style={styles.activeScoreTagText}>Active</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.scoreSub}>
-                            Your bio is highly engaging. Push it now.
-                          </Text>
-                        </View>
-                      </View>
+              {/* Collapsible Details Drawer */}
+              {!bioCollapsed && (
+                <ContentTransition transitionKey={bioMode} style={styles.bioDrawer}>
 
-                      {/* Bio Output Box */}
-                      <View style={styles.bioBoxResult}>
-                        <Text style={styles.bioResultText}>
-                          {generatedBioData.text}
-                        </Text>
-                      </View>
-
-                      {pushError && (
+                  {/* ── Panel 1: Sync with Live Dating Profile ── */}
+                  {bioMode === 'tinder' && (
+                    <View style={styles.bioPanel}>
+                      {syncError ? (
                         <View style={styles.syncErrorCard}>
                           <Ionicons name="alert-circle" size={16} color={uiTheme.colors.error} />
-                          <Text style={styles.syncErrorText}>{pushError}</Text>
+                          <Text style={styles.syncErrorText}>{syncError}</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.syncStatusCard}>
+                          <View style={styles.syncStatusDot} />
+                          <Text style={styles.syncStatusText}>
+                            Synced from Tinder · {lastSyncTime}
+                          </Text>
                         </View>
                       )}
 
-                      {/* Action Buttons */}
-                      <View style={styles.genActionsRow}>
-                        <TouchableOpacity accessibilityRole="button"
-                          style={styles.genActionSecBtn}
-                          onPress={handleRunGenerate}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={styles.genActionSecText}>↺ Regen</Text>
-                        </TouchableOpacity>
+                      <AppText variant="footnote">Uses your live dating profile.</AppText>
 
-                        <TouchableOpacity accessibilityRole="button"
-                          style={[
-                            styles.genActionPushBtn,
-                            pushSuccess && styles.genActionPushBtnSuccess,
-                          ]}
-                          onPress={handlePushBio}
-                          disabled={pushing}
-                          accessibilityState={{ disabled: !!pushing, busy: !!pushing }}
-                          activeOpacity={0.85}
-                        >
-                          {pushing ? (
-                            <ActivityIndicator size="small" color={uiTheme.colors.onPrimary} />
-                          ) : (
-                            <View style={styles.genActionPushInner}>
-                              {pushSuccess && (
-                                <Ionicons name="checkmark-circle" size={16} color={uiTheme.colors.onPrimary} />
-                              )}
-                              <Text style={styles.genActionPushText}>
-                                {pushSuccess ? '✓ Pushed to Tinder' : '↓ Push Bio to Tinder'}
-                              </Text>
-                            </View>
-                          )}
-                        </TouchableOpacity>
+                      <AppButton
+                        title={syncSuccess ? '✓ Synced' : 'Sync Now'}
+                        accessibilityLabel={syncSuccess ? 'Synced' : 'Sync Now'}
+                        icon={syncSuccess ? undefined : 'sync-outline'}
+                        loading={syncing}
+                        onPress={handleSyncNow}
+                      />
 
-                        <TouchableOpacity accessibilityRole="button"
-                          style={styles.genActionSecBtn}
-                          onPress={handleCopyBio}
-                          activeOpacity={0.8}
-                        >
-                          <Text
-                            style={[
-                              styles.genActionSecText,
-                              copySuccess && { color: uiTheme.colors.success },
-                            ]}
-                          >
-                            {copySuccess ? '✓ Copied' : 'Copy'}
-                          </Text>
-                        </TouchableOpacity>
+                      <MotionTouchable accessibilityRole="button"
+                        accessibilityLabel="How AI Sees You"
+                        pressScale={0.985}
+                        activeOpacity={0.75}
+                        style={styles.insetRow}
+                        onPress={() => setPreviewVisible(true)}
+                      >
+                        <IconWell icon="eye-outline" tone="primary" size={32} />
+                        <View style={styles.rowCopy}>
+                          <AppText variant="bodyStrong" numberOfLines={1}>How AI Sees You</AppText>
+                          <AppText variant="footnote" numberOfLines={2} style={styles.rowHelper}>Preview the profile context it writes from</AppText>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color={c.muted} />
+                      </MotionTouchable>
+                    </View>
+                  )}
+
+                  {/* ── Panel 2: Custom Bio ── */}
+                  {bioMode === 'manual' && (
+                    <View style={styles.bioPanel}>
+                      <FocusInput
+                        style={styles.bioTextArea}
+                        multiline={true}
+                        placeholder="Enter your text here"
+                        accessibilityLabel="Custom bio"
+                        value={form.manualBio || ''}
+                        onChangeText={v => updateField('manualBio', v)}
+                      />
+                      <View style={styles.customBioFooter}>
+                        <Text style={styles.bioPanelHint}>
+                          AI only uses this description
+                        </Text>
+                        <Text style={styles.charCountText}>
+                          {(form.manualBio || '').length} chars
+                        </Text>
                       </View>
                     </View>
                   )}
-                </View>
+
+                  {/* ── Panel 3: Magic Bio Studio (Step 0 - 3) ── */}
+                  {bioMode === 'ai' && (
+                    <View style={styles.bioPanel}>
+                      {genStep === 0 && (
+                        <View style={styles.genStepWrap}>
+                          <IconWell icon="sparkles" tone="primary" size={52} style={styles.magicIconWrap} />
+                          <Text style={styles.magicTitle}>Generate a Magic Bio</Text>
+                          <Text style={styles.magicDesc}>
+                            Let AI analyze your profile and craft the perfect bio to maximize your matches.
+                          </Text>
+                          <AppButton
+                            title="Generate Bio Now"
+                            icon="sparkles"
+                            onPress={handleRunGenerate}
+                          />
+                        </View>
+                      )}
+
+                      {genStep === 1 && (
+                        <View style={styles.genLoadingWrap}>
+                          <ActivityIndicator size="small" color={uiTheme.colors.accent} />
+                          <Text style={styles.genLoadingText}>
+                            ✨ AI is crafting your personalized bio...
+                          </Text>
+                        </View>
+                      )}
+
+                      {genStep === 2 && (
+                        <View style={styles.genResultWrap}>
+                          {/* Quality Score Ring */}
+                          <View style={styles.scoreRow}>
+                            <View style={styles.scoreRing}>
+                              <Text style={styles.scoreNumber}>
+                                {generatedBioData.score}
+                              </Text>
+                            </View>
+                            <View style={styles.scoreCopy}>
+                              <View style={styles.scoreTitleRow}>
+                                <Text style={styles.scoreLabel}>Quality Score</Text>
+                                <Badge label="Active" tone="success" size="sm" />
+                              </View>
+                              <Text style={styles.scoreSub}>
+                                Your bio is highly engaging. Push it now.
+                              </Text>
+                            </View>
+                          </View>
+
+                          {/* Bio Output Box */}
+                          <View style={styles.bioBoxResult}>
+                            <Text style={styles.bioResultText}>
+                              {generatedBioData.text}
+                            </Text>
+                          </View>
+
+                          {pushError && (
+                            <View style={styles.syncErrorCard}>
+                              <Ionicons name="alert-circle" size={16} color={uiTheme.colors.error} />
+                              <Text style={styles.syncErrorText}>{pushError}</Text>
+                            </View>
+                          )}
+
+                          {/* Action Buttons */}
+                          <AppButton
+                            title={pushSuccess ? '✓ Pushed to Tinder' : 'Push Bio to Tinder'}
+                            icon={pushSuccess ? undefined : 'arrow-down-circle-outline'}
+                            variant={pushSuccess ? 'secondary' : 'primary'}
+                            style={pushSuccess ? styles.pushSuccessBtn : undefined}
+                            textStyle={pushSuccess ? styles.pushSuccessText : undefined}
+                            loading={pushing}
+                            onPress={handlePushBio}
+                          />
+                          <View style={styles.genActionsRow}>
+                            <AppButton
+                              title="Regenerate"
+                              icon="refresh"
+                              variant="secondary"
+                              size="sm"
+                              style={styles.genActionHalf}
+                              onPress={handleRunGenerate}
+                            />
+                            <AppButton
+                              title={copySuccess ? '✓ Copied' : 'Copy'}
+                              icon={copySuccess ? undefined : 'copy-outline'}
+                              variant="secondary"
+                              size="sm"
+                              style={styles.genActionHalf}
+                              textStyle={copySuccess ? styles.pushSuccessText : undefined}
+                              onPress={handleCopyBio}
+                            />
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </ContentTransition>
               )}
             </View>
-          )}
-        </View>
+          </Card>
+        </FadeIn>
 
         {/* ════════════════════ CATEGORY 3: ACCOUNT ════════════════════ */}
-        <SectionHeader title="ACCOUNT & SESSION" description="Your connected Tinder account." style={styles.sectionHeader} />
+        <FadeIn delay={200}>
+          <SectionHeader title="Account & session" description="Your connected Tinder account." style={styles.sectionHeader} />
 
-        <View style={styles.card}>
-          <View style={styles.accountProfileRow}>
-            <View style={styles.accountIconWrap}>
-              <Image source={TINDER_ICON} style={styles.accountLogo} />
-              <View
-                style={[
-                  styles.accountActiveDot,
-                  !isTinderLoggedIn && styles.accountInactiveDot,
-                ]}
-              />
-            </View>
-            <View style={styles.accountInfoWrap}>
-              <View style={styles.accountTitleRow}>
-                <Text style={styles.accountTitle} numberOfLines={1}>
-                  {isTinderLoggedIn
-                    ? (form?.userProfile?.name
-                      ? `${form.userProfile.name} (Tinder)`
-                      : (stats?.tinderAccount?.name || tinderAuth?.accountName || 'Tinder Account'))
-                    : 'Tinder Account'}
-                </Text>
+          <Card padding="none" style={styles.groupCard}>
+            <View style={styles.accountProfileRow}>
+              <View style={styles.accountIconWrap}>
+                <Image source={TINDER_ICON} style={styles.accountLogo} />
                 <View
                   style={[
-                    styles.accountPlanBadge,
-                    !isTinderLoggedIn && styles.accountInactiveBadge,
+                    styles.accountActiveDot,
+                    !isTinderLoggedIn && styles.accountInactiveDot,
                   ]}
-                >
-                  <Text
-                    style={[
-                      styles.accountPlanText,
-                      !isTinderLoggedIn && styles.accountInactiveBadgeText,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {isTinderLoggedIn ? 'PRO PLAN ✦' : 'NOT CONNECTED'}
+                />
+              </View>
+              <View style={styles.accountInfoWrap}>
+                <View style={styles.accountTitleRow}>
+                  <Text style={styles.accountTitle} numberOfLines={1}>
+                    {accountName}
                   </Text>
+                  <Badge
+                    label={isTinderLoggedIn ? 'PRO PLAN ✦' : 'NOT CONNECTED'}
+                    tone={isTinderLoggedIn ? 'primary' : 'neutral'}
+                    size="sm"
+                  />
                 </View>
+                <Text style={styles.accountSubText} numberOfLines={1}>
+                  {isTinderLoggedIn
+                    ? (stats?.tinderAccount?.email ? `${stats.tinderAccount.email} • Connected` : 'Active • Connected Session')
+                    : 'Signed Out • Connect Tinder to automate'}
+                </Text>
               </View>
-              <Text style={styles.accountSubText} numberOfLines={1}>
-                {isTinderLoggedIn
-                  ? (stats?.tinderAccount?.email ? `${stats.tinderAccount.email} • Connected` : 'Active • Connected Session')
-                  : 'Signed Out • Connect Tinder to automate'}
-              </Text>
             </View>
-          </View>
 
-          <View style={styles.cardDivider} />
-
-          {/* Dynamic Action Button: Logout if Connected, Connect if Disconnected */}
-          {isTinderLoggedIn ? (
-            <TouchableOpacity accessibilityRole="button"
-              style={styles.accountLogoutBtn}
-              onPress={handleLogoutPress}
-              disabled={loggingOut}
-              accessibilityLabel="Log Out of Tinder"
-              accessibilityState={{ disabled: !!loggingOut, busy: !!loggingOut }}
-              activeOpacity={0.85}
-            >
-              {loggingOut ? (
-                <ActivityIndicator size="small" color={uiTheme.colors.error} />
+            {/* Dynamic Action Button: Logout if Connected, Connect if Disconnected */}
+            <View style={styles.accountActions}>
+              {isTinderLoggedIn ? (
+                <AppButton
+                  title="Log Out of Tinder"
+                  variant="dangerSoft"
+                  icon="log-out-outline"
+                  accessibilityLabel="Log Out of Tinder"
+                  loading={!!loggingOut}
+                  onPress={handleLogoutPress}
+                />
               ) : (
-                <View style={styles.accountLogoutBtnInner}>
-                  <Ionicons name="log-out-outline" size={18} color={uiTheme.colors.error} />
-                  <Text style={styles.accountLogoutBtnText}>Log Out of Tinder</Text>
-                </View>
+                <AppButton
+                  title="Log In to Tinder"
+                  icon="flame"
+                  iconRight="arrow-forward"
+                  onPress={handleConnectPress}
+                />
               )}
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity accessibilityRole="button"
-              style={styles.accountConnectBtn}
-              onPress={handleConnectPress}
-              activeOpacity={0.85}
-            >
-              <View style={styles.accountConnectBtnInner}>
-                <Ionicons name="flame" size={18} color={uiTheme.colors.onPrimary} />
-                <Text style={styles.accountConnectBtnText}>Log In to Tinder</Text>
-                <Ionicons name="arrow-forward" size={16} color={uiTheme.colors.onPrimary} />
-              </View>
-            </TouchableOpacity>
-          )}
-        </View>
+            </View>
+          </Card>
+        </FadeIn>
 
         {/* ════════════════════ CATEGORY 4: DIRECT KEYPAD ════════════════════ */}
         {rawControlsContent && (
-          <>
-            <SectionHeader title="VIRTUAL CONTAINER CONTROLS" description="Manual OTP and keypad input." style={styles.sectionHeader} />
-            <View style={styles.card}>
-              <TouchableOpacity accessibilityRole="button"
+          <FadeIn delay={250}>
+            <SectionHeader title="Virtual container controls" description="Manual OTP and keypad input." style={styles.sectionHeader} />
+            <Card padding="none" style={styles.groupCard}>
+              <MotionTouchable accessibilityRole="button"
                 accessibilityLabel="Direct OTP & Keypad"
                 accessibilityState={{ expanded: !!showRawControls }}
-                style={styles.cardHeaderRow}
+                pressScale={0.985}
+                activeOpacity={0.7}
+                style={styles.row}
                 onPress={() => {
-                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  animateLayout();
                   setShowRawControls(!showRawControls);
                 }}
-                activeOpacity={0.85}
               >
-                <View style={styles.cardHeaderLeft}>
-                  <IconWell icon="keypad-outline" tone="info" size={36} />
-                  <Text style={styles.cardTitle} numberOfLines={1}>Direct OTP & Keypad</Text>
+                <IconWell icon="keypad-outline" tone="info" size={36} />
+                <View style={styles.rowCopy}>
+                  <AppText variant="bodyStrong" numberOfLines={1}>Direct OTP & Keypad</AppText>
+                  <AppText variant="footnote" numberOfLines={1} style={styles.rowHelper}>Type codes into the session</AppText>
                 </View>
                 <Ionicons
                   name={showRawControls ? 'chevron-up' : 'chevron-down'}
                   size={18}
-                  color={uiTheme.colors.muted}
+                  color={c.muted}
                 />
-              </TouchableOpacity>
+              </MotionTouchable>
 
               {showRawControls && (
                 <View style={styles.rawControlsBody}>
                   {rawControlsContent}
                 </View>
               )}
-            </View>
-          </>
+            </Card>
+          </FadeIn>
         )}
 
       </ScrollView>
 
-      {/* ─── Modal: How AI Sees You (Profile Inspection Sheet) ─── */}
-      <Modal
+      {/* ─── Sheet: How AI Sees You (Profile Inspection Sheet) ─── */}
+      <BottomSheet
         visible={previewVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setPreviewVisible(false)}
+        onClose={() => setPreviewVisible(false)}
+        title="How AI Sees You"
+        subtitle="Your synced profile context"
+        maxHeightRatio={0.88}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet} accessibilityViewIsModal>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderCopy}>
-                <Text style={styles.modalTitle} accessibilityRole="header" numberOfLines={1}>How AI Sees You</Text>
-                <Text style={styles.modalSubtitle} numberOfLines={1}>YOUR SYNCED PROFILE CONTEXT</Text>
-              </View>
-              <IconButton
-                icon="close"
-                size={40}
-                iconSize={20}
-                style={styles.modalCloseBtn}
-                onPress={() => setPreviewVisible(false)}
-                accessibilityLabel="Close"
-              />
-            </View>
-
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <TinderProfileCard
-                profile={form?.userProfile}
-                settings={form}
-                stats={stats}
-                isLoggedIn={Boolean(form?.userProfile?.name || form?.userProfile?.bio)}
-                syncing={syncing}
-                onSync={handleSyncNow}
-                compact
-              />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+        <TinderProfileCard
+          profile={form?.userProfile}
+          settings={form}
+          stats={stats}
+          isLoggedIn={Boolean(form?.userProfile?.name || form?.userProfile?.bio)}
+          syncing={syncing}
+          onSync={handleSyncNow}
+          compact
+        />
+      </BottomSheet>
 
       {/* ─── Logout confirmation (shared branded dialog) ─── */}
       <AppConfirmModal
@@ -1732,6 +1755,269 @@ const ty = uiTheme.type;
 const L = uiTheme.layout;
 
 const styles = StyleSheet.create({
+  // ─── Control centre (v3 layout) ───
+  statusCard: {
+    borderRadius: r.xl,
+    borderWidth: 1,
+    borderColor: c.hairline,
+    padding: sp.lg,
+    overflow: 'hidden',
+    backgroundColor: c.surface,
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+  },
+  statusCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statusSub: {
+    marginTop: sp.xxs,
+  },
+  statusBadge: {
+    alignSelf: 'center',
+  },
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: sp.sm,
+    marginTop: sp.lg,
+  },
+  statTile: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    minWidth: 0,
+    gap: sp.xxs,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.md - 2,
+    borderRadius: r.lg,
+    borderWidth: 1,
+    borderColor: c.hairline,
+    backgroundColor: alpha(c.white, 0.04),
+  },
+  statTileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.xs + 2,
+  },
+  statTileLabel: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statTileValue: {
+    ...ty.title2,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.text,
+    marginTop: sp.xxs,
+    fontVariant: ['tabular-nums'],
+  },
+  callout: {
+    marginTop: sp.md,
+  },
+  calloutRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: sp.md,
+  },
+  calloutCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  calloutText: {
+    marginTop: sp.xxs,
+  },
+  calloutAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: sp.xs + 2,
+    minHeight: 36,
+    marginTop: sp.md,
+    paddingHorizontal: sp.lg,
+    borderRadius: r.pill,
+    backgroundColor: c.warning,
+  },
+  calloutActionText: {
+    ...ty.buttonSmall,
+    color: c.background,
+  },
+  groupCard: {
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    minHeight: 60,
+    paddingVertical: sp.md - 2,
+    paddingHorizontal: sp.lg,
+  },
+  rowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.divider,
+  },
+  rowCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rowHelper: {
+    marginTop: sp.xxs,
+  },
+  expandBody: {
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.lg,
+    paddingTop: sp.md,
+    gap: sp.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.divider,
+  },
+  meterGrid: {
+    flexDirection: 'row',
+    gap: sp.sm,
+  },
+  meterTile: {
+    flex: 1,
+    minWidth: 0,
+    gap: sp.xxs,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm + 2,
+    borderRadius: r.md,
+    borderWidth: 1,
+    borderColor: c.hairline,
+    backgroundColor: c.elevated,
+  },
+  meterTileValue: {
+    ...ty.headline,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.text,
+    fontVariant: ['tabular-nums'],
+  },
+  presetStack: {
+    gap: sp.lg,
+    paddingTop: sp.xs,
+  },
+  presetBlock: {
+    gap: sp.sm,
+  },
+  presetBlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: sp.md,
+  },
+  presetBlockLabel: {
+    flex: 1,
+    minWidth: 0,
+  },
+  presetBlockValue: {
+    fontFamily: uiTheme.fonts.strong,
+    fontVariant: ['tabular-nums'],
+  },
+  segTrack: {
+    flexDirection: 'row',
+    padding: 3,
+    gap: 3,
+    borderRadius: r.md,
+    borderWidth: 1,
+    borderColor: c.hairline,
+    backgroundColor: c.background,
+  },
+  segItem: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: r.sm,
+    overflow: 'hidden',
+  },
+  segItemActive: {
+    ...uiTheme.shadows.sm,
+  },
+  segItemText: {
+    ...ty.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
+    fontVariant: ['tabular-nums'],
+  },
+  segItemTextActive: {
+    fontFamily: uiTheme.fonts.strong,
+    color: c.onPrimary,
+  },
+  bioBody: {
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.lg,
+  },
+  bioTabs: {
+    flexDirection: 'row',
+    padding: 3,
+    gap: 3,
+    borderRadius: r.md,
+    borderWidth: 1,
+    borderColor: c.hairline,
+    backgroundColor: c.background,
+  },
+  bioTab: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: sp.xs + 1,
+    paddingHorizontal: sp.xs,
+    borderRadius: r.sm,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  bioTabActive: {
+    backgroundColor: c.primarySoft,
+    borderColor: c.primaryBorder,
+  },
+  bioTabText: {
+    ...ty.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
+    flexShrink: 1,
+  },
+  bioTabTextActive: {
+    color: c.text,
+  },
+  bioPanel: {
+    marginTop: sp.lg,
+    gap: sp.md,
+  },
+  insetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    minHeight: 56,
+    paddingVertical: sp.sm + 2,
+    paddingHorizontal: sp.md,
+    borderRadius: r.lg,
+    borderWidth: 1,
+    borderColor: c.hairline,
+    backgroundColor: c.elevated,
+  },
+  pushSuccessBtn: {
+    backgroundColor: c.successSoft,
+    borderColor: c.successBorder,
+  },
+  pushSuccessText: {
+    color: c.success,
+  },
+  genActionHalf: {
+    flex: 1,
+    minWidth: 0,
+  },
+  accountActions: {
+    padding: sp.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.divider,
+  },
+
   container: {
     flex: 1,
     backgroundColor: c.background,
@@ -1754,7 +2040,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: sp.xxs,
-    paddingTop: 0,
+    paddingTop: sp.xs,
     paddingBottom: sp.section,
   },
   categoryLabel: {
@@ -2028,7 +2314,7 @@ const styles = StyleSheet.create({
     color: c.onPrimary,
   },
   bioDrawer: {
-    marginTop: sp.xs,
+    marginTop: 0,
   },
   bioSubPanel: {
     marginTop: sp.md,
@@ -2126,7 +2412,7 @@ const styles = StyleSheet.create({
     borderColor: c.border,
     color: c.text,
     padding: sp.md,
-    minHeight: 104,
+    minHeight: 132,
     textAlignVertical: 'top',
   },
   customBioFooter: {
@@ -2134,7 +2420,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: sp.md,
-    marginTop: sp.sm,
   },
   charCountText: {
     ...ty.footnote,
@@ -2312,6 +2597,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.md,
+    minHeight: 80,
+    padding: sp.lg,
   },
   accountIconWrap: {
     position: 'relative',
@@ -2437,10 +2724,11 @@ const styles = StyleSheet.create({
     color: c.text,
   },
   rawControlsBody: {
-    marginTop: sp.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: c.divider,
     paddingTop: sp.md,
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.lg,
   },
 
   // ─── Desktop V2 Toast Banner ───

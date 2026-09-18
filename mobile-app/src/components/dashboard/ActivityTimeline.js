@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, LayoutAnimation } from 'react-native';
+import { View, Text, StyleSheet, LayoutAnimation, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme as uiTheme } from '../../theme';
 import { MotionTouchable, ContentTransition, FadeIn, useMotionReduced } from '../common/Motion';
-import { AppButton, Badge, Chip, CountUp, EmptyState, IconWell, SectionHeader } from '../ui';
+import { AppButton, AppText, Badge, Card, Chip, CountUp, EmptyState, IconWell, LiveDot } from '../ui';
+import { TONES } from '../ui/Badge';
 
 const EVENT_CONFIG = {
   opener_sent:      { icon: 'mail-outline',          label: 'Opener Sent',        tone: 'info' },
@@ -29,6 +30,12 @@ const EVENT_CONFIG = {
   success:          { icon: 'sparkles',              label: 'Milestone',          tone: 'success' },
 };
 
+const FILTER_ICONS = { All: 'albums-outline', Matches: 'heart-outline', Messages: 'chatbubbles-outline', System: 'settings-outline' };
+// Entrance stagger: only the first rows animate, in small steps.
+const STAGGER_ROWS = 10;
+const STAGGER_STEP = 35;
+// The summary shows a live pulse when the newest event is this recent.
+const LIVE_WINDOW_MS = 15 * 60000;
 
 const categories = {
   Matches: ['match_detected', 'match', 'handoff_detected'],
@@ -55,34 +62,55 @@ function dayLabel(value) {
   if (day === yesterday.toDateString()) return 'Yesterday';
   return new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 }
-function EventRow({ event }) {
+
+// One timeline entry: colour-coded icon well on a vertical rail, title + time, expandable detail.
+function EventRow({ event, last = false }) {
   const [expanded, setExpanded] = useState(false);
   const reducedMotion = useMotionReduced();
   const meta = EVENT_CONFIG[event.type] || { icon: 'pulse-outline', label: 'Activity update', tone: 'neutral' };
   const detail = String(event.detail || event.message || event.text || '').trim();
   const title = meta.label + (event.name ? ' · ' + event.name : '');
+  const toneColor = (TONES[meta.tone] || TONES.neutral).fg;
+  const isMoment = event.type === 'handoff_detected';
   const toggleExpanded = () => {
     if (!reducedMotion) LayoutAnimation.configureNext(LayoutAnimation.create(uiTheme.motion.normal, 'easeInEaseOut', 'opacity'));
     setExpanded(!expanded);
   };
   return <View style={styles.event}>
-    <IconWell icon={meta.icon} tone={meta.tone} size={40} />
-    <View style={styles.eventCopy}>
-      <View style={styles.eventHead}>
-        <Text style={styles.eventTitle} numberOfLines={2}>{title}</Text>
+    <View style={styles.railCol}>
+      <IconWell icon={meta.icon} tone={meta.tone} size={36} iconSize={17} />
+      {!last && <View style={styles.rail} />}
+    </View>
+    <View style={[styles.eventCopy, !last && styles.eventCopySpaced]}>
+      <View style={styles.eventHead} accessible accessibilityLabel={`${title}, ${timeLabel(event.time)}`}>
+        <Text style={styles.eventTitle} numberOfLines={2}>
+          {meta.label}
+          {event.name ? <Text style={[styles.eventName, { color: toneColor }]}>{' · ' + event.name}</Text> : null}
+        </Text>
         <Text style={styles.time} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{timeLabel(event.time)}</Text>
       </View>
-      {!!detail && <MotionTouchable onPress={toggleExpanded} activeOpacity={0.75} pressScale={0.99} accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse event details' : 'Expand event details'} accessibilityState={{ expanded }} style={styles.detailButton}>
+      {!!detail && <MotionTouchable onPress={toggleExpanded} activeOpacity={0.75} pressScale={0.99} accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse event details' : 'Expand event details'} accessibilityState={{ expanded }} style={[styles.detailButton, expanded && styles.detailButtonOpen]}>
         <Text style={styles.detail} numberOfLines={expanded ? undefined : 2}>{detail}</Text>
         <View style={styles.expandRow}>
           <Text style={styles.expand} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{expanded ? 'Show less' : 'View details'}</Text>
           <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={uiTheme.colors.accent} />
         </View>
       </MotionTouchable>}
-      {event.type === 'handoff_detected' && <Badge label="Connection milestone" tone="success" icon="checkmark-circle-outline" size="sm" style={styles.milestone} />}
+      {isMoment && <Badge label="Connection milestone" tone="success" icon="checkmark-circle-outline" size="sm" style={styles.milestone} />}
     </View>
   </View>;
 }
+
+// Small tinted count pill used in the summary card.
+function StatPill({ icon, tone, count, label }) {
+  const t = TONES[tone] || TONES.neutral;
+  return <View style={[styles.statPill, { backgroundColor: t.bg, borderColor: t.border }]} accessible accessibilityLabel={`${label}: ${count.toLocaleString()}`}>
+    <Ionicons name={icon} size={13} color={t.fg} />
+    <CountUp value={count} style={[styles.statPillValue, { color: t.fg }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome} importantForAccessibility="no" />
+    <Text style={styles.statPillLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{label}</Text>
+  </View>;
+}
+
 export default function ActivityTimeline({ progressFeed }) {
   const [filter, setFilter] = useState('All');
   const [limit, setLimit] = useState(30);
@@ -93,25 +121,70 @@ export default function ActivityTimeline({ progressFeed }) {
   const visible = filtered.slice(0, limit);
   const matches = events.filter(e => ['match', 'match_detected'].includes(e.type)).length;
   const messages = events.filter(e => ['opener_sent', 'message_replied', 'message', 'follow_up_sent'].includes(e.type)).length;
+
+  // Presentation only: split the already-sorted visible rows into consecutive day sections.
+  const groups = [];
+  visible.forEach((event, index) => {
+    const label = dayLabel(event.time);
+    if (index === 0 || label !== dayLabel(visible[index - 1].time)) groups.push({ label, items: [] });
+    groups[groups.length - 1].items.push({ event, index });
+  });
+  const latest = events.length ? events[0].time : 0;
+  const isLive = !!latest && Date.now() - latest < LIVE_WINDOW_MS;
+
   return <View style={styles.container}>
+    {/* Intro copy commented out: the screen's large-title header already names this page.
     <View style={styles.intro}><Text style={styles.title} accessibilityRole="header">Your activity, at a glance</Text><Text style={styles.subtitle}>Matches, conversations, and updates in one place.</Text></View>
-    <View style={styles.summary}>
-      {[['pulse-outline', events.length, 'Events', 'neutral'], ['heart-outline', matches, 'Matches', 'primary'], ['chatbubble-outline', messages, 'Messages', 'info']].map(([icon, count, label, tone]) => <View key={label} style={styles.summaryCell} accessible accessibilityLabel={`${label}: ${count.toLocaleString()}`}>
-        <IconWell icon={icon} tone={tone} size={32} iconSize={16} />
-        <CountUp value={count} style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} maxFontSizeMultiplier={uiTheme.fontScale.chrome} importantForAccessibility="no" />
-        <Text style={styles.summaryLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{label}</Text>
-      </View>)}
-    </View>
-    <Text style={styles.caption}>Counts reflect the available activity history.</Text>
-    <View style={styles.filters} accessibilityRole="tablist">
-      {['All', 'Matches', 'Messages', 'System'].map(label => <Chip key={label} label={label} selected={filter === label} accessibilityRole="tab" onPress={() => { setFilter(label); setLimit(30); }} accessibilityLabel={`${label} activity`} style={styles.filter} />)}
-    </View>
+    */}
+
+    {/* ── Summary header ── */}
+    <FadeIn offset={8}>
+      <Card padding="lg" style={styles.summary}>
+        <View style={styles.summaryTop}>
+          <View style={styles.eyebrow}>
+            <LiveDot size={8} active={isLive} color={isLive ? uiTheme.colors.success : uiTheme.colors.textTertiary} />
+            <AppText variant="overline" color={isLive ? 'success' : 'muted'} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{isLive ? 'LIVE NOW' : 'HIGHLIGHTS'}</AppText>
+          </View>
+          {latest ? <AppText variant="footnote" numberOfLines={1} style={styles.latest} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{'Latest · ' + timeLabel(latest)}</AppText> : null}
+        </View>
+        <View style={styles.hero} accessible accessibilityLabel={`Events: ${events.length.toLocaleString()}`}>
+          <CountUp value={events.length} style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} maxFontSizeMultiplier={uiTheme.fontScale.chrome} importantForAccessibility="no" />
+          <AppText variant="callout" color="textSecondary" style={styles.heroLabel}>{events.length === 1 ? 'update' : 'updates'} in your activity history</AppText>
+        </View>
+        <View style={styles.statRow}>
+          <StatPill icon="heart" tone="primary" count={matches} label="Matches" />
+          <StatPill icon="chatbubble" tone="info" count={messages} label="Messages" />
+        </View>
+        {/* Previous three-cell summary + caption, replaced by the card above.
+        <View style={styles.summaryLegacy}>…Events / Matches / Messages cells…</View>
+        <Text style={styles.caption}>Counts reflect the available activity history.</Text>
+        */}
+      </Card>
+    </FadeIn>
+
+    {/* ── Filters ── */}
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} accessibilityRole="tablist">
+      {['All', 'Matches', 'Messages', 'System'].map(label => <Chip key={label} label={label} icon={FILTER_ICONS[label]} selected={filter === label} accessibilityRole="tab" onPress={() => { setFilter(label); setLimit(30); }} accessibilityLabel={`${label} activity`} style={styles.filter} />)}
+    </ScrollView>
+
+    {/* ── Timeline grouped by day ── */}
     <ContentTransition transitionKey={filter}>
-    {visible.length ? <View>
-      {visible.map((event, index) => <React.Fragment key={event.id ? String(event.id) + '_' + index : String(event.time) + '_' + index}>
-        {(index === 0 || dayLabel(event.time) !== dayLabel(visible[index - 1].time)) && <SectionHeader title={dayLabel(event.time)} style={styles.day} />}
-        {index < 12 ? <FadeIn delay={index * 40} offset={8}><EventRow event={event} /></FadeIn> : <EventRow event={event} />}
-      </React.Fragment>)}
+    {visible.length ? <View style={styles.groups}>
+      {groups.map(group => <View key={group.label + '_' + group.items[0].index} style={styles.group}>
+        <View style={styles.dayHeader}>
+          <AppText variant="overline" accessibilityRole="header" numberOfLines={1} style={styles.dayTitle}>{group.label.toUpperCase()}</AppText>
+          <AppText variant="footnote" numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{group.items.length === 1 ? '1 update' : group.items.length + ' updates'}</AppText>
+        </View>
+        <Card padding="md" style={styles.groupCard}>
+          {group.items.map(({ event, index }, i) => {
+            const last = i === group.items.length - 1;
+            const key = event.id ? String(event.id) + '_' + index : String(event.time) + '_' + index;
+            return index < STAGGER_ROWS
+              ? <FadeIn key={key} delay={index * STAGGER_STEP} offset={8}><EventRow event={event} last={last} /></FadeIn>
+              : <EventRow key={key} event={event} last={last} />;
+          })}
+        </Card>
+      </View>)}
       {filtered.length > limit && <AppButton title="Show more activity" variant="secondary" iconRight="chevron-down" onPress={() => setLimit(limit + 30)} style={styles.more} />}
     </View> : <EmptyState
       icon={filter === 'Messages' ? 'chatbubbles-outline' : filter === 'Matches' ? 'heart-outline' : 'pulse-outline'}
@@ -129,24 +202,42 @@ const styles = StyleSheet.create({
   intro: { gap: 6, paddingTop: uiTheme.spacing.md },
   title: { ...uiTheme.type.title, color: uiTheme.colors.text },
   subtitle: { ...uiTheme.type.body, color: uiTheme.colors.muted },
-  summary: { flexDirection: 'row', backgroundColor: uiTheme.colors.surface, borderRadius: uiTheme.radius.card, borderWidth: 1, borderColor: uiTheme.colors.hairline, paddingVertical: uiTheme.spacing.lg, paddingHorizontal: uiTheme.spacing.xs },
-  summaryCell: { flex: 1, minWidth: 0, alignItems: 'center', gap: 6, paddingHorizontal: uiTheme.spacing.xs },
-  summaryValue: { ...uiTheme.type.number, fontVariant: ['tabular-nums'], color: uiTheme.colors.text, alignSelf: 'stretch', textAlign: 'center' },
-  summaryLabel: { ...uiTheme.type.overline, textTransform: 'uppercase', color: uiTheme.colors.muted },
-  caption: { ...uiTheme.type.caption, color: uiTheme.colors.muted, marginTop: -uiTheme.spacing.sm },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: uiTheme.spacing.sm },
+  // Summary card
+  summary: { borderRadius: uiTheme.radius.xl, gap: uiTheme.spacing.md },
+  summaryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiTheme.spacing.sm },
+  eyebrow: { flexDirection: 'row', alignItems: 'center', gap: uiTheme.spacing.sm, flexShrink: 1, minWidth: 0 },
+  latest: { flexShrink: 1, minWidth: 0, textAlign: 'right' },
+  hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: uiTheme.spacing.sm },
+  heroValue: { ...uiTheme.type.largeTitle, fontVariant: ['tabular-nums'], color: uiTheme.colors.text, maxWidth: '100%' },
+  heroLabel: { flexShrink: 1, minWidth: 0 },
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: uiTheme.spacing.sm },
+  statPill: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 30, paddingHorizontal: uiTheme.spacing.md, borderRadius: uiTheme.radius.pill, borderWidth: 1, maxWidth: '100%' },
+  statPillValue: { ...uiTheme.type.buttonSmall, fontFamily: uiTheme.fonts.strong, fontVariant: ['tabular-nums'] },
+  statPillLabel: { ...uiTheme.type.subhead, color: uiTheme.colors.textSecondary, flexShrink: 1, minWidth: 0 },
+  // Filters
+  filters: { flexDirection: 'row', gap: uiTheme.spacing.sm, paddingRight: uiTheme.spacing.xs },
   filter: { minHeight: uiTheme.layout.touchTarget - 4 },
-  day: { marginTop: uiTheme.spacing.md },
-  event: { flexDirection: 'row', gap: uiTheme.spacing.md, padding: uiTheme.spacing.lg, marginBottom: uiTheme.spacing.sm, borderRadius: uiTheme.radius.lg, backgroundColor: uiTheme.colors.surface, borderWidth: 1, borderColor: uiTheme.colors.borderSubtle },
-  eventCopy: { flex: 1, minWidth: 0, gap: uiTheme.spacing.xs },
+  // Day groups + timeline rows
+  groups: { gap: uiTheme.spacing.xl },
+  group: { gap: uiTheme.spacing.sm },
+  dayHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: uiTheme.spacing.md, paddingHorizontal: uiTheme.spacing.xs },
+  dayTitle: { flexShrink: 1, minWidth: 0 },
+  groupCard: { paddingBottom: uiTheme.spacing.sm },
+  event: { flexDirection: 'row', gap: uiTheme.spacing.md },
+  railCol: { width: 36, alignItems: 'center' },
+  rail: { flex: 1, width: 2, borderRadius: 1, marginVertical: uiTheme.spacing.xs, backgroundColor: uiTheme.colors.divider },
+  eventCopy: { flex: 1, minWidth: 0, gap: uiTheme.spacing.xs, paddingTop: uiTheme.spacing.xs, paddingBottom: uiTheme.spacing.xs },
+  eventCopySpaced: { paddingBottom: uiTheme.spacing.lg },
   eventHead: { flexDirection: 'row', alignItems: 'flex-start', gap: uiTheme.spacing.sm },
-  eventTitle: { ...uiTheme.type.headline, color: uiTheme.colors.text, flex: 1, minWidth: 0 },
-  time: { ...uiTheme.type.footnote, fontVariant: ['tabular-nums'], color: uiTheme.colors.muted, marginTop: 2 },
-  detailButton: { minHeight: uiTheme.layout.touchTarget, gap: 6, paddingTop: uiTheme.spacing.xs },
+  eventTitle: { ...uiTheme.type.bodyStrong, color: uiTheme.colors.text, flex: 1, minWidth: 0 },
+  eventName: { fontFamily: uiTheme.fonts.label },
+  time: { ...uiTheme.type.footnote, fontVariant: ['tabular-nums'], color: uiTheme.colors.muted, marginTop: 2, flexShrink: 0 },
+  detailButton: { minHeight: uiTheme.layout.touchTarget, gap: 6, paddingVertical: uiTheme.spacing.sm, paddingHorizontal: uiTheme.spacing.md, borderRadius: uiTheme.radius.md, backgroundColor: uiTheme.colors.elevated, marginTop: 2 },
+  detailButtonOpen: { backgroundColor: uiTheme.colors.elevatedHigh },
   detail: { ...uiTheme.type.callout, color: uiTheme.colors.textSecondary },
   expandRow: { flexDirection: 'row', alignItems: 'center', gap: uiTheme.spacing.xs },
   expand: { ...uiTheme.type.buttonSmall, color: uiTheme.colors.accent },
   milestone: { marginTop: uiTheme.spacing.xs },
-  more: { marginTop: uiTheme.spacing.md },
+  more: { marginTop: -uiTheme.spacing.xs },
   empty: { backgroundColor: uiTheme.colors.surface, borderRadius: uiTheme.radius.card, borderWidth: 1, borderColor: uiTheme.colors.borderSubtle },
 });

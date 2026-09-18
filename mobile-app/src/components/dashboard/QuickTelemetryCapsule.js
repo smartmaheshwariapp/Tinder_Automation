@@ -1,9 +1,9 @@
 import { theme as uiTheme } from '../../theme';
-// src/components/dashboard/QuickTelemetryCapsule.js — Apple Health-Style Metric Telemetry Bar
+// src/components/dashboard/QuickTelemetryCapsule.js — Compact lifetime stat strip (Swipes · Messages · Matches)
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import Badge, { TONES } from '../ui/Badge';
+import { TONES } from '../ui/Badge';
+import IconWell from '../ui/IconWell';
 import CountUp from '../ui/CountUp';
 
 function formatNumber(n) {
@@ -13,7 +13,7 @@ function formatNumber(n) {
   return String(n);
 }
 
-export default function QuickTelemetryCapsule({ lifetimeStats }) {
+export default function QuickTelemetryCapsule({ lifetimeStats, style }) {
   const stats = lifetimeStats || {};
 
   const totalSwipes   = stats.totalSwipes   ?? stats.totalLikes   ?? stats.swipes   ?? 0;
@@ -24,8 +24,8 @@ export default function QuickTelemetryCapsule({ lifetimeStats }) {
   const activeChats   = stats.activeChats   ?? stats.activeConversations ?? stats.matches ?? 0;
 
   return (
-    <View style={styles.container}>
-      {/* ── 1. Swipes Telemetry Column ── */}
+    <View style={[styles.container, style]}>
+      {/* ── 1. Swipes ── */}
       <Metric
         icon="heart"
         tone="primary"
@@ -37,7 +37,7 @@ export default function QuickTelemetryCapsule({ lifetimeStats }) {
 
       <View style={styles.divider} />
 
-      {/* ── 2. Messages Telemetry Column ── */}
+      {/* ── 2. Messages ── */}
       <Metric
         icon="chatbubbles"
         tone="secondary"
@@ -49,7 +49,7 @@ export default function QuickTelemetryCapsule({ lifetimeStats }) {
 
       <View style={styles.divider} />
 
-      {/* ── 3. Matches & Leads Telemetry Column ── */}
+      {/* ── 3. Matches ── */}
       <Metric
         icon="sparkles"
         tone="info"
@@ -62,24 +62,26 @@ export default function QuickTelemetryCapsule({ lifetimeStats }) {
   );
 }
 
+// One stat cell: icon well + rolling number, then label and a tone-coloured delta line.
 function Metric({ icon, tone, label, value, raw, badge }) {
+  const toneColor = (TONES[tone] || TONES.neutral).fg;
   return (
     <View style={styles.col} accessible accessibilityLabel={`${label}: ${value}, ${badge}`}>
-      <View style={styles.colHeader}>
-        <Ionicons name={icon} size={12} color={(TONES[tone] || TONES.neutral).fg} />
-        <Text style={styles.colLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{label}</Text>
+      <View style={styles.valueRow}>
+        <IconWell icon={icon} tone={tone} size={24} iconSize={12} />
+        <CountUp
+          value={typeof raw === 'number' && !isNaN(raw) ? raw : value}
+          format={v => formatNumber(Math.round(v))}
+          style={styles.colValue}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+          maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+          importantForAccessibility="no"
+        />
       </View>
-      <CountUp
-        value={typeof raw === 'number' && !isNaN(raw) ? raw : value}
-        format={v => formatNumber(Math.round(v))}
-        style={styles.colValue}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}
-        maxFontSizeMultiplier={uiTheme.fontScale.chrome}
-        importantForAccessibility="no"
-      />
-      <Badge label={badge} tone={tone} size="sm" style={styles.badge} />
+      <Text style={styles.colLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{label}</Text>
+      <Text style={[styles.colDelta, { color: toneColor }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{badge}</Text>
     </View>
   );
 }
@@ -87,48 +89,43 @@ function Metric({ icon, tone, label, value, raw, badge }) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.card,
+    borderRadius: uiTheme.radius.lg,
     borderWidth: 1,
     borderColor: uiTheme.colors.hairline,
     paddingVertical: uiTheme.spacing.md,
-    paddingHorizontal: uiTheme.spacing.xs,
-    marginBottom: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.lg,
   },
   col: {
     flex: 1,
     minWidth: 0,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: uiTheme.spacing.xs,
+    paddingHorizontal: uiTheme.spacing.md - 2,
   },
-  colHeader: {
+  valueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    maxWidth: '100%',
-    marginBottom: uiTheme.spacing.xs,
-  },
-  colLabel: {
-    ...uiTheme.type.overline,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    color: uiTheme.colors.muted,
-    flexShrink: 1,
+    gap: 6,
+    minWidth: 0,
   },
   colValue: {
     ...uiTheme.type.title2,
     fontFamily: uiTheme.fonts.strong,
     fontVariant: ['tabular-nums'],
     color: uiTheme.colors.text,
-    alignSelf: 'stretch',
-    textAlign: 'center',
+    flexShrink: 1,
+    minWidth: 0,
   },
-  badge: {
+  colLabel: {
+    ...uiTheme.type.subhead,
+    color: uiTheme.colors.textSecondary,
     marginTop: uiTheme.spacing.xs,
-    alignSelf: 'center',
-    maxWidth: '100%',
+  },
+  colDelta: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.label,
+    marginTop: 1,
   },
   divider: {
     width: StyleSheet.hairlineWidth,

@@ -32,21 +32,28 @@ function LoadingState() {
       accessibilityLabel="Connecting your assistant. Your latest activity will appear here shortly."
       accessibilityLiveRegion="polite"
     >
-      <View style={styles.loadingIntro}>
-        <Skeleton width="70%" height={22} />
-        <Skeleton width="50%" height={14} />
-      </View>
+      {/* Summary card: eyebrow, hero number, two stat pills */}
       <View style={styles.loadingSummary}>
-        {[0, 1, 2].map(i => (
-          <View key={i} style={styles.loadingCell}>
-            <Skeleton width={32} height={32} radius={10} />
-            <Skeleton width="60%" height={22} />
-          </View>
+        <Skeleton width={96} height={11} />
+        <Skeleton width="42%" height={34} radius={uiTheme.radius.sm} />
+        <View style={styles.loadingPills}>
+          <Skeleton width={104} height={30} radius={uiTheme.radius.pill} />
+          <Skeleton width={112} height={30} radius={uiTheme.radius.pill} />
+        </View>
+      </View>
+      {/* Filter chips */}
+      <View style={styles.loadingChips}>
+        {[56, 88, 96, 80].map((w, i) => (
+          <Skeleton key={i} width={w} height={36} radius={uiTheme.radius.pill} />
         ))}
       </View>
-      {[0, 1, 2, 3].map(i => (
-        <SkeletonRow key={i} style={styles.loadingRow} />
-      ))}
+      {/* One day group of timeline rows */}
+      <Skeleton width={72} height={11} style={styles.loadingDay} />
+      <View style={styles.loadingGroup}>
+        {[0, 1, 2, 3].map(i => (
+          <SkeletonRow key={i} style={styles.loadingRow} />
+        ))}
+      </View>
     </View>
   );
 }
@@ -181,14 +188,18 @@ export default function DashboardPanel({
         />}
         */}
 
-        {/* ── 2. Integrated Telemetry Capsule (Swipes, Messages, Matches) ── */}
-        <QuickTelemetryCapsule lifetimeStats={lifetimeStats} />
-
-        {/* ── 3. Apple-Style Segmented Navigation (Activity | Automation | Settings) ── */}
+        {/* ── 2. Pill Segmented Navigation (Activity | Automation | Controls) — always first so the
+               Controls page stays reachable ── */}
         <SegmentedTabControl
           activeTab={activeTab}
           onSelectTab={handleTabSelect}
         />
+
+        {/* ── 3. Lifetime stat strip (Swipes, Messages, Matches) — shown on Activity & Automation;
+               hidden on Controls where it competes with the form content ── */}
+        {activeTab !== 'settings' && (
+          <QuickTelemetryCapsule lifetimeStats={lifetimeStats} />
+        )}
 
         {/* ── 4. Active Tab Content ── */}
         {activeTab === 'activity' && (
@@ -267,30 +278,38 @@ const styles = StyleSheet.create({
     paddingBottom: 90, // Extra breathing space so content isn't covered by floating save bar
   },
   loadingWrap: {
-    gap: uiTheme.spacing.md,
-    paddingTop: uiTheme.spacing.md,
-  },
-  loadingIntro: {
-    gap: uiTheme.spacing.sm,
-    marginBottom: uiTheme.spacing.xs,
+    gap: uiTheme.spacing.lg,
   },
   loadingSummary: {
+    gap: uiTheme.spacing.md,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.xl,
+    borderWidth: 1,
+    borderColor: uiTheme.colors.borderSubtle,
+    padding: uiTheme.spacing.xl,
+  },
+  loadingPills: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: uiTheme.spacing.sm,
+  },
+  loadingChips: {
+    flexDirection: 'row',
+    gap: uiTheme.spacing.sm,
+    overflow: 'hidden',
+  },
+  loadingDay: {
+    marginBottom: -uiTheme.spacing.sm,
+    marginLeft: uiTheme.spacing.xs,
+  },
+  loadingGroup: {
     backgroundColor: uiTheme.colors.surface,
     borderRadius: uiTheme.radius.card,
     borderWidth: 1,
-    borderColor: uiTheme.colors.hairline,
-    paddingVertical: uiTheme.spacing.lg,
-  },
-  loadingCell: {
-    flex: 1,
-    alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    borderColor: uiTheme.colors.borderSubtle,
+    paddingVertical: uiTheme.spacing.xs,
   },
   loadingRow: {
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.lg,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.borderSubtle,
+    paddingVertical: uiTheme.spacing.md,
   },
 });

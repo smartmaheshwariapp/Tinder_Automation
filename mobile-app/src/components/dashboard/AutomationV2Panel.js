@@ -26,10 +26,15 @@ import TimeRangeSlider, { timeToMins, minsToDisplay, minsTo24 } from '../common/
 import V2Dropdown from '../common/V2Dropdown';
 import { CITY_PRESETS } from '../../utils/locationHubs';
 import { theme as uiTheme, alpha } from '../../theme';
-import { FocusInput } from '../common/Motion';
+import { FocusInput, FadeIn, ContentTransition, MotionTouchable, useMotionReduced } from '../common/Motion';
+import { LinearGradient } from 'expo-linear-gradient';
 import AppButton from '../ui/AppButton';
+import AppText from '../ui/AppText';
+import Badge from '../ui/Badge';
+import Card from '../ui/Card';
 import IconButton from '../ui/IconButton';
 import IconWell from '../ui/IconWell';
+import SectionHeader from '../ui/SectionHeader';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -42,6 +47,9 @@ const SHOW_SWIPING_CONTROLS = false;
 const SHOW_MESSAGING_CONTROLS = false;
 const SHOW_LOCATION_FEATURE = false;
 const SHOW_DEFAULT_LANGUAGE = false;
+// Previous accordion layout of the "Your Dating Goal" card, kept for reference.
+// The redesigned sections below render the exact same controls (goal, stop-after-goal, handles, gender).
+const SHOW_LEGACY_GOAL_ACCORDION = false;
 
 // ─── Goal Options ───
 const GOAL_OPTIONS = [
@@ -689,6 +697,141 @@ const getPersonaForLang = (langCode) => {
   return LOCALIZED_TRAINING_PERSONAS[code] || LOCALIZED_TRAINING_PERSONAS.en;
 };
 
+// ─── Redesigned Automation page building blocks (UI only; values/callbacks come from the panel) ───
+const SEGMENT_PAD = 3;
+const SEGMENT_BORDER = 1;
+
+// Large selectable goal card: icon well, title, one-line description and a radio check.
+function GoalOptionCard({ option, selected, onPress }) {
+  return (
+    <MotionTouchable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityLabel={`${option.label}. ${option.desc}`}
+      accessibilityState={{ checked: selected, selected }}
+      pressScale={0.98}
+      activeOpacity={0.9}
+      style={[styles.goalCard, selected && styles.goalCardSelected]}
+    >
+      <IconWell icon={option.icon} tone={selected ? 'primary' : 'neutral'} size={44} />
+      <View style={styles.goalCardCopy}>
+        <AppText variant="headline" numberOfLines={2}>{option.label}</AppText>
+        <AppText variant="footnote" color={selected ? 'textSecondary' : 'muted'} numberOfLines={2} style={styles.goalCardDesc}>{option.desc}</AppText>
+      </View>
+      <View style={[styles.goalRadio, selected && styles.goalRadioSelected]}>
+        {selected ? <Ionicons name="checkmark" size={14} color={uiTheme.colors.onPrimary} /> : null}
+      </View>
+    </MotionTouchable>
+  );
+}
+
+// Segmented control with a sliding brand-gradient thumb (native-driver translateX).
+function SegmentedControl({ options, value, onChange, accessibilityLabel }) {
+  const reduced = useMotionReduced();
+  const [trackWidth, setTrackWidth] = useState(0);
+  const index = Math.max(0, options.findIndex(o => o.id === value));
+  const position = useRef(new Animated.Value(index)).current;
+
+  useEffect(() => {
+    position.stopAnimation();
+    if (reduced) { position.setValue(index); return undefined; }
+    const animation = Animated.spring(position, { toValue: index, damping: 20, stiffness: 260, mass: 0.9, useNativeDriver: true });
+    animation.start();
+    return () => animation.stop();
+  }, [index, reduced, position]);
+
+  const segmentWidth = trackWidth ? (trackWidth - (SEGMENT_PAD + SEGMENT_BORDER) * 2) / options.length : 0;
+
+  return (
+    <View
+      style={styles.segmented}
+      accessibilityRole="radiogroup"
+      accessibilityLabel={accessibilityLabel}
+      onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}
+    >
+      {segmentWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.segmentThumb, { width: segmentWidth, transform: [{ translateX: Animated.multiply(position, segmentWidth) }] }]}
+        >
+          <LinearGradient colors={uiTheme.gradients.brandShort} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+      ) : null}
+      {options.map(option => {
+        const selected = option.id === value;
+        return (
+          <MotionTouchable
+            key={option.id}
+            onPress={() => onChange(option.id)}
+            accessibilityRole="radio"
+            accessibilityLabel={option.label}
+            accessibilityState={{ checked: selected, selected }}
+            pressScale={0.96}
+            activeOpacity={0.85}
+            style={styles.segment}
+          >
+            <AppText
+              variant="buttonSmall"
+              color={selected ? 'onPrimary' : 'muted'}
+              numberOfLines={1}
+              maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+              style={styles.segmentText}
+            >
+              {option.label}
+            </AppText>
+          </MotionTouchable>
+        );
+      })}
+    </View>
+  );
+}
+
+// Contact handle row: icon + label + switch; the input slides in below when the handle is shared.
+function ContactHandleRow({ icon, tone, title, switchLabel, enabled, onToggle, sentCount, value, inputLabel, missingHint, divider, inputProps }) {
+  const missing = enabled && !String(value || '').trim();
+  return (
+    <View style={[styles.handleRow, divider && styles.handleRowDivider]}>
+      <View style={styles.handleRowHead}>
+        <IconWell icon={icon} tone={enabled ? tone : 'neutral'} size={40} />
+        <View style={styles.handleRowCopy}>
+          <AppText variant="bodyStrong" numberOfLines={1}>{title}</AppText>
+          <View style={styles.handleSentRow}>
+            <Ionicons name="paper-plane-outline" size={12} color={uiTheme.colors.muted} />
+            <AppText variant="footnote" numberOfLines={1} style={styles.handleSentText}>
+              Sent to <AppText variant="footnote" color={enabled ? 'text' : 'muted'} style={styles.handleStatCount}>{sentCount}</AppText> matches
+            </AppText>
+          </View>
+        </View>
+        <Switch
+          accessibilityLabel={switchLabel}
+          value={enabled}
+          onValueChange={onToggle}
+          trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+          thumbColor={uiTheme.colors.white}
+          ios_backgroundColor={uiTheme.colors.elevatedHigh}
+        />
+      </View>
+      {enabled ? (
+        <FadeIn offset={-6} style={styles.handleInputWrap}>
+          <AppText variant="caption" color="textSecondary" style={styles.handleInputLabel}>{inputLabel}</AppText>
+          <FocusInput
+            {...inputProps}
+            value={value || ''}
+            autoCorrect={false}
+            style={[styles.handleInput, missing && styles.handleInputMissing]}
+          />
+          {missing ? (
+            <View style={styles.handleHintRow}>
+              <Ionicons name="alert-circle-outline" size={13} color={uiTheme.colors.warning} />
+              <AppText variant="caption" color="warning" style={styles.handleHintText}>{missingHint}</AppText>
+            </View>
+          ) : null}
+        </FadeIn>
+      ) : null}
+    </View>
+  );
+}
+
 export default function AutomationV2Panel({ settings, loading, saving, saveSuccess, error, onSave, onDirtyChange, onNavigateToSettings }) {
   const [form, setForm] = useState(null);
   const formRef = useRef(null);
@@ -718,6 +861,7 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
   const [inlineSaved, setInlineSaved] = useState(false);
   const [simLangModalOpen, setSimLangModalOpen] = useState(false);
   const [tooltipModal, setTooltipModal] = useState(null);
+  const reduceMotion = useMotionReduced();
 
   // ─── Location Hub State (Global Geolocation Sync) ───
 
@@ -1590,15 +1734,170 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
     return `${start} – ${end}`;
   };
 
+  // ─── Redesigned page: derived display values (read-only views of `form`) ───
+  const activeGoalId = form.goal || 'never';
+  const activeGoal = GOAL_OPTIONS.find(g => g.id === activeGoalId)
+    || { id: activeGoalId, label: 'Custom goal', desc: 'Pick a goal below to change how the wingman steers chats', icon: 'flag-outline' };
+  // Mirrors what gets saved (handleSavePress treats a missing goal as 'never').
+  const stopAfterGoalOn = form.stopAfterGoal !== false && activeGoalId !== 'never';
+  const instagramEnabled = form.contactDetails?.instagram?.enabled !== false;
+  const whatsappEnabled = form.contactDetails?.whatsapp?.enabled !== false;
+  const currentGender = (form.userGenderOverride || 'auto').toLowerCase();
+  const handleBadge = (enabled, value, name) => {
+    if (!enabled) return { tone: 'neutral', label: `${name} off` };
+    return String(value || '').trim() ? { tone: 'success', label: `${name} ready` } : { tone: 'warning', label: `${name} missing` };
+  };
+  const instagramBadge = handleBadge(instagramEnabled, form.contactDetails?.instagram?.value, 'Instagram');
+  const whatsappBadge = handleBadge(whatsappEnabled, form.contactDetails?.whatsapp?.value, 'WhatsApp');
+  // Animates the input reveal/collapse, then applies the exact same field update as before.
+  const toggleHandle = (path, value) => {
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.create(uiTheme.motion.normal, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
+    updateField(path, value);
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
 
-        {/* ════════════════════ CARD 1: YOUR DATING GOAL (V2 DESKTOP PARITY) ════════════════════ */}
+        {/* ════════════════════ PAGE INTRO: WHAT THE WINGMAN IS AIMING FOR ════════════════════ */}
+        <FadeIn>
+          <View style={styles.heroCard}>
+            <LinearGradient colors={uiTheme.gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+            <ContentTransition transitionKey={activeGoalId} style={styles.heroTop}>
+              <IconWell icon={activeGoal.icon} tone="primary" size={52} />
+              <View style={styles.heroCopy}>
+                <AppText variant="overline" color="secondary" numberOfLines={1}>WINGMAN IS AIMING FOR</AppText>
+                <AppText variant="title2" numberOfLines={2} style={styles.heroTitle}>{activeGoal.label}</AppText>
+                <AppText variant="footnote" color="textSecondary" numberOfLines={2}>{activeGoal.desc}</AppText>
+              </View>
+            </ContentTransition>
+            <View style={styles.heroDivider} />
+            <View style={styles.heroBadges} accessible accessibilityLabel={`${stopAfterGoalOn ? 'Stops after goal' : 'Keeps chatting'}, ${instagramBadge.label}, ${whatsappBadge.label}`}>
+              <Badge
+                tone={stopAfterGoalOn ? 'secondary' : 'neutral'}
+                icon={stopAfterGoalOn ? 'flag-outline' : 'infinite-outline'}
+                label={stopAfterGoalOn ? 'Stops after goal' : 'Keeps chatting'}
+                style={styles.heroBadge}
+                textStyle={styles.heroBadgeText}
+              />
+              <Badge tone={instagramBadge.tone} icon="logo-instagram" label={instagramBadge.label} style={styles.heroBadge} textStyle={styles.heroBadgeText} />
+              <Badge tone={whatsappBadge.tone} icon="logo-whatsapp" label={whatsappBadge.label} style={styles.heroBadge} textStyle={styles.heroBadgeText} />
+            </View>
+          </View>
+        </FadeIn>
+
+        {/* ════════════════════ SECTION: DATING GOAL ════════════════════ */}
+        <View style={styles.pageSection}>
+          <FadeIn delay={50}>
+            <SectionHeader title="Dating goal" description="How the AI Wingman steers and closes conversations." />
+          </FadeIn>
+          <View style={styles.goalList} accessibilityRole="radiogroup" accessibilityLabel="Primary Goal">
+            {GOAL_OPTIONS.map((option, idx) => (
+              <FadeIn key={option.id} delay={100 + idx * 40}>
+                <GoalOptionCard
+                  option={option}
+                  selected={activeGoalId === option.id}
+                  onPress={() => updateField('goal', option.id)}
+                />
+              </FadeIn>
+            ))}
+          </View>
+          <FadeIn delay={320}>
+            <Card padding="none" style={styles.groupCard}>
+              <View style={[styles.settingRow, form.goal === 'never' && styles.settingRowDisabled]}>
+                <IconWell icon="flag-outline" tone={stopAfterGoalOn ? 'secondary' : 'neutral'} size={40} />
+                <View style={styles.settingRowCopy}>
+                  <AppText variant="bodyStrong" numberOfLines={1}>Stop After Goal</AppText>
+                  <AppText variant="footnote" numberOfLines={2} style={styles.settingRowSub}>
+                    {form.goal === 'never' ? 'Not used while Keep Engaging is selected' : 'Stop messaging a match once the goal is reached'}
+                  </AppText>
+                </View>
+                <Switch
+                  accessibilityLabel="Stop After Goal"
+                  value={form.stopAfterGoal !== false && form.goal !== 'never'}
+                  disabled={form.goal === 'never'}
+                  onValueChange={v => updateField('stopAfterGoal', v)}
+                  trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                  thumbColor={uiTheme.colors.white}
+                  ios_backgroundColor={uiTheme.colors.elevatedHigh}
+                />
+              </View>
+            </Card>
+          </FadeIn>
+        </View>
+
+        {/* ════════════════════ SECTION: CONTACT HANDLES ════════════════════ */}
+        <FadeIn delay={370} style={styles.pageSection}>
+          <SectionHeader title="Your contact details" description="Toggle on the details you want the AI to share when a match asks for your contact." />
+          <Card padding="none" style={styles.groupCard}>
+            <ContactHandleRow
+              icon="logo-instagram"
+              tone="primary"
+              title="Instagram"
+              switchLabel="Share Instagram"
+              enabled={instagramEnabled}
+              onToggle={v => toggleHandle('contactDetails.instagram.enabled', v)}
+              sentCount={form.handleSentStats?.instagram || 0}
+              value={form.contactDetails?.instagram?.value}
+              inputLabel="Your Instagram handle"
+              missingHint="Add your handle so the wingman can share it."
+              divider
+              inputProps={{
+                placeholder: '@yourhandle',
+                accessibilityLabel: 'Instagram handle',
+                autoCapitalize: 'none',
+                textContentType: 'username',
+                onChangeText: val => updateField('contactDetails.instagram.value', val),
+              }}
+            />
+            <ContactHandleRow
+              icon="logo-whatsapp"
+              tone="success"
+              title="WhatsApp"
+              switchLabel="Share WhatsApp"
+              enabled={whatsappEnabled}
+              onToggle={v => toggleHandle('contactDetails.whatsapp.enabled', v)}
+              sentCount={form.handleSentStats?.whatsapp || 0}
+              value={form.contactDetails?.whatsapp?.value}
+              inputLabel="Your WhatsApp number"
+              missingHint="Add your number so the wingman can share it."
+              inputProps={{
+                placeholder: '+1 555 000 0000',
+                accessibilityLabel: 'WhatsApp number',
+                keyboardType: 'phone-pad',
+                textContentType: 'telephoneNumber',
+                onChangeText: val => updateField('contactDetails.whatsapp.value', val),
+              }}
+            />
+          </Card>
+        </FadeIn>
+
+        {/* ════════════════════ SECTION: ABOUT YOU (GENDER) ════════════════════ */}
+        <FadeIn delay={420} style={styles.pageSection}>
+          <SectionHeader title="Your gender" description="Used for grammar in AI messages." />
+          <Card padding="md" style={styles.groupCard}>
+            <SegmentedControl
+              options={GENDER_OPTIONS}
+              value={currentGender}
+              onChange={id => updateField('userGenderOverride', id)}
+              accessibilityLabel="Your gender"
+            />
+            <View style={styles.genderHintRow}>
+              <Ionicons name="sparkles-outline" size={13} color={uiTheme.colors.muted} />
+              <AppText variant="footnote" style={styles.genderHintText}>
+                Auto = detected from your profile. Set manually if Auto is wrong.
+              </AppText>
+            </View>
+          </Card>
+        </FadeIn>
+
+        {/* ════════════════════ CARD 1 (LEGACY ACCORDION LAYOUT, HIDDEN): YOUR DATING GOAL (V2 DESKTOP PARITY) ════════════════════ */}
+        {SHOW_LEGACY_GOAL_ACCORDION && (
         <View style={[styles.v2Card, openCards.goal && styles.v2CardOpen]}>
           <TouchableOpacity accessibilityRole="button"
             accessibilityLabel="Your Dating Goal"
@@ -1932,6 +2231,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             </View>
           )}
         </View>
+        )}
 
         {/* ════════════════════ CARD 2: SWIPING & SAFETY LIMITS ════════════════════ */}
         {SHOW_SWIPING_CONTROLS && (
@@ -3380,11 +3680,11 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           activeOpacity={1}
           onPress={() => setTooltipModal(null)}
         >
-          <View style={[styles.simLangModalContent, styles.tooltipContent]} accessibilityViewIsModal>
-            <View style={styles.simLangModalHeader}>
+          <View style={[styles.simLangModalContent, styles.tooltipContent]} accessibilityViewIsModal onStartShouldSetResponder={() => true}>
+            <View style={styles.tooltipHeader}>
               <View style={styles.tooltipTitleRow}>
-                <IconWell icon="information-circle-outline" tone="info" size={36} />
-                <Text style={styles.tooltipTitle} accessibilityRole="header" numberOfLines={2}>{tooltipModal?.title || 'How it works'}</Text>
+                <IconWell icon="information-circle-outline" tone="primary" size={40} />
+                <AppText variant="title2" style={styles.tooltipTitle} accessibilityRole="header" numberOfLines={2}>{tooltipModal?.title || 'How it works'}</AppText>
               </View>
               <IconButton icon="close" size={36} iconSize={18} onPress={() => setTooltipModal(null)} accessibilityLabel="Close" />
             </View>
@@ -3392,7 +3692,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             <View style={styles.tooltipLines}>
               {tooltipModal?.lines?.map((line, idx) => (
                 <View key={idx} style={styles.tooltipLineRow}>
-                  <Text style={styles.tooltipLineText}>{line}</Text>
+                  <AppText variant="callout" style={styles.tooltipLineText}>{line}</AppText>
                 </View>
               ))}
             </View>
@@ -3440,7 +3740,216 @@ const styles = StyleSheet.create({
     paddingHorizontal: sp.xxs,
     paddingTop: sp.xs,
     paddingBottom: sp.section,
-    gap: sp.lg,
+    gap: sp.xxl,
+  },
+
+  // ─── Redesigned page: intro summary ───
+  heroCard: {
+    borderRadius: r.xl,
+    borderWidth: 1,
+    borderColor: c.primaryBorder,
+    overflow: 'hidden',
+    padding: sp.lg,
+    backgroundColor: c.surface,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+  },
+  heroCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  heroTitle: {
+    marginTop: sp.xxs,
+    marginBottom: sp.xxs,
+  },
+  heroDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: c.hairline,
+    marginVertical: sp.md,
+  },
+  heroBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: sp.sm,
+  },
+  heroBadge: {
+    maxWidth: '100%',
+  },
+  heroBadgeText: {
+    flexShrink: 1,
+  },
+
+  // ─── Redesigned page: sections ───
+  pageSection: {
+    gap: sp.xxs,
+  },
+  groupCard: {
+    overflow: 'hidden',
+  },
+  goalList: {
+    gap: sp.sm,
+    marginBottom: sp.md,
+  },
+  goalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    minHeight: 76,
+    paddingVertical: sp.md,
+    paddingHorizontal: sp.lg,
+    borderRadius: r.card,
+    borderWidth: 1,
+    borderColor: c.borderSubtle,
+    backgroundColor: c.surface,
+  },
+  goalCardSelected: {
+    backgroundColor: c.primarySoft,
+    borderColor: c.primaryBorder,
+  },
+  goalCardCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  goalCardDesc: {
+    marginTop: sp.xxs,
+  },
+  goalRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: c.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  goalRadioSelected: {
+    backgroundColor: c.primary,
+    borderColor: c.primary,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    minHeight: 64,
+    paddingVertical: sp.md,
+    paddingHorizontal: sp.lg,
+  },
+  settingRowDisabled: {
+    opacity: 0.6,
+  },
+  settingRowCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  settingRowSub: {
+    marginTop: sp.xxs,
+  },
+
+  // ─── Redesigned page: contact handles ───
+  handleRow: {
+    paddingVertical: sp.md,
+    paddingHorizontal: sp.lg,
+  },
+  handleRowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.divider,
+  },
+  handleRowHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    minHeight: 44,
+  },
+  handleRowCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  handleSentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.xs,
+    marginTop: sp.xxs,
+  },
+  handleSentText: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  handleInputWrap: {
+    marginTop: sp.md,
+  },
+  handleInputLabel: {
+    marginBottom: sp.xs,
+    marginLeft: sp.xxs,
+  },
+  handleInput: {
+    fontFamily: ty.body.fontFamily,
+    fontSize: ty.body.fontSize,
+    height: uiTheme.layout.inputHeight,
+    paddingHorizontal: sp.lg,
+    paddingVertical: 0,
+    backgroundColor: c.elevated,
+    borderRadius: r.input,
+    borderWidth: 1,
+    borderColor: c.border,
+    color: c.text,
+  },
+  handleInputMissing: {
+    borderColor: c.warningBorder,
+  },
+  handleHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.xs,
+    marginTop: sp.sm,
+    marginLeft: sp.xxs,
+  },
+  handleHintText: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  // ─── Redesigned page: segmented control ───
+  segmented: {
+    flexDirection: 'row',
+    padding: SEGMENT_PAD,
+    borderWidth: SEGMENT_BORDER,
+    borderColor: c.border,
+    borderRadius: r.md,
+    backgroundColor: c.elevated,
+  },
+  segmentThumb: {
+    position: 'absolute',
+    top: SEGMENT_PAD,
+    bottom: SEGMENT_PAD,
+    left: SEGMENT_PAD,
+    borderRadius: r.sm,
+    overflow: 'hidden',
+  },
+  segment: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: uiTheme.layout.touchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: sp.xs,
+    borderRadius: r.sm,
+  },
+  segmentText: {
+    textAlign: 'center',
+  },
+  genderHintRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: sp.xs,
+    marginTop: sp.md,
+  },
+  genderHintText: {
+    flex: 1,
+    minWidth: 0,
   },
 
   // ─── V2 Accordion Cards ───
@@ -4382,6 +4891,13 @@ const styles = StyleSheet.create({
   },
   tooltipContent: {
     maxWidth: 380,
+  },
+  tooltipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: sp.md,
+    marginBottom: sp.xs,
   },
   tooltipTitleRow: {
     flex: 1,

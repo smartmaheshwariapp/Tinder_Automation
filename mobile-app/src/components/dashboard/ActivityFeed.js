@@ -1,10 +1,12 @@
 import { theme as uiTheme } from '../../theme';
-// src/components/dashboard/ActivityFeed.js — Live Stream Timeline of AI Engine Actions with Match Moments Hub
+// src/components/dashboard/ActivityFeed.js — Compact live stream of AI engine actions (rail timeline) with Match Moments count
 import React, { useRef, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import IconWell from '../ui/IconWell';
 import Badge, { TONES } from '../ui/Badge';
+import LiveDot from '../ui/LiveDot';
 import { EmptyState } from '../ui';
+import { FadeIn } from '../common/Motion';
 
 // ─── Feed metadata with clean vector icons (tone → IconWell / Badge tones) ────
 const FEED_META = {
@@ -21,6 +23,10 @@ const FEED_META = {
   trial_ended:      { icon: 'flag-outline',          label: 'Cycle Paused',       tone: 'neutral' },
   error:            { icon: 'alert-circle-outline',  label: 'Attention Needed',   tone: 'error' },
 };
+
+// Entrance stagger for the first rows only.
+const STAGGER_ROWS = 10;
+const STAGGER_STEP = 35;
 
 function formatTimeAgo(timestamp) {
   const diff = Date.now() - timestamp;
@@ -39,7 +45,7 @@ function truncateText(text, maxLen = 52) {
   return clean.length > maxLen ? `${clean.slice(0, maxLen - 1)}…` : clean;
 }
 
-function FeedItem({ event }) {
+function FeedItem({ event, last = false }) {
   const meta = FEED_META[event.type] || FEED_META.error;
   const nameLabel = event.name ? ` → ${event.name}` : '';
   const detailText = event.detail ? truncateText(event.detail) : null;
@@ -51,21 +57,26 @@ function FeedItem({ event }) {
 
   return (
     <View
-      style={[styles.feedItem, isMoment && styles.feedItemMoment]}
+      style={styles.feedItem}
       accessible
       accessibilityLabel={[title + nameLabel, detailText, timeAgo].filter(Boolean).join(', ')}
     >
-      <IconWell icon={isMoment ? 'star' : meta.icon} tone={tone} size={32} iconSize={15} />
-      <View style={styles.itemContent}>
-        <Text style={styles.itemTitle} numberOfLines={1}>
-          {title}
-          {nameLabel ? <Text style={[styles.itemName, { color: toneColor }]}>{nameLabel}</Text> : null}
-        </Text>
+      <View style={styles.railCol}>
+        <IconWell icon={isMoment ? 'star' : meta.icon} tone={tone} size={32} iconSize={15} />
+        {!last && <View style={styles.rail} />}
+      </View>
+      <View style={[styles.itemContent, !last && styles.itemContentSpaced]}>
+        <View style={styles.itemHead}>
+          <Text style={[styles.itemTitle, isMoment && styles.itemTitleMoment]} numberOfLines={1}>
+            {title}
+            {nameLabel ? <Text style={[styles.itemName, { color: toneColor }]}>{nameLabel}</Text> : null}
+          </Text>
+          <Text style={styles.itemTime} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{timeAgo}</Text>
+        </View>
         {detailText ? (
           <Text style={styles.itemDetail} numberOfLines={1}>{detailText}</Text>
         ) : null}
       </View>
-      <Text style={styles.itemTime} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{timeAgo}</Text>
     </View>
   );
 }
@@ -100,14 +111,17 @@ export default function ActivityFeed({ progressFeed }) {
     <View style={styles.container}>
       <View style={styles.feedHeader}>
         <View style={styles.feedHeaderTitle}>
+          <LiveDot size={8} active={events.length > 0} color={events.length > 0 ? uiTheme.colors.success : uiTheme.colors.textTertiary} />
           <Text style={styles.sectionTitle} accessibilityRole="header" numberOfLines={1}>Live Activity Timeline</Text>
+        </View>
+        <View style={styles.feedHeaderBadges}>
           {momentsCount > 0 && (
             <Badge label={`${momentsCount} Leads`} tone="success" icon="star" size="sm" />
           )}
+          {events.length > 0 && (
+            <Badge label={`${events.length} events`} tone="neutral" size="sm" />
+          )}
         </View>
-        {events.length > 0 && (
-          <Badge label={`${events.length} events`} tone="neutral" size="sm" />
-        )}
       </View>
       {events.length === 0 ? (
         <EmptyFeed />
@@ -118,9 +132,13 @@ export default function ActivityFeed({ progressFeed }) {
           nestedScrollEnabled={true}
           showsVerticalScrollIndicator={false}
         >
-          {events.map((event, index) => (
-            <FeedItem key={event.id || `${event.timestamp}_${index}`} event={event} />
-          ))}
+          {events.map((event, index) => {
+            const key = event.id || `${event.timestamp}_${index}`;
+            const last = index === events.length - 1;
+            return index < STAGGER_ROWS
+              ? <FadeIn key={key} delay={index * STAGGER_STEP} offset={6}><FeedItem event={event} last={last} /></FadeIn>
+              : <FeedItem key={key} event={event} last={last} />;
+          })}
         </ScrollView>
       )}
     </View>
@@ -151,39 +169,59 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
   },
+  feedHeaderBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiTheme.spacing.xs,
+  },
   sectionTitle: {
     ...uiTheme.type.headline,
     fontFamily: uiTheme.fonts.heading,
     color: uiTheme.colors.text,
     flexShrink: 1,
+    minWidth: 0,
   },
   scroll: {
     maxHeight: 220,
   },
   feedItem: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: uiTheme.spacing.md,
-    backgroundColor: uiTheme.colors.elevated,
-    borderRadius: uiTheme.radius.md,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.borderSubtle,
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: uiTheme.spacing.md,
-    marginBottom: uiTheme.spacing.sm,
   },
-  feedItemMoment: {
-    borderColor: uiTheme.colors.successBorder,
-    backgroundColor: uiTheme.colors.successSoft,
+  railCol: {
+    width: 32,
+    alignItems: 'center',
+  },
+  rail: {
+    flex: 1,
+    width: 2,
+    borderRadius: 1,
+    marginVertical: uiTheme.spacing.xs,
+    backgroundColor: uiTheme.colors.divider,
   },
   itemContent: {
     flex: 1,
     minWidth: 0,
+    paddingTop: 6,
+    paddingBottom: uiTheme.spacing.xs,
+  },
+  itemContentSpaced: {
+    paddingBottom: uiTheme.spacing.md,
+  },
+  itemHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: uiTheme.spacing.sm,
   },
   itemTitle: {
     ...uiTheme.type.subhead,
     fontFamily: uiTheme.fonts.label,
     color: uiTheme.colors.text,
+    flex: 1,
+    minWidth: 0,
+  },
+  itemTitleMoment: {
+    color: uiTheme.colors.success,
   },
   itemName: {
     fontFamily: uiTheme.fonts.strong,
@@ -191,11 +229,12 @@ const styles = StyleSheet.create({
   itemDetail: {
     ...uiTheme.type.footnote,
     color: uiTheme.colors.muted,
-    marginTop: 1,
+    marginTop: 2,
   },
   itemTime: {
     ...uiTheme.type.footnote,
     fontVariant: ['tabular-nums'],
     color: uiTheme.colors.muted,
+    flexShrink: 0,
   },
 });
