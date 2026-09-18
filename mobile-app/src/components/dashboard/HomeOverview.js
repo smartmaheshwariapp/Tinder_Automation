@@ -40,6 +40,7 @@ export default function HomeOverview({
   onAutomation,
   onSettings,
   onActivity,
+  onEnterPocketMode,
 }) {
   const effectiveStats = stats || agentState || {};
   const state = effectiveStats?.agentState || effectiveStats || {};
@@ -269,6 +270,24 @@ export default function HomeOverview({
           onToggleAgent={onToggleAgent}
           onOpenBrowser={onOpenBrowser}
         />
+
+        {running && (
+          <TouchableOpacity
+            style={styles.contextualPocketBtn}
+            onPress={onEnterPocketMode}
+            activeOpacity={0.82}
+            accessibilityRole="button"
+            accessibilityLabel="Enter Pocket Mode"
+          >
+            <View style={styles.contextualPocketIconWrap}>
+              <Ionicons name="moon" size={13} color="#FBBF24" />
+            </View>
+            <Text style={styles.contextualPocketText}>
+              Enter Pocket Mode
+            </Text>
+            <View style={styles.contextualPocketDot} />
+          </TouchableOpacity>
+        )}
 
         <View style={styles.tiles}>
           {[
@@ -795,5 +814,39 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
+  },
+  contextualPocketBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(251, 191, 36, 0.12)',
+    borderColor: 'rgba(251, 191, 36, 0.35)',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    marginTop: -2,
+    marginBottom: 10,
+    gap: 7,
+  },
+  contextualPocketIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(251, 191, 36, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contextualPocketText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FBBF24',
+    letterSpacing: 0.2,
+  },
+  contextualPocketDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#48CB8D',
   },
 });

@@ -225,6 +225,8 @@ window.__flirteasyStopAutomation = stopAllAutomation;
 window.__linksyStopSwiping = stopAllAutomation;
 window.__flirteasyStartAutomation = function(count, initialProgress) {
   try { chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }, () => {}); } catch (_) {}
+  window.__flirteasyAutoStartCount = count || 50;
+  if (initialProgress !== undefined) window.__flirteasyAutoStartProgress = initialProgress;
   return autoLike(count || 50, initialProgress);
 };
 window.__flirteasyStartMessaging = function(maxMessages, customSettings) {
@@ -234,6 +236,48 @@ window.__flirteasyStartMessaging = function(maxMessages, customSettings) {
 };
 window.__linksyStartSwiping = window.__flirteasyStartAutomation;
 window.__flirteasyContentScriptReady = true;
+
+// ── Lifecycle hooks for seamless mobile app foreground / background transitions ──
+let _wasSuspendedByLifecycle = false;
+let _savedAutoLikeTarget = null;
+let _savedAutoLikeProgress = null;
+let _savedWasMessaging = false;
+
+function suspendAutomationForBackground() {
+  if (autoLikeRunning || processChatsRunning || window.__flirteasyAutoStartRequested) {
+    _wasSuspendedByLifecycle = true;
+    _savedWasMessaging = Boolean(processChatsRunning);
+    _savedAutoLikeTarget = window.__flirteasyAutoStartCount || 50;
+    _savedAutoLikeProgress = window.__flirteasyAutoStartProgress || 0;
+    // Invalidate loop generation tokens to abort any waiting delays
+    _autoLikeGen++;
+    _processChatsGen++;
+    autoLikeRunning = false;
+    processChatsRunning = false;
+    console.log('[FlirtEasy Lifecycle] Automation suspended cleanly for app backgrounding (wasMessaging=' + _savedWasMessaging + ')');
+  }
+}
+
+function resumeAutomationForForeground() {
+  if (_wasSuspendedByLifecycle && !window.__flirteasy_stop) {
+    _wasSuspendedByLifecycle = false;
+    const wasMsg = _savedWasMessaging;
+    _savedWasMessaging = false;
+    console.log('[FlirtEasy Lifecycle] Automation silently resuming for app foreground (wasMessaging=' + wasMsg + ')');
+    setTimeout(() => {
+      if (!window.__flirteasy_stop) {
+        if (wasMsg && typeof window.__flirteasyStartMessaging === 'function') {
+          window.__flirteasyStartMessaging();
+        } else if (typeof window.__flirteasyStartAutomation === 'function') {
+          window.__flirteasyStartAutomation(_savedAutoLikeTarget, _savedAutoLikeProgress);
+        }
+      }
+    }, 350);
+  }
+}
+
+window.__flirteasySuspend = suspendAutomationForBackground;
+window.__flirteasyResume = resumeAutomationForForeground;
 let tinderSessionSentIds = new Set(); // FAST session-based double-send lock
 let tinderNetworkOfflineReported = false;
 let lastMatchId = null;
@@ -5018,6 +5062,11 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
     }
 
     if (_wasLoggedIn && !nowLoggedIn) {
+      const isStillOnApp = (window.location.pathname || '').includes('/app') && !(window.location.pathname || '').includes('/app/login');
+      if (isStillOnApp) {
+        _consecutiveLoggedOutTicks = 0;
+        return;
+      }
       _consecutiveLoggedOutTicks++;
       // Require at least 3 consecutive ticks without token before reporting logged_out
       if (_consecutiveLoggedOutTicks < 3) {

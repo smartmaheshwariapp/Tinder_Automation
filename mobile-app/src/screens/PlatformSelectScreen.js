@@ -16,6 +16,7 @@ import {
   Platform,
   ScrollView,
   Alert,
+  BackHandler,
 } from "react-native";
 import ActivityIndicator from "../components/common/SafeActivityIndicator";
 
@@ -69,9 +70,23 @@ import NotificationService from "../services/notifications";
 import NotificationCenterModal from "../components/NotificationCenterModal";
 import PermissionPrePromptModal from "../components/common/PermissionPrePromptModal";
 import LocationNoticeModal from "../components/common/LocationNoticeModal";
+import PocketModeModal from "../components/common/PocketModeModal";
 import LocationService from "../services/locationService";
 import trackingService from "../services/trackingService";
 import BrowserScreen from "./BrowserScreen";
+
+let KeepAwake;
+try {
+  KeepAwake = require("expo-keep-awake");
+} catch (_) {
+  KeepAwake = null;
+}
+let Haptics;
+try {
+  Haptics = require("expo-haptics");
+} catch (_) {
+  Haptics = null;
+}
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -94,6 +109,79 @@ export default function PlatformSelectScreen({ navigation, route }) {
   const [userRegion, setUserRegion] = useState("israel"); // 'israel' | 'direct'
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
+
+  const [pocketModeActive, setPocketModeActive] = useState(false);
+  const pocketModeActiveRef = useRef(false);
+  useEffect(() => {
+    pocketModeActiveRef.current = pocketModeActive;
+  }, [pocketModeActive]);
+  const lastPocketTapRef = useRef(0);
+  const [tapHintVisible, setTapHintVisible] = useState(false);
+  const tapHintTimeoutRef = useRef(null);
+
+  const togglePocketMode = useCallback(async (enable) => {
+    if (enable) {
+      pocketModeActiveRef.current = true;
+      setPocketModeActive(true);
+      setTapHintVisible(false);
+      try {
+        if (KeepAwake?.activateKeepAwakeAsync) {
+          await KeepAwake.activateKeepAwakeAsync("flirteasy_pocket_mode_home");
+        }
+      } catch (_) {}
+      try {
+        if (Haptics?.impactAsync) {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+      } catch (_) {}
+    } else {
+      pocketModeActiveRef.current = false;
+      setPocketModeActive(false);
+      setTapHintVisible(false);
+      if (tapHintTimeoutRef.current) clearTimeout(tapHintTimeoutRef.current);
+      try {
+        if (KeepAwake?.deactivateKeepAwake) {
+          KeepAwake.deactivateKeepAwake("flirteasy_pocket_mode_home");
+        }
+      } catch (_) {}
+      try {
+        if (Haptics?.impactAsync) {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      } catch (_) {}
+    }
+  }, []);
+
+  const handlePocketTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastPocketTapRef.current < 500) {
+      togglePocketMode(false);
+    } else {
+      lastPocketTapRef.current = now;
+      setTapHintVisible(true);
+      if (tapHintTimeoutRef.current) clearTimeout(tapHintTimeoutRef.current);
+      tapHintTimeoutRef.current = setTimeout(() => {
+        setTapHintVisible(false);
+      }, 1800);
+      try {
+        if (Haptics?.impactAsync) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      } catch (_) {}
+    }
+  }, [togglePocketMode]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (pocketModeActiveRef.current) {
+        togglePocketMode(false);
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [togglePocketMode]);
 
   // Connection endpoints
   const [vpsUrl, setVpsUrl] = useState(
@@ -372,6 +460,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
   // ── Notification Center State ──
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [showQuickMenu, setShowQuickMenu] = useState(false);
 
   // ── App Permissions Pre-Prompt Modal ──
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -985,6 +1074,45 @@ export default function PlatformSelectScreen({ navigation, route }) {
     selectedPlatform,
   ]);
 
+  const isAutomationRunning = Boolean(
+    agentState?.agentState?.isRunning ||
+    agentState?.isRunning ||
+    (agentState?.agentState?.currentPhase &&
+      !['stopped', 'idle', 'waiting', 'paused'].includes(agentState.agentState.currentPhase)) ||
+    (agentState?.currentPhase &&
+      !['stopped', 'idle', 'waiting', 'paused'].includes(agentState.currentPhase))
+  );
+
+  const effectiveAgentState = agentState?.agentState || agentState || {};
+  const effectiveAgentStats = effectiveAgentState?.stats || stats || {};
+  const pocketModeTotalSwipes = Math.max(
+    effectiveAgentStats?.swipes ?? 0,
+    effectiveAgentStats?.totalSwipes ?? 0,
+    effectiveAgentStats?.totalLikes ?? 0,
+  );
+  const pocketModeCycleSwipes = effectiveAgentState?.currentCycle?.likesCompleted ?? 0;
+  const pocketModeCycleTarget =
+    effectiveAgentState?.currentCycle?.targetLikes ||
+    localSettings?.likesPerCycle ||
+    50;
+
+  const pocketModeTotalMessages = Math.max(
+    effectiveAgentStats?.messages ?? 0,
+    effectiveAgentStats?.totalMessages ?? 0,
+    effectiveAgentStats?.messagesSent ?? 0,
+  );
+  const pocketModeCycleMessages = effectiveAgentState?.currentCycle?.messagesProcessed ?? 0;
+  const pocketModeCycleMessagesTarget =
+    effectiveAgentState?.currentCycle?.targetMessages ||
+    localSettings?.messagesPerCycle ||
+    50;
+
+  const pocketModeMatches =
+    effectiveAgentStats?.matches ??
+    effectiveAgentStats?.totalMatches ??
+    effectiveAgentStats?.matchesCreated ??
+    0;
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -1025,47 +1153,60 @@ export default function PlatformSelectScreen({ navigation, route }) {
               uiTheme.colors.secondary,
               "#FFD166",
             ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={homeStyles.brandIcon}
           >
-            <Ionicons name="flame" size={25} color="#FFFFFF" />
+            <Ionicons name="flame" size={22} color="#FFFFFF" />
           </LinearGradient>
-          <View>
+          <View style={homeStyles.brandTextWrap}>
             <Text style={homeStyles.brandName}>Flint</Text>
-            <Text style={homeStyles.brandCaption}>
-              YOUR AI DATING ASSISTANT
+            <Text style={homeStyles.brandCaption} numberOfLines={1}>
+              AI Dating Assistant
             </Text>
           </View>
         </View>
+
+        {/* ── Spacious 2-Action Controls (44x44 Touch Target Ergonomics) ── */}
         <View style={homeStyles.headerActions}>
+          {/* Notification Center */}
           <TouchableOpacity
             style={homeStyles.headerButton}
             onPress={() => setShowNotifModal(true)}
             accessibilityRole="button"
             accessibilityLabel={`Notifications, ${unreadNotifCount} unread`}
+            activeOpacity={0.75}
           >
             <Ionicons
               name="notifications-outline"
               size={20}
-              color={uiTheme.colors.text}
+              color={unreadNotifCount > 0 ? "#FFFFFF" : "#9E90A6"}
             />
             {unreadNotifCount > 0 && (
               <View style={homeStyles.notificationDot} />
             )}
           </TouchableOpacity>
-          {homeTab !== "profile" && (
-            <TouchableOpacity
-              style={homeStyles.headerButton}
-              onPress={() => setHomeTab("profile")}
-              accessibilityRole="button"
-              accessibilityLabel="Profile details and settings"
-            >
-              <Ionicons
-                name="person-outline"
-                size={20}
-                color={uiTheme.colors.text}
-              />
-            </TouchableOpacity>
-          )}
+
+          {/* 3-Dash Menu Dropdown Trigger */}
+          <TouchableOpacity
+            style={[
+              homeStyles.headerButton,
+              isAutomationRunning && homeStyles.headerButtonActive,
+            ]}
+            onPress={() => setShowQuickMenu(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Quick actions menu"
+            activeOpacity={0.75}
+          >
+            <Ionicons
+              name="menu-outline"
+              size={22}
+              color={isAutomationRunning ? "#FBBF24" : "#FFFFFF"}
+            />
+            {isAutomationRunning && (
+              <View style={homeStyles.activeIndicatorDot} />
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1086,6 +1227,9 @@ export default function PlatformSelectScreen({ navigation, route }) {
           onAutomation={() => setHomeTab("automation")}
           onSettings={() => setHomeTab("settings")}
           onActivity={() => setHomeTab("activity")}
+          onEnterPocketMode={() => {
+            togglePocketMode(true);
+          }}
         />
       ) : homeTab === "profile" ? (
         <ProfileDetails
@@ -1183,6 +1327,24 @@ export default function PlatformSelectScreen({ navigation, route }) {
             }
             controlsContent={
               <View style={homeStyles.extraActions}>
+                {environment === "on_device" && (
+                  <TouchableOpacity
+                    style={[homeStyles.secondaryAction, { borderColor: 'rgba(251, 191, 36, 0.4)', backgroundColor: 'rgba(251, 191, 36, 0.08)' }]}
+                    onPress={() => {
+                      togglePocketMode(true);
+                    }}
+                    accessibilityRole="button"
+                  >
+                    <Ionicons
+                      name="moon"
+                      size={17}
+                      color="#FBBF24"
+                    />
+                    <Text style={[homeStyles.secondaryLabel, { color: '#FBBF24', fontWeight: '600' }]}>
+                      {agentState?.isRunning ? "Enter Pocket Mode" : "Pocket Mode"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={homeStyles.secondaryAction}
                   onPress={() => handleLaunch("Tinder")}
@@ -1596,6 +1758,123 @@ export default function PlatformSelectScreen({ navigation, route }) {
           </View>
         </View>
       </Modal>
+
+      {/* ═══════════════════ ANCHORED TOP-RIGHT HEADER DROPDOWN MENU ═══════════════════ */}
+      <Modal
+        visible={showQuickMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowQuickMenu(false)}
+        statusBarTranslucent
+      >
+        <Pressable
+          style={styles.dropdownOverlay}
+          onPress={() => setShowQuickMenu(false)}
+        >
+          <SafeAreaView edges={["top"]} style={styles.dropdownSafeArea} pointerEvents="box-none">
+            <Pressable
+              style={styles.dropdownMenu}
+              onPress={(e) => e.stopPropagation()}
+            >
+              {/* Pocket Mode */}
+              <TouchableOpacity
+                style={[
+                  styles.dropdownItem,
+                  isAutomationRunning && styles.dropdownItemActive,
+                ]}
+                onPress={() => {
+                  setShowQuickMenu(false);
+                  togglePocketMode(true);
+                }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Pocket Mode"
+              >
+                <View
+                  style={[
+                    styles.dropdownIconWrap,
+                    {
+                      backgroundColor: isAutomationRunning
+                        ? "rgba(251, 191, 36, 0.16)"
+                        : "rgba(251, 191, 36, 0.10)",
+                    },
+                  ]}
+                >
+                  <Ionicons name="moon" size={16} color="#FBBF24" />
+                </View>
+                <View style={styles.dropdownTextWrap}>
+                  <Text style={styles.dropdownItemTitle}>Pocket Mode</Text>
+                  <Text style={styles.dropdownItemDesc}>Stealth touch-lock</Text>
+                </View>
+                {isAutomationRunning ? (
+                  <View style={styles.dropdownActiveBadge}>
+                    <Text style={styles.dropdownActiveBadgeText}>RUNNING</Text>
+                  </View>
+                ) : (
+                  <Ionicons name="chevron-forward" size={14} color="#6B5E75" />
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.dropdownDivider} />
+
+              {/* Tinder Profile */}
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setShowQuickMenu(false);
+                  setHomeTab("profile");
+                }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Tinder Profile"
+              >
+                <View
+                  style={[
+                    styles.dropdownIconWrap,
+                    { backgroundColor: "rgba(110, 210, 177, 0.10)" },
+                  ]}
+                >
+                  <Ionicons name="person-outline" size={16} color="#6ED2B1" />
+                </View>
+                <View style={styles.dropdownTextWrap}>
+                  <Text style={styles.dropdownItemTitle}>Tinder Profile</Text>
+                  <Text style={styles.dropdownItemDesc}>Photos & account</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color="#6B5E75" />
+              </TouchableOpacity>
+
+              <View style={styles.dropdownDivider} />
+
+              {/* Preferences */}
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setShowQuickMenu(false);
+                  openModal();
+                }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Preferences"
+              >
+                <View
+                  style={[
+                    styles.dropdownIconWrap,
+                    { backgroundColor: "rgba(96, 165, 250, 0.10)" },
+                  ]}
+                >
+                  <Ionicons name="options-outline" size={16} color="#60A5FA" />
+                </View>
+                <View style={styles.dropdownTextWrap}>
+                  <Text style={styles.dropdownItemTitle}>Preferences</Text>
+                  <Text style={styles.dropdownItemDesc}>Pacing & safety</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color="#6B5E75" />
+              </TouchableOpacity>
+            </Pressable>
+          </SafeAreaView>
+        </Pressable>
+      </Modal>
+
       {/* ═══════════════════ NOTIFICATION CENTER MODAL ═══════════════════ */}
       <NotificationCenterModal
         visible={showNotifModal}
@@ -1641,10 +1920,12 @@ export default function PlatformSelectScreen({ navigation, route }) {
           <BrowserScreen
             ref={browserScreenRef}
             logoutTrigger={onDeviceLogoutTrigger}
+            isLoggedIn={isLoggedIn}
             route={{
               params: {
                 platform: "Tinder",
                 isOnDevice: true,
+                isLoggedIn: isLoggedIn,
                 vpsUrl: "https://tinder.com",
                 proxyIp: activeProxy,
                 orchestratorUrl,
@@ -1687,6 +1968,20 @@ export default function PlatformSelectScreen({ navigation, route }) {
           />
         </View>
       )}
+
+      {/* ── Pocket Mode Stealth Touch-Lock Screen (Luxury Industry-Standard) ── */}
+      <PocketModeModal
+        visible={pocketModeActive}
+        onDismiss={() => togglePocketMode(false)}
+        swipes={pocketModeTotalSwipes}
+        cycleSwipes={pocketModeCycleSwipes}
+        cycleTarget={pocketModeCycleTarget}
+        messages={pocketModeTotalMessages}
+        cycleMessages={pocketModeCycleMessages}
+        cycleMessagesTarget={pocketModeCycleMessagesTarget}
+        matches={pocketModeMatches}
+        isRunning={isAutomationRunning}
+      />
     </SafeAreaView>
   );
 }
@@ -2547,6 +2842,82 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "normal",
   },
+
+  /* Anchored Top-Right Header Dropdown Menu */
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+  },
+  dropdownSafeArea: {
+    alignItems: "flex-end",
+    paddingTop: 66,
+    paddingRight: 20,
+  },
+  dropdownMenu: {
+    width: 232,
+    backgroundColor: "#191222",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.55,
+    shadowRadius: 20,
+    elevation: 14,
+    overflow: "hidden",
+    paddingVertical: 5,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 11,
+  },
+  dropdownItemActive: {
+    backgroundColor: "rgba(251, 191, 36, 0.05)",
+  },
+  dropdownIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dropdownTextWrap: {
+    flex: 1,
+  },
+  dropdownItemTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13.5,
+    color: "#FFFFFF",
+    letterSpacing: -0.2,
+  },
+  dropdownItemDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "#8E8294",
+    marginTop: 1,
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    marginHorizontal: 12,
+  },
+  dropdownActiveBadge: {
+    backgroundColor: "rgba(251, 191, 36, 0.15)",
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(251, 191, 36, 0.3)",
+  },
+  dropdownActiveBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 8,
+    color: "#FBBF24",
+    letterSpacing: 0.5,
+  },
 });
 
 const homeStyles = StyleSheet.create({
@@ -2557,58 +2928,84 @@ const homeStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
     paddingTop: uiTheme.spacing.md,
-    paddingBottom: 14,
-    gap: 10,
+    paddingBottom: 12,
   },
   brand: {
     flexDirection: "row",
     alignItems: "center",
-    gap: uiTheme.spacing.md,
+    gap: 12,
     flex: 1,
+    marginRight: 10,
   },
   brandIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 13,
     alignItems: "center",
+    justifyContent: "center",
+    shadowColor: uiTheme.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  brandTextWrap: {
+    flex: 1,
     justifyContent: "center",
   },
   brandName: {
     fontFamily: "Manrope_800ExtraBold",
-    color: uiTheme.colors.text,
+    color: "#FFFFFF",
     fontSize: 21,
     fontWeight: "normal",
-    letterSpacing: -0.8,
+    letterSpacing: -0.6,
   },
   brandCaption: {
     fontFamily: "Inter_600SemiBold",
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    letterSpacing: 1.1,
-    fontWeight: "normal",
-    marginTop: uiTheme.spacing.xs,
+    color: "#8E8294",
+    fontSize: 11.5,
+    letterSpacing: 0.1,
+    marginTop: 1,
   },
-  headerActions: { flexDirection: "row", gap: uiTheme.spacing.sm },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   headerButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    backgroundColor: uiTheme.colors.surface,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
+  },
+  headerButtonActive: {
+    borderColor: "rgba(251, 191, 36, 0.35)",
+    backgroundColor: "rgba(251, 191, 36, 0.08)",
   },
   notificationDot: {
     position: "absolute",
     top: 10,
-    right: 12,
-    width: 5,
-    height: 5,
+    right: 11,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#FE3C72",
+  },
+  activeIndicatorDot: {
+    position: "absolute",
+    top: 10,
+    right: 11,
+    width: 6,
+    height: 6,
     borderRadius: 3,
-    backgroundColor: uiTheme.colors.primary,
+    backgroundColor: "#FBBF24",
   },
   dashboard: { flex: 1, paddingBottom: 80 },
   sectionHeader: {

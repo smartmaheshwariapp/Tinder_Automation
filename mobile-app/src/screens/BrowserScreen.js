@@ -1,6 +1,6 @@
 import { theme as uiTheme } from '../theme';
 import React, { useRef, useState, useEffect, useCallback, useMemo, useImperativeHandle } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ActivityIndicator from '../components/common/SafeActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,6 +45,21 @@ import { DashboardPanel } from '../components/dashboard';
 import { useExtensionStats } from '../hooks/useExtensionStats';
 import trackingService from '../services/trackingService';
 import NotificationService from '../services/notifications';
+import PocketModeModal from '../components/common/PocketModeModal';
+
+let KeepAwake;
+try {
+  KeepAwake = require('expo-keep-awake');
+} catch (_) {
+  KeepAwake = null;
+}
+
+let Haptics;
+try {
+  Haptics = require('expo-haptics');
+} catch (_) {
+  Haptics = null;
+}
 
 // Maximum time the UI waits for the WebView to confirm a purge before it
 // releases the logout modal on its own. Covers the purge script's own bounded
@@ -168,6 +183,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
   navigation,
   isOverlay = false,
   isHeadless = false,
+  isLoggedIn: propIsLoggedIn,
   onClose,
   onRequestIntervention,
   logoutTrigger = 0,
@@ -248,6 +264,9 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
     if (loginSheetTimeoutRef.current) {
       clearTimeout(loginSheetTimeoutRef.current);
       loginSheetTimeoutRef.current = null;
+    }
+    if (KeepAwake?.deactivateKeepAwake) {
+      try { KeepAwake.deactivateKeepAwake('flirteasy_pocket_mode'); } catch (_) {}
     }
     if (veilTimeoutRef.current) {
       clearTimeout(veilTimeoutRef.current);
@@ -454,8 +473,22 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
 
   // Drives the header's auth-dependent controls. Kept in React state (rather than
   // read imperatively) so the header actually re-renders when the session changes.
-  const [sessionStatus, setSessionStatus] = useState(readSessionStatus);
+  const isParentLoggedIn = Boolean(
+    propIsLoggedIn ||
+    route.params?.isLoggedIn ||
+    getTinderAuthState()?.isLoggedIn
+  );
+  const [sessionStatus, setSessionStatus] = useState(() =>
+    isParentLoggedIn ? SESSION_SIGNED_IN : readSessionStatus()
+  );
   const [currentTinderAuth, setCurrentTinderAuth] = useState(getTinderAuthState);
+
+  useEffect(() => {
+    if (propIsLoggedIn && sessionStatus !== SESSION_SIGNED_IN) {
+      setSessionStatus(SESSION_SIGNED_IN);
+      setLoginStep('done');
+    }
+  }, [propIsLoggedIn, sessionStatus]);
 
   // Two-way auth synchronization: if home page or background logs out, reset UI state
   useEffect(() => {
@@ -463,8 +496,11 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
       setTimeout(() => {
         if (isMountedRef.current) {
           setCurrentTinderAuth(state);
-          setSessionStatus(readSessionStatus());
-          if (!state?.isLoggedIn) {
+          if (state?.isLoggedIn) {
+            setSessionStatus(SESSION_SIGNED_IN);
+            setLoginStep('done');
+          } else {
+            setSessionStatus(SESSION_SIGNED_OUT);
             setLoginStep('options');
             delete persistentLoginCache[sessionKey];
           }
@@ -514,6 +550,66 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
   const onDeviceCycleMessagesRef = useRef(onDeviceCycleMessages);
   useEffect(() => { onDeviceCycleMessagesRef.current = onDeviceCycleMessages; }, [onDeviceCycleMessages]);
 
+  // ── OLED Pocket Mode (Continuous Stealth Automation with Screen Dimmed & KeepAwake) ──
+  const [pocketModeActive, setPocketModeActive] = useState(false);
+  const pocketModeActiveRef = useRef(false);
+  useEffect(() => { pocketModeActiveRef.current = pocketModeActive; }, [pocketModeActive]);
+  const lastPocketTapRef = useRef(0);
+  const [pocketTapHintVisible, setPocketTapHintVisible] = useState(false);
+  const pocketTapHintTimeoutRef = useRef(null);
+
+  const togglePocketMode = useCallback(async (enable) => {
+    if (enable) {
+      pocketModeActiveRef.current = true;
+      setPocketModeActive(true);
+      setPocketTapHintVisible(false);
+      try {
+        if (KeepAwake?.activateKeepAwakeAsync) {
+          await KeepAwake.activateKeepAwakeAsync('flirteasy_pocket_mode');
+        }
+      } catch (_) {}
+      try {
+        if (Haptics?.impactAsync) {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+      } catch (_) {}
+    } else {
+      pocketModeActiveRef.current = false;
+      setPocketModeActive(false);
+      setPocketTapHintVisible(false);
+      if (pocketTapHintTimeoutRef.current) clearTimeout(pocketTapHintTimeoutRef.current);
+      try {
+        if (KeepAwake?.deactivateKeepAwake) {
+          KeepAwake.deactivateKeepAwake('flirteasy_pocket_mode');
+        }
+      } catch (_) {}
+      try {
+        if (Haptics?.impactAsync) {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      } catch (_) {}
+    }
+  }, []);
+
+  const handlePocketTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastPocketTapRef.current < 500) {
+      togglePocketMode(false);
+    } else {
+      lastPocketTapRef.current = now;
+      setPocketTapHintVisible(true);
+      if (pocketTapHintTimeoutRef.current) clearTimeout(pocketTapHintTimeoutRef.current);
+      pocketTapHintTimeoutRef.current = setTimeout(() => {
+        setPocketTapHintVisible(false);
+      }, 1800);
+      try {
+        if (Haptics?.impactAsync) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      } catch (_) {}
+    }
+  }, [togglePocketMode]);
+
   const [rateLimitStatusState, setRateLimitStatusState] = useState(() => {
     try {
       const isSafetyOn = extensionSettings?.safetyMode !== false;
@@ -558,6 +654,10 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
   // that left the screen with no way out at all.
   useEffect(() => {
     const onBackPress = () => {
+      if (pocketModeActiveRef.current) {
+        togglePocketMode(false);
+        return true;
+      }
       if (!isHeadless && (revealActive || loading)) {
         if (onClose) {
           onClose();
@@ -1053,6 +1153,9 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
 
       if (!shouldStart) {
         if (worker) worker.handleMessage({ action: 'stopAgent' });
+        if (pocketModeActiveRef.current) {
+          togglePocketMode(false);
+        }
         webViewRef.current.injectJavaScript(`
           (function() {
             try {
@@ -1656,6 +1759,100 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
     return unsub;
   }, [toggleOnDeviceSwiping]);
 
+  // ── Production-Grade Silent AppState Foreground Auto-Resume Engine ──
+  const appStateRef = useRef(AppState.currentState);
+  const wasRunningBeforeBackgroundRef = useRef(false);
+  const resumeDebounceTimerRef = useRef(null);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState) => {
+      const prevAppState = appStateRef.current;
+      appStateRef.current = nextAppState;
+
+      if (!isOnDevice) return;
+
+      // 1. App transitioned from foreground to background / inactive
+      if (prevAppState === 'active' && (nextAppState === 'background' || nextAppState === 'inactive')) {
+        if (resumeDebounceTimerRef.current) {
+          clearTimeout(resumeDebounceTimerRef.current);
+          resumeDebounceTimerRef.current = null;
+        }
+
+        const currentSession = getOnDeviceSessionState();
+        const isRunning = (onDeviceSwipingRef.current || currentSession?.isRunning === true) && !isLoggingOutRef.current;
+
+        if (isRunning) {
+          wasRunningBeforeBackgroundRef.current = true;
+          try {
+            webViewRef.current?.injectJavaScript(`
+              if (window.__flirteasySuspend) {
+                window.__flirteasySuspend();
+              }
+              true;
+            `);
+          } catch (_) {}
+        } else {
+          wasRunningBeforeBackgroundRef.current = false;
+        }
+      }
+
+      // 2. App returned from background / inactive to active (foreground)
+      if ((prevAppState === 'background' || prevAppState === 'inactive') && nextAppState === 'active') {
+        if (resumeDebounceTimerRef.current) {
+          clearTimeout(resumeDebounceTimerRef.current);
+          resumeDebounceTimerRef.current = null;
+        }
+
+        // Re-assert keep awake if pocket mode was active when backgrounded
+        if (pocketModeActiveRef.current) {
+          try {
+            if (KeepAwake?.activateKeepAwakeAsync) {
+              KeepAwake.activateKeepAwakeAsync('flirteasy_pocket_mode');
+            }
+          } catch (_) {}
+        }
+
+        // Only resume if it was actively automating before backgrounding and user didn't stop or log out
+        const currentSession = getOnDeviceSessionState();
+        const shouldResume = wasRunningBeforeBackgroundRef.current &&
+          (onDeviceSwipingRef.current || currentSession?.isRunning === true) &&
+          !isLoggingOutRef.current;
+
+        if (shouldResume) {
+          // 350ms debounce: allows mobile OS to stabilize network connection and DOM
+          resumeDebounceTimerRef.current = setTimeout(() => {
+            if (!isMountedRef.current || isLoggingOutRef.current) return;
+
+            // Silently wake up the WebView loop (strictly zero UI clutter / toasts)
+            try {
+              webViewRef.current?.injectJavaScript(`
+                if (window.__flirteasyResume) {
+                  window.__flirteasyResume();
+                } else if (window.__flirteasyStartAutomation) {
+                  window.__flirteasyStartAutomation(window.__flirteasyAutoStartCount || 50, window.__flirteasyAutoStartProgress || 0);
+                }
+                true;
+              `);
+            } catch (_) {}
+
+            // Ensure worker singleton is in active state
+            if (backgroundWorkerRef.current) {
+              backgroundWorkerRef.current.handleMessage({ action: 'startAgent' });
+            }
+          }, 350);
+        }
+      }
+    };
+
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      sub.remove();
+      if (resumeDebounceTimerRef.current) {
+        clearTimeout(resumeDebounceTimerRef.current);
+      }
+    };
+  }, [isOnDevice]);
+
   // Helper to execute coordinate-based click on WebRTC player and Orchestrator backend
   const dispatchCoordClick = async (x, y, label = '') => {
     try {
@@ -2020,6 +2217,17 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
       await clearTinderAuthState();
       setSharedExtensionSettings({ userProfile: null });
 
+      // Cease pocket mode if active
+      if (pocketModeActiveRef.current) {
+        pocketModeActiveRef.current = false;
+        setPocketModeActive(false);
+        try {
+          if (KeepAwake?.deactivateKeepAwake) {
+            KeepAwake.deactivateKeepAwake('flirteasy_pocket_mode');
+          }
+        } catch (_) {}
+      }
+
       if (isOnDevice) {
         exitAfterLogoutRef.current = true;
         if (webViewRef.current) {
@@ -2058,7 +2266,9 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
   useImperativeHandle(ref, () => ({
     handleLogout,
     purgeSession: handleLogout,
-  }), [handleLogout]);
+    togglePocketMode,
+    isPocketModeActive: () => pocketModeActiveRef.current,
+  }), [handleLogout, togglePocketMode]);
 
   useEffect(() => {
     if (logoutTrigger > 0 && logoutTrigger !== lastLogoutTriggerRef.current) {
@@ -2490,10 +2700,8 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                 style={[
                   styles.onDeviceDashboardBtn,
                   onDeviceSwiping ? styles.onDeviceDashboardBtnActive : styles.onDeviceDashboardBtnIdle,
-                  sessionStatus !== SESSION_SIGNED_IN && styles.headerBtnDisabled,
                 ]}
                 onPress={() => setShowDashboard(true)}
-                disabled={sessionStatus !== SESSION_SIGNED_IN}
                 activeOpacity={0.85}
                 accessibilityRole="button"
                 accessibilityLabel={
@@ -2504,9 +2712,6 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     : (isMessagingMode
                         ? `AI controls, ${currentMessages} of ${currentTargetMessages} messages completed`
                         : `AI controls, ${currentLikes} of ${currentTargetLikes} likes completed`)
-                }
-                accessibilityHint={
-                  sessionStatus === SESSION_SIGNED_IN ? undefined : 'Sign in to Tinder to enable AI controls'
                 }
               >
                 <Ionicons
@@ -2521,6 +2726,19 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                   {onDeviceSwiping ? 'AI Active' : 'AI Controls'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Pocket Mode Quick Toggle */}
+              {isOnDevice && (
+                <TouchableOpacity
+                  style={[styles.onDeviceLogsBtn, { backgroundColor: 'rgba(251, 191, 36, 0.16)', borderColor: 'rgba(251, 191, 36, 0.45)' }]}
+                  onPress={() => togglePocketMode(true)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Enter Pocket Mode"
+                >
+                  <Ionicons name="moon" size={14} color="#FBBF24" />
+                </TouchableOpacity>
+              )}
 
               {/* Tri-state: a logout control only exists when there is a session to
                   end. The other two states hold the slot with an equally sized
@@ -2652,7 +2870,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                   webViewRef.current.injectJavaScript('if (!window.location.href.includes("tinder.com")) { window.location.href = "https://tinder.com/"; } true;');
                 }
               }}
-              isLoggedIn={isOnDevice ? (sessionStatus === SESSION_SIGNED_IN) : (loginStep === 'done' || sessionStatus === SESSION_SIGNED_IN)}
+              isLoggedIn={isOnDevice ? (sessionStatus === SESSION_SIGNED_IN || isParentLoggedIn || getTinderAuthState()?.isLoggedIn) : (loginStep === 'done' || sessionStatus === SESSION_SIGNED_IN)}
               onSaveSettings={isOnDevice ? handleSaveOnDeviceSettings : undefined}
               settings={isOnDevice ? extensionSettings : undefined}
               onSyncProfile={handleSyncProfileOnDevice}
@@ -2660,6 +2878,22 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
               controlsContent={
                 isOnDevice ? (
                   <View style={styles.onDeviceControlsBox}>
+                    <TouchableOpacity
+                      style={[styles.onDeviceQuickChatsBtn, { backgroundColor: 'rgba(251, 191, 36, 0.12)', borderColor: 'rgba(251, 191, 36, 0.35)', marginBottom: 8 }]}
+                      onPress={() => {
+                        setShowDashboard(false);
+                        if (!onDeviceSwipingRef.current) {
+                          toggleOnDeviceSwiping(true);
+                        }
+                        togglePocketMode(true);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="moon" size={15} color="#FBBF24" />
+                      <Text style={[styles.onDeviceQuickChatsBtnText, { color: '#FBBF24', fontWeight: '600' }]}>
+                        {onDeviceSwiping ? "🌙 Enter Pocket Mode" : "🌙 Start in Pocket Mode"}
+                      </Text>
+                    </TouchableOpacity>
                     <TouchableOpacity accessibilityRole="button"
                       style={styles.onDeviceQuickChatsBtn}
                       onPress={() => {
@@ -2851,6 +3085,17 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
               }}
               onNavigationStateChange={(navState) => {
                 setCanGoBackWeb(navState.canGoBack);
+                if (isOnDevice && navState.url && navState.url.includes('/app') && !navState.url.includes('/app/login')) {
+                  setSessionStatus(SESSION_SIGNED_IN);
+                  const current = getTinderAuthState();
+                  if (!current?.isLoggedIn) {
+                    setTinderAuthState({
+                      isLoggedIn: true,
+                      token: current?.token || undefined,
+                      accountName: current?.accountName || 'Tinder Account',
+                    });
+                  }
+                }
               }}
               onMessage={async (event) => {
                 try {
@@ -3137,6 +3382,9 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                       });
                       pushProgressFeedEvent('rate_limit', `Daily like quota reached. Wingman engaged (chatting). Refills in ~${hoursLeft}h.`, null, 10);
                     } else {
+                      if (pocketModeActiveRef.current) {
+                        togglePocketMode(false);
+                      }
                       saveOnDeviceSessionState({
                         likesExhaustedAt: finalExhaustedAt,
                         likesReplenishTimestamp: replenishTimestamp,
@@ -3211,6 +3459,14 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     }
                   }
                   if (msg.type === 'FE_SESSION_EXPIRED') {
+                    if (pocketModeActiveRef.current) {
+                      togglePocketMode(false);
+                      try {
+                        if (Haptics?.notificationAsync) {
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                        }
+                      } catch (_) {}
+                    }
                     addLog('⚠️ Tinder session expired (401 Unauthorized). Automation halted. Reconnect your account.', 'error');
                     setOnDeviceSwiping(false);
                     onDeviceSwipingRef.current = false;
@@ -3229,6 +3485,14 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     const reason = msg.reason || 'verification';
                     const message = msg.message || 'User verification required';
                     if (reason === 'login_required') return;
+                    if (pocketModeActiveRef.current) {
+                      togglePocketMode(false);
+                      try {
+                        if (Haptics?.notificationAsync) {
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                        }
+                      } catch (_) {}
+                    }
                     addLog(`⚠️ Intervention required: ${message}`, 'warn');
                     setOnDeviceSwiping(false);
                     onDeviceSwipingRef.current = false;
@@ -3276,6 +3540,9 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                       pushProgressFeedEvent('persona_update', 'Swipes complete · Checking match conversations', null, 5);
                       triggerProcessChats();
                     } else {
+                      if (pocketModeActiveRef.current) {
+                        togglePocketMode(false);
+                      }
                       addLog(`❤️ Swiping goal reached (${count} likes). Auto-messaging is disabled — scheduling rest.`, 'info');
                       const intervalMinutes = extensionSettings?.scheduleInterval || 60;
                       const nextRun = Date.now() + intervalMinutes * 60000;
@@ -3317,6 +3584,9 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     }
                   }
                   if (msg.type === 'FE_MESSAGING_CYCLE_DONE') {
+                    if (pocketModeActiveRef.current) {
+                      togglePocketMode(false);
+                    }
                     const processed = msg.processed || 0;
                     const followUps = msg.followUps || 0;
                     addLog(`💬 Messaging round complete (${processed} replied, ${followUps} follow-ups)`, 'success');
@@ -3352,92 +3622,108 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     if (isLoggingOutRef.current || getPendingWebViewPurge()) return;
                     // ── Initial Page Status Report (fired on content.js inject) ──
                     // Syncs the home screen to the live WebView page state on load.
-                    if (typeof msg.isLoggedIn === 'boolean') {
-                      if (msg.isLoggedIn) {
-                        const capturedToken = msg.token || undefined;
-                        const isLandingOrLoginUrl = msg.url && (!msg.url.includes('/app') || msg.url.includes('/app/login'));
-                        if (isLandingOrLoginUrl) {
-                          if (capturedToken) {
-                            probeTinderSession(capturedToken).then((res) => {
-                              if (res?.ok) {
-                                setTinderAuthState({
-                                  isLoggedIn: true,
-                                  token: capturedToken,
-                                  accountName: msg.accountName || 'Tinder Account'
-                                });
-                                triggerAutoStartIfReady();
-                              } else {
-                                setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
-                              }
-                            }).catch(() => {
-                              setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
-                            });
-                          } else {
-                            setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
-                          }
-                        } else {
-                          setTinderAuthState({
-                            isLoggedIn: true,
-                            token: capturedToken,
-                            accountName: msg.accountName || 'Tinder Account'
-                          });
-                          if (capturedToken) {
-                            probeTinderSession(capturedToken).then((res) => {
-                              if (res?.ok && (res.profile || res.user)) {
-                                const profile = res.profile || parseTinderUserProfile(res.user, {
-                                  plan: res.plan,
-                                  isPro: res.isPro,
-                                  likesRemaining: res.likesRemaining,
-                                  rateLimitedUntil: res.rateLimitedUntil,
-                                });
-                                if (profile) {
-                                  handleSaveOnDeviceSettings({
-                                    userProfile: profile,
-                                    manualBio: profile.bio || undefined,
-                                  });
-                                }
-                              }
-                            }).catch(() => {});
-                          }
-                          triggerAutoStartIfReady();
-                        }
-                      } else {
-                        const current = getTinderAuthState();
-                        const hasActiveToken = Boolean(
-                          (current?.token && typeof current.token === 'string' && current.token.trim().length >= 16) ||
-                          (currentTinderAuth?.token && typeof currentTinderAuth.token === 'string' && currentTinderAuth.token.trim().length >= 16)
-                        );
-                        // Never clobber a believed-good session while the user is
-                        // partway through entering a code or number, or while the page is still hydrating recs.
-                        const midLogin = loginStep === 'otp' || loginStep === 'phone';
-                        const isLandingOrLoginUrl = msg.url && (!msg.url.includes('/app') || msg.url.includes('/app/login'));
-                        if (!midLogin && !hasActiveToken && isLandingOrLoginUrl && (!current?.lastUpdated || current.isLoggedIn)) {
-                          setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
-                        }
-                        // If we have an active token and landed on the landing page, auto-redirect to /app/recs
-                        if (hasActiveToken && isLandingOrLoginUrl && !midLogin) {
-                          webViewRef.current?.injectJavaScript(`
-                            (function() {
-                              if (window.location.pathname.indexOf('/app') === -1) {
-                                window.location.href = 'https://tinder.com/app/recs';
-                              }
-                            })(); true;
-                          `);
-                        }
-                      }
-                    }
-                  }
-                  if (msg.type === 'FE_AUTH_STEP') {
-                    if (msg.step === 'logged_in') {
-                      if (isLoggingOutRef.current || getPendingWebViewPurge()) return;
-                      if (msg.url && (!msg.url.includes('/app') || msg.url.includes('/app/login'))) return;
+                    const isAppUrl = msg.url && msg.url.includes('/app') && !msg.url.includes('/app/login');
+                    if (msg.isLoggedIn || isAppUrl) {
+                      setSessionStatus(SESSION_SIGNED_IN);
                       setLoginStep('done');
                       const capturedToken = msg.token || undefined;
+                      const isLandingOrLoginUrl = msg.url && (!msg.url.includes('/app') || msg.url.includes('/app/login'));
+                      if (isLandingOrLoginUrl) {
+                        if (capturedToken) {
+                          probeTinderSession(capturedToken).then((res) => {
+                            if (res?.ok) {
+                              setTinderAuthState({
+                                isLoggedIn: true,
+                                token: capturedToken,
+                                accountName: msg.accountName || 'Tinder Account'
+                              });
+                              triggerAutoStartIfReady();
+                            } else {
+                              setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+                            }
+                          }).catch(() => {
+                            setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+                          });
+                        } else {
+                          setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+                        }
+                      } else {
+                        setTinderAuthState({
+                          isLoggedIn: true,
+                          token: capturedToken,
+                          accountName: msg.accountName || 'Tinder Account'
+                        });
+                        if (capturedToken) {
+                          probeTinderSession(capturedToken).then((res) => {
+                            if (res?.ok && (res.profile || res.user)) {
+                              const profile = res.profile || parseTinderUserProfile(res.user, {
+                                plan: res.plan,
+                                isPro: res.isPro,
+                                likesRemaining: res.likesRemaining,
+                                rateLimitedUntil: res.rateLimitedUntil,
+                              });
+                              if (profile) {
+                                handleSaveOnDeviceSettings({
+                                userProfile: profile,
+                                manualBio: profile.bio || undefined,
+                              });
+                            }
+                          }
+                        }).catch(() => {});
+                      }
+                      triggerAutoStartIfReady();
+                    }
+                  } else if (typeof msg.isLoggedIn === 'boolean') {
+                    const current = getTinderAuthState();
+                    const hasActiveToken = Boolean(
+                      (current?.token && typeof current.token === 'string' && current.token.trim().length >= 16) ||
+                      (currentTinderAuth?.token && typeof currentTinderAuth.token === 'string' && currentTinderAuth.token.trim().length >= 16)
+                    );
+                    // Never clobber a believed-good session while the user is
+                    // partway through entering a code or number, or while the page is still hydrating recs.
+                    const midLogin = loginStep === 'otp' || loginStep === 'phone';
+                    const isLandingOrLoginUrl = msg.url && (!msg.url.includes('/app') || msg.url.includes('/app/login'));
+                    if (!midLogin && !hasActiveToken && isLandingOrLoginUrl && (!current?.lastUpdated || current.isLoggedIn)) {
+                      setSessionStatus(SESSION_SIGNED_OUT);
+                      setTinderAuthState({ isLoggedIn: false, accountName: null, token: null });
+                    }
+                    // If we have an active token and landed on the landing page, auto-redirect to /app/recs
+                    if (hasActiveToken && isLandingOrLoginUrl && !midLogin) {
+                      webViewRef.current?.injectJavaScript(`
+                        (function() {
+                          if (window.location.pathname.indexOf('/app') === -1) {
+                            window.location.href = 'https://tinder.com/app/recs';
+                          }
+                        })(); true;
+                      `);
+                    }
+                  }
+                }
+                if (msg.type === 'FE_URL_CHANGE') {
+                  if (msg.pathname && msg.pathname.includes('/app') && !msg.pathname.includes('/app/login')) {
+                    setSessionStatus(SESSION_SIGNED_IN);
+                    setLoginStep('done');
+                    const current = getTinderAuthState();
+                    if (!current?.isLoggedIn) {
                       setTinderAuthState({
                         isLoggedIn: true,
-                        token: capturedToken,
-                        accountName: msg.name || 'Tinder Account'
+                        token: current?.token || undefined,
+                        accountName: current?.accountName || 'Tinder Account',
                       });
+                    }
+                  }
+                }
+                if (msg.type === 'FE_AUTH_STEP') {
+                  if (msg.step === 'logged_in') {
+                    if (isLoggingOutRef.current || getPendingWebViewPurge()) return;
+                    setSessionStatus(SESSION_SIGNED_IN);
+                    setLoginStep('done');
+                    const capturedToken = msg.token || undefined;
+                    setTinderAuthState({
+                      isLoggedIn: true,
+                      token: capturedToken,
+                      accountName: msg.name || 'Tinder Account'
+                    });
                       if (capturedToken) {
                         probeTinderSession(capturedToken).then((res) => {
                           if (res?.ok && (res.profile || res.user)) {
@@ -4389,6 +4675,20 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
           </LinearGradient>
         </Animated.View>
       )}
+
+      {/* ─── Pocket Mode Stealth Overlay (Luxury Industry-Standard) ─── */}
+      <PocketModeModal
+        visible={pocketModeActive}
+        onDismiss={() => togglePocketMode(false)}
+        swipes={onDeviceSwipes}
+        cycleSwipes={onDeviceCycleLikes}
+        cycleTarget={extensionSettings?.likesPerCycle || 50}
+        messages={onDeviceMessages}
+        cycleMessages={onDeviceCycleMessages}
+        cycleMessagesTarget={extensionSettings?.messagesPerCycle || 50}
+        matches={onDeviceMatches}
+        isRunning={Boolean(onDeviceSwiping)}
+      />
     </SafeAreaView>
   );
 });
