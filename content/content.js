@@ -1421,6 +1421,8 @@ async function autoLike(count = 50, initialProgress = undefined) {
         const profileInfo = typeof getCurrentProfile === 'function' ? getCurrentProfile() : {};
         const currentAge = typeof getProfileAge === 'function' ? getProfileAge() : null;
         const currentName = profileInfo.name || (typeof getSwipeCardName === 'function' ? getSwipeCardName() : getMatchName()) || 'Someone';
+        // Photo of the card being liked (captured before the click so it matches this profile).
+        const currentPhotoUrl = typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl() : null;
         const profileDetail = currentAge
           ? `Age ${currentAge} · Verified Profile`
           : (profileInfo.bio ? profileInfo.bio.slice(0, 42).trim() : 'AI Target Match · Safe Paced');
@@ -1442,6 +1444,7 @@ async function autoLike(count = 50, initialProgress = undefined) {
                 name: currentName,
                 age: currentAge,
                 detail: profileDetail,
+                photoUrl: currentPhotoUrl,
               }));
             }
           } catch (_) {}

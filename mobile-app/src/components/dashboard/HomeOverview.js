@@ -7,6 +7,7 @@ import {
   Animated,
   Easing,
   Platform,
+  Image,
 } from "react-native";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
@@ -58,6 +59,31 @@ const greetingFor = (date = new Date()) => {
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 };
+
+const tinderPhotoFor = (settings) => {
+  const photos = settings?.userProfile?.photos;
+  if (!Array.isArray(photos)) return null;
+  for (const item of photos) {
+    const url = typeof item === "string" ? item : item?.url || item?.processedFiles?.[0]?.url;
+    if (typeof url === "string" && /^https?:\/\//.test(url)) return url;
+  }
+  return null;
+};
+
+// Round/rounded photo that falls back to `fallback` when the URL is missing or fails to load.
+function ProfilePhoto({ uri, style, fallback }) {
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => { setFailed(false); }, [uri]);
+  if (!uri || failed) return fallback;
+  return (
+    <Image
+      source={{ uri }}
+      style={[style, styles.photo]}
+      onError={() => setFailed(true)}
+      accessibilityIgnoresInvertColors
+    />
+  );
+}
 
 const displayNameFor = (settings, user) => {
   const raw =
@@ -209,6 +235,7 @@ export default function HomeOverview({
   const showCycle = isLoggedIn && running && cycleLikes > 0 && settings?.autoSwipe !== false;
 
   const name = displayNameFor(settings, user);
+  const photoUri = tinderPhotoFor(settings);
   const initials = name === "there" ? "" : name.slice(0, 1).toUpperCase();
 
   return (
@@ -229,11 +256,15 @@ export default function HomeOverview({
         >
           <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarRing}>
             <View style={styles.avatar}>
-              {initials ? (
-                <Text style={styles.avatarText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{initials}</Text>
-              ) : (
-                <Ionicons name="person" size={20} color={c.textSecondary} />
-              )}
+              <ProfilePhoto
+                uri={photoUri}
+                style={styles.avatarPhoto}
+                fallback={initials ? (
+                  <Text style={styles.avatarText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{initials}</Text>
+                ) : (
+                  <Ionicons name="person" size={20} color={c.textSecondary} />
+                )}
+              />
             </View>
           </LinearGradient>
           <View style={styles.greetingCopy}>
@@ -289,9 +320,20 @@ export default function HomeOverview({
             accessibilityState={{ disabled: Boolean(starting), busy: Boolean(starting) }}
           >
             <View style={styles.flameWrap}>
-              <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.flame}>
-                <Ionicons name="flame" size={18} color={c.onPrimary} />
-              </LinearGradient>
+              <ProfilePhoto
+                uri={isLoggedIn ? photoUri : null}
+                style={styles.flame}
+                fallback={
+                  <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.flame}>
+                    <Ionicons name="flame" size={18} color={c.onPrimary} />
+                  </LinearGradient>
+                }
+              />
+              {isLoggedIn && photoUri ? (
+                <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.flameBadge}>
+                  <Ionicons name="flame" size={10} color={c.onPrimary} />
+                </LinearGradient>
+              ) : null}
               <LiveDot style={styles.onlineDot} size={10} active={isLoggedIn} color={isLoggedIn ? c.success : c.textTertiary} ringColor={c.elevated} />
             </View>
             <View style={styles.connectionCopy}>
@@ -665,6 +707,27 @@ const styles = StyleSheet.create({
     backgroundColor: c.elevated,
     borderWidth: 2,
     borderColor: c.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarPhoto: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 22,
+  },
+  photo: {
+    resizeMode: "cover",
+    backgroundColor: c.elevated,
+  },
+  flameBadge: {
+    position: "absolute",
+    top: -4,
+    left: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: c.elevated,
     alignItems: "center",
     justifyContent: "center",
   },
