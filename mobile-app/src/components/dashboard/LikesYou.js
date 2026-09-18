@@ -60,7 +60,7 @@ function PersonCard({ person, locked, width, onPress, index }) {
       <PersonPhoto person={person} locked={locked} style={StyleSheet.absoluteFill} />
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(0,0,0,0)', 'rgba(8,4,12,0.85)']}
+        colors={[alpha(c.background, 0), alpha(c.background, 0.88)]}
         start={{ x: 0.5, y: 0.45 }}
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -107,7 +107,7 @@ function PersonDetail({ person, onOpenTinder, onClose }) {
         <PersonPhoto person={person} locked={false} index={photoIndex} style={StyleSheet.absoluteFill} iconSize={48} />
         <LinearGradient
           pointerEvents="none"
-          colors={['rgba(0,0,0,0)', 'rgba(8,4,12,0.9)']}
+          colors={[alpha(c.background, 0), alpha(c.background, 0.92)]}
           start={{ x: 0.5, y: 0.5 }}
           end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFill}

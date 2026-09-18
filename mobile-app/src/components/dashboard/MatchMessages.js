@@ -113,7 +113,7 @@ function ConversationDetail({ item, ownerId, onOpenTinder, onClose }) {
             <Text style={styles.heroInitial} maxFontSizeMultiplier={theme.fontScale.chrome}>{(profile.name || '?').slice(0, 1).toUpperCase()}</Text>
           </LinearGradient>
         )}
-        <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0)', 'rgba(8,4,12,0.9)']} start={{ x: 0.5, y: 0.45 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} />
+        <LinearGradient pointerEvents="none" colors={[alpha(c.background, 0), alpha(c.background, 0.92)]} start={{ x: 0.5, y: 0.45 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} />
         {photos.length > 1 ? (
           <View style={styles.pager} pointerEvents="none">
             {photos.map((p, i) => <View key={`${p}-${i}`} style={[styles.pagerBar, i === photoIndex && styles.pagerBarActive]} />)}

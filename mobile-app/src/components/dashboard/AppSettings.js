@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../theme';
+import { theme, getActiveTheme, THEME_OPTIONS } from '../../theme';
+import ThemePickerSheet from './ThemePickerSheet';
 import SafeActivityIndicator from '../common/SafeActivityIndicator';
 import { FadeIn } from '../common/Motion';
 import { AppText, Badge, Card, ListRow, ScreenHeader, SectionHeader } from '../ui';
@@ -39,6 +40,8 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
   updatingLocation, onRefreshLocation, onNotifications, onPreferences, onSession,
   onAutomation, onConnect, onBack }) {
   const { gutter } = useResponsive();
+  const [showThemes, setShowThemes] = useState(false);
+  const activeTheme = THEME_OPTIONS.find((option) => option.id === getActiveTheme()) || THEME_OPTIONS[0];
   const profileName = settings?.userProfile?.name;
   const openSystemSettings = async () => {
     try { await Linking.openSettings(); }
@@ -97,14 +100,17 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
       </Section>
 
       <Section title="App & connection" delay={240}>
-        <ListRow icon="moon-outline" iconTone="plus" divider title="Appearance"
-          subtitle="Midnight plum · Flint’s signature dark theme"
-          accessibilityLabel="Appearance. Midnight plum, Flint’s signature dark theme" />
+        <ListRow icon="color-palette-outline" iconTone="plus" divider title="Appearance"
+          subtitle={`${activeTheme.name} · Tap to change theme`}
+          onPress={() => setShowThemes(true)}
+          accessibilityLabel={`Appearance. Current theme ${activeTheme.name}`}
+          accessibilityHint="Opens the theme picker" />
         <SettingsRow icon="server-outline" tone="neutral" title="Advanced preferences"
           description={`Connection: ${{ on_device: 'On-device', hyperbeam: 'Cloud', vps: 'VPS', local: 'Local' }[environment] || 'Not configured'}. Manage your environment and server.`}
           onPress={onPreferences} />
       </Section>
       <AppText variant="caption" align="center" style={styles.footer}>Flint · Version {appConfig.expo.version}</AppText>
+      <ThemePickerSheet visible={showThemes} onClose={() => setShowThemes(false)} />
     </ScrollView>
   );
 }

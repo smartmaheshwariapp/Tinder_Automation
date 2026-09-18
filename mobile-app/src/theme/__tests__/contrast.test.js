@@ -1,4 +1,4 @@
-import { theme } from '../index';
+import { theme, applyTheme, THEME_OPTIONS, DEFAULT_THEME } from '../index';
 
 function luminance(hex) {
   const channels = hex.replace('#', '').match(/../g).map(value => parseInt(value, 16) / 255);
@@ -6,7 +6,11 @@ function luminance(hex) {
   return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
 }
 
-describe('Flint theme text contrast', () => {
+// Every selectable theme must keep body text readable on every surface.
+describe.each(THEME_OPTIONS.map(option => option.id))('Flint theme "%s" text contrast', (themeId) => {
+  beforeAll(() => applyTheme(themeId));
+  afterAll(() => applyTheme(DEFAULT_THEME));
+
   for (const surface of ['background', 'surface', 'elevated']) {
     for (const text of ['text', 'textSecondary', 'muted']) {
       it(`${text} remains readable on ${surface}`, () => {
