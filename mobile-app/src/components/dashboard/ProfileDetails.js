@@ -11,10 +11,10 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { theme } from '../../theme';
+import { theme, alpha } from '../../theme';
 import AppConfirmModal from '../common/AppConfirmModal';
-import { FadeIn, FocusInput } from '../common/Motion';
-import { AppButton, AppText, Badge, Card, CountUp, IconButton, ListRow, ScreenHeader, SectionHeader } from '../ui';
+import { FadeIn, FocusInput, MotionTouchable } from '../common/Motion';
+import { AppButton, AppText, Badge, Card, CountUp, IconButton, ListRow, SectionHeader } from '../ui';
 import useResponsive from '../../hooks/useResponsive';
 import TinderProfileCard from './TinderProfileCard';
 import appConfig from '../../../app.json';
@@ -50,23 +50,25 @@ const display = value =>
       ? String(value)
       : '';
 
-function StatCard({ icon, label, value, color }) {
+function Stat({ icon, label, value, color }) {
   const formatted = Number.isFinite(Number(value)) ? Number(value).toLocaleString() : String(value);
   return (
-    <View style={styles.statCard} accessible accessibilityLabel={`${formatted} ${label.toLowerCase()}`}>
-      <Ionicons name={icon} size={20} color={color} />
+    <View style={styles.stat} accessible accessibilityLabel={`${formatted} ${label.toLowerCase()}`}>
       <CountUp
         value={Number.isFinite(Number(value)) ? Number(value) : formatted}
-        style={[styles.statValue, { color }]}
+        style={styles.statValue}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.7}
         maxFontSizeMultiplier={theme.fontScale.chrome}
         importantForAccessibility="no"
       />
-      <Text style={styles.statLabel} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
-        {label}
-      </Text>
+      <View style={styles.statLabelRow}>
+        <Ionicons name={icon} size={13} color={color} />
+        <Text style={styles.statLabel} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
+          {label}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -236,14 +238,15 @@ export default function ProfileDetails({
     setConfirmModal({
       visible: true,
       icon: 'log-out-outline',
-      iconColor: c.warning,
-      iconBg: c.warningSoft,
-      iconBorder: c.warningBorder,
+      iconColor: c.accent,
+      iconBg: c.primarySoft,
+      iconBorder: c.primaryBorder,
       title: 'Log out of Flint?',
       message: 'This will disconnect your Tinder session and return you to the login screen.',
+      detail: { title: flintName, subtitle: flintEmail, initial: flintInitial },
       confirmText: 'Log out',
       cancelText: 'Cancel',
-      confirmVariant: 'warning',
+      confirmVariant: 'primary',
       onConfirm: () => {
         closeConfirmModal();
         onLogout();
@@ -281,75 +284,67 @@ export default function ProfileDetails({
           { paddingHorizontal: gutter, paddingBottom: theme.layout.navHeight + sp.hero + sp.sm },
         ]}
       >
-        {/* Header */}
-        <ScreenHeader title="Profile" onBack={onBack} backLabel="Back to home" />
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <IconButton icon="chevron-back" variant="plain" iconSize={26} onPress={onBack} accessibilityLabel="Back to home" style={styles.backButton} />
+          <AppText variant="headline" accessibilityRole="header" style={styles.topTitle}>Profile</AppText>
+          <IconButton icon="create-outline" onPress={openEditor} accessibilityLabel="Edit profile" size={40} iconSize={19} style={styles.roundButton} />
+        </View>
 
-        {/* ── 1. Flint Account Hero Card ── */}
-        <FadeIn>
+        {/* ── 1. Identity: cover banner with overlapping avatar ── */}
+        <FadeIn style={styles.identity}>
           <LinearGradient
-            colors={theme.gradients.hero}
+            colors={[alpha(c.primary, 0.55), alpha(c.accent, 0.35), alpha(c.secondary, 0.25)]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.identity}
+            style={styles.cover}
           >
-            <View style={styles.identityTop}>
-              <LinearGradient
-                colors={theme.gradients.brand}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.avatarRing}
-              >
-                <View style={styles.avatar} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-                  <Text style={styles.initial} maxFontSizeMultiplier={theme.fontScale.chrome}>{flintInitial}</Text>
-                </View>
-              </LinearGradient>
-              <View style={styles.identityCopy}>
-                <AppText variant="overline" color="secondary">ACCOUNT</AppText>
-                <AppText variant="title2" numberOfLines={1}>
-                  {flintName}
-                </AppText>
-                <AppText variant="footnote" numberOfLines={1}>
-                  {flintEmail}
-                </AppText>
-                <Badge
-                  label={isLoggedIn ? 'Tinder connected' : 'Tinder not connected'}
-                  tone={isLoggedIn ? 'success' : 'neutral'}
-                  dot
-                  size="sm"
-                  style={styles.connectionBadge}
-                />
-              </View>
-            </View>
-            <AppButton
-              variant="secondary"
-              title="Edit profile"
-              icon="create-outline"
-              iconRight="arrow-forward"
-              onPress={openEditor}
+            <LinearGradient
+              pointerEvents="none"
+              colors={[alpha(c.background, 0), alpha(c.surface, 0.9)]}
+              start={{ x: 0.5, y: 0.2 }}
+              end={{ x: 0.5, y: 1 }}
+              style={StyleSheet.absoluteFill}
             />
+            <Ionicons name="flame" size={120} color={alpha(c.white, 0.07)} style={styles.coverMark} />
           </LinearGradient>
-        </FadeIn>
 
-        {/* ── 2. Flint Lifetime Stats ── */}
-        <FadeIn delay={60} style={styles.statsRow}>
-          <StatCard
-            icon="heart-outline"
-            label="SWIPES"
-            value={totalSwipes}
-            color={c.primary}
-          />
-          <StatCard
-            icon="people-outline"
-            label="MATCHES"
-            value={totalMatches}
-            color={c.secondary}
-          />
-          <StatCard
-            icon="chatbubble-outline"
-            label="MESSAGES"
-            value={totalMessages}
-            color={c.success}
-          />
+          <MotionTouchable
+            onPress={openEditor}
+            pressScale={0.95}
+            accessibilityRole="button"
+            accessibilityLabel={`${flintName}. Edit profile`}
+            style={styles.avatarWrap}
+          >
+            <LinearGradient colors={theme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarRing}>
+              <View style={styles.avatar}>
+                <Text style={styles.initial} maxFontSizeMultiplier={theme.fontScale.chrome}>{flintInitial}</Text>
+              </View>
+            </LinearGradient>
+            <View style={styles.avatarEdit}>
+              <Ionicons name="pencil" size={13} color={c.onPrimary} />
+            </View>
+          </MotionTouchable>
+
+          <View style={styles.identityCopy}>
+            <AppText variant="title" align="center" numberOfLines={2}>{flintName}</AppText>
+            <AppText variant="callout" color="muted" align="center" numberOfLines={1}>{flintEmail}</AppText>
+            <Badge
+              label={isLoggedIn ? 'Tinder connected' : 'Tinder not connected'}
+              tone={isLoggedIn ? 'success' : 'neutral'}
+              dot
+              style={styles.connectionBadge}
+            />
+          </View>
+
+          {/* ── 2. Lifetime stats ── */}
+          <View style={styles.statsRow}>
+            <Stat icon="heart" label="Swipes" value={totalSwipes} color={c.accent} />
+            <View style={styles.statDivider} />
+            <Stat icon="people" label="Matches" value={totalMatches} color={c.secondary} />
+            <View style={styles.statDivider} />
+            <Stat icon="chatbubble" label="Messages" value={totalMessages} color={c.info} />
+          </View>
         </FadeIn>
 
         {!!feedback && (
@@ -494,6 +489,7 @@ export default function ProfileDetails({
         iconBorder={confirmModal.iconBorder}
         title={confirmModal.title}
         message={confirmModal.message}
+        detail={confirmModal.detail}
         confirmText={confirmModal.confirmText}
         cancelText={confirmModal.cancelText}
         confirmVariant={confirmModal.confirmVariant}
@@ -512,67 +508,125 @@ const styles = StyleSheet.create({
     paddingTop: sp.sm,
     gap: sp.xl,
   },
-  identity: {
-    padding: sp.xl,
-    gap: sp.xl,
-    borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: c.borderSubtle,
-  },
-  identityTop: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: sp.lg,
+    justifyContent: 'space-between',
+    minHeight: 48,
   },
-  identityCopy: {
+  backButton: {
+    marginLeft: -sp.md,
+  },
+  topTitle: {
     flex: 1,
-    minWidth: 0,
-    gap: sp.xxs,
+    textAlign: 'center',
+  },
+  roundButton: {
+    borderRadius: theme.radius.pill,
+  },
+  identity: {
+    borderRadius: theme.radius.xxl,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.hairline,
+    overflow: 'hidden',
+    alignItems: 'center',
+    paddingBottom: sp.lg,
+    ...theme.shadows.md,
+  },
+  cover: {
+    alignSelf: 'stretch',
+    height: 112,
+    overflow: 'hidden',
+  },
+  coverMark: {
+    position: 'absolute',
+    right: -18,
+    top: -14,
+    transform: [{ rotate: '12deg' }],
+  },
+  avatarWrap: {
+    marginTop: -56,
   },
   avatarRing: {
     padding: 3,
-    borderRadius: 38,
-    flexShrink: 0,
+    borderRadius: 56,
   },
   avatar: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: c.surface,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: c.elevated,
+    borderWidth: 3,
+    borderColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   initial: {
-    ...theme.type.title,
+    ...theme.type.largeTitle,
     color: c.text,
   },
+  avatarEdit: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: c.primary,
+    borderWidth: 3,
+    borderColor: c.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  identityCopy: {
+    alignItems: 'center',
+    gap: sp.xs,
+    paddingHorizontal: sp.xl,
+    marginTop: sp.md,
+    alignSelf: 'stretch',
+  },
   connectionBadge: {
-    marginTop: sp.xs,
+    alignSelf: 'center',
+    marginTop: sp.sm,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: sp.sm,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginTop: sp.xl,
+    marginHorizontal: sp.lg,
+    paddingVertical: sp.md,
+    borderRadius: theme.radius.lg,
+    backgroundColor: alpha(c.background, 0.55),
+    borderWidth: 1,
+    borderColor: c.hairline,
   },
-  statCard: {
+  stat: {
     flex: 1,
     minWidth: 0,
     alignItems: 'center',
-    gap: sp.xs,
-    paddingVertical: sp.lg,
-    paddingHorizontal: sp.sm,
-    backgroundColor: c.surface,
-    borderRadius: theme.radius.card,
-    borderWidth: 1,
-    borderColor: c.borderSubtle,
+    gap: 2,
+    paddingHorizontal: sp.xs,
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 32,
+    backgroundColor: c.divider,
   },
   statValue: {
     ...theme.type.title2,
     fontFamily: theme.fonts.strong,
-    fontVariant: ['tabular-nums'],
+    color: c.text,
     maxWidth: '100%',
   },
+  statLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   statLabel: {
-    ...theme.type.overline,
+    ...theme.type.footnote,
     color: c.muted,
   },
   feedback: {

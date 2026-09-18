@@ -10,6 +10,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import ActivityIndicator from '../common/SafeActivityIndicator';
+import AppConfirmModal from '../common/AppConfirmModal';
 import {
   LayoutAnimation,
   Platform,
@@ -1689,56 +1690,23 @@ export default function SettingsPanel({
         </View>
       </Modal>
 
-      {/* ─── Custom Logout Confirmation Modal ─── */}
-      <Modal
+      {/* ─── Logout confirmation (shared branded dialog) ─── */}
+      <AppConfirmModal
         visible={showLogoutConfirm}
-        transparent
-        animationType="fade"
-        onRequestClose={() => !loggingOut && setShowLogoutConfirm(false)}
-        statusBarTranslucent
-      >
-        <View style={styles.logoutModalOverlay}>
-          <View style={styles.logoutModalCard} accessibilityViewIsModal>
-            <View style={styles.logoutIconBadge}>
-              <Ionicons name="log-out" size={28} color={uiTheme.colors.error} />
-            </View>
-
-            <Text style={styles.logoutModalTitle} accessibilityRole="header">Log Out of Tinder?</Text>
-            <Text style={styles.logoutModalSubtitle}>
-              This will end the active Tinder session and pause your AI automation assistant until you sign back in.
-            </Text>
-
-            <View style={styles.logoutModalBtnRow}>
-              <TouchableOpacity accessibilityRole="button"
-                style={styles.logoutModalCancelBtn}
-                onPress={() => setShowLogoutConfirm(false)}
-                disabled={loggingOut}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.logoutModalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity accessibilityRole="button"
-                style={styles.logoutModalConfirmBtn}
-                onPress={executeLogout}
-                disabled={loggingOut}
-                accessibilityLabel="Log Out"
-                accessibilityState={{ disabled: !!loggingOut, busy: !!loggingOut }}
-                activeOpacity={0.85}
-              >
-                {loggingOut ? (
-                  <ActivityIndicator size="small" color={uiTheme.colors.onPrimary} />
-                ) : (
-                  <>
-                    <Ionicons name="log-out-outline" size={18} color={uiTheme.colors.onPrimary} />
-                    <Text style={styles.logoutModalConfirmText}>Log Out</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        icon="log-out-outline"
+        iconColor={uiTheme.colors.accent}
+        iconBg={uiTheme.colors.primarySoft}
+        iconBorder={uiTheme.colors.primaryBorder}
+        title="Log out of Tinder?"
+        message="This ends the active Tinder session and pauses your AI assistant until you sign back in."
+        detail={{ title: settings?.userProfile?.name || "Your Tinder account", subtitle: "Tinder session on this device", icon: "flame" }}
+        confirmText="Log out"
+        cancelText="Cancel"
+        confirmVariant="primary"
+        busy={!!loggingOut}
+        onConfirm={executeLogout}
+        onCancel={() => !loggingOut && setShowLogoutConfirm(false)}
+      />
 
       {/* ─── Universal Synced Location Notice Modal ─── */}
       {SHOW_LOCATION_FEATURE && (

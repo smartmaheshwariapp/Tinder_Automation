@@ -64,10 +64,11 @@ import HomeOverview, {
 import AppSettings from "../components/dashboard/AppSettings";
 import ProfileDetails from "../components/dashboard/ProfileDetails";
 import { LinearGradient } from "expo-linear-gradient";
-import { AppButton, AppText, IconButton, ScreenHeader, ContentTransition } from "../components/ui";
+import { AppButton, AppText, Badge, IconButton, IconWell, MotionTouchable, ScreenHeader, ContentTransition } from "../components/ui";
 import SupabaseService from "../services/supabase";
 import NotificationService from "../services/notifications";
 import NotificationCenterModal from "../components/NotificationCenterModal";
+import AppConfirmModal from "../components/common/AppConfirmModal";
 import PermissionPrePromptModal from "../components/common/PermissionPrePromptModal";
 import LocationNoticeModal from "../components/common/LocationNoticeModal";
 import LocationService from "../services/locationService";
@@ -79,6 +80,14 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 // ─── Feature Flags (Hidden in On-Device mode for clean UX) ───
 const SHOW_LOCATION_PREFERENCE = false;
 const SHOW_ASSISTANT_STATUS_CARD = false;
+
+// Server environments shown in App Preferences (ids match `environment`).
+const ENVIRONMENT_OPTIONS = [
+  { id: "on_device", label: "On-Device", icon: "phone-portrait-outline", tone: "success", short: "Runs on this phone", description: "Tinder runs right here on your phone." },
+  { id: "hyperbeam", label: "Cloud", icon: "flash-outline", tone: "primary", short: "Secure cloud browser", description: "Streams Tinder from a secure cloud browser." },
+  { id: "vps", label: "VPS", icon: "cloud-done-outline", tone: "info", short: "Your private server", description: "Runs on your private server." },
+  { id: "local", label: "Local", icon: "laptop-outline", tone: "neutral", short: "Computer on your network", description: "Connects to a computer on your network." },
+];
 
 export default function PlatformSelectScreen({ navigation, route }) {
   const [homeTab, setHomeTab] = useState("home");
@@ -1019,7 +1028,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
       )}
 
       {/* The Home tab renders its own personal header (greeting, avatar, notifications). */}
-      {!["home", "automation", "activity", "settings"].includes(homeTab) && (
+      {!["home", "automation", "activity", "settings", "profile", "appSettings"].includes(homeTab) && (
       <View style={homeStyles.header}>
         <View
           style={homeStyles.brand}
@@ -1272,9 +1281,20 @@ export default function PlatformSelectScreen({ navigation, route }) {
                 <View style={styles.modalHandle} />
 
                 <View style={styles.modalHeader}>
+                  <LinearGradient
+                    colors={uiTheme.gradients.brand}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.prefsHeaderIcon}
+                  >
+                    <Ionicons name="options" size={20} color={uiTheme.colors.onPrimary} />
+                  </LinearGradient>
                   <View style={styles.modalHeaderCopy}>
                     <AppText variant="title2" numberOfLines={1}>
                       App Preferences
+                    </AppText>
+                    <AppText variant="footnote" numberOfLines={1}>
+                      Connection and account
                     </AppText>
                   </View>
                   <IconButton
@@ -1386,90 +1406,104 @@ export default function PlatformSelectScreen({ navigation, route }) {
                     </View>
                   )}
 
-                  {/* ─── 3. Developer / Advanced Network (Tucked Away Behind Toggle) ─── */}
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: showAdvanced }}
-                    style={styles.advancedToggleRow}
-                    onPress={() => setShowAdvanced(!showAdvanced)}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={styles.advancedToggleText}
-                      numberOfLines={1}
-                      maxFontSizeMultiplier={uiTheme.fontScale.chrome}
-                    >
-                      {showAdvanced
-                        ? "Hide Developer Settings"
-                        : "🛠️ Advanced / Developer Options"}
-                    </Text>
-                    <Ionicons
-                      name={showAdvanced ? "chevron-up" : "chevron-down"}
-                      size={16}
-                      color={uiTheme.colors.accent}
-                    />
-                  </TouchableOpacity>
+                  {/* ─── 3. Connection: current environment + developer picker ─── */}
+                  {(() => {
+                    const current = ENVIRONMENT_OPTIONS.find((option) => option.id === environment) || ENVIRONMENT_OPTIONS[0];
+                    return (
+                      <View style={styles.prefsCard}>
+                        <View style={styles.prefsCurrent}>
+                          <IconWell icon={current.icon} tone={current.tone} size={44} iconSize={20} />
+                          <View style={styles.prefsCurrentCopy}>
+                            <AppText variant="overline">CONNECTION</AppText>
+                            <AppText variant="headline" numberOfLines={1}>{current.label}</AppText>
+                            <AppText variant="footnote" numberOfLines={2}>{current.description}</AppText>
+                          </View>
+                          <Badge label="Selected" tone="primary" size="sm" />
+                        </View>
 
-                  {showAdvanced && (
-                    <View style={styles.advancedDrawer}>
-                      <Text style={styles.modalSectionLabel} accessibilityRole="header">
-                        Server Environment
-                      </Text>
-                      <View style={styles.envSelector} accessibilityRole="radiogroup">
-                        {[
-                          { id: "on_device", label: "On-Device", icon: "phone-portrait-outline", tint: uiTheme.colors.success },
-                          { id: "hyperbeam", label: "Cloud", icon: "flash-outline", tint: uiTheme.colors.primary },
-                          { id: "vps", label: "VPS", icon: "cloud-done-outline", tint: uiTheme.colors.text },
-                          { id: "local", label: "Local", icon: "laptop-outline", tint: uiTheme.colors.text },
-                        ].map((option) => {
-                          const active = environment === option.id;
-                          return (
-                            <TouchableOpacity
-                              key={option.id}
-                              accessibilityRole="radio"
-                              accessibilityLabel={`${option.label} environment`}
-                              accessibilityState={{ selected: active, checked: active }}
-                              style={[
-                                styles.envOption,
-                                active && styles.envOptionActive,
-                              ]}
-                              onPress={() => setEnvironment(option.id)}
-                              activeOpacity={0.8}
-                            >
-                              <Ionicons
-                                name={option.icon}
-                                size={18}
-                                color={active ? option.tint : uiTheme.colors.muted}
-                              />
-                              <Text
-                                numberOfLines={1}
-                                adjustsFontSizeToFit
-                                minimumFontScale={0.85}
-                                maxFontSizeMultiplier={uiTheme.fontScale.chrome}
-                                style={[
-                                  styles.envOptionText,
-                                  active && styles.envOptionTextActive,
-                                ]}
-                              >
-                                {option.label}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityState={{ expanded: showAdvanced }}
+                          accessibilityLabel={showAdvanced ? "Hide developer settings" : "Show developer settings"}
+                          style={styles.prefsDisclosure}
+                          onPress={() => setShowAdvanced(!showAdvanced)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="construct-outline" size={16} color={uiTheme.colors.muted} />
+                          <AppText variant="subhead" color="textSecondary" style={styles.prefsDisclosureText} numberOfLines={1}>
+                            Developer · Server environment
+                          </AppText>
+                          <Ionicons
+                            name={showAdvanced ? "chevron-up" : "chevron-down"}
+                            size={16}
+                            color={uiTheme.colors.muted}
+                          />
+                        </TouchableOpacity>
+
+                        {showAdvanced && (
+                          <View style={styles.envGrid} accessibilityRole="radiogroup">
+                            {ENVIRONMENT_OPTIONS.map((option) => {
+                              const active = environment === option.id;
+                              return (
+                                <MotionTouchable
+                                  key={option.id}
+                                  accessibilityRole="radio"
+                                  accessibilityLabel={`${option.label} environment. ${option.description}`}
+                                  accessibilityState={{ selected: active, checked: active }}
+                                  style={[styles.envCard, active && styles.envCardActive]}
+                                  onPress={() => setEnvironment(option.id)}
+                                  activeOpacity={0.85}
+                                  pressScale={0.96}
+                                >
+                                  <View style={styles.envCardTop}>
+                                    <IconWell icon={option.icon} tone={active ? option.tone : "neutral"} size={34} iconSize={16} />
+                                    <View style={[styles.envRadio, active && styles.envRadioActive]}>
+                                      {active ? <Ionicons name="checkmark" size={12} color={uiTheme.colors.onPrimary} /> : null}
+                                    </View>
+                                  </View>
+                                  <AppText variant="bodyStrong" color={active ? "text" : "textSecondary"} numberOfLines={1}>
+                                    {option.label}
+                                  </AppText>
+                                  <AppText variant="footnote" numberOfLines={2}>
+                                    {option.short}
+                                  </AppText>
+                                </MotionTouchable>
+                              );
+                            })}
+                          </View>
+                        )}
                       </View>
-                    </View>
-                  )}
+                    );
+                  })()}
 
                   {/* Active Session & Disconnect */}
+                  {/* Tinder Account section removed from App Preferences (log out stays available in Profile and Controls).
                   {isLoggedIn && (
-                    <View style={styles.modalAccountSection}>
-                      <Text style={styles.modalSectionLabel} accessibilityRole="header">
-                        Active Tinder Account
-                      </Text>
+                    <View style={styles.prefsCard}>
+                      <AppText variant="overline" accessibilityRole="header">TINDER ACCOUNT</AppText>
+                      <View style={styles.prefsAccount}>
+                        <LinearGradient
+                          colors={uiTheme.gradients.brand}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.prefsAccountAvatar}
+                        >
+                          <Ionicons name="flame" size={18} color={uiTheme.colors.onPrimary} />
+                        </LinearGradient>
+                        <View style={styles.prefsCurrentCopy}>
+                          <AppText variant="bodyStrong" numberOfLines={1}>
+                            {localSettings?.userProfile?.name || "Your Tinder account"}
+                          </AppText>
+                          <AppText variant="footnote" numberOfLines={1}>
+                            Session active on this device
+                          </AppText>
+                        </View>
+                        <Badge label="Live" tone="success" dot size="sm" />
+                      </View>
                       <AppButton
-                        variant="dangerSoft"
+                        variant="secondary"
                         icon="log-out-outline"
-                        title="Log Out & End Session"
+                        title="Log out & end session"
                         onPress={() => {
                           closeModal();
                           setTimeout(confirmLogout, 250);
@@ -1477,6 +1511,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                       />
                     </View>
                   )}
+                  */}
                 </ScrollView>
               </Pressable>
             </Animated.View>
@@ -1484,50 +1519,23 @@ export default function PlatformSelectScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* ═══════════════════ CUSTOM LOGOUT CONFIRMATION MODAL ═══════════════════ */}
-      <Modal
+      {/* ─── Logout confirmation (shared branded dialog) ─── */}
+      <AppConfirmModal
         visible={showLogoutConfirm}
-        transparent
-        animationType="fade"
-        onRequestClose={() => !loggingOut && setShowLogoutConfirm(false)}
-        statusBarTranslucent
-      >
-        <View style={styles.logoutModalOverlay}>
-          <View style={styles.logoutModalCard}>
-            <View style={styles.logoutIconBadge}>
-              <Ionicons name="log-out" size={28} color={uiTheme.colors.error} />
-            </View>
-
-            <Text style={styles.logoutModalTitle} accessibilityRole="header">
-              Log Out of Tinder?
-            </Text>
-            <Text style={styles.logoutModalSubtitle}>
-              This will end the active Tinder session and pause your AI
-              automation assistant until you sign back in.
-            </Text>
-
-            <View style={styles.logoutModalBtnRow}>
-              <AppButton
-                variant="secondary"
-                title="Cancel"
-                fullWidth={false}
-                style={styles.logoutModalBtn}
-                onPress={() => setShowLogoutConfirm(false)}
-                disabled={loggingOut}
-              />
-              <AppButton
-                variant="danger"
-                title="Log Out"
-                icon="log-out-outline"
-                fullWidth={false}
-                style={styles.logoutModalBtn}
-                onPress={handleLogout}
-                loading={loggingOut}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
+        icon="log-out-outline"
+        iconColor={uiTheme.colors.accent}
+        iconBg={uiTheme.colors.primarySoft}
+        iconBorder={uiTheme.colors.primaryBorder}
+        title="Log out of Tinder?"
+        message="This ends the active Tinder session and pauses your AI assistant until you sign back in."
+        detail={{ title: localSettings?.userProfile?.name || "Your Tinder account", subtitle: "Tinder session on this device", icon: "flame" }}
+        confirmText="Log out"
+        cancelText="Cancel"
+        confirmVariant="primary"
+        busy={!!loggingOut}
+        onConfirm={handleLogout}
+        onCancel={() => !loggingOut && setShowLogoutConfirm(false)}
+      />
       {/* ═══════════════════ NOTIFICATION CENTER MODAL ═══════════════════ */}
       <NotificationCenterModal
         visible={showNotifModal}
@@ -1922,6 +1930,100 @@ const styles = StyleSheet.create({
   logoutModalBtn: {
     flexGrow: 1,
     flexBasis: 120,
+  },
+  // ── App Preferences sheet ──
+  prefsHeaderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    ...uiTheme.shadows.glow,
+  },
+  prefsCard: {
+    backgroundColor: uiTheme.colors.elevated,
+    borderRadius: uiTheme.radius.card,
+    borderWidth: 1,
+    borderColor: uiTheme.colors.hairline,
+    padding: uiTheme.spacing.lg,
+    gap: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.lg,
+  },
+  prefsCurrent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.md,
+  },
+  prefsCurrentCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 1,
+  },
+  prefsDisclosure: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.sm,
+    minHeight: 44,
+    paddingHorizontal: uiTheme.spacing.md,
+    borderRadius: uiTheme.radius.md,
+    backgroundColor: alpha(uiTheme.colors.background, 0.5),
+    borderWidth: 1,
+    borderColor: uiTheme.colors.hairline,
+  },
+  prefsDisclosureText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  envGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: uiTheme.spacing.sm,
+  },
+  envCard: {
+    flexBasis: "47%",
+    flexGrow: 1,
+    minWidth: 120,
+    gap: uiTheme.spacing.xs,
+    padding: uiTheme.spacing.md,
+    borderRadius: uiTheme.radius.lg,
+    backgroundColor: uiTheme.colors.surface,
+    borderWidth: 1,
+    borderColor: uiTheme.colors.border,
+  },
+  envCardActive: {
+    backgroundColor: uiTheme.colors.primarySoft,
+    borderColor: uiTheme.colors.primaryBorder,
+  },
+  envCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: uiTheme.spacing.xs,
+  },
+  envRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: uiTheme.colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  envRadioActive: {
+    backgroundColor: uiTheme.colors.primary,
+    borderColor: uiTheme.colors.primary,
+  },
+  prefsAccount: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: uiTheme.spacing.md,
+  },
+  prefsAccountAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 

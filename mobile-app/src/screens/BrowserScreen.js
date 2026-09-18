@@ -48,6 +48,7 @@ import { useExtensionStats } from '../hooks/useExtensionStats';
 import useResponsive from '../hooks/useResponsive';
 import { AppText, AppButton, IconButton, IconWell, Badge, FocusInput, FadeIn, MotionTouchable as TouchableOpacity } from '../components/ui';
 import { useMotionReduced } from '../components/common/Motion';
+import AppConfirmModal from '../components/common/AppConfirmModal';
 import trackingService from '../services/trackingService';
 import NotificationService from '../services/notifications';
 
@@ -2750,43 +2751,22 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
           </SafeAreaView>
         </Modal>
 
-        {/* ─── Custom Logout Confirmation Modal ─── */}
-        <Modal
+        {/* ─── Logout confirmation (shared branded dialog) ─── */}
+        <AppConfirmModal
           visible={showLogoutConfirm}
-          transparent
-          animationType="fade"
-          onRequestClose={() => !loggingOut && setShowLogoutConfirm(false)}
-          statusBarTranslucent
-        >
-          <View style={styles.logoutModalOverlay}>
-            <View style={styles.logoutModalCard} accessibilityViewIsModal>
-              <IconWell icon="log-out-outline" tone="error" size={60} style={styles.logoutIconBadge} />
-
-              <AppText variant="title2" align="center" style={styles.logoutModalTitle}>Log Out of Tinder?</AppText>
-              <AppText variant="callout" color="muted" align="center" style={styles.logoutModalSubtitle}>
-                This will terminate the active session, clear browser state, and return you to the login screen.
-              </AppText>
-
-              <View style={styles.logoutModalBtnRow}>
-                <AppButton
-                  title="Cancel"
-                  variant="secondary"
-                  onPress={() => setShowLogoutConfirm(false)}
-                  disabled={loggingOut}
-                  style={styles.logoutModalBtn}
-                />
-                <AppButton
-                  title="Log Out"
-                  icon="log-out-outline"
-                  variant="danger"
-                  onPress={handleLogout}
-                  loading={loggingOut}
-                  style={styles.logoutModalBtn}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
+          icon="log-out-outline"
+          iconColor={uiTheme.colors.accent}
+          iconBg={uiTheme.colors.primarySoft}
+          iconBorder={uiTheme.colors.primaryBorder}
+          title="Log out of Tinder?"
+          message="This ends the active session, clears browser data and returns you to the login screen."
+          confirmText="Log out"
+          cancelText="Cancel"
+          confirmVariant="primary"
+          busy={!!loggingOut}
+          onConfirm={handleLogout}
+          onCancel={() => !loggingOut && setShowLogoutConfirm(false)}
+        />
 
         {/* ─── Rounded Glass Browser Container ─── */}
         <View

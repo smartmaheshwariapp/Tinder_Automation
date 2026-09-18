@@ -22,7 +22,8 @@ import { resolveLocalUrl } from '../utils/network';
 import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession, getSharedExtensionSettings } from '../utils/sessionManager';
 import NotificationService from '../services/notifications';
 import useResponsive from '../hooks/useResponsive';
-import { AppText, AppButton, Card, ListRow, SectionHeader, ScreenHeader, FadeIn } from '../components/ui';
+import { AppText, AppButton, Card, ListRow, SectionHeader, IconButton, Badge, FadeIn } from '../components/ui';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Feature Flags (Hidden to avoid duplicating V2 Automation Panel) ───
 const SHOW_DUPLICATE_AUTOMATION_SECTIONS = false;
@@ -216,6 +217,9 @@ export default function PlatformConfigScreen({ route, navigation }) {
 
   const themeColor = platform.toLowerCase() === 'tinder' ? uiTheme.colors.primary : uiTheme.colors.warning;
 
+  const alertsOn = [notifyGoals, notifyMatches, notifyCycles].filter(Boolean).length;
+  const asksBefore = ['tinder', 'whatsapp', 'instagram'].filter((key) => redirectPrefs?.[key] === 'always_ask').length;
+
   const switchProps = (value) => ({
     trackColor: { false: uiTheme.colors.elevatedHigh, true: themeColor },
     thumbColor: value ? uiTheme.colors.onPrimary : uiTheme.colors.muted,
@@ -241,13 +245,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
         style={{ flex: 1 }}
       >
         {/* Header */}
-        <View style={styles.headerBand}>
-          <ScreenHeader
-            style={[styles.headerInner, { paddingHorizontal: gutter }]}
-            onBack={() => navigation.goBack()}
-            title={platform + ' Preferences'}
-            subtitle="Alerts & App Shortcuts"
-          />
+        <View style={[styles.header, { paddingHorizontal: gutter }]}>
+          <IconButton icon="chevron-back" variant="plain" iconSize={26} onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={styles.backButton} />
         </View>
 
         <ScrollView
@@ -255,6 +254,37 @@ export default function PlatformConfigScreen({ route, navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+
+          <FadeIn style={styles.titleBlock}>
+            <AppText variant="largeTitle" numberOfLines={2}>{platform} Preferences</AppText>
+            <AppText variant="body" color="muted" style={styles.titleSub}>Alerts and app shortcuts for your live session.</AppText>
+          </FadeIn>
+
+          {/* Session summary */}
+          <FadeIn delay={40}>
+            <View style={styles.hero}>
+              <LinearGradient
+                colors={[alpha(themeColor, 0.28), alpha(uiTheme.colors.secondary, 0.1), alpha(uiTheme.colors.surface, 0)]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Ionicons name="flame" size={140} color={alpha(uiTheme.colors.white, 0.05)} style={styles.heroMark} />
+              <View style={styles.heroTop}>
+                <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroLogo}>
+                  <Ionicons name="flame" size={26} color={uiTheme.colors.onPrimary} />
+                </LinearGradient>
+                <View style={styles.heroCopy}>
+                  <AppText variant="section" numberOfLines={1}>Ready when you are</AppText>
+                  <AppText variant="footnote" color="textSecondary">Review your alerts, then open the live {platform} screen.</AppText>
+                </View>
+              </View>
+              <View style={styles.heroChips}>
+                <Badge label={`${alertsOn} of 3 alerts on`} tone={alertsOn ? 'success' : 'neutral'} icon="notifications" />
+                <Badge label={asksBefore ? `Asks before ${asksBefore} app${asksBefore === 1 ? '' : 's'}` : 'Opens apps directly'} tone="secondary" icon="open-outline" />
+              </View>
+            </View>
+          </FadeIn>
 
           {SHOW_DUPLICATE_AUTOMATION_SECTIONS && (
             <>
@@ -416,8 +446,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
           )}
 
           {/* Section 4: Push Notification Preferences */}
-          <FadeIn>
-            <SectionHeader title="Notification Preferences" description="Choose which updates you want to receive on your phone." />
+          <FadeIn delay={80}>
+            <SectionHeader title="Alerts" description="Choose which updates reach your phone." style={styles.sectionHeaderGap} />
             <Card padding="none" style={styles.groupCard}>
               {/* Toggle 1: Goal Alerts */}
               <ListRow
@@ -469,8 +499,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
           </FadeIn>
 
           {/* Section 5: External App Redirects */}
-          <FadeIn delay={60}>
-            <SectionHeader title="External App Redirects" description="Choose whether to ask for confirmation before leaving FlirtEasy." />
+          <FadeIn delay={120}>
+            <SectionHeader title="Leaving Flint" description="Ask before a tap opens another app." style={styles.sectionHeaderGap} />
             <Card padding="none" style={styles.groupCard}>
               {/* Toggle 1: Tinder Confirmation */}
               <ListRow
@@ -529,14 +559,23 @@ export default function PlatformConfigScreen({ route, navigation }) {
         </ScrollView>
 
         {/* Launch Button (sticky footer above the home indicator) */}
-        <View style={[styles.footer, { paddingBottom: uiTheme.spacing.lg, paddingHorizontal: gutter }]}>
+        <View style={[styles.footer, { paddingBottom: uiTheme.spacing.lg, paddingHorizontal: gutter }]} pointerEvents="box-none">
+          <LinearGradient
+            pointerEvents="none"
+            colors={[alpha(uiTheme.colors.background, 0), uiTheme.colors.background]}
+            style={styles.footerFade}
+          />
           <AppButton
             title="Open Live Screen"
+            icon="flame"
             iconRight="arrow-forward"
             onPress={handleStartSession}
             loading={loading}
             style={styles.launchBtn}
           />
+          <AppText variant="footnote" color="muted" align="center" style={styles.footerNote}>
+            Opens {platform} in a secure live screen
+          </AppText>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -544,29 +583,77 @@ export default function PlatformConfigScreen({ route, navigation }) {
 }
 
 // Height reserved at the bottom of the scroll content so the sticky footer never covers it.
-const FOOTER_SPACE = uiTheme.layout.buttonHeight + uiTheme.spacing.section + uiTheme.spacing.lg;
+const FOOTER_SPACE = uiTheme.layout.buttonHeight + uiTheme.spacing.section + uiTheme.spacing.xxl + uiTheme.spacing.lg;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: uiTheme.colors.background,
   },
-  headerBand: {
+  header: {
     width: '100%',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: uiTheme.colors.divider,
-    backgroundColor: uiTheme.colors.surface,
-  },
-  headerInner: {
     maxWidth: uiTheme.layout.readableMax + 64,
     alignSelf: 'center',
-    paddingVertical: uiTheme.spacing.xs,
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  backButton: {
+    marginLeft: -uiTheme.spacing.md,
   },
   scrollContent: {
     width: '100%',
     maxWidth: uiTheme.layout.readableMax + 64,
     alignSelf: 'center',
-    paddingTop: uiTheme.spacing.xxl,
+    paddingTop: uiTheme.spacing.xs,
+  },
+  titleBlock: {
+    marginBottom: uiTheme.spacing.xl,
+  },
+  titleSub: {
+    marginTop: uiTheme.spacing.xs,
+  },
+  hero: {
+    borderRadius: uiTheme.radius.xl,
+    borderWidth: 1,
+    borderColor: uiTheme.colors.primaryBorder,
+    backgroundColor: uiTheme.colors.surface,
+    padding: uiTheme.spacing.lg,
+    gap: uiTheme.spacing.lg,
+    overflow: 'hidden',
+    marginBottom: uiTheme.spacing.section,
+    ...uiTheme.shadows.md,
+  },
+  heroMark: {
+    position: 'absolute',
+    right: -24,
+    bottom: -30,
+    transform: [{ rotate: '-12deg' }],
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiTheme.spacing.md,
+  },
+  heroLogo: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...uiTheme.shadows.glow,
+  },
+  heroCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  heroChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: uiTheme.spacing.sm,
+  },
+  sectionHeaderGap: {
+    marginBottom: uiTheme.spacing.sm,
   },
   groupCard: {
     overflow: 'hidden',
@@ -577,10 +664,18 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingTop: uiTheme.spacing.md,
-    backgroundColor: alpha(uiTheme.colors.background, 0.96),
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: uiTheme.colors.divider,
+    paddingTop: uiTheme.spacing.sm,
+    backgroundColor: uiTheme.colors.background,
+  },
+  footerFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: -28,
+    height: 28,
+  },
+  footerNote: {
+    marginTop: uiTheme.spacing.sm,
   },
   launchBtn: {
     width: '100%',
