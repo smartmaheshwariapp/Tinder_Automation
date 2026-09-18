@@ -3,7 +3,8 @@ import { StyleSheet, Text, View, StatusBar } from 'react-native';
 import SafeActivityIndicator from './src/components/common/SafeActivityIndicator';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { theme } from './src/theme';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
 import AppNavigator from './src/navigation/AppNavigator';
 import InAppNotificationBanner from './src/components/InAppNotificationBanner';
@@ -27,6 +28,21 @@ const navigationTheme = {
   fonts: { regular: { fontFamily: theme.fonts.body, fontWeight: "normal" }, medium: { fontFamily: theme.fonts.label, fontWeight: "normal" }, bold: { fontFamily: theme.fonts.heading, fontWeight: "normal" }, heavy: { fontFamily: theme.fonts.display, fontWeight: "normal" } },
   colors: { ...DarkTheme.colors, primary: theme.colors.primary, background: theme.colors.background, card: theme.colors.surface, text: theme.colors.text, border: theme.colors.border, notification: theme.colors.primary },
 };
+
+// Root shell shared by the splash and the app: gesture handling, safe-area context and a
+// safe-area inset view. Screens inside it no longer need to add the notch/home-indicator
+// insets themselves; full-screen Modals render in their own window and still do.
+function AppShell({ children }) {
+  return (
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.root}>
+          {children}
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
@@ -111,6 +127,7 @@ export default function App() {
 
   if (!isReady || (!fontsLoaded && !fontError)) {
     return (
+      <AppShell>
       <View style={styles.splashContainer}>
         <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
         <LinearGradient colors={theme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.splashMark}>
@@ -120,11 +137,12 @@ export default function App() {
         <Text style={styles.splashStatus} accessibilityLiveRegion="polite">{updateStatus}</Text>
         <SafeActivityIndicator size={20} color={theme.colors.accent} style={styles.splashSpinner} />
       </View>
+      </AppShell>
     );
   }
 
   return (
-    <SafeAreaProvider>
+    <AppShell>
       <MotionProvider>
       <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <AppNavigator initialRouteName={initialRoute} initialUser={initialUser} />
@@ -145,11 +163,15 @@ export default function App() {
         />
       </NavigationContainer>
       </MotionProvider>
-    </SafeAreaProvider>
+    </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
   splashContainer: {
     flex: 1,
     backgroundColor: theme.colors.background,

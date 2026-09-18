@@ -13,9 +13,10 @@ import {
   Animated,
   Easing,
   StatusBar,
+  ScrollView,
   useWindowDimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Badge, EmptyState, IconButton, IconWell, MotionTouchable, FadeIn } from './ui';
 import { useMotionReduced } from './common/Motion';
@@ -93,7 +94,6 @@ export default function NotificationCenterModal({
   onClose,
   onOpenStream,
 }) {
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { gutter } = useResponsive();
   const reduced = useMotionReduced();
@@ -210,17 +210,15 @@ export default function NotificationCenterModal({
         </View>
 
         <View style={styles.rowBody}>
-          <View style={styles.rowTitleLine}>
-            <Text style={[styles.rowTitle, isUnread && styles.rowTitleUnread]} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text style={styles.rowTime} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-              {formatTimeAgo(item.created_at)}
-            </Text>
-          </View>
+          <Text style={[styles.rowTitle, isUnread && styles.rowTitleUnread]} numberOfLines={2}>
+            {item.title}
+          </Text>
           {item.body ? (
             <Text style={styles.rowText} numberOfLines={3}>{item.body}</Text>
           ) : null}
+          <Text style={styles.rowTime} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+            {formatTimeAgo(item.created_at)}
+          </Text>
 
           {(phone || isGoal) ? (
             <View style={styles.rowActions}>
@@ -248,7 +246,6 @@ export default function NotificationCenterModal({
           ) : null}
         </View>
 
-        <Ionicons name="chevron-forward" size={16} color={uiTheme.colors.textTertiary} style={styles.rowChevron} />
       </MotionTouchable>
     );
     return (
@@ -274,13 +271,14 @@ export default function NotificationCenterModal({
         accessibilityViewIsModal
         style={[
           styles.page,
-          { paddingTop: insets.top, transform: [{ translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, width] }) }] },
+          { transform: [{ translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, width] }) }] },
         ]}
       >
+        <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.safe}>
         <View style={[styles.column, { paddingHorizontal: gutter }]}>
           {/* Top bar */}
           <View style={styles.topBar}>
-            <IconButton icon="chevron-back" onPress={handleDismiss} accessibilityLabel="Back" style={styles.roundButton} />
+            <IconButton icon="chevron-back" variant="plain" iconSize={26} onPress={handleDismiss} accessibilityLabel="Back" style={styles.backButton} />
             <View style={styles.topActions}>
               {unreadCount > 0 ? (
                 <IconButton
@@ -291,6 +289,8 @@ export default function NotificationCenterModal({
                   }}
                   accessibilityLabel="Mark all notifications as read"
                   color={uiTheme.colors.accent}
+                  size={40}
+                  iconSize={19}
                   style={styles.roundButton}
                 />
               ) : null}
@@ -300,6 +300,8 @@ export default function NotificationCenterModal({
                   onPress={() => setConfirmClear(true)}
                   accessibilityLabel="Clear all notifications"
                   color={uiTheme.colors.textSecondary}
+                  size={40}
+                  iconSize={18}
                   style={styles.roundButton}
                 />
               ) : null}
@@ -327,38 +329,45 @@ export default function NotificationCenterModal({
             </View>
           </View>
 
-          {/* Filter tabs */}
-          <View style={styles.tabs} accessibilityRole="tablist">
-            {FILTERS.map((f) => {
-              const selected = activeFilter === f.id;
-              return (
-                <MotionTouchable
-                  key={f.id}
-                  accessibilityRole="tab"
-                  accessibilityLabel={`${f.label}, ${f.count}`}
-                  accessibilityState={{ selected }}
-                  onPress={() => {
-                    setActiveFilter(f.id);
-                    safeHaptic('light');
-                  }}
-                  pressScale={0.95}
-                  style={[styles.tab, selected && styles.tabSelected]}
-                >
-                  <Text style={[styles.tabText, selected && styles.tabTextSelected]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                    {f.label}
-                  </Text>
-                  {f.count > 0 ? (
-                    <View style={[styles.tabCount, selected && styles.tabCountSelected]}>
-                      <Text style={[styles.tabCountText, selected && styles.tabCountTextSelected]} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                        {f.count > 99 ? '99+' : f.count}
-                      </Text>
-                    </View>
-                  ) : null}
-                </MotionTouchable>
-              );
-            })}
-          </View>
         </View>
+
+        {/* Filter pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabsScroll}
+          contentContainerStyle={[styles.tabs, { paddingHorizontal: gutter }]}
+          accessibilityRole="tablist"
+        >
+          {FILTERS.map((f) => {
+            const selected = activeFilter === f.id;
+            return (
+              <MotionTouchable
+                key={f.id}
+                accessibilityRole="tab"
+                accessibilityLabel={`${f.label}, ${f.count}`}
+                accessibilityState={{ selected }}
+                onPress={() => {
+                  setActiveFilter(f.id);
+                  safeHaptic('light');
+                }}
+                pressScale={0.95}
+                style={[styles.tab, selected && styles.tabSelected]}
+              >
+                <Text style={[styles.tabText, selected && styles.tabTextSelected]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  {f.label}
+                </Text>
+                {f.count > 0 ? (
+                  <View style={[styles.tabCount, selected && styles.tabCountSelected]}>
+                    <Text style={[styles.tabCountText, selected && styles.tabCountTextSelected]} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                      {f.count > 99 ? '99+' : f.count}
+                    </Text>
+                  </View>
+                ) : null}
+              </MotionTouchable>
+            );
+          })}
+        </ScrollView>
 
         {/* Feed */}
         {filteredNotifications.length === 0 ? (
@@ -379,10 +388,11 @@ export default function NotificationCenterModal({
               </View>
             )}
             stickySectionHeadersEnabled
-            contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, paddingBottom: insets.bottom + uiTheme.spacing.section }]}
+            contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, paddingBottom: uiTheme.spacing.section }]}
             showsVerticalScrollIndicator={false}
           />
         )}
+        </SafeAreaView>
       </Animated.View>
 
       <AppConfirmModal
@@ -415,6 +425,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: c.background,
   },
+  safe: {
+    flex: 1,
+  },
   column: {
     width: '100%',
     maxWidth: uiTheme.layout.readableMax,
@@ -424,8 +437,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 52,
+    minHeight: 48,
     marginTop: sp.xs,
+  },
+  backButton: {
+    marginLeft: -sp.md,
   },
   topActions: {
     flexDirection: 'row',
@@ -434,7 +450,7 @@ const styles = StyleSheet.create({
   },
   roundButton: { borderRadius: r.pill },
   titleBlock: {
-    marginTop: sp.sm,
+    marginTop: sp.xs,
     marginBottom: sp.lg,
   },
   title: {
@@ -458,33 +474,34 @@ const styles = StyleSheet.create({
     color: c.muted,
   },
 
-  // Segmented filter tabs
+  // Filter pills
+  // flexShrink: 0 keeps the list below from squeezing this row and clipping the pills.
+  tabsScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: sp.xs,
+  },
   tabs: {
     flexDirection: 'row',
-    padding: 4,
-    gap: 4,
-    borderRadius: r.lg,
-    backgroundColor: c.surface,
-    borderWidth: 1,
-    borderColor: c.borderSubtle,
-    marginBottom: sp.sm,
+    alignItems: 'center',
+    gap: sp.sm,
+    paddingVertical: sp.xs,
   },
   tab: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 40,
+    minHeight: 38,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: sp.xs,
-    borderRadius: r.md,
+    gap: 8,
+    paddingLeft: sp.lg,
+    paddingRight: sp.md,
+    borderRadius: r.pill,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.border,
   },
   tabSelected: {
-    backgroundColor: c.elevatedHigh,
-    borderWidth: 1,
+    backgroundColor: c.primarySoft,
     borderColor: c.primaryBorder,
-    ...uiTheme.shadows.sm,
   },
   tabText: {
     ...t.subhead,
@@ -579,17 +596,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  rowTitleLine: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: sp.sm,
-  },
   rowTitle: {
     ...t.bodyStrong,
     fontFamily: uiTheme.fonts.caption,
     color: c.textSecondary,
-    flex: 1,
-    minWidth: 0,
   },
   rowTitleUnread: {
     fontFamily: uiTheme.fonts.strong,
@@ -597,8 +607,9 @@ const styles = StyleSheet.create({
   },
   rowTime: {
     ...t.footnote,
-    color: c.muted,
+    color: c.textTertiary,
     fontVariant: ['tabular-nums'],
+    marginTop: sp.xs,
   },
   rowText: {
     ...t.callout,
@@ -634,9 +645,6 @@ const styles = StyleSheet.create({
     color: c.accent,
     flexShrink: 1,
     fontVariant: ['tabular-nums'],
-  },
-  rowChevron: {
-    alignSelf: 'center',
   },
   rowDivider: {
     height: StyleSheet.hairlineWidth,

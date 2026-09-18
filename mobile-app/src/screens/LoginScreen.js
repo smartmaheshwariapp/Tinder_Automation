@@ -17,7 +17,6 @@ import {
   Dimensions,
   Linking,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SupabaseService from '../services/supabase';
@@ -83,7 +82,6 @@ const FLINT_EMBLEM_URI =
   'https://lh3.googleusercontent.com/aida/AEtjO1XBLBCvT6YG6NjEQtmsjtWA5j_uCps04hYP22UuacAxVsDbTJ-8aEt7FTCHe54G4532OO4W9mUziOo89_l3f1s4bw-AKSf13KLGKYwV1JM7egtBa0zRtTlt6WR24SfQmVAI4KU4-pfv8GOxG7PNQAIU6vvTe82hpcB8hAGX_4vQVn3Yns7nE5T3vr7KmRLK5K2FWS_pPKMg3gmSBbNJvIWyqdTTRyPdOnrkGYitlXO70H45WmmZI8svYw';
 
 export default function LoginScreen({ navigation, route }) {
-  const insets = useSafeAreaInsets();
   const { gutter, isCompact, isShort } = useResponsive();
   const passwordInputRef = useRef(null);
   const [email, setEmail] = useState('');
@@ -347,8 +345,8 @@ export default function LoginScreen({ navigation, route }) {
             styles.scrollContent,
             {
               paddingHorizontal: gutter,
-              paddingTop: Math.max(insets.top, SPACE.xl) + SPACE.sm,
-              paddingBottom: Math.max(insets.bottom, SPACE.xl) + SPACE.sm,
+              paddingTop: SPACE.xl + SPACE.sm,
+              paddingBottom: SPACE.xl + SPACE.sm,
             },
           ]}
           keyboardShouldPersistTaps="handled"

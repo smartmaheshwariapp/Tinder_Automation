@@ -1,7 +1,6 @@
 import React from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../theme';
 import SafeActivityIndicator from '../common/SafeActivityIndicator';
 import { FadeIn } from '../common/Motion';
@@ -39,7 +38,6 @@ function Section({ title, children, delay = 0 }) {
 export default function AppSettings({ settings, isLoggedIn, environment, unreadCount,
   updatingLocation, onRefreshLocation, onNotifications, onPreferences, onSession,
   onAutomation, onConnect, onBack }) {
-  const insets = useSafeAreaInsets();
   const { gutter } = useResponsive();
   const profileName = settings?.userProfile?.name;
   const openSystemSettings = async () => {
@@ -49,7 +47,7 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}
-      contentContainerStyle={[styles.content, { paddingHorizontal: gutter, paddingBottom: insets.bottom + theme.layout.navHeight + theme.spacing.hero + theme.spacing.sm }]}>
+      contentContainerStyle={[styles.content, { paddingHorizontal: gutter, paddingBottom: theme.layout.navHeight + theme.spacing.hero + theme.spacing.sm }]}>
       <ScreenHeader
         title="App settings"
         subtitle="Make Flint work for you."

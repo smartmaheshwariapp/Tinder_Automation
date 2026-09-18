@@ -19,7 +19,7 @@ import {
 } from "react-native";
 import ActivityIndicator from "../components/common/SafeActivityIndicator";
 
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -82,7 +82,6 @@ const SHOW_ASSISTANT_STATUS_CARD = false;
 
 export default function PlatformSelectScreen({ navigation, route }) {
   const [homeTab, setHomeTab] = useState("home");
-  const insets = useSafeAreaInsets();
   const [deviceLatencyMs, setDeviceLatencyMs] = useState(null);
   const [selectedPlatform, setSelectedPlatform] = useState("Tinder");
   const [browserVisible, setBrowserVisible] = useState(false);
@@ -1264,7 +1263,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
               style={[
                 styles.modalSheet,
                 {
-                  paddingBottom: Math.max(insets.bottom, uiTheme.spacing.lg),
+                  paddingBottom: uiTheme.spacing.lg,
                   transform: [{ translateY: modalSlide }],
                 },
               ]}

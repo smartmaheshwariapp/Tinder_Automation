@@ -14,7 +14,6 @@ import {
   Clipboard,
   useWindowDimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import IconWell from './ui/IconWell';
@@ -40,7 +39,6 @@ const safeHaptic = (type = 'notification') => {
 };
 
 export default function InAppNotificationBanner({ onNavigateToStream }) {
-  const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const [currentNotif, setCurrentNotif] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -188,7 +186,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
       style={[
         styles.bannerContainer,
         {
-          top: Math.max(insets.top, 14) + uiTheme.spacing.xs,
+          top: uiTheme.spacing.sm,
           left: sideInset,
           right: sideInset,
           transform: [{ translateY }, { scale }],

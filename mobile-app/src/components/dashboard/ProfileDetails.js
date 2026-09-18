@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../../theme';
 import AppConfirmModal from '../common/AppConfirmModal';
 import { FadeIn, FocusInput } from '../common/Motion';
@@ -83,7 +83,6 @@ export default function ProfileDetails({
   onLogout,
   onDeleteData,
 }) {
-  const insets = useSafeAreaInsets();
   const { gutter } = useResponsive();
 
   // ── 1. Isolated Flint App User Profile ──
@@ -279,7 +278,7 @@ export default function ProfileDetails({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingHorizontal: gutter, paddingBottom: insets.bottom + theme.layout.navHeight + sp.hero + sp.sm },
+          { paddingHorizontal: gutter, paddingBottom: theme.layout.navHeight + sp.hero + sp.sm },
         ]}
       >
         {/* Header */}
@@ -413,6 +412,7 @@ export default function ProfileDetails({
 
       {/* ── Edit Flint Profile Modal ── */}
       <Modal visible={editing} animationType="slide" onRequestClose={closeEditor}>
+        <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.modal}>
         <KeyboardAvoidingView
           style={styles.modal}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -423,7 +423,7 @@ export default function ProfileDetails({
             contentContainerStyle={[
               styles.content,
               styles.modalContent,
-              { paddingHorizontal: gutter, paddingTop: insets.top + sp.lg, paddingBottom: insets.bottom + sp.xxl },
+              { paddingHorizontal: gutter, paddingTop: sp.lg, paddingBottom: sp.xxl },
             ]}
           >
             <View style={styles.modalHeader}>
@@ -482,6 +482,7 @@ export default function ProfileDetails({
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       {/* ── Custom Branded 2026 Confirmation Modal (Logout, Delete, Discard) ── */}

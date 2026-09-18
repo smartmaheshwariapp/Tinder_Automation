@@ -13,7 +13,6 @@ import * as Haptics from "expo-haptics";
 import { MotionTouchable as TouchableOpacity, FadeIn, useMotionReduced } from "../common/Motion";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ActivityIndicator from "../common/SafeActivityIndicator";
 import MasterControlOrb from "./MasterControlOrb";
 import { getLikesReplenishStatus } from "../../utils/sessionManager";
@@ -502,7 +501,6 @@ const NAV_PAD = 6;
 const FAB_SIZE = 58;
 
 export function HomeBottomNavigation({ activeTab, onSelect }) {
-  const insets = useSafeAreaInsets();
   const { gutter } = useResponsive();
   const reduced = useMotionReduced();
   const [barWidth, setBarWidth] = React.useState(0);
@@ -522,7 +520,7 @@ export function HomeBottomNavigation({ activeTab, onSelect }) {
 
   return (
     <View
-      style={[styles.navigationWrap, { bottom: insets.bottom + 10, left: gutter, right: gutter }]}
+      style={[styles.navigationWrap, { bottom: 10, left: gutter, right: gutter }]}
       pointerEvents="box-none"
     >
       <View style={styles.navigationShadow}>

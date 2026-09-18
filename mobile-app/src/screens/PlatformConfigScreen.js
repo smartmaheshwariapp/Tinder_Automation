@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import ActivityIndicator from '../components/common/SafeActivityIndicator';
 
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
 import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession, getSharedExtensionSettings } from '../utils/sessionManager';
@@ -39,7 +39,6 @@ export default function PlatformConfigScreen({ route, navigation }) {
   const { platform, vpsUrl: rawVpsUrl, proxyIp } = route.params;
   const vpsUrl = resolveLocalUrl(rawVpsUrl);
   const [loading, setLoading] = useState(false);
-  const insets = useSafeAreaInsets();
   const { gutter } = useResponsive();
 
   // V2 Dating Goal & Contact Handle
@@ -252,7 +251,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
         </View>
 
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter, paddingBottom: FOOTER_SPACE + insets.bottom }]}
+          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter, paddingBottom: FOOTER_SPACE }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -530,7 +529,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
         </ScrollView>
 
         {/* Launch Button (sticky footer above the home indicator) */}
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, uiTheme.spacing.lg), paddingHorizontal: gutter }]}>
+        <View style={[styles.footer, { paddingBottom: uiTheme.spacing.lg, paddingHorizontal: gutter }]}>
           <AppButton
             title="Open Live Screen"
             iconRight="arrow-forward"

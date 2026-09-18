@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ContentTransition, MotionTouchable as Button } from '../common/Motion';
 import FeedbackState from '../common/FeedbackState';
 import { AppButton, AppText, Badge, IconButton, IconWell } from '../ui';
@@ -110,7 +110,6 @@ export default function TinderCollections({ settings, onConnect }) {
   const [tab, setTab] = useState('swiped');
   const [selected, setSelected] = useState(null);
   const [open, setOpen] = useState(false);
-  const insets = useSafeAreaInsets();
   useEffect(() => {
     const update = auth => auth?.isLoggedIn && auth?.token ? activateCollections(auth.token) : disconnectCollections();
     const stop = subscribeCollections(setState); update(getTinderAuthState());
@@ -168,7 +167,7 @@ export default function TinderCollections({ settings, onConnect }) {
       <View style={styles.sync}><Ionicons name="shield-checkmark-outline" size={14} color={c.success} /><Text style={styles.syncText} maxFontSizeMultiplier={theme.fontScale.body}>Private and saved on this device</Text></View>
     </>}
     <Modal visible={open} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={close}>
-      <View style={[styles.modal, { paddingTop: insets.top }]}>
+      <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.modal}>
         <View style={styles.modalHeader}>
           <IconButton icon={selected ? 'arrow-back' : 'close'} onPress={selected ? () => setSelected(null) : close} accessibilityLabel={selected ? 'Back to list' : 'Close connections'} />
           <View style={styles.modalHeading}>
@@ -177,7 +176,7 @@ export default function TinderCollections({ settings, onConnect }) {
           </View>
           <IconWell icon={config.icon} tone={config.tone} size={40} iconSize={18} />
         </View>
-        {selected ? <ScrollView contentContainerStyle={[styles.details, { paddingBottom: insets.bottom + sp.section }]} showsVerticalScrollIndicator={false}>
+        {selected ? <ScrollView contentContainerStyle={[styles.details, { paddingBottom: sp.section }]} showsVerticalScrollIndicator={false}>
           <LinearGradient colors={[alpha(c.primary, 0.16), alpha(c.secondary, 0.04), 'transparent']} style={styles.hero}>
             <Avatar profile={selected.profile} large />
             <AppText variant="title" align="center" numberOfLines={2} style={styles.detailName}>{selected.profile?.name || 'Tinder profile'}</AppText>
@@ -188,8 +187,8 @@ export default function TinderCollections({ settings, onConnect }) {
           {!!selected.profile?.interests?.length && <View style={styles.detailCard}><AppText variant="overline" color="secondary" accessibilityRole="header">INTERESTS</AppText><View style={styles.chips}>{selected.profile.interests.map(value => <View key={value} style={styles.interest}><Text style={styles.interestText} maxFontSizeMultiplier={theme.fontScale.body}>{value}</Text></View>)}</View></View>}
           {!!selected.action && <View style={styles.actionDetail}><IconWell icon={selected.action === 'like' ? 'heart' : 'close'} tone={config.tone} size={44} iconSize={18} /><View style={styles.actionCopy}><AppText variant="bodyStrong">{selected.action === 'like' ? 'You liked this profile' : 'You passed this profile'}</AppText><AppText variant="footnote">{new Date(selected.swipedAt).toLocaleString()}</AppText></View></View>}
           {!!selected.messages?.length && <View style={styles.detailCard}><AppText variant="overline" color="secondary" accessibilityRole="header">RECENT MESSAGES</AppText>{selected.messages.map(message => { const mine = message.senderId === state.data?.ownerId; return <View key={message.id} style={[styles.message, mine && styles.mine]}><Text style={styles.sender} maxFontSizeMultiplier={theme.fontScale.chrome}>{mine ? 'YOU' : selected.profile?.name?.toUpperCase() || 'MATCH'}</Text><Text style={styles.messageText} maxFontSizeMultiplier={theme.fontScale.body}>{message.text || 'Media message'}</Text></View>; })}</View>}
-        </ScrollView> : <FlatList data={entries} keyExtractor={(item, index) => String(item.id || item.profileId || item.profile?.id || index)} renderItem={({ item }) => <ProfileRow item={item} tab={tab} ownerId={state.data?.ownerId} onPress={() => setSelected(item)} />} ItemSeparatorComponent={() => <View style={styles.separator} />} ListEmptyComponent={<Empty tab={tab} loading={state.loading} />} contentContainerStyle={[styles.modalList, { paddingBottom: insets.bottom + sp.section }]} />}
-      </View>
+        </ScrollView> : <FlatList data={entries} keyExtractor={(item, index) => String(item.id || item.profileId || item.profile?.id || index)} renderItem={({ item }) => <ProfileRow item={item} tab={tab} ownerId={state.data?.ownerId} onPress={() => setSelected(item)} />} ItemSeparatorComponent={() => <View style={styles.separator} />} ListEmptyComponent={<Empty tab={tab} loading={state.loading} />} contentContainerStyle={[styles.modalList, { paddingBottom: sp.section }]} />}
+      </SafeAreaView>
     </Modal>
   </View>;
 }
