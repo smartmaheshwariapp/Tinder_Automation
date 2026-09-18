@@ -1,29 +1,28 @@
-import { theme as uiTheme } from '../theme';
 // mobile-app/src/components/NotificationCenterModal.js
-// Production-Grade Top-Down Notification Center Shade (iOS 17 / Native Notification Drawer)
+// Full-screen Notifications page. It is presented over the home screen like a pushed
+// screen (slides in from the right) and keeps the same props: visible, onClose, onOpenStream.
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
   Modal,
-  FlatList,
-  Dimensions,
+  SectionList,
   Clipboard,
-  Platform,
-  ScrollView,
   Animated,
-  PanResponder,
+  Easing,
   StatusBar,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { AppButton, Badge, Chip, EmptyState, IconButton, IconWell, SectionHeader } from './ui';
+import { Badge, EmptyState, IconButton, IconWell, MotionTouchable, FadeIn } from './ui';
+import { useMotionReduced } from './common/Motion';
+import AppConfirmModal from './common/AppConfirmModal';
+import useResponsive from '../hooks/useResponsive';
 import NotificationService, { NOTIFICATION_CATEGORIES } from '../services/notifications';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { theme as uiTheme, alpha } from '../theme';
 
 let Haptics = null;
 try {
@@ -66,80 +65,60 @@ function dayGroupLabel(isoString) {
   return 'Earlier';
 }
 
+// Visual tone per notification type (icon well + accent).
+const TYPE_TONES = {
+  goal_unlocked: 'success',
+  date_secured: 'secondary',
+  new_match: 'primary',
+  fast_reply: 'info',
+  cycle_complete: 'success',
+  safety_cooldown: 'warning',
+  daily_digest: 'neutral',
+};
+
+const isMilestone = (item) => item.type === 'goal_unlocked' || item.type === 'date_secured';
+const isMatch = (item) => item.type === 'new_match' || item.type === 'fast_reply';
+const isAutomation = (item) =>
+  item.type === 'cycle_complete' || item.type === 'safety_cooldown' || item.type === 'daily_digest';
+
+const EMPTY_COPY = {
+  all: { icon: 'notifications-outline', title: 'You’re all caught up', message: 'New matches, replies and milestones will show up here.' },
+  milestones: { icon: 'trophy-outline', title: 'No milestones yet', message: 'When a match shares a number or a date is set, you’ll see it here.' },
+  matches: { icon: 'heart-outline', title: 'No match updates', message: 'New matches and quick replies will appear here.' },
+  automation: { icon: 'pulse-outline', title: 'No activity updates', message: 'Session summaries and safety pauses will appear here.' },
+};
+
 export default function NotificationCenterModal({
   visible,
   onClose,
   onOpenStream,
 }) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { gutter } = useResponsive();
+  const reduced = useMotionReduced();
   const [notifications, setNotifications] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'milestones' | 'matches' | 'automation'
   const [copiedId, setCopiedId] = useState(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
-  // Top-Down Slide Animation
-  const translateY = useRef(new Animated.Value(-SCREEN_HEIGHT)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-
+  // Push-style presentation: slide in from the right, slide out on dismiss.
+  const slide = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (visible) {
       safeHaptic('light');
-      Animated.parallel([
-        Animated.spring(translateY, {
-          toValue: 0,
-          friction: 8,
-          tension: 65,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      if (reduced) { slide.setValue(0); return; }
+      slide.setValue(1);
+      Animated.timing(slide, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     }
-  }, [visible]);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDismiss = () => {
-    Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: -SCREEN_HEIGHT,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(backdropOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
+    if (reduced) { onClose(); return; }
+    Animated.timing(slide, { toValue: 1, duration: 240, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(() => {
       onClose();
     });
   };
-
-  // Pan Responder for bottom drag handle to swipe up to close
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5,
-      onPanResponderMove: (_, gesture) => {
-        if (gesture.dy < 0) {
-          translateY.setValue(gesture.dy);
-        }
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy < -60 || gesture.vy < -0.5) {
-          handleDismiss();
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            friction: 8,
-            tension: 65,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
 
   useEffect(() => {
     const unsubscribe = NotificationService.subscribeInbox((items) => {
@@ -150,36 +129,29 @@ export default function NotificationCenterModal({
 
   const totalCount = notifications.length;
   const unreadCount = notifications.filter((n) => !n.is_read).length;
-  const milestoneCount = notifications.filter(
-    (n) => n.type === 'goal_unlocked' || n.type === 'date_secured'
-  ).length;
-  const matchCount = notifications.filter(
-    (n) => n.type === 'new_match' || n.type === 'fast_reply'
-  ).length;
-  const automationCount = notifications.filter(
-    (n) =>
-      n.type === 'cycle_complete' ||
-      n.type === 'safety_cooldown' ||
-      n.type === 'daily_digest'
-  ).length;
+  const milestoneCount = notifications.filter(isMilestone).length;
+  const matchCount = notifications.filter(isMatch).length;
+  const automationCount = notifications.filter(isAutomation).length;
 
   const filteredNotifications = notifications.filter((item) => {
     if (activeFilter === 'all') return true;
-    if (activeFilter === 'milestones') {
-      return item.type === 'goal_unlocked' || item.type === 'date_secured';
-    }
-    if (activeFilter === 'matches') {
-      return item.type === 'new_match' || item.type === 'fast_reply';
-    }
-    if (activeFilter === 'automation') {
-      return (
-        item.type === 'cycle_complete' ||
-        item.type === 'safety_cooldown' ||
-        item.type === 'daily_digest'
-      );
-    }
+    if (activeFilter === 'milestones') return isMilestone(item);
+    if (activeFilter === 'matches') return isMatch(item);
+    if (activeFilter === 'automation') return isAutomation(item);
     return true;
   });
+
+  // Consecutive day groups; list order is unchanged.
+  const sections = useMemo(() => {
+    const out = [];
+    filteredNotifications.forEach((item) => {
+      const label = dayGroupLabel(item.created_at);
+      const last = out[out.length - 1];
+      if (last && last.title === label) last.data.push(item);
+      else out.push({ title: label, data: [item] });
+    });
+    return out;
+  }, [filteredNotifications]);
 
   const handleItemPress = (item) => {
     NotificationService.markAsRead(item.id);
@@ -202,113 +174,92 @@ export default function NotificationCenterModal({
     }
   };
 
-  const renderNotificationCard = ({ item, index }) => {
+  if (!visible) return null;
+
+  const FILTERS = [
+    { id: 'all', label: 'All', count: totalCount },
+    { id: 'matches', label: 'Matches', count: matchCount },
+    { id: 'milestones', label: 'Milestones', count: milestoneCount },
+    { id: 'automation', label: 'Activity', count: automationCount },
+  ];
+
+  const renderItem = ({ item, index, section }) => {
     const category =
       NOTIFICATION_CATEGORIES[item.type?.toUpperCase()] ||
       NOTIFICATION_CATEGORIES.NEW_MATCH;
-
-    const isGoal = item.type === 'goal_unlocked' || item.type === 'date_secured';
+    const isGoal = isMilestone(item);
     const isCopied = copiedId === item.id;
     const phone = item.data?.phone;
     const isUnread = !item.is_read;
-    // Visual day grouping only — list order and filtering are untouched.
-    const group = dayGroupLabel(item.created_at);
-    const prev = index > 0 ? filteredNotifications[index - 1] : null;
-    const showGroup = !prev || dayGroupLabel(prev.created_at) !== group;
-    const iconTone = isGoal ? 'primary' : isUnread ? 'info' : 'neutral';
+    const tone = TYPE_TONES[item.type] || 'primary';
+    const first = index === 0;
+    const last = index === section.data.length - 1;
+    const row = (
+      <MotionTouchable
+        accessibilityRole="button"
+        accessibilityLabel={`${isUnread ? 'Unread. ' : ''}${item.title || ''}. ${item.body || ''}. ${formatTimeAgo(item.created_at)}`}
+        accessibilityHint="Opens this notification"
+        style={[styles.row, isUnread && styles.rowUnread]}
+        onPress={() => handleItemPress(item)}
+        activeOpacity={0.85}
+        pressScale={0.985}
+      >
+        <View>
+          <IconWell icon={category.icon || 'notifications-outline'} tone={tone} size={44} iconSize={20} />
+          {isUnread ? <View style={styles.unreadDot} /> : null}
+        </View>
 
-    return (
-      <View>
-        {showGroup ? <SectionHeader title={group} style={styles.groupHeader} /> : null}
-        <TouchableOpacity accessibilityRole="button"
-          accessibilityLabel={`${isUnread ? 'Unread. ' : ''}${item.title || ''}. ${item.body || ''}. ${formatTimeAgo(item.created_at)}`}
-          accessibilityHint="Opens this notification"
-          style={[
-            styles.cardWrapper,
-            isUnread && styles.cardWrapperUnread,
-            isGoal && styles.cardWrapperGoal,
-          ]}
-          onPress={() => handleItemPress(item)}
-          activeOpacity={0.88}
-        >
-          <View style={styles.cardInner}>
-            {/* Unread Indicator Dot */}
-            <View style={[styles.unreadDot, !isUnread && styles.unreadDotHidden]} />
-
-            {/* Icon Badge */}
-            <IconWell icon={category.icon || 'notifications-outline'} tone={iconTone} size={36} iconSize={17} />
-
-            {/* Center Content Body */}
-            <View style={styles.cardCenter}>
-              <View style={styles.cardTitleRow}>
-                <Text
-                  style={[
-                    styles.cardTitle,
-                    isUnread && styles.cardTitleUnread,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {item.title}
-                </Text>
-                <Text style={styles.timeAgoText} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{formatTimeAgo(item.created_at)}</Text>
-              </View>
-
-              <Text style={styles.cardBody} numberOfLines={2}>
-                {item.body}
-              </Text>
-
-              {/* Action Pills */}
-              <View style={styles.cardActionsRow}>
-                {phone && (
-                  <TouchableOpacity accessibilityRole="button"
-                    accessibilityLabel={isCopied ? 'Phone number copied' : `Copy phone number ${phone}`}
-                    hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
-                    style={[styles.phonePill, isCopied && styles.phonePillCopied]}
-                    onPress={(e) => handleCopyPhone(item, e)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons
-                      name={isCopied ? 'checkmark-circle-outline' : 'copy-outline'}
-                      size={13}
-                      color={isCopied ? uiTheme.colors.success : uiTheme.colors.accent}
-                    />
-                    <Text
-                      style={[
-                        styles.phonePillText,
-                        isCopied && { color: uiTheme.colors.success },
-                      ]}
-                      numberOfLines={1}
-                      maxFontSizeMultiplier={uiTheme.fontScale.chrome}
-                    >
-                      {isCopied ? 'Copied' : `Copy ${phone}`}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {isGoal && (
-                  <Badge label="MILESTONE" tone="success" icon="checkmark-circle-outline" size="sm" />
-                )}
-
-                <View style={styles.tapActionWrap}>
-                  <Text style={styles.tapActionText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Open in Tinder</Text>
-                  <Ionicons name="chevron-forward" size={12} color={uiTheme.colors.textTertiary} />
-                </View>
-              </View>
-            </View>
+        <View style={styles.rowBody}>
+          <View style={styles.rowTitleLine}>
+            <Text style={[styles.rowTitle, isUnread && styles.rowTitleUnread]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={styles.rowTime} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+              {formatTimeAgo(item.created_at)}
+            </Text>
           </View>
-        </TouchableOpacity>
+          {item.body ? (
+            <Text style={styles.rowText} numberOfLines={3}>{item.body}</Text>
+          ) : null}
+
+          {(phone || isGoal) ? (
+            <View style={styles.rowActions}>
+              {isGoal ? <Badge label="Milestone" tone="success" icon="trophy" size="sm" /> : null}
+              {phone ? (
+                <MotionTouchable
+                  accessibilityRole="button"
+                  accessibilityLabel={isCopied ? 'Phone number copied' : `Copy phone number ${phone}`}
+                  hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+                  style={[styles.copyPill, isCopied && styles.copyPillDone]}
+                  onPress={(e) => handleCopyPhone(item, e)}
+                  pressScale={0.95}
+                >
+                  <Ionicons
+                    name={isCopied ? 'checkmark-circle' : 'copy-outline'}
+                    size={14}
+                    color={isCopied ? uiTheme.colors.success : uiTheme.colors.accent}
+                  />
+                  <Text style={[styles.copyText, isCopied && { color: uiTheme.colors.success }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    {isCopied ? 'Copied' : phone}
+                  </Text>
+                </MotionTouchable>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+
+        <Ionicons name="chevron-forward" size={16} color={uiTheme.colors.textTertiary} style={styles.rowChevron} />
+      </MotionTouchable>
+    );
+    return (
+      <View style={[styles.rowWrap, first && styles.rowFirst, last && styles.rowLast]}>
+        {index < 10 ? <FadeIn delay={index * 35} offset={6}>{row}</FadeIn> : row}
+        {!last ? <View style={styles.rowDivider} /> : null}
       </View>
     );
   };
 
-  if (!visible) return null;
-
-  const FILTERS = [
-    { id: 'all', label: `All (${totalCount})` },
-    { id: 'milestones', label: `Milestones (${milestoneCount})` },
-    { id: 'matches', label: `Matches (${matchCount})` },
-    { id: 'automation', label: `Activity (${automationCount})` },
-  ];
+  const empty = EMPTY_COPY[activeFilter] || EMPTY_COPY.all;
 
   return (
     <Modal
@@ -318,412 +269,383 @@ export default function NotificationCenterModal({
       onRequestClose={handleDismiss}
       statusBarTranslucent
     >
-      <View style={styles.rootModalContainer}>
-        {/* Animated Dim Backdrop */}
-        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-          <TouchableOpacity accessibilityRole="button"
-            accessibilityLabel="Close notifications"
-            style={styles.dismissArea}
-            activeOpacity={1}
-            onPress={handleDismiss}
-          />
-        </Animated.View>
-
-        {/* Top-Down Sliding Shade Container */}
-        <Animated.View
-          accessibilityViewIsModal
-          style={[
-            styles.shadeContainer,
-            {
-              paddingTop: Math.max(insets.top, 14),
-              transform: [{ translateY }],
-            },
-          ]}
-        >
-          {/* Header Bar */}
-          <View style={styles.header}>
-            <View style={styles.headerTitleRow}>
-              <IconWell icon="notifications-outline" tone="primary" size={36} iconSize={18} />
-              <Text style={styles.headerTitle} accessibilityRole="header" numberOfLines={1}>Notification Center</Text>
-            </View>
-            <IconButton icon="close" size={40} iconSize={18} onPress={handleDismiss} accessibilityLabel="Close notifications" />
-          </View>
-
-          {(unreadCount > 0 || totalCount > 0) && (
-            <View style={styles.headerActionsRow}>
+      <StatusBar barStyle="light-content" />
+      <Animated.View
+        accessibilityViewIsModal
+        style={[
+          styles.page,
+          { paddingTop: insets.top, transform: [{ translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, width] }) }] },
+        ]}
+      >
+        <View style={[styles.column, { paddingHorizontal: gutter }]}>
+          {/* Top bar */}
+          <View style={styles.topBar}>
+            <IconButton icon="chevron-back" onPress={handleDismiss} accessibilityLabel="Back" style={styles.roundButton} />
+            <View style={styles.topActions}>
               {unreadCount > 0 ? (
-                <Badge label={`${unreadCount} unread`} tone="primary" dot />
+                <IconButton
+                  icon="checkmark-done"
+                  onPress={() => {
+                    NotificationService.markAllAsRead();
+                    safeHaptic('light');
+                  }}
+                  accessibilityLabel="Mark all notifications as read"
+                  color={uiTheme.colors.accent}
+                  style={styles.roundButton}
+                />
+              ) : null}
+              {totalCount > 0 ? (
+                <IconButton
+                  icon="trash-outline"
+                  onPress={() => setConfirmClear(true)}
+                  accessibilityLabel="Clear all notifications"
+                  color={uiTheme.colors.textSecondary}
+                  style={styles.roundButton}
+                />
+              ) : null}
+            </View>
+          </View>
+
+          {/* Large title */}
+          <View style={styles.titleBlock}>
+            <Text style={styles.title} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+              Notifications
+            </Text>
+            <View style={styles.subtitleRow}>
+              {unreadCount > 0 ? (
+                <>
+                  <View style={styles.subtitleDot} />
+                  <Text style={styles.subtitle} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    {unreadCount} unread · {totalCount} total
+                  </Text>
+                </>
               ) : (
-                <Badge label="All caught up" tone="success" icon="checkmark" />
+                <Text style={styles.subtitle} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  {totalCount > 0 ? `All caught up · ${totalCount} total` : 'Nothing new right now'}
+                </Text>
               )}
-              <View style={styles.headerRightActions}>
-                {unreadCount > 0 && (
-                  <AppButton
-                    title="Mark all read"
-                    icon="checkmark-done"
-                    size="sm"
-                    variant="ghost"
-                    fullWidth={false}
-                    haptic={false}
-                    accessibilityLabel="Mark all notifications as read"
-                    style={styles.headerActionBtn}
-                    onPress={() => {
-                      NotificationService.markAllAsRead();
-                      safeHaptic('light');
-                    }}
-                  />
-                )}
+            </View>
+          </View>
 
-                {totalCount > 0 && (
-                  <AppButton
-                    title="Clear"
-                    icon="trash-outline"
-                    size="sm"
-                    variant="ghost"
-                    fullWidth={false}
-                    haptic={false}
-                    accessibilityLabel="Clear all notifications"
-                    style={styles.headerActionBtn}
-                    textStyle={styles.clearText}
-                    onPress={() => {
-                      NotificationService.clearAll();
-                      safeHaptic('light');
-                    }}
-                  />
-                )}
+          {/* Filter tabs */}
+          <View style={styles.tabs} accessibilityRole="tablist">
+            {FILTERS.map((f) => {
+              const selected = activeFilter === f.id;
+              return (
+                <MotionTouchable
+                  key={f.id}
+                  accessibilityRole="tab"
+                  accessibilityLabel={`${f.label}, ${f.count}`}
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    setActiveFilter(f.id);
+                    safeHaptic('light');
+                  }}
+                  pressScale={0.95}
+                  style={[styles.tab, selected && styles.tabSelected]}
+                >
+                  <Text style={[styles.tabText, selected && styles.tabTextSelected]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    {f.label}
+                  </Text>
+                  {f.count > 0 ? (
+                    <View style={[styles.tabCount, selected && styles.tabCountSelected]}>
+                      <Text style={[styles.tabCountText, selected && styles.tabCountTextSelected]} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                        {f.count > 99 ? '99+' : f.count}
+                      </Text>
+                    </View>
+                  ) : null}
+                </MotionTouchable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Feed */}
+        {filteredNotifications.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <EmptyState icon={empty.icon} title={empty.title} message={empty.message} />
+          </View>
+        ) : (
+          <SectionList
+            key={activeFilter}
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            renderSectionHeader={({ section }) => (
+              <View style={[styles.sectionHeader, { paddingHorizontal: gutter }]}>
+                <Text style={styles.sectionTitle} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  {section.title.toUpperCase()}
+                </Text>
               </View>
-            </View>
-          )}
+            )}
+            stickySectionHeadersEnabled
+            contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, paddingBottom: insets.bottom + uiTheme.spacing.section }]}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </Animated.View>
 
-          {/* Quick Metrics Bar */}
-          <View style={styles.metricsBar}>
-            <View style={styles.metricItem} accessible accessibilityLabel={`${milestoneCount} milestones`}>
-              <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{milestoneCount}</Text>
-              <Text style={styles.metricLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Milestones</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricItem} accessible accessibilityLabel={`${matchCount} matches`}>
-              <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{matchCount}</Text>
-              <Text style={styles.metricLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Matches</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricItem} accessible accessibilityLabel={`${automationCount} activity updates`}>
-              <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{automationCount}</Text>
-              <Text style={styles.metricLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Activity</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricItem} accessible accessibilityLabel="Assistant active">
-              <Text style={[styles.metricVal, { color: uiTheme.colors.success }]} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Active</Text>
-              <Text style={styles.metricLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Assistant</Text>
-            </View>
-          </View>
-
-          {/* Category Filter Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filterScrollView}
-            contentContainerStyle={styles.filterScroll}
-            accessibilityRole="tablist"
-          >
-            {FILTERS.map((f) => (
-              <Chip
-                key={f.id}
-                label={f.label}
-                selected={activeFilter === f.id}
-                accessibilityRole="tab"
-                onPress={() => {
-                  setActiveFilter(f.id);
-                  safeHaptic('light');
-                }}
-              />
-            ))}
-          </ScrollView>
-
-          {/* Notifications Feed */}
-          {filteredNotifications.length === 0 ? (
-            <EmptyState
-              compact
-              icon="notifications-off-outline"
-              title="No notifications"
-              message="You have no unread alerts in this category."
-            />
-          ) : (
-            <FlatList
-              data={filteredNotifications}
-              keyExtractor={(item) => item.id}
-              renderItem={renderNotificationCard}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-
-          {/* Bottom Pull-Up Dismiss Handle Area */}
-          <View
-            style={styles.bottomHandleBar}
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel="Close notifications"
-            accessibilityHint="Swipe up to close"
-            onAccessibilityTap={handleDismiss}
-            {...panResponder.panHandlers}
-          >
-            <View style={styles.bottomHandleIndicator} />
-            <Text style={styles.bottomHandleText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Swipe up to close</Text>
-          </View>
-        </Animated.View>
-      </View>
+      <AppConfirmModal
+        visible={confirmClear}
+        icon="trash-outline"
+        iconColor={uiTheme.colors.error}
+        iconBg={uiTheme.colors.errorSoft}
+        iconBorder={uiTheme.colors.errorBorder}
+        title="Clear all notifications?"
+        message="This removes every notification from this list. It won’t affect your matches or conversations."
+        confirmText="Clear all"
+        cancelText="Keep"
+        onCancel={() => setConfirmClear(false)}
+        onConfirm={() => {
+          NotificationService.clearAll();
+          safeHaptic('light');
+          setConfirmClear(false);
+        }}
+      />
     </Modal>
   );
 }
 
 const c = uiTheme.colors;
+const sp = uiTheme.spacing;
+const t = uiTheme.type;
+const r = uiTheme.radius;
 const styles = StyleSheet.create({
-  rootModalContainer: {
+  page: {
     flex: 1,
-    justifyContent: 'flex-start',
+    backgroundColor: c.background,
   },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: c.scrim,
-  },
-  dismissArea: {
-    flex: 1,
-  },
-  shadeContainer: {
+  column: {
     width: '100%',
-    maxWidth: 640,
+    maxWidth: uiTheme.layout.readableMax,
     alignSelf: 'center',
-    backgroundColor: c.surface,
-    borderBottomLeftRadius: uiTheme.radius.sheet,
-    borderBottomRightRadius: uiTheme.radius.sheet,
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: c.hairline,
-    maxHeight: SCREEN_HEIGHT * 0.85,
-    ...uiTheme.shadows.lg,
   },
-  header: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: uiTheme.spacing.md,
-    paddingHorizontal: uiTheme.spacing.xl,
-    marginTop: uiTheme.spacing.xs,
-    marginBottom: uiTheme.spacing.sm,
+    minHeight: 52,
+    marginTop: sp.xs,
   },
-  headerTitleRow: {
+  topActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.md,
-    flex: 1,
-    minWidth: 0,
+    gap: sp.sm,
   },
-  headerTitle: {
-    ...uiTheme.type.title2,
-    color: c.text,
-    flexShrink: 1,
+  roundButton: { borderRadius: r.pill },
+  titleBlock: {
+    marginTop: sp.sm,
+    marginBottom: sp.lg,
   },
-  headerActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: uiTheme.spacing.sm,
-    paddingHorizontal: uiTheme.spacing.xl,
-    marginBottom: uiTheme.spacing.sm,
-  },
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    marginLeft: 'auto',
-  },
-  headerActionBtn: {
-    minHeight: 40,
-  },
-  clearText: {
-    color: c.muted,
-  },
-  metricsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: c.elevated,
-    marginHorizontal: uiTheme.spacing.lg,
-    borderRadius: uiTheme.radius.md,
-    paddingVertical: uiTheme.spacing.md,
-    paddingHorizontal: uiTheme.spacing.xs,
-    borderWidth: 1,
-    borderColor: c.borderSubtle,
-    marginBottom: uiTheme.spacing.md,
-  },
-  metricItem: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: 'center',
-    paddingHorizontal: 2,
-  },
-  metricVal: {
-    ...uiTheme.type.headline,
-    fontFamily: uiTheme.fonts.strong,
-    fontVariant: ['tabular-nums'],
+  title: {
+    ...t.largeTitle,
     color: c.text,
   },
-  metricLabel: {
-    ...uiTheme.type.footnote,
-    color: c.muted,
-    marginTop: 1,
-  },
-  metricDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 24,
-    backgroundColor: c.divider,
-  },
-  filterScrollView: {
-    flexGrow: 0,
-    marginBottom: uiTheme.spacing.md,
-  },
-  filterScroll: {
+  subtitleRow: {
     flexDirection: 'row',
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingVertical: uiTheme.spacing.xs,
-    gap: uiTheme.spacing.sm,
+    alignItems: 'center',
+    gap: sp.sm,
+    marginTop: sp.xs,
   },
-  listContent: {
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingBottom: uiTheme.spacing.lg,
-    gap: uiTheme.spacing.sm,
-  },
-  groupHeader: {
-    marginTop: uiTheme.spacing.xs,
-    marginBottom: uiTheme.spacing.xs,
-  },
-  cardWrapper: {
-    borderRadius: uiTheme.radius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: c.borderSubtle,
-    backgroundColor: c.surface,
-  },
-  cardWrapperUnread: {
-    backgroundColor: c.elevated,
-    borderColor: c.hairline,
-  },
-  cardWrapperGoal: {
-    borderColor: c.primaryBorder,
-  },
-  cardInner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: uiTheme.spacing.md,
-    paddingRight: uiTheme.spacing.md,
-    paddingLeft: uiTheme.spacing.sm,
-    gap: uiTheme.spacing.sm,
-  },
-  unreadDot: {
+  subtitleDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginTop: 14,
     backgroundColor: c.primary,
   },
-  unreadDotHidden: {
-    backgroundColor: 'transparent',
+  subtitle: {
+    ...t.callout,
+    color: c.muted,
   },
-  cardCenter: {
+
+  // Segmented filter tabs
+  tabs: {
+    flexDirection: 'row',
+    padding: 4,
+    gap: 4,
+    borderRadius: r.lg,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.borderSubtle,
+    marginBottom: sp.sm,
+  },
+  tab: {
     flex: 1,
     minWidth: 0,
-    marginLeft: uiTheme.spacing.xs,
-  },
-  cardTitleRow: {
+    minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     gap: 6,
-    marginBottom: 2,
+    paddingHorizontal: sp.xs,
+    borderRadius: r.md,
   },
-  cardTitle: {
-    ...uiTheme.type.subhead,
+  tabSelected: {
+    backgroundColor: c.elevatedHigh,
+    borderWidth: 1,
+    borderColor: c.primaryBorder,
+    ...uiTheme.shadows.sm,
+  },
+  tabText: {
+    ...t.subhead,
     fontFamily: uiTheme.fonts.label,
+    color: c.muted,
+    flexShrink: 1,
+  },
+  tabTextSelected: {
+    color: c.text,
+  },
+  tabCount: {
+    minWidth: 20,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.neutralSoft,
+  },
+  tabCountSelected: {
+    backgroundColor: c.primary,
+  },
+  tabCountText: {
+    fontFamily: uiTheme.fonts.strong,
+    fontSize: 10,
+    lineHeight: 13,
+    color: c.muted,
+    fontVariant: ['tabular-nums'],
+  },
+  tabCountTextSelected: {
+    color: c.onPrimary,
+  },
+
+  // Feed
+  listContent: {
+    width: '100%',
+    maxWidth: uiTheme.layout.readableMax,
+    alignSelf: 'center',
+  },
+  sectionHeader: {
+    backgroundColor: c.background,
+    paddingTop: sp.lg,
+    paddingBottom: sp.sm,
+    marginHorizontal: -1,
+  },
+  sectionTitle: {
+    ...t.overline,
+    color: c.muted,
+    paddingHorizontal: sp.xs,
+  },
+  rowWrap: {
+    backgroundColor: c.surface,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: c.borderSubtle,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: sp.md,
+    paddingVertical: sp.md + 2,
+    paddingLeft: sp.md + 2,
+    paddingRight: sp.md,
+    backgroundColor: c.surface,
+  },
+  rowFirst: {
+    borderTopWidth: 1,
+    borderTopLeftRadius: r.card,
+    borderTopRightRadius: r.card,
+  },
+  rowLast: {
+    borderBottomWidth: 1,
+    borderBottomLeftRadius: r.card,
+    borderBottomRightRadius: r.card,
+  },
+  rowUnread: {
+    backgroundColor: alpha(c.primary, 0.06),
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: c.primary,
+    borderWidth: 2,
+    borderColor: c.surface,
+  },
+  rowBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rowTitleLine: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: sp.sm,
+  },
+  rowTitle: {
+    ...t.bodyStrong,
+    fontFamily: uiTheme.fonts.caption,
     color: c.textSecondary,
     flex: 1,
     minWidth: 0,
   },
-  cardTitleUnread: {
-    fontFamily: uiTheme.fonts.heading,
+  rowTitleUnread: {
+    fontFamily: uiTheme.fonts.strong,
     color: c.text,
   },
-  timeAgoText: {
-    ...uiTheme.type.footnote,
+  rowTime: {
+    ...t.footnote,
+    color: c.muted,
     fontVariant: ['tabular-nums'],
-    color: c.muted,
   },
-  cardBody: {
-    ...uiTheme.type.footnote,
+  rowText: {
+    ...t.callout,
     color: c.muted,
-    marginBottom: uiTheme.spacing.sm,
+    marginTop: 2,
   },
-  cardActionsRow: {
+  rowActions: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: sp.sm,
+    marginTop: sp.sm + 2,
   },
-  phonePill: {
+  copyPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
+    gap: 6,
     maxWidth: '100%',
+    minHeight: 30,
+    paddingHorizontal: sp.md,
+    borderRadius: r.pill,
     backgroundColor: c.primarySoft,
     borderWidth: 1,
     borderColor: c.primaryBorder,
-    borderRadius: uiTheme.radius.pill,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: uiTheme.spacing.xs,
   },
-  phonePillCopied: {
+  copyPillDone: {
     backgroundColor: c.successSoft,
     borderColor: c.successBorder,
   },
-  phonePillText: {
-    ...uiTheme.type.footnote,
+  copyText: {
+    ...t.footnote,
     fontFamily: uiTheme.fonts.label,
     color: c.accent,
     flexShrink: 1,
+    fontVariant: ['tabular-nums'],
   },
-  tapActionWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    marginLeft: 'auto',
+  rowChevron: {
+    alignSelf: 'center',
   },
-  tapActionText: {
-    ...uiTheme.type.footnote,
-    fontFamily: uiTheme.fonts.caption,
-    color: c.muted,
+  rowDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: c.divider,
+    marginLeft: sp.md + 2 + 44 + sp.md,
   },
-  bottomHandleBar: {
-    minHeight: uiTheme.layout.touchTarget,
-    paddingVertical: uiTheme.spacing.sm,
-    alignItems: 'center',
+  emptyWrap: {
+    flex: 1,
     justifyContent: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: c.divider,
-    backgroundColor: c.surface,
-    borderBottomLeftRadius: uiTheme.radius.sheet,
-    borderBottomRightRadius: uiTheme.radius.sheet,
-  },
-  bottomHandleIndicator: {
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: c.borderStrong,
-    marginBottom: uiTheme.spacing.xs,
-  },
-  bottomHandleText: {
-    ...uiTheme.type.footnote,
-    fontFamily: uiTheme.fonts.label,
-    color: c.muted,
+    paddingBottom: 80,
   },
 });

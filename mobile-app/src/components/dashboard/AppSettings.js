@@ -75,8 +75,10 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
       </FadeIn>
 
       <Section title="Account & session" delay={60}>
+        {/* Open/Connect Tinder removed from App Settings (reachable from the Home dock and hero card).
         <SettingsRow icon="flame-outline" tone="primary" divider title={isLoggedIn ? 'Open Tinder' : 'Connect Tinder'}
           description={isLoggedIn ? 'View your connected account and live session' : 'Sign in to start using your dating assistant'} onPress={onConnect} />
+        */}
         <SettingsRow icon="options-outline" tone="secondary" divider title="Session preferences"
           description="Choose how your next session runs" onPress={onSession} />
         <SettingsRow icon="sparkles-outline" tone="info" title="Dating assistant"
