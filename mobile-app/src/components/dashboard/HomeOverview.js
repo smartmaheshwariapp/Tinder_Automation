@@ -18,10 +18,14 @@ import ActivityIndicator from "../common/SafeActivityIndicator";
 import MasterControlOrb from "./MasterControlOrb";
 import { getLikesReplenishStatus } from "../../utils/sessionManager";
 import TinderCollections from "./TinderCollections";
+import LikesYou from "./LikesYou";
+// import MatchMessages from "./MatchMessages"; // separate Chats section (commented out)
 import Badge from "../ui/Badge";
 import LiveDot from "../ui/LiveDot";
 import IconButton from "../ui/IconButton";
 import useResponsive from "../../hooks/useResponsive";
+import useTinderLikesCount from "../../hooks/useTinderLikesCount";
+import CountUp from "../ui/CountUp";
 import { theme as uiTheme, alpha } from "../../theme";
 
 const c = uiTheme.colors;
@@ -236,6 +240,8 @@ export default function HomeOverview({
 
   const name = displayNameFor(settings, user);
   const photoUri = tinderPhotoFor(settings);
+  const likesYou = useTinderLikesCount();
+  const showLikes = isLoggedIn && likesYou.count != null;
   const initials = name === "there" ? "" : name.slice(0, 1).toUpperCase();
 
   return (
@@ -363,6 +369,40 @@ export default function HomeOverview({
             )}
           </TouchableOpacity>
 
+          {/* Likes You pill — replaced by the LikesYou section below the hero.
+          {showLikes ? (
+            <TouchableOpacity
+              style={styles.likes}
+              onPress={onOpenBrowser}
+              pressScale={0.98}
+              accessibilityRole="button"
+              accessibilityLabel={`${likesYou.count} ${likesYou.count === 1 ? "person likes" : "people like"} your Tinder profile. Open Tinder`}
+            >
+              <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.likesIcon}>
+                <Ionicons name="heart" size={18} color={c.onPrimary} />
+              </LinearGradient>
+              <View style={styles.likesCopy}>
+                <View style={styles.likesLine}>
+                  <CountUp
+                    value={likesYou.count}
+                    format={(v) => (Math.round(v) > 99 ? "99+" : String(Math.round(v)))}
+                    style={styles.likesCount}
+                    maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                    importantForAccessibility="no"
+                  />
+                  <Text style={styles.likesLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    {likesYou.count === 1 ? "person likes you" : "people like you"}
+                  </Text>
+                </View>
+                <Text style={styles.likesHint} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  {likesYou.count > 0 ? "Waiting in Likes You on Tinder" : "New likes will show up here"}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={c.muted} />
+            </TouchableOpacity>
+          ) : null}
+          */}
+
           {/* Live status */}
           <View style={styles.statusBlock} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${stateTitle}. ${statusLabel}`}>
             <View style={styles.statusLine}>
@@ -458,6 +498,16 @@ export default function HomeOverview({
       </View>}
 
       <FadeIn delay={STAGGER * 2}>
+        <LikesYou count={likesYou.count} isLoggedIn={isLoggedIn} onOpenTinder={onOpenBrowser} />
+      </FadeIn>
+
+      {/* Separate Chats section removed — chats live in the Connection Intelligence "Chats" tab.
+      <FadeIn delay={STAGGER * 3}>
+        <MatchMessages settings={settings} isLoggedIn={isLoggedIn} onOpenTinder={onOpenBrowser} />
+      </FadeIn>
+      */}
+
+      <FadeIn delay={STAGGER * 4}>
         <TinderCollections settings={settings} onConnect={onOpenBrowser} />
       </FadeIn>
     </ScrollView>
@@ -816,6 +866,46 @@ const styles = StyleSheet.create({
     fontFamily: uiTheme.fonts.strong,
     color: c.textSecondary,
     fontVariant: ["tabular-nums"],
+  },
+  likes: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: sp.md,
+    marginTop: sp.sm,
+    padding: sp.md,
+    borderRadius: r.lg,
+    backgroundColor: c.primarySoft,
+    borderWidth: 1,
+    borderColor: c.primaryBorder,
+  },
+  likesIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    ...uiTheme.shadows.glow,
+  },
+  likesCopy: { flex: 1, minWidth: 0 },
+  likesLine: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+  },
+  likesCount: {
+    ...t.title2,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.text,
+  },
+  likesLabel: {
+    ...t.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: c.textSecondary,
+    flexShrink: 1,
+  },
+  likesHint: {
+    ...t.footnote,
+    color: c.muted,
   },
   statusBlock: {
     alignItems: "center",

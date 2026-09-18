@@ -20,7 +20,7 @@ const r = theme.radius;
 const TABS = {
   swiped: { label: 'Swiped', full: 'Swiped profiles', icon: 'heart', tone: 'primary', color: c.accent, tint: c.primarySoft, border: c.primaryBorder },
   strong: { label: 'Strong', full: 'Strong matches', icon: 'sparkles', tone: 'secondary', color: c.secondary, tint: c.secondarySoft, border: c.secondaryBorder },
-  chatting: { label: 'Chats', full: 'Conversations', icon: 'chatbubbles', tone: 'success', color: c.success, tint: c.successSoft, border: c.successBorder },
+  chatting: { label: 'Chats', full: 'Messaged you', icon: 'chatbubbles', tone: 'success', color: c.success, tint: c.successSoft, border: c.successBorder },
 };
 const STAGGER = 35; // FadeIn step for rail items (≤ 40ms)
 const SHADE = ['transparent', alpha(c.background, 0.35), alpha(c.background, 0.94)];
@@ -355,7 +355,16 @@ export default function TinderCollections({ settings, onConnect }) {
     const stop = subscribeCollections(setState); update(getTinderAuthState());
     const stopAuth = subscribeTinderAuthState(update); return () => { stop(); stopAuth(); };
   }, []);
-  const lists = useMemo(() => collectionLists(state.data, state.own, settings), [state.data, state.own, settings]);
+  const messagers = useMemo(() => {
+    const data = state.data;
+    if (!data) return [];
+    const profiles = data.profiles || {};
+    return Object.values(data.conversations || {})
+      .filter(item => !item.archived)
+      .sort((a, b) => (b.lastActivityAt || 0) - (a.lastActivityAt || 0))
+      .map(item => ({ id: item.id, name: profiles[item.profileId]?.name || 'Tinder match' }));
+  }, [state.data]);
+  const lists = useMemo(() => ({ ...collectionLists(state.data, state.own, settings), chatting: messagers }), [state.data, state.own, settings, messagers]);
   const entries = lists[tab], config = TABS[tab], limit = tab === 'swiped' ? 10 : 3;
   const openItem = item => { setSelected(item); setOpen(true); };
   const openList = () => { setSelected(null); setOpen(true); };
@@ -376,7 +385,7 @@ export default function TinderCollections({ settings, onConnect }) {
         <AppText variant="title2" numberOfLines={1}>Your connections</AppText>
       </View>
       {/* {state.data && <Badge label="LIVE" tone="success" dot />} */}
-      {state.data && !!entries.length && <Button style={styles.seeAll} onPress={openList} accessibilityRole="button" accessibilityLabel={`View all ${config.full.toLowerCase()}`} hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}>
+      {state.data && !!entries.length && tab !== 'chatting' && <Button style={styles.seeAll} onPress={openList} accessibilityRole="button" accessibilityLabel={`View all ${config.full.toLowerCase()}`} hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}>
         <Text style={styles.seeAllText} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>See all</Text>
         <Ionicons name="chevron-forward" size={15} color={c.accent} />
       </Button>}
@@ -389,7 +398,7 @@ export default function TinderCollections({ settings, onConnect }) {
       <ContentTransition transitionKey={tab} style={styles.content}>
         <View style={styles.listHeader}>
           <AppText variant="headline" numberOfLines={1} accessibilityRole="header" style={styles.listHeaderTitle}>{config.full}</AppText>
-          <AppText variant="footnote" numberOfLines={1}>{entries.length} {entries.length === 1 ? 'profile' : 'profiles'}</AppText>
+          <AppText variant="footnote" numberOfLines={1}>{entries.length} {tab === 'chatting' ? (entries.length === 1 ? 'person' : 'people') : (entries.length === 1 ? 'profile' : 'profiles')}</AppText>
         </View>
         {!!state.error && <AppText variant="footnote" color="error" align="center" style={styles.error}>{state.error}</AppText>}{tab === 'chatting' && !!state.conversationError && <AppText variant="footnote" color="error" align="center" style={styles.error}>{state.conversationError}</AppText>}
         {!!entries.length && tab === 'swiped' && <Rail gutter={gutter}>
@@ -401,6 +410,7 @@ export default function TinderCollections({ settings, onConnect }) {
           {entries.length > limit && <MoreCard count={entries.length - limit} config={config} index={limit} width={96} onPress={openList} />}
         </Rail>}
         {tab === 'strong' && <StrongNote />}
+        {/* Chat rows (last message previews) — replaced by the names-only list below.
         {!!entries.length && tab === 'chatting' && <View style={styles.chatList}>
           {entries.slice(0, limit).map((item, index) => <FadeIn key={itemKey(item, index)} delay={index * STAGGER} offset={6}>
             {index > 0 && <View style={styles.chatDivider} />}
@@ -410,6 +420,19 @@ export default function TinderCollections({ settings, onConnect }) {
             <Text style={[styles.moreText, { color: config.color }]} maxFontSizeMultiplier={theme.fontScale.chrome}>View all {entries.length} conversations</Text>
             <Ionicons name="arrow-forward" size={14} color={config.color} />
           </Button>}
+        </View>}
+        */}
+        {!!entries.length && tab === 'chatting' && <View style={styles.nameList} accessibilityRole="list">
+          {entries.map((person, index) => <FadeIn key={person.id || index} delay={Math.min(index, 8) * STAGGER} offset={6}>
+            {index > 0 && <View style={styles.nameDivider} />}
+            <View style={styles.nameRow} accessible accessibilityLabel={`${person.name} messaged you`}>
+              <LinearGradient colors={theme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.nameInitial}>
+                <Text style={styles.nameInitialText} maxFontSizeMultiplier={theme.fontScale.chrome}>{person.name.slice(0, 1).toUpperCase()}</Text>
+              </LinearGradient>
+              <Text style={styles.nameText} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{person.name}</Text>
+              <Ionicons name="chatbubble-ellipses-outline" size={16} color={c.muted} />
+            </View>
+          </FadeIn>)}
         </View>}
         {!entries.length && <Empty tab={tab} loading={state.loading} />}
       </ContentTransition>
@@ -473,6 +496,13 @@ export default function TinderCollections({ settings, onConnect }) {
 }
 
 const styles = StyleSheet.create({
+  // Names-only "Messaged you" list
+  nameList: { borderRadius: r.card, backgroundColor: c.surface, borderWidth: 1, borderColor: c.borderSubtle, overflow: 'hidden' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: sp.md, minHeight: 56, paddingHorizontal: sp.lg, paddingVertical: sp.sm },
+  nameDivider: { height: StyleSheet.hairlineWidth, backgroundColor: c.divider, marginLeft: sp.lg + 36 + sp.md },
+  nameInitial: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  nameInitialText: { ...t.headline, fontFamily: theme.fonts.heading, color: c.onPrimary },
+  nameText: { ...t.bodyStrong, color: c.text, flex: 1, minWidth: 0 },
   section: { gap: sp.lg },
   header: { flexDirection: 'row', alignItems: 'flex-end', gap: sp.md },
   headerCopy: { flex: 1, minWidth: 0 },
