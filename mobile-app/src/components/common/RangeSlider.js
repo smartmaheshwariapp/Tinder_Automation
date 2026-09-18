@@ -1,9 +1,9 @@
-import { theme as uiTheme } from '../../theme';
 // src/components/common/RangeSlider.js
 // High-performance Native Slider matching Desktop V2 UI
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import Slider from '@react-native-community/slider';
+import { theme as uiTheme } from '../../theme';
 
 export default function RangeSlider({
   min = 2,
@@ -27,9 +27,9 @@ export default function RangeSlider({
     <View style={[styles.container, disabled && styles.disabled]}>
       {/* Live Badge Display */}
       <View style={styles.headerBadgeRow}>
-        <Text style={styles.badgeLabel}>Radius Distance</Text>
+        <Text style={styles.badgeLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Radius Distance</Text>
         <View style={styles.valueBadge}>
-          <Text style={styles.valueBadgeText}>
+          <Text style={styles.valueBadgeText} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
             {prefix}{clampedVal} {unit}
           </Text>
         </View>
@@ -47,8 +47,8 @@ export default function RangeSlider({
         accessibilityValue={{ min, max, now: clampedVal, text: `${clampedVal} ${unit}` }}
         accessibilityState={{ disabled }}
         minimumTrackTintColor={uiTheme.colors.primary}
-        maximumTrackTintColor={uiTheme.colors.elevated}
-        thumbTintColor="#FFFFFF"
+        maximumTrackTintColor={uiTheme.colors.elevatedHigh}
+        thumbTintColor={uiTheme.colors.white}
         onValueChange={(val) => {
           setLocalVal(val);
           if (onValueChange) onValueChange(val);
@@ -57,16 +57,17 @@ export default function RangeSlider({
 
       {/* Limit Indicators */}
       <View style={styles.limitsRow}>
-        <Text style={styles.limitText}>{min} {unit}</Text>
-        <Text style={styles.limitText}>{max} {unit}</Text>
+        <Text style={styles.limitText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{min} {unit}</Text>
+        <Text style={styles.limitText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{max} {unit}</Text>
       </View>
     </View>
   );
 }
 
+const c = uiTheme.colors;
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 6,
+    marginVertical: uiTheme.spacing.xs,
   },
   disabled: {
     opacity: 0.4,
@@ -75,39 +76,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    gap: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.xs,
   },
-  badgeLabel: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  badgeLabel: {
+    ...uiTheme.type.label,
+    color: c.textSecondary,
+    flexShrink: 1,
+    minWidth: 0,
   },
   valueBadge: {
-    backgroundColor: uiTheme.colors.elevated,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 6,
+    backgroundColor: c.primarySoft,
+    paddingHorizontal: uiTheme.spacing.md,
+    paddingVertical: uiTheme.spacing.xs,
+    borderRadius: uiTheme.radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.4)',
+    borderColor: c.primaryBorder,
+    flexShrink: 0,
   },
-  valueBadgeText: { fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  valueBadgeText: {
+    ...uiTheme.type.subhead,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.accent,
+    fontVariant: ['tabular-nums'],
   },
   slider: {
     width: '100%',
-    height: 40,
+    height: uiTheme.layout.touchTarget,
   },
   limitsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 6,
-    marginTop: -4,
+    paddingHorizontal: uiTheme.spacing.xs,
+    marginTop: -uiTheme.spacing.xs,
   },
-  limitText: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  limitText: {
+    ...uiTheme.type.footnote,
+    color: c.muted,
+    fontVariant: ['tabular-nums'],
   },
 });

@@ -1,4 +1,3 @@
-import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/AutomationV2Panel.js — Comprehensive FlirtEasy V2 Panel with Style Training & Safety Controls
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
@@ -26,6 +25,11 @@ import MultiRangeSlider from '../common/MultiRangeSlider';
 import TimeRangeSlider, { timeToMins, minsToDisplay, minsTo24 } from '../common/TimeRangeSlider';
 import V2Dropdown from '../common/V2Dropdown';
 import { CITY_PRESETS } from '../../utils/locationHubs';
+import { theme as uiTheme, alpha } from '../../theme';
+import { FocusInput } from '../common/Motion';
+import AppButton from '../ui/AppButton';
+import IconButton from '../ui/IconButton';
+import IconWell from '../ui/IconWell';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -1516,8 +1520,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
   if (loading || !form) {
     return (
       <View style={styles.centerWrap}>
-        <ActivityIndicator size="small" color={uiTheme.colors.primary} />
-        <Text style={styles.loadingText}>Syncing Automation V2 configuration...</Text>
+        <ActivityIndicator size="small" color={uiTheme.colors.accent} />
+        <Text style={styles.loadingText} accessibilityRole="progressbar" accessibilityLabel="Syncing Automation V2 configuration">Syncing Automation V2 configuration...</Text>
       </View>
     );
   }
@@ -1597,18 +1601,20 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
         {/* ════════════════════ CARD 1: YOUR DATING GOAL (V2 DESKTOP PARITY) ════════════════════ */}
         <View style={[styles.v2Card, openCards.goal && styles.v2CardOpen]}>
           <TouchableOpacity accessibilityRole="button"
+            accessibilityLabel="Your Dating Goal"
+            accessibilityState={{ expanded: !!openCards.goal }}
             style={styles.v2CardHeader}
             onPress={() => toggleCard('goal')}
             activeOpacity={0.85}
           >
             <View style={styles.cardTitleWrap}>
-              <Ionicons name="flag-outline" size={17} color={uiTheme.colors.primary} />
-              <Text style={styles.v2CardTitle}>Your Dating Goal</Text>
+              <IconWell icon="flag-outline" tone="primary" size={36} />
+              <Text style={styles.v2CardTitle} numberOfLines={2} accessibilityRole="header">Your Dating Goal</Text>
             </View>
             <Ionicons
               name={openCards.goal ? "chevron-up" : "chevron-down"}
-              size={18}
-              color={uiTheme.colors.muted}
+              size={20}
+              color={openCards.goal ? uiTheme.colors.accent : uiTheme.colors.muted}
             />
           </TouchableOpacity>
 
@@ -1616,17 +1622,17 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           {!openCards.goal && (
             <View style={styles.collapsedRow}>
               <View style={styles.v2Chip}>
-                <Ionicons name="locate" size={11} color={uiTheme.colors.primary} />
-                <Text style={styles.v2ChipText}>{getGoalSummary()}</Text>
+                <Ionicons name="locate" size={12} color={uiTheme.colors.accent} />
+                <Text style={styles.v2ChipText} numberOfLines={1}>{getGoalSummary()}</Text>
               </View>
               <View style={styles.v2Chip}>
-                <Text style={styles.v2ChipText}>
+                <Text style={styles.v2ChipText} numberOfLines={1}>
                   {form.stopAfterGoal !== false && form.goal !== 'never' ? 'Stop After Goal' : 'Stop Off'}
                 </Text>
               </View>
               <View style={styles.v2Chip}>
-                <Ionicons name="chatbox" size={11} color="#EC4899" />
-                <Text style={styles.v2ChipText}>{getContactSummary()}</Text>
+                <Ionicons name="chatbox" size={12} color={uiTheme.colors.accent} />
+                <Text style={styles.v2ChipText} numberOfLines={1}>{getContactSummary()}</Text>
               </View>
             </View>
           )}
@@ -1654,14 +1660,16 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 <View style={styles.subBoxDivider} />
 
                 {/* Stop After Goal Toggle */}
-                <View style={styles.rowBetween}>
-                  <Text style={styles.toggleTitle}>Stop After Goal</Text>
+                <View style={[styles.rowBetween, styles.switchRow]}>
+                  <Text style={[styles.toggleTitle, styles.flexText]}>Stop After Goal</Text>
                   <Switch
+                    accessibilityLabel="Stop After Goal"
                     value={form.stopAfterGoal !== false && form.goal !== 'never'}
                     disabled={form.goal === 'never'}
                     onValueChange={v => updateField('stopAfterGoal', v)}
-                    trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
-                    thumbColor={(form.stopAfterGoal !== false && form.goal !== 'never') ? '#FFF' : uiTheme.colors.muted}
+                    trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                    thumbColor={uiTheme.colors.white}
+                    ios_backgroundColor={uiTheme.colors.elevatedHigh}
                   />
                 </View>
               </View>
@@ -1692,46 +1700,50 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               {/* ─── Your Contact Details Accordion Section (Desktop V2 Parity) ─── */}
               <View style={styles.contactSection}>
                 <TouchableOpacity accessibilityRole="button"
+                  accessibilityLabel="Your Contact Details"
+                  accessibilityState={{ expanded: !!contactDetailsOpen }}
                   style={styles.contactHeader}
                   onPress={toggleContactDetails}
                   activeOpacity={0.8}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name="card-outline" size={16} color={uiTheme.colors.primary} />
-                    <Text style={styles.contactHeaderTitle}>Your Contact Details</Text>
+                  <View style={styles.contactHeaderLeft}>
+                    <Ionicons name="card-outline" size={18} color={uiTheme.colors.accent} />
+                    <Text style={styles.contactHeaderTitle} numberOfLines={1}>Your Contact Details</Text>
                   </View>
                   <Ionicons
                     name={contactDetailsOpen ? "chevron-up" : "chevron-down"}
-                    size={16}
-                    color={uiTheme.colors.muted}
+                    size={18}
+                    color={contactDetailsOpen ? uiTheme.colors.accent : uiTheme.colors.muted}
                   />
                 </TouchableOpacity>
 
                 {contactDetailsOpen && (
-                  <View style={{ marginTop: 12 }}>
+                  <View style={styles.contactBody}>
                     {/* Instagram Row */}
                     <View style={styles.contactRow}>
-                      <Ionicons name="logo-instagram" size={17} color="#E1306C" style={{ width: 22 }} />
-                      <Text style={styles.contactRowLabel}>Instagram</Text>
-                      <TextInput
-                        style={styles.contactInput}
-                        placeholder="@yourhandle"
-                        placeholderTextColor="#55526B"
-                        autoCapitalize="none"
-                        value={form.contactDetails?.instagram?.value || ''}
-                        onChangeText={val => updateField('contactDetails.instagram.value', val)}
-                      />
+                      <Ionicons name="logo-instagram" size={18} color="#E1306C" style={styles.contactRowIcon} />
+                      <Text style={styles.contactRowLabel} numberOfLines={1}>Instagram</Text>
                       <Switch
+                        accessibilityLabel="Share Instagram"
                         value={form.contactDetails?.instagram?.enabled !== false}
                         onValueChange={v => updateField('contactDetails.instagram.enabled', v)}
-                        trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
-                        thumbColor={form.contactDetails?.instagram?.enabled !== false ? '#FFF' : uiTheme.colors.muted}
+                        trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                        thumbColor={uiTheme.colors.white}
+                        ios_backgroundColor={uiTheme.colors.elevatedHigh}
                       />
                     </View>
+                    <FocusInput
+                      style={styles.contactInput}
+                      placeholder="@yourhandle"
+                      accessibilityLabel="Instagram handle"
+                      autoCapitalize="none"
+                      value={form.contactDetails?.instagram?.value || ''}
+                      onChangeText={val => updateField('contactDetails.instagram.value', val)}
+                    />
                     <View style={styles.handleStatRow}>
-                      <Ionicons name="mail-outline" size={11} color={uiTheme.colors.muted} />
+                      <Ionicons name="mail-outline" size={12} color={uiTheme.colors.muted} />
                       <Text style={styles.handleStatText}>
-                        Sent to <Text style={{ fontFamily: 'Inter_700Bold', color: uiTheme.colors.primary, fontWeight: 'normal' }}>{form.handleSentStats?.instagram || 0}</Text> matches
+                        Sent to <Text style={[styles.handleStatCount, { color: uiTheme.colors.accent }]}>{form.handleSentStats?.instagram || 0}</Text> matches
                       </Text>
                     </View>
 
@@ -1792,28 +1804,30 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     */}
 
                     {/* WhatsApp Row */}
-                    <View style={styles.contactRow}>
-                      <Ionicons name="logo-whatsapp" size={17} color="#25D366" style={{ width: 22 }} />
-                      <Text style={styles.contactRowLabel}>WhatsApp</Text>
-                      <TextInput
-                        style={styles.contactInput}
-                        placeholder="+1 555 000 0000"
-                        placeholderTextColor="#55526B"
-                        keyboardType="phone-pad"
-                        value={form.contactDetails?.whatsapp?.value || ''}
-                        onChangeText={val => updateField('contactDetails.whatsapp.value', val)}
-                      />
+                    <View style={[styles.contactRow, styles.contactRowSpaced]}>
+                      <Ionicons name="logo-whatsapp" size={18} color="#25D366" style={styles.contactRowIcon} />
+                      <Text style={styles.contactRowLabel} numberOfLines={1}>WhatsApp</Text>
                       <Switch
+                        accessibilityLabel="Share WhatsApp"
                         value={form.contactDetails?.whatsapp?.enabled !== false}
                         onValueChange={v => updateField('contactDetails.whatsapp.enabled', v)}
-                        trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
-                        thumbColor={form.contactDetails?.whatsapp?.enabled !== false ? '#FFF' : uiTheme.colors.muted}
+                        trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                        thumbColor={uiTheme.colors.white}
+                        ios_backgroundColor={uiTheme.colors.elevatedHigh}
                       />
                     </View>
+                    <FocusInput
+                      style={styles.contactInput}
+                      placeholder="+1 555 000 0000"
+                      accessibilityLabel="WhatsApp number"
+                      keyboardType="phone-pad"
+                      value={form.contactDetails?.whatsapp?.value || ''}
+                      onChangeText={val => updateField('contactDetails.whatsapp.value', val)}
+                    />
                     <View style={styles.handleStatRow}>
-                      <Ionicons name="mail-outline" size={11} color={uiTheme.colors.muted} />
+                      <Ionicons name="mail-outline" size={12} color={uiTheme.colors.muted} />
                       <Text style={styles.handleStatText}>
-                        Sent to <Text style={{ fontFamily: 'Inter_700Bold', color: '#25D366', fontWeight: 'normal' }}>{form.handleSentStats?.whatsapp || 0}</Text> matches
+                        Sent to <Text style={[styles.handleStatCount, { color: uiTheme.colors.success }]}>{form.handleSentStats?.whatsapp || 0}</Text> matches
                       </Text>
                     </View>
 
@@ -1824,20 +1838,22 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     <View style={styles.subBoxDivider} />
 
                     {/* ─── Your Gender Selector ─── */}
-                    <View style={{ marginTop: 6 }}>
+                    <View style={styles.genderBlock}>
                       <Text style={styles.inputLabel}>Your gender</Text>
-                      <View style={styles.genderSelector}>
+                      <View style={styles.genderSelector} accessibilityRole="radiogroup" accessibilityLabel="Your gender">
                         {GENDER_OPTIONS.map(g => {
                           const currentGender = (form.userGenderOverride || 'auto').toLowerCase();
                           const isSelected = currentGender === g.id;
                           return (
                             <TouchableOpacity accessibilityRole="button"
                               key={g.id}
+                              accessibilityLabel={g.label}
+                              accessibilityState={{ selected: isSelected }}
                               style={[styles.genderBtn, isSelected && styles.genderBtnActive]}
                               onPress={() => updateField('userGenderOverride', g.id)}
                               activeOpacity={0.8}
                             >
-                              <Text style={[styles.genderBtnText, isSelected && styles.genderBtnTextActive]}>
+                              <Text style={[styles.genderBtnText, isSelected && styles.genderBtnTextActive]} numberOfLines={1}>
                                 {g.label}
                               </Text>
                             </TouchableOpacity>
@@ -1959,7 +1975,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               <Text style={styles.fieldDesc}>Control swipe batches, cooldown pacing & profile filters:</Text>
 
               {/* Core Swiping Controls (Auto Swipe & Activity Speed) */}
-              <View style={[styles.subBox, isSafetyOn && { borderColor: 'rgba(254, 60, 114, 0.2)' }]}>
+              <View style={[styles.subBox, isSafetyOn && { borderColor: alpha(uiTheme.colors.primary, 0.2) }]}>
                 {/* Auto Swipe Toggle */}
                 <View style={styles.rowBetween}>
                   <View style={{ flex: 1, paddingRight: 10 }}>
@@ -1996,8 +2012,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         updateFields(updates);
                       }
                     }}
-                    trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
-                    thumbColor={isAutoSwipeOn ? '#FFF' : uiTheme.colors.muted}
+                    trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                    thumbColor={uiTheme.colors.white}
+                    ios_backgroundColor={uiTheme.colors.elevatedHigh}
                   />
                 </View>
 
@@ -2019,7 +2036,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 {isSafetyOn && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
                     <Ionicons name="lock-closed" size={11} color={uiTheme.colors.muted} style={{ marginRight: 5 }} />
-                    <Text style={{ fontFamily: 'Inter_400Regular', color: uiTheme.colors.muted, fontSize: 11, fontStyle: 'italic', flex: 1 }}>
+                    <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.body, color: uiTheme.colors.muted, fontStyle: 'italic', flex: 1 }}>
                       Activity Speed is locked to safe defaults. Toggle Safety Mode OFF in Settings to customize pacing.
                     </Text>
                   </View>
@@ -2044,8 +2061,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     <Switch
                       value={form.ageFilter?.enabled === true}
                       onValueChange={v => updateField('ageFilter.enabled', v)}
-                      trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
-                      thumbColor={form.ageFilter?.enabled ? '#FFF' : uiTheme.colors.muted}
+                      trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                      thumbColor={uiTheme.colors.white}
+                      ios_backgroundColor={uiTheme.colors.elevatedHigh}
                     />
                   </View>
                 </View>
@@ -2116,8 +2134,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     <Switch
                       value={form.distanceFilter?.enabled === true}
                       onValueChange={v => updateField('distanceFilter.enabled', v)}
-                      trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
-                      thumbColor={form.distanceFilter?.enabled ? '#FFF' : uiTheme.colors.muted}
+                      trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                      thumbColor={uiTheme.colors.white}
+                      ios_backgroundColor={uiTheme.colors.elevatedHigh}
                     />
                   </View>
                 </View>
@@ -2227,7 +2246,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             activeOpacity={0.85}
           >
             <View style={styles.cardTitleWrap}>
-              <Ionicons name="chatbubbles-outline" size={17} color="#EC4899" />
+              <Ionicons name="chatbubbles-outline" size={17} color={uiTheme.colors.accent} />
               <Text style={styles.v2CardTitle}>Messaging</Text>
             </View>
             <Ionicons
@@ -2241,11 +2260,11 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           {!openCards.messaging && (
             <View style={styles.collapsedRow}>
               <View style={styles.v2Chip}>
-                <Ionicons name="chatbubble" size={11} color={isAutoMessagingOn ? "#EC4899" : uiTheme.colors.muted} />
+                <Ionicons name="chatbubble" size={11} color={isAutoMessagingOn ? uiTheme.colors.accent : uiTheme.colors.muted} />
                 <Text style={styles.v2ChipText}>{getMessagingSummary().messaging}</Text>
               </View>
               <View style={styles.v2Chip}>
-                <Ionicons name="sparkles" size={11} color="#EC4899" />
+                <Ionicons name="sparkles" size={11} color={uiTheme.colors.accent} />
                 <Text style={styles.v2ChipText}>{getMessagingSummary().intention}</Text>
               </View>
               <View style={styles.v2Chip}>
@@ -2279,7 +2298,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               <Text style={styles.fieldDesc}>Configure conversation style, intentions & priority balancing:</Text>
 
               {/* Core Messaging Controls (Auto Messaging) */}
-              <View style={[styles.subBox, isSafetyOn && { borderColor: 'rgba(236, 72, 153, 0.2)' }]}>
+              <View style={[styles.subBox, isSafetyOn && { borderColor: alpha(uiTheme.colors.primary, 0.2) }]}>
                 {/* Auto Messaging Toggle */}
                 <View style={styles.rowBetween}>
                   <View style={{ flex: 1, paddingRight: 10 }}>
@@ -2316,8 +2335,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         updateFields(updates);
                       }
                     }}
-                    trackColor={{ false: uiTheme.colors.elevated, true: '#EC4899' }}
-                    thumbColor={isAutoMessagingOn ? '#FFF' : uiTheme.colors.muted}
+                    trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                    thumbColor={uiTheme.colors.white}
+                    ios_backgroundColor={uiTheme.colors.elevatedHigh}
                   />
                 </View>
               </View>
@@ -2351,8 +2371,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       updateField('randomHearts', v);
                       updateField('smartReactionsEnabled', v);
                     }}
-                    trackColor={{ false: uiTheme.colors.elevated, true: '#EC4899' }}
-                    thumbColor={(form.randomHearts ?? form.smartReactionsEnabled) ? '#FFF' : uiTheme.colors.muted}
+                    trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                    thumbColor={uiTheme.colors.white}
+                    ios_backgroundColor={uiTheme.colors.elevatedHigh}
                   />
                 </View>
 
@@ -2367,8 +2388,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   <Switch
                     value={form.useEmojis !== false}
                     onValueChange={v => updateField('useEmojis', v)}
-                    trackColor={{ false: uiTheme.colors.elevated, true: '#EC4899' }}
-                    thumbColor={form.useEmojis !== false ? '#FFF' : uiTheme.colors.muted}
+                    trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                    thumbColor={uiTheme.colors.white}
+                    ios_backgroundColor={uiTheme.colors.elevatedHigh}
                   />
                 </View>
 
@@ -2398,8 +2420,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   <Switch
                     value={form.consecutiveMessagesEnabled === true}
                     onValueChange={v => updateField('consecutiveMessagesEnabled', v)}
-                    trackColor={{ false: uiTheme.colors.elevated, true: '#EC4899' }}
-                    thumbColor={form.consecutiveMessagesEnabled ? '#FFF' : uiTheme.colors.muted}
+                    trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                    thumbColor={uiTheme.colors.white}
+                    ios_backgroundColor={uiTheme.colors.elevatedHigh}
                   />
                 </View>
               </View>
@@ -2458,7 +2481,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               <View style={styles.subBox}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={styles.subBoxTitle}>
-                    Messaging Priority <Text style={{ fontFamily: 'Inter_400Regular', color: uiTheme.colors.muted, fontSize: 11, fontWeight: 'normal' }}>(Replies : New Matches)</Text>
+                    Messaging Priority <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.body, color: uiTheme.colors.muted }}>(Replies : New Matches)</Text>
                   </Text>
                   <TouchableOpacity accessibilityRole="button"
                     onPress={() => setTooltipModal({
@@ -2501,7 +2524,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 </View>
 
                 <View style={{ marginTop: 8 }}>
-                  <Text style={{ fontFamily: 'Inter_600SemiBold', color: uiTheme.colors.primary, fontSize: 11, fontWeight: 'normal' }}>
+                  <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.label, color: uiTheme.colors.primary }}>
                     {PRIORITY_PRESETS.find(p => p.value === (form.prioritySlider ?? form.minReplySlots ?? 50))?.desc || 'Balanced outreach & replies (Recommended)'}
                   </Text>
                 </View>
@@ -2520,7 +2543,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             activeOpacity={0.85}
           >
             <View style={styles.cardTitleWrap}>
-              <Ionicons name="sparkles-outline" size={17} color="#C026D3" />
+              <Ionicons name="sparkles-outline" size={17} color={uiTheme.colors.info} />
               <Text style={styles.v2CardTitle}>Your Chat Style</Text>
             </View>
             <Ionicons
@@ -2534,8 +2557,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           {!openCards.style && (
             <View style={styles.collapsedRow}>
               {getStyleSummary().map((item, idx) => (
-                <View key={idx} style={[styles.v2Chip, item.full && { borderColor: 'rgba(192, 38, 211, 0.4)' }]}>
-                  <Ionicons name="sparkles" size={11} color="#C026D3" />
+                <View key={idx} style={[styles.v2Chip, item.full && { borderColor: alpha(uiTheme.colors.info, 0.4) }]}>
+                  <Ionicons name="sparkles" size={11} color={uiTheme.colors.info} />
                   <Text style={[styles.v2ChipText, item.full && { color: uiTheme.colors.text }]}>{item.label}</Text>
                 </View>
               ))}
@@ -2564,7 +2587,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 return (
                   <View style={styles.cstIntroContainer}>
                     <View style={styles.cstIntroIconWrap}>
-                      <Ionicons name="chatbubbles" size={24} color="#C026D3" />
+                      <Ionicons name="chatbubbles" size={24} color={uiTheme.colors.info} />
                     </View>
 
                     <Text style={styles.cstIntroTitle}>
@@ -2633,12 +2656,12 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
                     {/* Start / Continue Button */}
                     <TouchableOpacity accessibilityRole="button"
-                      style={[styles.cstStartBtn, atCap && { opacity: 0.5, backgroundColor: '#332E4A' }]}
+                      style={[styles.cstStartBtn, atCap && { opacity: 0.5, backgroundColor: uiTheme.colors.elevatedHigh }]}
                       onPress={() => !atCap && startTrainingSession(trainingLang, isFull)}
                       disabled={atCap}
                       activeOpacity={0.85}
                     >
-                      <Ionicons name={atCap ? "alert-circle" : "sparkles"} size={15} color="#FFF" />
+                      <Ionicons name={atCap ? "alert-circle" : "sparkles"} size={15} color={uiTheme.colors.onPrimary} />
                       <Text style={styles.cstStartBtnText}>
                         {atCap
                           ? `Profile Limit Reached (Max ${maxProfiles})`
@@ -2683,7 +2706,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                         <View style={styles.simAvatarWrapper}>
                           <View style={styles.simAvatar}>
-                            <Text style={{ fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal', fontSize: 12 }}>
+                            <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.strong, color: uiTheme.colors.onPrimary }}>
                               {persona.name.charAt(0)}
                             </Text>
                           </View>
@@ -2691,15 +2714,15 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         </View>
                         <View>
                           <Text style={styles.simMatchName}>{persona.name}</Text>
-                          <Text style={{ fontFamily: 'Inter_600SemiBold', color: uiTheme.colors.success, fontSize: 11, fontWeight: 'normal' }}>Online now</Text>
+                          <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.label, color: uiTheme.colors.success }}>Online now</Text>
                         </View>
                       </View>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={{ width: 60, height: 4, backgroundColor: '#221E33', borderRadius: 2, overflow: 'hidden' }}>
+                        <View style={{ width: 60, height: 4, backgroundColor: uiTheme.colors.divider, borderRadius: 2, overflow: 'hidden' }}>
                           <View style={{ width: `${progressPct}%`, height: '100%', backgroundColor: uiTheme.colors.primary, borderRadius: 2 }} />
                         </View>
-                        <Text style={{ fontFamily: 'Inter_700Bold', color: uiTheme.colors.muted, fontSize: 11, fontWeight: 'normal' }}>{validCount} / 12</Text>
+                        <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.strong, color: uiTheme.colors.muted }}>{validCount} / 12</Text>
                         <TouchableOpacity accessibilityRole="button"
                           style={styles.cstRestartBtn}
                           onPress={restartTrainingSession}
@@ -2742,7 +2765,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           return (
                             <View key={msg.id} style={styles.simMatchRow}>
                               <View style={styles.simMatchAvatarTiny}>
-                                <Text style={{ fontFamily: 'Inter_800ExtraBold', color: '#FFF', fontSize: 10, fontWeight: 'normal' }}>
+                                <Text style={{ fontFamily: uiTheme.fonts.heavy, color: uiTheme.colors.onPrimary, fontSize: 10, fontWeight: 'normal' }}>
                                   {persona.name.charAt(0)}
                                 </Text>
                               </View>
@@ -2758,7 +2781,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                             style={[
                               styles.simBubble,
                               styles.simBubbleUser,
-                              msg.garbage && { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.4)' }
+                              msg.garbage && { backgroundColor: alpha(uiTheme.colors.error, 0.2), borderWidth: 1, borderColor: alpha(uiTheme.colors.error, 0.4) }
                             ]}
                           >
                             <Text style={styles.simBubbleTextUser}>{msg.text}</Text>
@@ -2768,12 +2791,12 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       {calibrating && (
                         <View style={styles.simMatchRow}>
                           <View style={styles.simMatchAvatarTiny}>
-                            <Text style={{ fontFamily: 'Inter_800ExtraBold', color: '#FFF', fontSize: 10, fontWeight: 'normal' }}>
+                            <Text style={{ fontFamily: uiTheme.fonts.heavy, color: uiTheme.colors.onPrimary, fontSize: 10, fontWeight: 'normal' }}>
                               {persona.name.charAt(0)}
                             </Text>
                           </View>
                           <View style={[styles.simBubble, styles.simBubbleMatch]}>
-                            <Text style={{ fontFamily: 'Inter_400Regular', color: uiTheme.colors.muted, fontSize: 11, fontStyle: 'italic' }}>
+                            <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.body, color: uiTheme.colors.muted, fontStyle: 'italic' }}>
                               {persona.name} is typing…
                             </Text>
                           </View>
@@ -2783,7 +2806,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       {/* Desktop V2 Finish Banner */}
                       {sessionCompleted && (
                         <View style={styles.cstFinishBanner}>
-                          <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 22, textAlign: 'center', marginBottom: 4 }}>🎉</Text>
+                          <Text style={{ fontFamily: uiTheme.fonts.body, fontSize: 22, textAlign: 'center', marginBottom: 4 }}>🎉</Text>
                           <Text style={styles.cstFinishTitle}>Training complete!</Text>
                           <Text style={styles.cstFinishSub}>
                             Your style has been captured. Tap below to see what the AI learned.
@@ -2805,7 +2828,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         <TouchableOpacity accessibilityRole="button"
                           style={[
                             styles.cstSaveInlinePill,
-                            inlineSaved && { borderColor: uiTheme.colors.success, backgroundColor: 'rgba(16, 185, 129, 0.12)' }
+                            inlineSaved && { borderColor: uiTheme.colors.success, backgroundColor: alpha(uiTheme.colors.success, 0.12) }
                           ]}
                           onPress={saveStyleInline}
                           activeOpacity={0.8}
@@ -2822,7 +2845,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           onPress={() => setSimLangModalOpen(true)}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="person-circle-outline" size={13} color="#C026D3" />
+                          <Ionicons name="person-circle-outline" size={13} color={uiTheme.colors.info} />
                           <Text style={styles.cstProfilesBtnText}>Profiles {trainedCodes.length}</Text>
                         </TouchableOpacity>
                       )}
@@ -2878,13 +2901,13 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                                   activeOpacity={0.7}
                                 >
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                    <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 18 }}>{lang.flag}</Text>
+                                    <Text style={{ fontFamily: uiTheme.fonts.body, fontSize: 18 }}>{lang.flag}</Text>
                                     <View>
-                                      <Text style={[styles.simLangModalOptionText, isSelected && { fontFamily: 'Inter_800ExtraBold', color: uiTheme.colors.primary, fontWeight: 'normal' }]}>
+                                      <Text style={[styles.simLangModalOptionText, isSelected && { fontFamily: uiTheme.fonts.heavy, color: uiTheme.colors.primary, fontWeight: 'normal' }]}>
                                         {lang.label}
                                       </Text>
                                       {isTrained && (
-                                        <Text style={{ fontFamily: 'Inter_600SemiBold', color: isPartial ? uiTheme.colors.warning : uiTheme.colors.success, fontSize: 10, fontWeight: 'normal' }}>
+                                        <Text style={{ fontFamily: uiTheme.fonts.label, color: isPartial ? uiTheme.colors.warning : uiTheme.colors.success, fontSize: 10, fontWeight: 'normal' }}>
                                           {isPartial ? `Partial session (${count}/12)` : '✓ Style trained'}
                                         </Text>
                                       )}
@@ -2912,7 +2935,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                             sessionCompleted && { opacity: 0.5 }
                           ]}
                           placeholder={sessionCompleted ? "Training complete" : "Type your reply..."}
-                          placeholderTextColor="#55526B"
+                          placeholderTextColor={uiTheme.colors.muted}
                           value={inputPracticeMsg}
                           onChangeText={text => {
                             setInputPracticeMsg(text);
@@ -2928,7 +2951,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           activeOpacity={0.8}
                           disabled={sessionCompleted}
                         >
-                          <Ionicons name="arrow-forward" size={16} color="#FFF" />
+                          <Ionicons name="arrow-forward" size={16} color={uiTheme.colors.onPrimary} />
                         </TouchableOpacity>
                       </View>
 
@@ -2952,7 +2975,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 return (
                   <View style={styles.cstInsightsContainer}>
                     <View style={styles.cstInsightsHeader}>
-                      <View style={[styles.cstBadgeSuccess, isPartial && { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: 'rgba(245, 158, 11, 0.3)' }]}>
+                      <View style={[styles.cstBadgeSuccess, isPartial && { backgroundColor: alpha(uiTheme.colors.warning, 0.15), borderColor: alpha(uiTheme.colors.warning, 0.3) }]}>
                         <Ionicons
                           name={isPartial ? "time-outline" : "checkmark-circle"}
                           size={14}
@@ -3016,7 +3039,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
                       <View style={styles.cstMetricCard}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Ionicons name="happy-outline" size={14} color="#EC4899" />
+                          <Ionicons name="happy-outline" size={14} color={uiTheme.colors.accent} />
                           <Text style={styles.cstMetricTitle}>Emoji Placement</Text>
                         </View>
                         <Text style={styles.cstMetricValue}>
@@ -3039,7 +3062,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           <Ionicons name="flash-outline" size={14} color={uiTheme.colors.success} />
                           <Text style={styles.cstMetricTitle}>AI Mirroring Status</Text>
                         </View>
-                        <Text style={[styles.cstMetricValue, { fontFamily: 'Inter_700Bold', color: uiTheme.colors.success, fontWeight: 'normal' }]}>Active in Live Chats</Text>
+                        <Text style={[styles.cstMetricValue, { fontFamily: uiTheme.fonts.strong, color: uiTheme.colors.success, fontWeight: 'normal' }]}>Active in Live Chats</Text>
                       </View>
                     </View>
 
@@ -3050,7 +3073,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         onPress={() => startTrainingSession(viewingLang, !isPartial)}
                         activeOpacity={0.85}
                       >
-                        <Ionicons name="refresh" size={14} color="#FFF" />
+                        <Ionicons name="refresh" size={14} color={uiTheme.colors.onPrimary} />
                         <Text style={styles.cstStartBtnText}>
                           {isPartial ? `Continue Training ${langObj.label}` : `Retrain ${langObj.label} Style`}
                         </Text>
@@ -3061,7 +3084,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         onPress={trainAnotherLanguage}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="add" size={15} color="#FFF" />
+                        <Ionicons name="add" size={15} color={uiTheme.colors.onPrimary} />
                         <Text style={styles.cstTrainAnotherBtnText}>+ Train Another Language</Text>
                       </TouchableOpacity>
 
@@ -3112,8 +3135,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         onPress={() => setStyleView('insights')}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="arrow-back" size={16} color="#C026D3" />
-                        <Text style={{ fontFamily: 'Inter_700Bold', color: '#C026D3', fontSize: 12, fontWeight: 'normal' }}>Back</Text>
+                        <Ionicons name="arrow-back" size={16} color={uiTheme.colors.info} />
+                        <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.strong, color: uiTheme.colors.info }}>Back</Text>
                       </TouchableOpacity>
                       <Text style={styles.simMatchName}>{langObj.flag} Training Transcript</Text>
                       <View style={{ width: 40 }} />
@@ -3129,7 +3152,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           key={msg.id}
                           style={[styles.simBubble, msg.sender === 'user' ? styles.simBubbleUser : styles.simBubbleMatch]}
                         >
-                          <Text style={[styles.simBubbleText, msg.sender === 'user' && { color: '#FFF' }]}>
+                          <Text style={[styles.simBubbleText, msg.sender === 'user' && { color: uiTheme.colors.onPrimary }]}>
                             {msg.text}
                           </Text>
                         </View>
@@ -3145,7 +3168,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 return (
                   <View style={styles.cstInsightsContainer}>
                     <View style={styles.cstInsightsHeader}>
-                      <View style={[styles.cstBadgeSuccess, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
+                      <View style={[styles.cstBadgeSuccess, { backgroundColor: alpha(uiTheme.colors.error, 0.15), borderColor: alpha(uiTheme.colors.error, 0.3) }]}>
                         <Ionicons name="warning-outline" size={14} color={uiTheme.colors.error} />
                         <Text style={[styles.cstBadgeSuccessText, { color: uiTheme.colors.error }]}>Replies Too Short</Text>
                       </View>
@@ -3160,7 +3183,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       onPress={() => startTrainingSession(trainingLang, true)}
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="refresh" size={14} color="#FFF" />
+                      <Ionicons name="refresh" size={14} color={uiTheme.colors.onPrimary} />
                       <Text style={styles.cstStartBtnText}>Try Again ({langObj.label})</Text>
                     </TouchableOpacity>
 
@@ -3209,8 +3232,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     toggleCard('activeTime');
                   }
                 }}
-                trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.success }}
-                thumbColor={form.activeHours?.enabled !== false ? '#FFF' : uiTheme.colors.muted}
+                trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                thumbColor={uiTheme.colors.white}
+                ios_backgroundColor={uiTheme.colors.elevatedHigh}
               />
 
               <TouchableOpacity accessibilityRole="button"
@@ -3247,7 +3271,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               <View style={styles.subBox}>
                 <View style={styles.rowBetween}>
                   <Text style={styles.subBoxTitle}>Operating Hours Window</Text>
-                  <Text style={{ fontFamily: 'Inter_700Bold', color: uiTheme.colors.success, fontSize: 11.5, fontWeight: 'normal' }}>
+                  <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.strong, color: uiTheme.colors.success }}>
                     {form.activeHours?.enabled !== false ? 'Scheduled Active' : '24/7 Always On'}
                   </Text>
                 </View>
@@ -3356,32 +3380,28 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           activeOpacity={1}
           onPress={() => setTooltipModal(null)}
         >
-          <View style={[styles.simLangModalContent, { maxWidth: 330, padding: 18 }]}>
+          <View style={[styles.simLangModalContent, styles.tooltipContent]} accessibilityViewIsModal>
             <View style={styles.simLangModalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="information-circle" size={18} color={uiTheme.colors.primary} />
-                <Text style={styles.simLangModalTitle}>{tooltipModal?.title || 'How it works'}</Text>
+              <View style={styles.tooltipTitleRow}>
+                <IconWell icon="information-circle-outline" tone="info" size={36} />
+                <Text style={styles.tooltipTitle} accessibilityRole="header" numberOfLines={2}>{tooltipModal?.title || 'How it works'}</Text>
               </View>
-              <TouchableOpacity accessibilityRole="button" onPress={() => setTooltipModal(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name="close" size={18} color={uiTheme.colors.muted} />
-              </TouchableOpacity>
+              <IconButton icon="close" size={36} iconSize={18} onPress={() => setTooltipModal(null)} accessibilityLabel="Close" />
             </View>
 
-            <View style={{ marginTop: 10, gap: 10 }}>
+            <View style={styles.tooltipLines}>
               {tooltipModal?.lines?.map((line, idx) => (
-                <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                  <Text style={{ fontFamily: 'Inter_400Regular', color: uiTheme.colors.text, fontSize: 12.5, lineHeight: 18, flex: 1 }}>{line}</Text>
+                <View key={idx} style={styles.tooltipLineRow}>
+                  <Text style={styles.tooltipLineText}>{line}</Text>
                 </View>
               ))}
             </View>
 
-            <TouchableOpacity accessibilityRole="button"
-              style={[styles.cstStartBtn, { marginTop: 16, paddingVertical: 10 }]}
+            <AppButton
+              title="Got it"
               onPress={() => setTooltipModal(null)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.cstStartBtnText}>Got it</Text>
-            </TouchableOpacity>
+              style={styles.tooltipBtn}
+            />
           </View>
         </TouchableOpacity>
       </Modal>
@@ -3390,497 +3410,533 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
   );
 }
 
+const c = uiTheme.colors;
+const sp = uiTheme.spacing;
+const r = uiTheme.radius;
+const ty = uiTheme.type;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: uiTheme.colors.background,
+    backgroundColor: c.background,
   },
   centerWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: uiTheme.spacing.xl,
-    backgroundColor: uiTheme.colors.background,
+    padding: sp.xl,
+    backgroundColor: c.background,
   },
-  loadingText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    marginTop: 10,
-    fontSize: 13,
+  loadingText: {
+    ...ty.footnote,
+    color: c.muted,
+    marginTop: sp.md,
+    textAlign: 'center',
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    padding: 14,
-    paddingBottom: 90,
-    gap: uiTheme.spacing.md,
+    paddingHorizontal: sp.xxs,
+    paddingTop: sp.xs,
+    paddingBottom: sp.section,
+    gap: sp.lg,
   },
 
   // ─── V2 Accordion Cards ───
   v2Card: {
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: 16,
+    backgroundColor: c.surface,
+    borderRadius: r.card,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.borderSubtle,
     overflow: 'hidden',
   },
   v2CardOpen: {
-    borderColor: 'rgba(254, 60, 114, 0.4)',
+    borderColor: c.primaryBorder,
   },
   v2CardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: uiTheme.spacing.lg,
+    gap: sp.md,
+    minHeight: 64,
+    paddingHorizontal: sp.lg,
+    paddingVertical: sp.md,
   },
   cardTitleWrap: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: sp.md,
   },
-  v2CardTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
+  v2CardTitle: {
+    ...ty.headline,
+    color: c.text,
+    flexShrink: 1,
   },
 
   // ─── Collapsed Summary Chips ───
   collapsedRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingBottom: 14,
+    gap: sp.sm,
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.lg,
   },
   v2Chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: uiTheme.colors.elevated,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 4.5,
-    borderRadius: 7,
+    gap: sp.xs,
+    maxWidth: '100%',
+    backgroundColor: c.neutralSoft,
+    paddingHorizontal: sp.md - 2,
+    paddingVertical: sp.xs,
+    borderRadius: r.pill,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.neutralBorder,
   },
-  v2ChipText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.textSecondary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  v2ChipText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: c.textSecondary,
+    flexShrink: 1,
   },
 
   // ─── Expanded Card Body ───
   v2CardBody: {
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingBottom: uiTheme.spacing.lg,
-    borderTopWidth: 1,
-    borderColor: '#221E33',
-    paddingTop: uiTheme.spacing.md,
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.lg,
+    paddingTop: sp.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: c.divider,
   },
-  fieldDesc: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    marginBottom: uiTheme.spacing.md,
-    lineHeight: 16,
+  fieldDesc: {
+    ...ty.footnote,
+    color: c.muted,
+    marginBottom: sp.md,
   },
 
   // ─── Radio Group ───
   radioGroup: {
-    gap: uiTheme.spacing.sm,
-    marginBottom: uiTheme.spacing.md,
+    gap: sp.sm,
+    marginBottom: sp.md,
   },
   goalOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.input,
-    padding: uiTheme.spacing.md,
+    minHeight: 56,
+    backgroundColor: c.elevated,
+    borderRadius: r.input,
+    padding: sp.md,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: c.hairline,
   },
   goalOptionSelected: {
-    borderColor: uiTheme.colors.primary,
-    backgroundColor: 'rgba(254, 60, 114, 0.06)',
+    borderColor: c.primaryBorder,
+    backgroundColor: c.primarySoft,
   },
   radioCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    borderColor: uiTheme.colors.muted,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: c.muted,
     justifyContent: 'center',
     alignItems: 'center',
   },
   radioCircleActive: {
-    borderColor: uiTheme.colors.primary,
+    borderColor: c.primary,
   },
   radioInnerCircle: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: uiTheme.colors.primary,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: c.primary,
   },
-  goalOptionLabel: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.text,
-    fontSize: 13,
-    fontWeight: 'normal',
+  goalOptionLabel: {
+    ...ty.bodyStrong,
+    color: c.text,
   },
-  goalOptionSub: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    marginTop: 1,
+  goalOptionSub: {
+    ...ty.footnote,
+    color: c.muted,
+    marginTop: sp.xxs,
   },
 
   // ─── Sub-Boxes & Inputs ───
   subBox: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.input,
-    padding: uiTheme.spacing.md,
+    backgroundColor: c.elevated,
+    borderRadius: r.lg,
+    padding: sp.lg,
     borderWidth: 1,
-    borderColor: '#221E33',
-    marginTop: 10,
+    borderColor: c.hairline,
+    marginTop: sp.md,
   },
-  subBoxTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#FFF',
-    fontSize: 12.5,
-    fontWeight: 'normal',
-    marginBottom: uiTheme.spacing.sm,
+  subBoxTitle: {
+    ...ty.label,
+    fontFamily: uiTheme.fonts.heading,
+    color: c.text,
+    marginBottom: sp.sm,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: sp.sm,
   },
   chip: {
-    backgroundColor: uiTheme.colors.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 7,
+    minHeight: 36,
+    justifyContent: 'center',
+    backgroundColor: c.surface,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs + 2,
+    borderRadius: r.pill,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.border,
   },
   chipActive: {
-    backgroundColor: uiTheme.colors.primary,
-    borderColor: uiTheme.colors.primary,
+    backgroundColor: c.primarySoft,
+    borderColor: c.primaryBorder,
   },
-  chipText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  chipText: {
+    ...ty.subhead,
+    color: c.textSecondary,
   },
-  chipTextActive: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFF',
-    fontWeight: 'normal',
+  chipTextActive: {
+    fontFamily: uiTheme.fonts.label,
+    color: c.text,
   },
   inputGroup: {
-    marginTop: uiTheme.spacing.sm,
+    marginTop: sp.md,
   },
-  inputLabel: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginBottom: uiTheme.spacing.xs,
+  inputLabel: {
+    ...ty.label,
+    color: c.textSecondary,
+    marginBottom: sp.sm,
   },
-  textInput: { fontFamily: 'Inter_400Regular',
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.small,
+  textInput: {
+    ...ty.callout,
+    minHeight: uiTheme.layout.touchTarget,
+    backgroundColor: c.surface,
+    borderRadius: r.input,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    color: '#FFF',
-    fontSize: 12.5,
-    paddingHorizontal: 10,
-    paddingVertical: uiTheme.spacing.sm,
+    borderColor: c.border,
+    color: c.text,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm,
   },
-  textArea: { fontFamily: 'Inter_400Regular',
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.small,
+  textArea: {
+    ...ty.callout,
+    backgroundColor: c.surface,
+    borderRadius: r.input,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    color: '#FFF',
-    fontSize: 12.5,
-    padding: 10,
-    minHeight: 65,
+    borderColor: c.border,
+    color: c.text,
+    padding: sp.md,
+    minHeight: 72,
     textAlignVertical: 'top',
   },
   rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: uiTheme.spacing.sm,
+    gap: sp.md,
+    marginTop: sp.sm,
   },
-  labelMuted: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  switchRow: {
+    minHeight: 48,
+    marginTop: 0,
   },
-  smallInput: { fontFamily: 'Inter_400Regular',
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: 7,
+  flexText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  labelMuted: {
+    ...ty.footnote,
+    color: c.muted,
+  },
+  smallInput: {
+    ...ty.subhead,
+    backgroundColor: c.surface,
+    borderRadius: r.sm,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    color: '#FFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    width: 54,
+    borderColor: c.border,
+    color: c.text,
+    width: 56,
+    minHeight: uiTheme.layout.touchTarget,
     textAlign: 'center',
-    paddingVertical: uiTheme.spacing.xs,
+    paddingVertical: sp.xs,
+    fontVariant: ['tabular-nums'],
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: uiTheme.spacing.sm,
+    gap: sp.md,
+    minHeight: 56,
+    paddingVertical: sp.sm,
   },
   v2ValueBadge: {
-    backgroundColor: uiTheme.colors.elevated,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 3.5,
-    borderRadius: 6,
+    backgroundColor: c.primarySoft,
+    paddingHorizontal: sp.sm + 2,
+    paddingVertical: sp.xxs + 1,
+    borderRadius: r.pill,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.primaryBorder,
   },
-  v2ValueBadgeText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  v2ValueBadgeText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.accent,
+    fontVariant: ['tabular-nums'],
   },
-  toggleTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: 'normal',
+  toggleTitle: {
+    ...ty.bodyStrong,
+    color: c.text,
+    flexShrink: 1,
   },
-  toggleSub: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    marginTop: 1,
+  toggleSub: {
+    ...ty.footnote,
+    color: c.muted,
+    marginTop: sp.xxs,
   },
   safetyChipBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    gap: sp.xs,
+    backgroundColor: c.successSoft,
+    paddingHorizontal: sp.sm,
+    paddingVertical: sp.xxs,
+    borderRadius: r.pill,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
+    borderColor: c.successBorder,
   },
-  safetyChipBadgeText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.success,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  safetyChipBadgeText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.success,
   },
   subBoxDivider: {
-    height: 1,
-    backgroundColor: '#221E33',
-    marginVertical: 10,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: c.divider,
+    marginVertical: sp.md,
   },
   speedButtonGroup: {
     flexDirection: 'row',
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.small,
+    backgroundColor: c.surface,
+    borderRadius: r.md,
     padding: 3,
     gap: 3,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.border,
   },
   speedBtn: {
     flex: 1,
-    paddingVertical: uiTheme.spacing.sm,
+    minWidth: 0,
+    minHeight: 40,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.xs,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 6,
+    borderRadius: r.sm,
   },
   speedBtnActive: {
-    backgroundColor: uiTheme.colors.primary,
+    backgroundColor: c.primary,
+    ...uiTheme.shadows.sm,
   },
-  speedBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  speedBtnText: {
+    ...ty.subhead,
+    color: c.muted,
+    textAlign: 'center',
   },
-  speedBtnTextActive: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFF',
-    fontWeight: 'normal',
+  speedBtnTextActive: {
+    fontFamily: uiTheme.fonts.label,
+    color: c.onPrimary,
   },
 
   // ─── Chat Style Training (CST) V2 Parity Styles ───
   cstIntroContainer: {
-    paddingVertical: 6,
+    paddingVertical: sp.sm,
   },
   cstIntroIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(192, 38, 211, 0.12)',
+    width: 52,
+    height: 52,
+    borderRadius: 17,
+    backgroundColor: c.infoSoft,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
-    marginBottom: 10,
+    marginBottom: sp.md,
     borderWidth: 1,
-    borderColor: 'rgba(192, 38, 211, 0.25)',
+    borderColor: c.infoBorder,
   },
-  cstIntroTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
+  cstIntroTitle: {
+    ...ty.section,
+    color: c.text,
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: sp.xs,
   },
-  cstIntroDesc: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    lineHeight: 17,
+  cstIntroDesc: {
+    ...ty.callout,
+    color: c.muted,
     textAlign: 'center',
-    marginBottom: 14,
-    paddingHorizontal: uiTheme.spacing.sm,
+    marginBottom: sp.lg,
+    paddingHorizontal: sp.sm,
   },
   cstTrainedBar: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: 10,
-    padding: 10,
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
+    padding: sp.md,
     borderWidth: 1,
-    borderColor: '#221E33',
-    marginBottom: uiTheme.spacing.sm,
+    borderColor: c.hairline,
+    marginBottom: sp.sm,
   },
-  cstTrainedBarLabel: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginBottom: 6,
+  cstTrainedBarLabel: {
+    ...ty.overline,
+    color: c.muted,
+    textTransform: 'uppercase',
+    marginBottom: sp.sm,
   },
   cstTrainedChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: sp.sm,
   },
   cstTrainedPill: {
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: 6,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: uiTheme.spacing.xs,
+    minHeight: 32,
+    justifyContent: 'center',
+    backgroundColor: c.surface,
+    borderRadius: r.pill,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.border,
   },
   cstTrainedPillActive: {
-    borderColor: '#C026D3',
-    backgroundColor: 'rgba(192, 38, 211, 0.15)',
+    borderColor: c.infoBorder,
+    backgroundColor: c.infoSoft,
   },
-  cstTrainedPillText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstTrainedPillText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
   },
-  cstTrainedPillTextActive: { fontFamily: 'Inter_700Bold',
-    color: '#C026D3',
-    fontWeight: 'normal',
+  cstTrainedPillTextActive: {
+    fontFamily: uiTheme.fonts.strong,
+    color: c.info,
   },
   cstStartBtn: {
-    backgroundColor: '#C026D3',
-    borderRadius: 10,
-    paddingVertical: uiTheme.spacing.md,
+    minHeight: uiTheme.layout.buttonHeight,
+    backgroundColor: c.primary,
+    borderRadius: r.button,
+    paddingVertical: sp.md,
+    paddingHorizontal: sp.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: uiTheme.spacing.sm,
-    marginTop: 14,
+    gap: sp.sm,
+    marginTop: sp.lg,
+    ...uiTheme.shadows.glow,
   },
-  cstStartBtnText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: 'normal',
+  cstStartBtnText: {
+    ...ty.button,
+    color: c.onPrimary,
   },
   cstViewTrainedBtn: {
-    marginTop: uiTheme.spacing.sm,
-    paddingVertical: 10,
+    marginTop: sp.sm,
+    minHeight: uiTheme.layout.buttonHeightSmall + 4,
+    paddingVertical: sp.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: uiTheme.radius.small,
+    borderRadius: r.button,
     borderWidth: 1,
-    borderColor: 'rgba(192, 38, 211, 0.3)',
-    backgroundColor: 'rgba(192, 38, 211, 0.06)',
+    borderColor: c.infoBorder,
+    backgroundColor: c.infoSoft,
   },
-  cstViewTrainedBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#C026D3',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstViewTrainedBtnText: {
+    ...ty.buttonSmall,
+    color: c.info,
   },
 
   // CST Simulator
   cstSimContainer: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.input,
+    backgroundColor: c.elevated,
+    borderRadius: r.lg,
     borderWidth: 1,
-    borderColor: '#221E33',
-    padding: uiTheme.spacing.md,
+    borderColor: c.hairline,
+    padding: sp.md,
   },
   cstSimTopBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderColor: '#221E33',
-    paddingBottom: 10,
+    gap: sp.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: c.divider,
+    paddingBottom: sp.md,
   },
   cstSaveExitBtn: {
-    backgroundColor: uiTheme.colors.surface,
+    minHeight: uiTheme.layout.touchTarget,
+    justifyContent: 'center',
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    borderRadius: 6,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: uiTheme.spacing.xs,
+    borderColor: c.border,
+    borderRadius: r.sm,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs,
   },
-  cstSaveExitBtnText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstSaveExitBtnText: {
+    ...ty.buttonSmall,
+    color: c.text,
   },
   cstCancelBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 6,
-    backgroundColor: uiTheme.colors.surface,
+    width: uiTheme.layout.touchTarget,
+    height: uiTheme.layout.touchTarget,
+    borderRadius: r.sm + 4,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cstProgressWrap: {
-    paddingVertical: uiTheme.spacing.sm,
+    paddingVertical: sp.sm,
   },
   cstProgressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: uiTheme.spacing.xs,
+    marginBottom: sp.xs,
   },
-  cstProgressLabel: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstProgressLabel: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
   },
-  cstProgressValue: { fontFamily: 'Inter_800ExtraBold',
-    color: '#C026D3',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstProgressValue: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.info,
+    fontVariant: ['tabular-nums'],
   },
   cstProgressBarBg: {
-    height: 5,
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: 2.5,
+    height: 4,
+    backgroundColor: c.elevatedHigh,
+    borderRadius: r.pill,
     overflow: 'hidden',
   },
   cstProgressBarFill: {
     height: '100%',
-    backgroundColor: '#C026D3',
-    borderRadius: 2.5,
+    backgroundColor: c.info,
+    borderRadius: r.pill,
   },
   cstMessagesScroll: {
     maxHeight: 230,
     minHeight: 140,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    marginVertical: uiTheme.spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: c.divider,
+    marginVertical: sp.xs,
   },
   simAvatarWrapper: {
     position: 'relative',
@@ -3889,7 +3945,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: uiTheme.colors.primary,
+    backgroundColor: c.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -3897,32 +3953,29 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -1,
     right: -1,
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: uiTheme.colors.success,
-    borderWidth: 1.5,
-    borderColor: uiTheme.colors.background,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: c.success,
+    borderWidth: 2,
+    borderColor: c.elevated,
   },
-  simMatchName: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: 'normal',
+  simMatchName: {
+    ...ty.label,
+    color: c.text,
   },
   simDateSeparator: {
     alignItems: 'center',
-    marginVertical: uiTheme.spacing.xs,
+    marginVertical: sp.xs,
   },
-  simDateSeparatorText: { fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.8,
+  simDateSeparatorText: {
+    ...ty.overline,
+    color: c.muted,
   },
   simMatchRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 6,
+    gap: sp.xs + 2,
     maxWidth: '88%',
     alignSelf: 'flex-start',
   },
@@ -3930,495 +3983,578 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: uiTheme.colors.primary,
+    backgroundColor: c.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: sp.xxs,
   },
   simBubble: {
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: 9,
-    borderRadius: 14,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm,
+    borderRadius: r.lg,
     maxWidth: '85%',
   },
   simBubbleMatch: {
-    backgroundColor: '#1F1B2E',
+    backgroundColor: c.elevatedHigh,
     borderWidth: 1,
-    borderColor: '#2D2842',
-    borderBottomLeftRadius: 3,
+    borderColor: c.hairline,
+    borderBottomLeftRadius: sp.xs,
   },
   simBubbleUser: {
-    backgroundColor: uiTheme.colors.primary,
+    backgroundColor: c.primary,
     alignSelf: 'flex-end',
-    borderBottomRightRadius: 3,
+    borderBottomRightRadius: sp.xs,
   },
-  simBubbleTextMatch: { fontFamily: 'Inter_400Regular',
-    color: '#FFF',
-    fontSize: 12.5,
-    lineHeight: 17,
+  simBubbleTextMatch: {
+    ...ty.callout,
+    color: c.text,
   },
-  simBubbleTextUser: { fontFamily: 'Inter_400Regular',
-    color: '#FFF',
-    fontSize: 12.5,
-    lineHeight: 17,
+  simBubbleText: {
+    ...ty.callout,
+    color: c.text,
+  },
+  simBubbleTextUser: {
+    ...ty.callout,
+    color: c.onPrimary,
   },
   simActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: uiTheme.spacing.xs,
+    flexWrap: 'wrap',
+    gap: sp.sm,
+    paddingVertical: sp.xs,
   },
   cstSaveInlinePill: {
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.input,
-    paddingHorizontal: 10,
-    paddingVertical: uiTheme.spacing.xs,
+    minHeight: 32,
+    justifyContent: 'center',
+    backgroundColor: c.surface,
+    borderRadius: r.pill,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.border,
   },
-  cstSaveInlinePillText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstSaveInlinePillText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.accent,
   },
   cstProfilesBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    backgroundColor: 'rgba(192, 38, 211, 0.1)',
-    borderRadius: uiTheme.radius.input,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: uiTheme.spacing.xs,
+    gap: sp.xs,
+    minHeight: 32,
+    backgroundColor: c.infoSoft,
+    borderRadius: r.pill,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs,
     borderWidth: 1,
-    borderColor: 'rgba(192, 38, 211, 0.25)',
-    marginRight: 6,
+    borderColor: c.infoBorder,
+    marginRight: sp.xs,
   },
-  cstProfilesBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#C026D3',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstProfilesBtnText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.info,
   },
   simLangPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    backgroundColor: 'rgba(254, 60, 114, 0.1)',
-    borderRadius: uiTheme.radius.input,
-    paddingHorizontal: 10,
-    paddingVertical: uiTheme.spacing.xs,
+    gap: sp.xs,
+    minHeight: 32,
+    backgroundColor: c.primarySoft,
+    borderRadius: r.pill,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.25)',
+    borderColor: c.primaryBorder,
   },
-  simLangPillText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  simLangPillText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.accent,
   },
   simInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    gap: sp.sm,
   },
-  simTextInput: { fontFamily: 'Inter_400Regular',
+  simTextInput: {
+    ...ty.callout,
     flex: 1,
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: 22,
+    minWidth: 0,
+    backgroundColor: c.surface,
+    borderRadius: r.pill,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    color: '#FFF',
-    fontSize: 12.5,
-    paddingHorizontal: 14,
-    paddingVertical: uiTheme.spacing.sm,
-    height: 42,
+    borderColor: c.border,
+    color: c.text,
+    paddingHorizontal: sp.lg,
+    paddingVertical: sp.sm,
+    height: uiTheme.layout.touchTarget,
   },
   simTextInputShaking: {
-    borderColor: uiTheme.colors.warning,
+    borderColor: c.warning,
     borderWidth: 1.5,
-    backgroundColor: 'rgba(245, 158, 11, 0.05)',
+    backgroundColor: c.warningSoft,
   },
-  simInputWarningText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.warning,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginTop: uiTheme.spacing.xs,
-    marginLeft: 6,
+  simInputWarningText: {
+    ...ty.footnote,
+    fontFamily: uiTheme.fonts.label,
+    color: c.warning,
+    marginTop: sp.xs,
+    marginLeft: sp.sm,
   },
   simSendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 21,
-    backgroundColor: uiTheme.colors.primary,
+    width: uiTheme.layout.touchTarget,
+    height: uiTheme.layout.touchTarget,
+    borderRadius: uiTheme.layout.touchTarget / 2,
+    backgroundColor: c.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
   // CST Insights (Completion Screen)
   cstInsightsContainer: {
-    paddingVertical: uiTheme.spacing.xs,
+    paddingVertical: sp.xs,
   },
   cstInsightsHeader: {
     alignItems: 'center',
-    marginBottom: uiTheme.spacing.md,
+    marginBottom: sp.lg,
   },
   cstBadgeSuccess: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 6,
+    gap: sp.xs,
+    backgroundColor: c.successSoft,
+    paddingHorizontal: sp.sm + 2,
+    paddingVertical: sp.xs,
+    borderRadius: r.pill,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
-    marginBottom: uiTheme.spacing.sm,
+    borderColor: c.successBorder,
+    marginBottom: sp.sm,
   },
-  cstBadgeSuccessText: { fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.success,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstBadgeSuccessText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.success,
   },
-  cstInsightsTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'normal',
-    marginBottom: uiTheme.spacing.xs,
-  },
-  cstInsightsSub: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  cstInsightsTitle: {
+    ...ty.section,
+    color: c.text,
     textAlign: 'center',
-    lineHeight: 16,
-    paddingHorizontal: 10,
+    marginBottom: sp.xs,
+  },
+  cstInsightsSub: {
+    ...ty.footnote,
+    color: c.muted,
+    textAlign: 'center',
+    paddingHorizontal: sp.md,
   },
   cstMetricGrid: {
-    gap: uiTheme.spacing.sm,
+    gap: sp.sm,
   },
   cstMetricCard: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: 10,
-    padding: 10,
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
+    padding: sp.md,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: c.hairline,
   },
-  cstMetricTitle: { fontFamily: 'Manrope_700Bold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstMetricTitle: {
+    ...ty.label,
+    color: c.text,
   },
-  cstMetricValue: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    marginTop: 3,
-    marginLeft: uiTheme.spacing.xl,
+  cstMetricValue: {
+    ...ty.footnote,
+    color: c.muted,
+    marginTop: sp.xs,
+    marginLeft: sp.xl,
   },
   cstRestartBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 6,
-    backgroundColor: uiTheme.colors.surface,
+    width: uiTheme.layout.touchTarget,
+    height: uiTheme.layout.touchTarget,
+    borderRadius: r.sm + 4,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cstTraitsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: sp.sm,
     justifyContent: 'center',
-    marginBottom: uiTheme.spacing.md,
+    marginBottom: sp.lg,
   },
   cstTraitChip: {
-    backgroundColor: uiTheme.colors.surface,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 3.5,
-    borderRadius: 6,
+    backgroundColor: c.neutralSoft,
+    paddingHorizontal: sp.md - 2,
+    paddingVertical: sp.xs,
+    borderRadius: r.pill,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.neutralBorder,
   },
-  cstTraitChipText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstTraitChipText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: c.text,
   },
   cstTrainAnotherBtn: {
-    backgroundColor: '#9333EA',
-    borderRadius: 10,
-    paddingVertical: 11,
+    minHeight: uiTheme.layout.buttonHeight,
+    backgroundColor: c.primary,
+    borderRadius: r.button,
+    paddingVertical: sp.md,
+    paddingHorizontal: sp.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: sp.sm,
   },
-  cstTrainAnotherBtnText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFF',
-    fontSize: 12.5,
-    fontWeight: 'normal',
+  cstTrainAnotherBtnText: {
+    ...ty.button,
+    color: c.onPrimary,
   },
   cstSecondaryBtn: {
-    paddingVertical: 10,
-    borderRadius: uiTheme.radius.small,
+    minHeight: uiTheme.layout.buttonHeightSmall + 4,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.lg,
+    borderRadius: r.button,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    backgroundColor: uiTheme.colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.elevated,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: sp.sm,
   },
-  cstSecondaryBtnText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstSecondaryBtnText: {
+    ...ty.buttonSmall,
+    color: c.text,
   },
   simSystemHint: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    borderRadius: uiTheme.radius.small,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginVertical: uiTheme.spacing.xs,
+    gap: sp.sm,
+    backgroundColor: c.warningSoft,
+    borderRadius: r.md,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm,
+    marginVertical: sp.xs,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: c.warningBorder,
     alignSelf: 'center',
     maxWidth: '92%',
   },
-  simSystemHintText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.warning,
-    fontSize: uiTheme.type.caption.fontSize,
+  simSystemHintText: {
+    ...ty.footnote,
+    color: c.warning,
     fontStyle: 'italic',
     flex: 1,
-    lineHeight: 15,
+    minWidth: 0,
   },
   cstFinishBanner: {
-    backgroundColor: uiTheme.colors.surface,
+    backgroundColor: c.infoSoft,
     borderWidth: 1,
-    borderColor: '#9333EA',
-    borderRadius: uiTheme.radius.input,
-    padding: 14,
+    borderColor: c.infoBorder,
+    borderRadius: r.lg,
+    padding: sp.lg,
     alignItems: 'center',
-    marginVertical: uiTheme.spacing.sm,
+    marginVertical: sp.sm,
   },
-  cstFinishTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-    marginBottom: uiTheme.spacing.xs,
-  },
-  cstFinishSub: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  cstFinishTitle: {
+    ...ty.headline,
+    color: c.text,
     textAlign: 'center',
-    lineHeight: 16,
-    marginBottom: 10,
+    marginBottom: sp.xs,
+  },
+  cstFinishSub: {
+    ...ty.footnote,
+    color: c.muted,
+    textAlign: 'center',
+    marginBottom: sp.md,
   },
   cstFinishBtn: {
-    backgroundColor: '#C026D3',
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: uiTheme.radius.small,
+    minHeight: uiTheme.layout.buttonHeightSmall + 4,
+    justifyContent: 'center',
+    backgroundColor: c.primary,
+    paddingHorizontal: sp.xl,
+    paddingVertical: sp.sm,
+    borderRadius: r.button,
   },
-  cstFinishBtnText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFF',
-    fontSize: 12.5,
-    fontWeight: 'normal',
+  cstFinishBtnText: {
+    ...ty.buttonSmall,
+    color: c.onPrimary,
   },
   cstAiSummaryWrap: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: 10,
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
     borderWidth: 1,
-    borderColor: '#221E33',
-    padding: 10,
-    marginBottom: 10,
+    borderColor: c.hairline,
+    padding: sp.md,
+    marginBottom: sp.md,
   },
-  cstAiSummaryLabel: { fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginBottom: uiTheme.spacing.xs,
+  cstAiSummaryLabel: {
+    ...ty.overline,
+    color: c.accent,
+    marginBottom: sp.xs,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  cstAiSummaryText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    lineHeight: 17,
+  cstAiSummaryText: {
+    ...ty.callout,
+    color: c.text,
   },
   cstDeleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: uiTheme.spacing.sm,
+    gap: sp.xs,
+    minHeight: uiTheme.layout.touchTarget,
+    paddingVertical: sp.sm,
   },
-  cstDeleteBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.error,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  cstDeleteBtnText: {
+    ...ty.buttonSmall,
+    color: c.error,
   },
 
-  // ─── Simulator Language Picker Modal ───
+  // ─── Modals (simulator language picker, info tooltip) ───
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: c.scrim,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: uiTheme.spacing.xl,
+    padding: sp.xl,
+  },
+  simLangModalOverlay: {
+    flex: 1,
+    backgroundColor: c.scrim,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: sp.xl,
   },
   simLangModalContent: {
     width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#120F1D',
-    borderRadius: 16,
+    maxWidth: 400,
+    backgroundColor: c.surface,
+    borderRadius: r.sheet,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    padding: uiTheme.spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 10,
+    borderColor: c.hairline,
+    padding: sp.xl,
+    ...uiTheme.shadows.lg,
   },
   simLangModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: uiTheme.spacing.md,
-    borderBottomWidth: 1,
-    borderColor: '#221E33',
-    marginBottom: uiTheme.spacing.sm,
+    gap: sp.md,
+    paddingBottom: sp.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: c.divider,
+    marginBottom: sp.sm,
   },
-  simLangModalTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
+  simLangModalTitle: {
+    ...ty.title2,
+    color: c.text,
+    flexShrink: 1,
   },
   simLangModalOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: uiTheme.spacing.md,
-    borderRadius: 10,
-    marginVertical: 2,
+    gap: sp.sm,
+    minHeight: 48,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.md,
+    borderRadius: r.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginVertical: sp.xxs,
   },
   simLangModalOptionSelected: {
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
+    backgroundColor: c.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
+    borderColor: c.primaryBorder,
   },
-  simLangModalOptionText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.text,
-    fontSize: 13,
-    fontWeight: 'normal',
+  simLangModalOptionText: {
+    ...ty.bodyStrong,
+    color: c.text,
   },
+  tooltipContent: {
+    maxWidth: 380,
+  },
+  tooltipTitleRow: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+  },
+  tooltipTitle: {
+    ...ty.title2,
+    color: c.text,
+    flexShrink: 1,
+  },
+  tooltipLines: {
+    marginTop: sp.sm,
+    gap: sp.md,
+  },
+  tooltipLineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: sp.sm,
+  },
+  tooltipLineText: {
+    ...ty.callout,
+    color: c.textSecondary,
+    flex: 1,
+    minWidth: 0,
+  },
+  tooltipBtn: {
+    marginTop: sp.xl,
+  },
+
   // ─── Contact Section & Move Off App (Desktop V2 Parity) ───
   contactSection: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.input,
+    backgroundColor: c.elevated,
+    borderRadius: r.lg,
     borderWidth: 1,
-    borderColor: '#221E33',
-    padding: uiTheme.spacing.md,
-    marginTop: 10,
+    borderColor: c.hairline,
+    paddingHorizontal: sp.lg,
+    paddingVertical: sp.xs,
+    marginTop: sp.md,
   },
   contactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 2,
+    gap: sp.md,
+    minHeight: 52,
+    paddingVertical: sp.xs,
   },
-  contactHeaderTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: 'normal',
+  contactHeaderLeft: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.sm,
+  },
+  contactHeaderTitle: {
+    ...ty.bodyStrong,
+    color: c.text,
+    flexShrink: 1,
+  },
+  contactBody: {
+    paddingTop: sp.sm,
+    paddingBottom: sp.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.divider,
   },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-    marginVertical: uiTheme.spacing.xs,
+    gap: sp.sm,
+    minHeight: 48,
+    marginVertical: sp.xxs,
   },
-  contactRowLabel: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    width: 68,
+  contactRowSpaced: {
+    marginTop: sp.md,
   },
-  contactInput: { fontFamily: 'Inter_400Regular',
+  contactRowIcon: {
+    width: 24,
+    textAlign: 'center',
+  },
+  contactRowLabel: {
+    ...ty.bodyStrong,
+    color: c.text,
     flex: 1,
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.small,
+    minWidth: 0,
+  },
+  contactInput: {
+    ...ty.callout,
+    backgroundColor: c.surface,
+    borderRadius: r.input,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    color: '#FFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 6,
-    height: 36,
+    borderColor: c.border,
+    color: c.text,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm,
+    height: 48,
   },
   handleStatRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    marginLeft: 30,
-    marginTop: -2,
-    marginBottom: 6,
+    gap: sp.xs,
+    marginTop: sp.sm,
+    marginBottom: sp.xs,
+    marginLeft: sp.xs,
   },
-  handleStatText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  handleStatText: {
+    ...ty.footnote,
+    color: c.muted,
+    flexShrink: 1,
+  },
+  handleStatCount: {
+    fontFamily: uiTheme.fonts.strong,
+    fontVariant: ['tabular-nums'],
+  },
+  genderBlock: {
+    marginTop: sp.xs,
   },
   genderSelector: {
     flexDirection: 'row',
-    gap: 6,
-    marginTop: 6,
+    gap: 3,
+    padding: 3,
+    marginTop: sp.xxs,
+    backgroundColor: c.surface,
+    borderRadius: r.md,
+    borderWidth: 1,
+    borderColor: c.border,
   },
   genderBtn: {
     flex: 1,
-    paddingVertical: 7,
+    minWidth: 0,
+    minHeight: uiTheme.layout.touchTarget,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.xs,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 7,
-    backgroundColor: uiTheme.colors.surface,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderRadius: r.sm,
   },
   genderBtnActive: {
-    backgroundColor: uiTheme.colors.primary,
-    borderColor: uiTheme.colors.primary,
+    backgroundColor: c.primary,
+    ...uiTheme.shadows.sm,
   },
-  genderBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  genderBtnText: {
+    ...ty.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
   },
-  genderBtnTextActive: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFF',
-    fontWeight: 'normal',
+  genderBtnTextActive: {
+    fontFamily: uiTheme.fonts.label,
+    color: c.onPrimary,
   },
-  helperNote: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    lineHeight: 15,
-    marginTop: uiTheme.spacing.xs,
+  helperNote: {
+    ...ty.footnote,
+    color: c.muted,
+    marginTop: sp.sm,
   },
 
   // ─── AI Active Time (Desktop V2 Parity) ───
-  atHeaderRangeText: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    color: uiTheme.colors.muted,
+  atHeaderRangeText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
+    fontVariant: ['tabular-nums'],
   },
   timelineWrap: {
-    marginTop: 10,
-    marginBottom: uiTheme.spacing.xs,
+    marginTop: sp.md,
+    marginBottom: sp.xs,
   },
   timelineBg: {
-    height: 8,
-    backgroundColor: uiTheme.colors.elevated,
-    borderRadius: 4,
+    height: 6,
+    backgroundColor: c.elevatedHigh,
+    borderRadius: r.pill,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -4426,19 +4562,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    backgroundColor: uiTheme.colors.success,
-    borderRadius: 4,
+    backgroundColor: c.primary,
+    borderRadius: r.pill,
   },
   timelineMarkers: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: uiTheme.spacing.xs,
-    paddingHorizontal: 2,
+    marginTop: sp.xs,
+    paddingHorizontal: sp.xxs,
   },
-  timelineMarkerText: { fontFamily: 'Inter_600SemiBold',
-    color: '#65637D',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  timelineMarkerText: {
+    ...ty.caption,
+    color: c.textTertiary,
+    fontVariant: ['tabular-nums'],
   },
 
   // ─── Desktop V2 Toast Banner ───
@@ -4446,21 +4582,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: uiTheme.spacing.sm,
-    backgroundColor: '#064E3B',
-    borderColor: uiTheme.colors.success,
+    gap: sp.sm,
+    backgroundColor: c.successSoft,
+    borderColor: c.successBorder,
     borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: uiTheme.spacing.lg,
-    marginHorizontal: 14,
-    marginTop: 10,
-    borderRadius: uiTheme.radius.input,
+    paddingVertical: sp.md,
+    paddingHorizontal: sp.lg,
+    marginHorizontal: sp.md,
+    marginTop: sp.md,
+    borderRadius: r.input,
     zIndex: 99,
   },
-  toastBannerText: { fontFamily: 'Inter_700Bold',
-    color: '#ECFDF5',
-    fontSize: 13,
-    fontWeight: 'normal',
+  toastBannerText: {
+    ...ty.label,
+    color: c.success,
+    flexShrink: 1,
   },
 
   // ─── Desktop V2 Sticky Save Bar ───
@@ -4469,25 +4605,21 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: uiTheme.colors.surface,
+    backgroundColor: c.elevated,
     borderTopWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    paddingHorizontal: 14,
-    paddingVertical: uiTheme.spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 10,
+    borderColor: c.hairline,
+    paddingHorizontal: sp.lg,
+    paddingVertical: sp.md,
+    ...uiTheme.shadows.lg,
   },
   saveBarProgress: {
     position: 'absolute',
     top: 0,
     left: 0,
     height: 3,
-    backgroundColor: uiTheme.colors.primary,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    backgroundColor: c.primary,
+    borderTopLeftRadius: r.md,
+    borderTopRightRadius: r.md,
   },
   saveBarContent: {
     flexDirection: 'row',
@@ -4497,9 +4629,10 @@ const styles = StyleSheet.create({
   saveBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    gap: sp.sm,
     flex: 1,
-    marginRight: 10,
+    minWidth: 0,
+    marginRight: sp.md,
   },
   statusDot: {
     width: 8,
@@ -4507,74 +4640,71 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   unsavedDot: {
-    backgroundColor: uiTheme.colors.warning,
+    backgroundColor: c.warning,
   },
   savedDot: {
-    backgroundColor: uiTheme.colors.success,
+    backgroundColor: c.success,
   },
-  saveBarText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  saveBarText: {
+    ...ty.footnote,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
   },
-  saveBarTextUnsaved: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontWeight: 'normal',
+  saveBarTextUnsaved: {
+    fontFamily: uiTheme.fonts.strong,
+    color: c.accent,
   },
   saveBarActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    gap: sp.sm,
   },
   discardBtn: {
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: 13,
-    borderRadius: uiTheme.radius.small,
+    minHeight: uiTheme.layout.touchTarget,
+    justifyContent: 'center',
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.md,
+    borderRadius: r.sm,
     borderWidth: 1,
-    borderColor: uiTheme.colors.border,
+    borderColor: c.border,
     backgroundColor: 'transparent',
   },
-  discardBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.textSecondary,
-    fontSize: 12.5,
-    fontWeight: 'normal',
+  discardBtnText: {
+    ...ty.buttonSmall,
+    color: c.textSecondary,
   },
   saveChangesBtn: {
-    backgroundColor: uiTheme.colors.primary,
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: uiTheme.spacing.lg,
-    borderRadius: uiTheme.radius.small,
+    minHeight: uiTheme.layout.touchTarget,
+    backgroundColor: c.primary,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.lg,
+    borderRadius: r.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 3,
+    ...uiTheme.shadows.glow,
   },
   saveChangesBtnIdle: {
-    backgroundColor: '#E11D48',
+    backgroundColor: c.primary,
     opacity: 0.95,
   },
   saveChangesBtnSuccess: {
-    backgroundColor: uiTheme.colors.success,
-    shadowColor: uiTheme.colors.success,
+    backgroundColor: c.success,
+    shadowColor: c.success,
   },
-  saveChangesBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: 12.5,
-    fontWeight: 'normal',
+  saveChangesBtnText: {
+    ...ty.buttonSmall,
+    color: c.onPrimary,
   },
   btnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: sp.xs,
   },
-  errorText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.error,
-    fontSize: uiTheme.type.caption.fontSize,
+  errorText: {
+    ...ty.footnote,
+    color: c.error,
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: sp.xs,
   },
 
   // ─── Swiping Location Capsule ───
@@ -4582,81 +4712,81 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0E0C18',
-    borderRadius: uiTheme.radius.input,
+    gap: sp.sm,
+    backgroundColor: c.elevated,
+    borderRadius: r.lg,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    paddingHorizontal: 14,
-    paddingVertical: uiTheme.spacing.md,
-    marginTop: 10,
+    borderColor: c.hairline,
+    paddingHorizontal: sp.lg,
+    paddingVertical: sp.md,
+    marginTop: sp.md,
   },
   swipingLocationLeft: {
     flex: 1,
-    paddingRight: 10,
+    minWidth: 0,
+    paddingRight: sp.sm,
   },
   swipingLocationTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-    marginBottom: uiTheme.spacing.xs,
+    flexWrap: 'wrap',
+    gap: sp.sm,
+    marginBottom: sp.xs,
   },
-  swipingLocationTitle: { fontFamily: 'Manrope_700Bold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  swipingLocationTitle: {
+    ...ty.overline,
+    color: c.muted,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   swipingLocationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    gap: sp.xs,
+    paddingHorizontal: sp.sm,
+    paddingVertical: sp.xxs,
+    borderRadius: r.pill,
   },
   swipingLocationBadgeGps: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    backgroundColor: c.successSoft,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
+    borderColor: c.successBorder,
   },
   swipingLocationBadgePassport: {
-    backgroundColor: 'rgba(254, 60, 114, 0.1)',
+    backgroundColor: c.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.22)',
+    borderColor: c.primaryBorder,
   },
-  swipingLocationBadgeText: { fontFamily: 'Inter_800ExtraBold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.5,
+  swipingLocationBadgeText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    letterSpacing: 0.4,
   },
   swipingLocationCityRow: {
-    marginTop: 2,
+    marginTop: sp.xxs,
   },
-  swipingLocationCityText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
+  swipingLocationCityText: {
+    ...ty.bodyStrong,
+    color: c.text,
   },
-  swipingLocationSub: { fontFamily: 'Inter_400Regular',
-    color: '#65637D',
-    fontSize: uiTheme.type.caption.fontSize,
-    marginTop: 2,
+  swipingLocationSub: {
+    ...ty.footnote,
+    color: c.textTertiary,
+    marginTop: sp.xxs,
   },
   swipingLocationActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(254, 60, 114, 0.08)',
+    gap: sp.xs,
+    minHeight: 36,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs + 2,
+    borderRadius: r.pill,
+    backgroundColor: c.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.25)',
+    borderColor: c.primaryBorder,
   },
-  swipingLocationActionText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  swipingLocationActionText: {
+    ...ty.buttonSmall,
+    color: c.accent,
   },
 });

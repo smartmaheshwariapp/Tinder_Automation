@@ -7,8 +7,8 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import ActivityIndicator from '../common/SafeActivityIndicator';
-import { Ionicons } from '@expo/vector-icons';
+import Skeleton, { SkeletonRow } from '../ui/Skeleton';
+import useResponsive from '../../hooks/useResponsive';
 
 import MasterHeroController from './MasterHeroController';
 import QuickTelemetryCapsule from './QuickTelemetryCapsule';
@@ -22,8 +22,33 @@ import { resolveLocalUrl } from '../../utils/network';
 import { getProgressFeed } from '../../utils/sessionManager';
 import FeedbackState from '../common/FeedbackState';
 
+// List-shaped loading placeholder that mirrors the activity timeline (summary + event rows).
 function LoadingState() {
-  return <FeedbackState kind="loading" title="Connecting your assistant" message="Your latest activity will appear here shortly." />;
+  return (
+    <View
+      style={styles.loadingWrap}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Connecting your assistant. Your latest activity will appear here shortly."
+      accessibilityLiveRegion="polite"
+    >
+      <View style={styles.loadingIntro}>
+        <Skeleton width="70%" height={22} />
+        <Skeleton width="50%" height={14} />
+      </View>
+      <View style={styles.loadingSummary}>
+        {[0, 1, 2].map(i => (
+          <View key={i} style={styles.loadingCell}>
+            <Skeleton width={32} height={32} radius={10} />
+            <Skeleton width="60%" height={22} />
+          </View>
+        ))}
+      </View>
+      {[0, 1, 2, 3].map(i => (
+        <SkeletonRow key={i} style={styles.loadingRow} />
+      ))}
+    </View>
+  );
 }
 
 export default function DashboardPanel({
@@ -43,6 +68,7 @@ export default function DashboardPanel({
   selectedTab,
   onTabChange,
 }) {
+  const { gutter } = useResponsive();
   const [internalTab, setInternalTab] = useState('activity');
   const activeTab = selectedTab || internalTab;
   const [targetSettingsSection, setTargetSettingsSection] = useState(null);
@@ -144,7 +170,7 @@ export default function DashboardPanel({
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter }]}
       >
         {/* ── 1. Master Centerpiece Hero Controller (1:1 with Desktop V2) ── */}
         {activeTab !== 'activity' && <MasterHeroController
@@ -231,35 +257,38 @@ const styles = StyleSheet.create({
     backgroundColor: uiTheme.colors.background,
     position: 'relative',
   },
-  scrollContent: { width: '100%', maxWidth: 760, alignSelf: 'center',
-    paddingHorizontal: 14,
+  scrollContent: {
+    width: '100%',
+    maxWidth: uiTheme.layout.contentMax,
+    alignSelf: 'center',
     paddingTop: uiTheme.spacing.md,
     paddingBottom: 90, // Extra breathing space so content isn't covered by floating save bar
   },
   loadingWrap: {
-    paddingVertical: 36,
-    alignItems: 'center',
+    gap: uiTheme.spacing.md,
+    paddingTop: uiTheme.spacing.md,
   },
-  loadingText: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.muted,
-    fontSize: 12.5,
-    marginTop: 10,
-    fontWeight: 'normal',
+  loadingIntro: {
+    gap: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.xs,
   },
-  errorBanner: {
+  loadingSummary: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: uiTheme.radius.input,
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.25)',
-    padding: uiTheme.spacing.md,
-    marginBottom: uiTheme.spacing.md,
+    borderColor: uiTheme.colors.hairline,
+    paddingVertical: uiTheme.spacing.lg,
   },
-  errorText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.error,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  loadingCell: {
+    flex: 1,
+    alignItems: 'center',
+    gap: uiTheme.spacing.sm,
+  },
+  loadingRow: {
+    backgroundColor: uiTheme.colors.surface,
+    borderRadius: uiTheme.radius.lg,
+    borderWidth: 1,
+    borderColor: uiTheme.colors.borderSubtle,
   },
 });

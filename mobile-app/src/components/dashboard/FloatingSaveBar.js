@@ -1,26 +1,77 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform } from 'react-native';
+import { View, Text, Animated, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme as uiTheme } from '../../theme';
-import ActivityIndicator from '../common/SafeActivityIndicator';
 import useReducedMotion from '../../hooks/useReducedMotion';
+import AppButton from '../ui/AppButton';
+import Badge from '../ui/Badge';
+
+const c = uiTheme.colors;
+const HIT = { top: 4, bottom: 4, left: 4, right: 4 };
 
 export default function FloatingSaveBar({ visible, saving, saveSuccess, error, onSave, onDiscard }) {
   const entrance = useRef(new Animated.Value(0)).current;
   const reducedMotion = useReducedMotion();
+  const { width } = useWindowDimensions();
+  const stacked = width < 360;
   useEffect(() => {
     Animated.timing(entrance, { toValue: visible || saveSuccess ? 1 : 0, duration: reducedMotion ? 0 : 180, useNativeDriver: true }).start();
   }, [visible, saveSuccess, reducedMotion, entrance]);
   if (!visible && !saveSuccess) return null;
+
+  const statusText = saving ? 'Saving your changes…' : saveSuccess ? 'Changes saved' : 'You have unsaved changes';
+  const statusIcon = saveSuccess ? 'checkmark-circle' : error ? 'alert-circle' : saving ? 'cloud-upload-outline' : 'ellipse';
+  const statusColor = saveSuccess ? c.success : error ? c.error : saving ? c.info : c.warning;
+
   return (
-    <Animated.View style={[styles.saveBar, { opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]} accessibilityLiveRegion="polite">
-      {error ? <Text style={styles.errorText}>Your changes could not be saved. Please try again.</Text> : null}
-      <View style={styles.saveBarContent}>
-        <Text style={styles.saveBarText}>{saving ? 'Saving your changes…' : saveSuccess ? 'Changes saved' : 'You have unsaved changes'}</Text>
-        <View style={styles.saveBarActions}>
-          {!saveSuccess && <TouchableOpacity style={styles.discardBtn} onPress={onDiscard} disabled={saving} accessibilityRole="button" accessibilityState={{ disabled: !!saving }}><Text style={styles.discardBtnText}>Discard</Text></TouchableOpacity>}
-          <TouchableOpacity style={[styles.saveChangesBtn, saveSuccess && styles.saveChangesBtnSuccess, saving && { opacity: 0.65 }]} onPress={onSave} disabled={saving || saveSuccess} accessibilityRole="button" accessibilityState={{ disabled: !!(saving || saveSuccess), busy: !!saving }}>
-            <View style={styles.btnRow}>{saving && <ActivityIndicator color="#FFFFFF" />}<Text style={styles.saveChangesBtnText}>{saving ? 'Saving…' : saveSuccess ? 'Saved' : 'Save changes'}</Text></View>
-          </TouchableOpacity>
+    <Animated.View
+      pointerEvents="box-none"
+      style={[styles.anchor, { opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}
+      accessibilityLiveRegion="polite"
+    >
+      <View style={[styles.saveBar, error && !saveSuccess && styles.saveBarError, saveSuccess && styles.saveBarSuccess]}>
+        {error ? (
+          <View style={styles.errorRow}>
+            <Ionicons name="alert-circle" size={16} color={c.error} />
+            <Text style={styles.errorText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Your changes could not be saved. Please try again.</Text>
+          </View>
+        ) : null}
+        <View style={[styles.saveBarContent, stacked && styles.saveBarContentStacked]}>
+          <View style={[styles.statusRow, stacked && styles.statusRowStacked]}>
+            <Ionicons name={statusIcon} size={statusIcon === 'ellipse' ? 10 : 18} color={statusColor} />
+            <Text style={styles.saveBarText} numberOfLines={2} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{statusText}</Text>
+          </View>
+          <View style={[styles.saveBarActions, stacked && styles.saveBarActionsStacked]}>
+            {!saveSuccess && (
+              <AppButton
+                title="Discard"
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
+                onPress={onDiscard}
+                disabled={saving}
+                hitSlop={HIT}
+                textStyle={styles.discardText}
+                accessibilityLabel="Discard"
+              />
+            )}
+            {saveSuccess ? (
+              <Badge label="Saved" tone="success" icon="checkmark" style={styles.savedBadge} />
+            ) : (
+              <AppButton
+                title={saving ? 'Saving…' : 'Save changes'}
+                variant="primary"
+                size="sm"
+                fullWidth={false}
+                onPress={onSave}
+                disabled={saving || saveSuccess}
+                loading={!!saving}
+                hitSlop={HIT}
+                style={stacked && styles.saveBtnStacked}
+                accessibilityLabel={saving ? 'Saving…' : 'Save changes'}
+              />
+            )}
+          </View>
         </View>
       </View>
     </Animated.View>
@@ -28,110 +79,79 @@ export default function FloatingSaveBar({ visible, saving, saveSuccess, error, o
 }
 
 const styles = StyleSheet.create({
-  saveBar: {
+  anchor: {
     position: 'absolute',
-    bottom: 0,
+    bottom: Platform.OS === 'ios' ? uiTheme.spacing.xl : uiTheme.spacing.md,
     left: 0,
     right: 0,
-    backgroundColor: uiTheme.colors.surface,
-    borderTopWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingTop: uiTheme.spacing.md,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 25,
+    paddingHorizontal: uiTheme.spacing.md,
+    alignItems: 'center',
     zIndex: 99999,
+    elevation: 25,
   },
-  saveBarProgress: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    height: 3,
-    backgroundColor: uiTheme.colors.primary,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+  saveBar: {
+    width: '100%',
+    maxWidth: uiTheme.layout.readableMax,
+    backgroundColor: uiTheme.colors.elevated,
+    borderWidth: 1,
+    borderColor: c.hairline,
+    borderRadius: uiTheme.radius.xl,
+    paddingHorizontal: uiTheme.spacing.lg,
+    paddingVertical: uiTheme.spacing.md,
+    ...uiTheme.shadows.lg,
+  },
+  saveBarError: { borderColor: c.errorBorder },
+  saveBarSuccess: { borderColor: c.successBorder },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: uiTheme.spacing.sm,
+    paddingBottom: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.divider,
+  },
+  errorText: {
+    ...uiTheme.type.footnote,
+    color: c.error,
+    flex: 1,
+    minWidth: 0,
   },
   saveBarContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: uiTheme.spacing.md,
   },
-  saveBarLeft: {
+  saveBarContentStacked: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: uiTheme.spacing.sm,
+  },
+  statusRow: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiTheme.spacing.sm,
-    flex: 1,
-    marginRight: 10,
   },
-  unsavedDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: uiTheme.colors.warning,
-  },
-  saveBarText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
+  statusRowStacked: { flex: 0 },
+  saveBarText: {
+    ...uiTheme.type.label,
+    color: c.text,
+    flexShrink: 1,
   },
   saveBarActions: {
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'flex-end',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    gap: uiTheme.spacing.xs,
   },
-  discardBtn: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: 13,
-    borderRadius: uiTheme.radius.small,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    backgroundColor: 'transparent',
+  saveBarActionsStacked: {
+    justifyContent: 'space-between',
   },
-  discardBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.textSecondary,
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-  },
-  saveChangesBtn: {
-    minHeight: 44,
-    backgroundColor: uiTheme.colors.primary,
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: uiTheme.spacing.lg,
-    borderRadius: uiTheme.radius.small,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  saveChangesBtnSuccess: {
-    backgroundColor: uiTheme.colors.success,
-    shadowColor: uiTheme.colors.success,
-  },
-  saveChangesBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-  },
-  btnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  errorText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.error,
-    fontSize: 13,
-    fontWeight: 'normal',
-    marginBottom: 6,
-  },
+  saveBtnStacked: { flexGrow: 1 },
+  discardText: { color: c.textSecondary },
+  savedBadge: { alignSelf: 'center', paddingHorizontal: uiTheme.spacing.md, paddingVertical: 6 },
 });

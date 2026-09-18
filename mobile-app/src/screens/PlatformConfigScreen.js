@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../theme';
+import { theme as uiTheme, alpha } from '../theme';
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -16,11 +16,13 @@ import {
 } from 'react-native';
 import ActivityIndicator from '../components/common/SafeActivityIndicator';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
 import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession, getSharedExtensionSettings } from '../utils/sessionManager';
 import NotificationService from '../services/notifications';
+import useResponsive from '../hooks/useResponsive';
+import { AppText, AppButton, Card, ListRow, SectionHeader, ScreenHeader, FadeIn } from '../components/ui';
 
 // ─── Feature Flags (Hidden to avoid duplicating V2 Automation Panel) ───
 const SHOW_DUPLICATE_AUTOMATION_SECTIONS = false;
@@ -37,6 +39,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
   const { platform, vpsUrl: rawVpsUrl, proxyIp } = route.params;
   const vpsUrl = resolveLocalUrl(rawVpsUrl);
   const [loading, setLoading] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { gutter } = useResponsive();
 
   // V2 Dating Goal & Contact Handle
   const [selectedGoal, setSelectedGoal] = useState('date');
@@ -211,16 +215,26 @@ export default function PlatformConfigScreen({ route, navigation }) {
     });
   };
 
-  const themeColor = platform.toLowerCase() === 'tinder' ? uiTheme.colors.primary : '#FFB800';
+  const themeColor = platform.toLowerCase() === 'tinder' ? uiTheme.colors.primary : uiTheme.colors.warning;
+
+  const switchProps = (value) => ({
+    trackColor: { false: uiTheme.colors.elevatedHigh, true: themeColor },
+    thumbColor: value ? uiTheme.colors.onPrimary : uiTheme.colors.muted,
+    ios_backgroundColor: uiTheme.colors.elevatedHigh,
+  });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={uiTheme.colors.background} />
       {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={themeColor} />
-          <Text style={styles.loadingText}>Initializing Session...</Text>
-          <Text style={styles.loadingSubtext}>Connecting to browser container</Text>
+        <View style={styles.loadingOverlay} accessibilityViewIsModal accessibilityLiveRegion="polite">
+          <FadeIn style={styles.loadingInner}>
+            <View style={styles.loadingWell}>
+              <ActivityIndicator size="large" color={themeColor} />
+            </View>
+            <AppText variant="section" align="center" style={styles.loadingText}>Initializing Session...</AppText>
+            <AppText variant="callout" color="muted" align="center" style={styles.loadingSubtext}>Connecting to browser container</AppText>
+          </FadeIn>
         </View>
       )}
       <KeyboardAvoidingView
@@ -228,19 +242,20 @@ export default function PlatformConfigScreen({ route, navigation }) {
         style={{ flex: 1 }}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity accessibilityRole="button" style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={18} color={uiTheme.colors.text} />
-            <Text style={styles.backBtnText}>Back</Text>
-          </TouchableOpacity>
-          <View style={styles.headerTitleWrap}>
-            <Text style={styles.title}>{platform} Preferences</Text>
-            <Text style={[styles.headerSubtitle, { color: themeColor }]}>Alerts & App Shortcuts</Text>
-          </View>
-          <View style={{ width: 50 }} />
+        <View style={styles.headerBand}>
+          <ScreenHeader
+            style={[styles.headerInner, { paddingHorizontal: gutter }]}
+            onBack={() => navigation.goBack()}
+            title={platform + ' Preferences'}
+            subtitle="Alerts & App Shortcuts"
+          />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter, paddingBottom: FOOTER_SPACE + insets.bottom }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
 
           {SHOW_DUPLICATE_AUTOMATION_SECTIONS && (
             <>
@@ -258,16 +273,18 @@ export default function PlatformConfigScreen({ route, navigation }) {
                   {V2_GOALS.map(goal => (
                     <TouchableOpacity accessibilityRole="button"
                       key={goal.id}
-                      style={[styles.goalPill, selectedGoal === goal.id && { borderColor: themeColor, backgroundColor: themeColor + '12' }]}
+                      accessibilityLabel={goal.label}
+                      accessibilityState={{ selected: selectedGoal === goal.id }}
+                      style={[styles.goalPill, selectedGoal === goal.id && { borderColor: themeColor, backgroundColor: alpha(themeColor, 0.08) }]}
                       onPress={() => setSelectedGoal(goal.id)}
                       activeOpacity={0.8}
                     >
                       <Ionicons
                         name={goal.icon}
-                        size={14}
+                        size={16}
                         color={selectedGoal === goal.id ? themeColor : uiTheme.colors.muted}
                       />
-                      <Text style={[styles.goalPillText, selectedGoal === goal.id && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' }]}>
+                      <Text style={[styles.goalPillText, selectedGoal === goal.id && styles.goalPillTextSelected]}>
                         {goal.label}
                       </Text>
                     </TouchableOpacity>
@@ -275,7 +292,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
                 </View>
 
                 {selectedGoal !== 'never' && (
-                  <View style={{ marginTop: 12 }}>
+                  <View style={{ marginTop: uiTheme.spacing.md }}>
                     <Text style={styles.inputLabel}>
                       {selectedGoal === 'phone' ? 'WhatsApp / Phone Number' : selectedGoal === 'instagram' ? 'Instagram Username' : selectedGoal === 'move_to_telegram' ? 'Telegram Handle' : 'Contact Handle for Date Logistics'}
                     </Text>
@@ -298,7 +315,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
                     <Ionicons name="speedometer-outline" size={16} color={themeColor} />
                     <Text style={styles.sectionHeader}>Daily Pacing & Safety</Text>
                   </View>
-                  <View style={[styles.activePill, { backgroundColor: themeColor + '18', borderColor: themeColor + '40' }]}>
+                  <View style={[styles.activePill, { backgroundColor: alpha(themeColor, 0.1), borderColor: alpha(themeColor, 0.25) }]}>
                     <Text style={[styles.activePillText, { color: themeColor }]}>Safe Pacing</Text>
                   </View>
                 </View>
@@ -311,12 +328,12 @@ export default function PlatformConfigScreen({ route, navigation }) {
                     <Text style={styles.stepperHelper}>Target profiles to like</Text>
                   </View>
                   <View style={styles.stepperControls}>
-                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(likesPerCycle, setLikesPerCycle, 10, 0)}>
-                      <Feather name="minus" size={14} color="#FFF" />
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease likes per session" style={styles.stepBtn} onPress={() => decrement(likesPerCycle, setLikesPerCycle, 10, 0)}>
+                      <Feather name="minus" size={14} color={uiTheme.colors.text} />
                     </TouchableOpacity>
                     <Text style={styles.stepperValue}>{likesPerCycle}</Text>
-                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(likesPerCycle, setLikesPerCycle, 10, 200)}>
-                      <Feather name="plus" size={14} color="#FFF" />
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase likes per session" style={styles.stepBtn} onPress={() => increment(likesPerCycle, setLikesPerCycle, 10, 200)}>
+                      <Feather name="plus" size={14} color={uiTheme.colors.text} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -330,12 +347,12 @@ export default function PlatformConfigScreen({ route, navigation }) {
                     <Text style={styles.stepperHelper}>First messages to new matches</Text>
                   </View>
                   <View style={styles.stepperControls}>
-                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(messagesPerCycle, setMessagesPerCycle, 5, 0)}>
-                      <Feather name="minus" size={14} color="#FFF" />
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease intro messages per session" style={styles.stepBtn} onPress={() => decrement(messagesPerCycle, setMessagesPerCycle, 5, 0)}>
+                      <Feather name="minus" size={14} color={uiTheme.colors.text} />
                     </TouchableOpacity>
                     <Text style={styles.stepperValue}>{messagesPerCycle}</Text>
-                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(messagesPerCycle, setMessagesPerCycle, 5, 100)}>
-                      <Feather name="plus" size={14} color="#FFF" />
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase intro messages per session" style={styles.stepBtn} onPress={() => increment(messagesPerCycle, setMessagesPerCycle, 5, 100)}>
+                      <Feather name="plus" size={14} color={uiTheme.colors.text} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -349,15 +366,15 @@ export default function PlatformConfigScreen({ route, navigation }) {
                     <Text style={styles.stepperHelper}>Rest time before next session</Text>
                   </View>
                   <View style={styles.stepperControls}>
-                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => decrement(scheduleInterval, setScheduleInterval, 5, 5)}>
-                      <Feather name="minus" size={14} color="#FFF" />
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease break between sessions" style={styles.stepBtn} onPress={() => decrement(scheduleInterval, setScheduleInterval, 5, 5)}>
+                      <Feather name="minus" size={14} color={uiTheme.colors.text} />
                     </TouchableOpacity>
                     <View style={styles.stepperValueWrapper}>
                       <Text style={styles.stepperValue}>{scheduleInterval}</Text>
                       <Text style={styles.stepperUnit}>min</Text>
                     </View>
-                    <TouchableOpacity accessibilityRole="button" style={styles.stepBtn} onPress={() => increment(scheduleInterval, setScheduleInterval, 5, 1440)}>
-                      <Feather name="plus" size={14} color="#FFF" />
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase break between sessions" style={styles.stepBtn} onPress={() => increment(scheduleInterval, setScheduleInterval, 5, 1440)}>
+                      <Feather name="plus" size={14} color={uiTheme.colors.text} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -376,8 +393,8 @@ export default function PlatformConfigScreen({ route, navigation }) {
                   <Switch
                     value={useCustomIntro}
                     onValueChange={setUseCustomIntro}
-                    trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
-                    thumbColor={useCustomIntro ? '#FFF' : uiTheme.colors.muted}
+                    accessibilityLabel="Custom first message"
+                    {...switchProps(useCustomIntro)}
                   />
                 </View>
 
@@ -400,195 +417,185 @@ export default function PlatformConfigScreen({ route, navigation }) {
           )}
 
           {/* Section 4: Push Notification Preferences */}
-          <View style={styles.sectionCard}>
-            <View style={styles.cardTitleRow}>
-              <Ionicons name="notifications-outline" size={16} color={themeColor} />
-              <Text style={styles.sectionHeader}>Notification Preferences</Text>
-            </View>
-            <Text style={styles.sectionDesc}>Choose which updates you want to receive on your phone.</Text>
-
-            {/* Toggle 1: Goal Alerts */}
-            <View style={styles.toggleHeaderRow}>
-              <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Milestones & Phone Numbers</Text>
-                <Text style={styles.stepperHelper}>Get notified when a match shares their phone or date</Text>
-              </View>
-              <Switch
-                value={notifyGoals}
-                onValueChange={setNotifyGoals}
-                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
-                thumbColor={notifyGoals ? '#FFF' : uiTheme.colors.muted}
+          <FadeIn>
+            <SectionHeader title="Notification Preferences" description="Choose which updates you want to receive on your phone." />
+            <Card padding="none" style={styles.groupCard}>
+              {/* Toggle 1: Goal Alerts */}
+              <ListRow
+                icon="trophy-outline"
+                iconTone="secondary"
+                title="Milestones & Phone Numbers"
+                subtitle="Get notified when a match shares their phone or date"
+                divider
+                right={
+                  <Switch
+                    value={notifyGoals}
+                    onValueChange={setNotifyGoals}
+                    accessibilityLabel="Milestones and phone number alerts"
+                    {...switchProps(notifyGoals)}
+                  />
+                }
               />
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Toggle 2: New Match Sparks */}
-            <View style={styles.toggleHeaderRow}>
-              <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>New Matches</Text>
-                <Text style={styles.stepperHelper}>Get notified when someone matches with you</Text>
-              </View>
-              <Switch
-                value={notifyMatches}
-                onValueChange={setNotifyMatches}
-                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
-                thumbColor={notifyMatches ? '#FFF' : uiTheme.colors.muted}
+              {/* Toggle 2: New Match Sparks */}
+              <ListRow
+                icon="heart-outline"
+                title="New Matches"
+                subtitle="Get notified when someone matches with you"
+                divider
+                right={
+                  <Switch
+                    value={notifyMatches}
+                    onValueChange={setNotifyMatches}
+                    accessibilityLabel="New match alerts"
+                    {...switchProps(notifyMatches)}
+                  />
+                }
               />
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Toggle 3: Cycles & Safety */}
-            <View style={styles.toggleHeaderRow}>
-              <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Session Summaries</Text>
-                <Text style={styles.stepperHelper}>Daily activity wrap-up and breaks</Text>
-              </View>
-              <Switch
-                value={notifyCycles}
-                onValueChange={setNotifyCycles}
-                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
-                thumbColor={notifyCycles ? '#FFF' : uiTheme.colors.muted}
+              {/* Toggle 3: Cycles & Safety */}
+              <ListRow
+                icon="stats-chart-outline"
+                iconTone="info"
+                title="Session Summaries"
+                subtitle="Daily activity wrap-up and breaks"
+                right={
+                  <Switch
+                    value={notifyCycles}
+                    onValueChange={setNotifyCycles}
+                    accessibilityLabel="Session summary alerts"
+                    {...switchProps(notifyCycles)}
+                  />
+                }
               />
-            </View>
-          </View>
+            </Card>
+          </FadeIn>
 
           {/* Section 5: External App Redirects */}
-          <View style={styles.sectionCard}>
-            <View style={styles.cardTitleRow}>
-              <Ionicons name="open-outline" size={16} color={themeColor} />
-              <Text style={styles.sectionHeader}>External App Redirects</Text>
-            </View>
-            <Text style={styles.sectionDesc}>Choose whether to ask for confirmation before leaving FlirtEasy.</Text>
-
-            {/* Toggle 1: Tinder Confirmation */}
-            <View style={styles.toggleHeaderRow}>
-              <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Ask before opening Tinder</Text>
-                <Text style={styles.stepperHelper}>Show confirmation prompt when tapping match alerts</Text>
-              </View>
-              <Switch
-                value={redirectPrefs.tinder === 'always_ask'}
-                onValueChange={(val) => {
-                  NotificationService.setRedirectPreference('tinder', val ? 'always_ask' : 'auto_open');
-                }}
-                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
-                thumbColor={redirectPrefs.tinder === 'always_ask' ? '#FFF' : uiTheme.colors.muted}
+          <FadeIn delay={60}>
+            <SectionHeader title="External App Redirects" description="Choose whether to ask for confirmation before leaving FlirtEasy." />
+            <Card padding="none" style={styles.groupCard}>
+              {/* Toggle 1: Tinder Confirmation */}
+              <ListRow
+                icon="flame-outline"
+                title="Ask before opening Tinder"
+                subtitle="Show confirmation prompt when tapping match alerts"
+                divider
+                right={
+                  <Switch
+                    value={redirectPrefs.tinder === 'always_ask'}
+                    onValueChange={(val) => {
+                      NotificationService.setRedirectPreference('tinder', val ? 'always_ask' : 'auto_open');
+                    }}
+                    accessibilityLabel="Ask before opening Tinder"
+                    {...switchProps(redirectPrefs.tinder === 'always_ask')}
+                  />
+                }
               />
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Toggle 2: WhatsApp Confirmation */}
-            <View style={styles.toggleHeaderRow}>
-              <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Ask before opening WhatsApp</Text>
-                <Text style={styles.stepperHelper}>Show confirmation prompt when phone numbers are tapped</Text>
-              </View>
-              <Switch
-                value={redirectPrefs.whatsapp === 'always_ask'}
-                onValueChange={(val) => {
-                  NotificationService.setRedirectPreference('whatsapp', val ? 'always_ask' : 'auto_open');
-                }}
-                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
-                thumbColor={redirectPrefs.whatsapp === 'always_ask' ? '#FFF' : uiTheme.colors.muted}
+              {/* Toggle 2: WhatsApp Confirmation */}
+              <ListRow
+                icon="logo-whatsapp"
+                iconTone="success"
+                title="Ask before opening WhatsApp"
+                subtitle="Show confirmation prompt when phone numbers are tapped"
+                divider
+                right={
+                  <Switch
+                    value={redirectPrefs.whatsapp === 'always_ask'}
+                    onValueChange={(val) => {
+                      NotificationService.setRedirectPreference('whatsapp', val ? 'always_ask' : 'auto_open');
+                    }}
+                    accessibilityLabel="Ask before opening WhatsApp"
+                    {...switchProps(redirectPrefs.whatsapp === 'always_ask')}
+                  />
+                }
               />
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Toggle 3: Instagram Confirmation */}
-            <View style={styles.toggleHeaderRow}>
-              <View style={styles.stepperTextContainer}>
-                <Text style={styles.stepperLabel}>Ask before opening Instagram</Text>
-                <Text style={styles.stepperHelper}>Show confirmation prompt when social handles are tapped</Text>
-              </View>
-              <Switch
-                value={redirectPrefs.instagram === 'always_ask'}
-                onValueChange={(val) => {
-                  NotificationService.setRedirectPreference('instagram', val ? 'always_ask' : 'auto_open');
-                }}
-                trackColor={{ false: uiTheme.colors.elevated, true: themeColor }}
-                thumbColor={redirectPrefs.instagram === 'always_ask' ? '#FFF' : uiTheme.colors.muted}
+              {/* Toggle 3: Instagram Confirmation */}
+              <ListRow
+                icon="logo-instagram"
+                iconTone="info"
+                title="Ask before opening Instagram"
+                subtitle="Show confirmation prompt when social handles are tapped"
+                right={
+                  <Switch
+                    value={redirectPrefs.instagram === 'always_ask'}
+                    onValueChange={(val) => {
+                      NotificationService.setRedirectPreference('instagram', val ? 'always_ask' : 'auto_open');
+                    }}
+                    accessibilityLabel="Ask before opening Instagram"
+                    {...switchProps(redirectPrefs.instagram === 'always_ask')}
+                  />
+                }
               />
-            </View>
-          </View>
-
-          {/* Launch Button */}
-          <TouchableOpacity accessibilityRole="button"
-            style={[styles.launchBtn, { backgroundColor: themeColor }]}
-            onPress={handleStartSession}
-            activeOpacity={0.85}
-          >
-            <Text style={[styles.launchBtnText, { color: '#FFF' }]}>
-              Open Live Screen
-            </Text>
-            <Ionicons
-              name="arrow-forward"
-              size={16}
-              color="#FFF"
-            />
-          </TouchableOpacity>
+            </Card>
+          </FadeIn>
         </ScrollView>
+
+        {/* Launch Button (sticky footer above the home indicator) */}
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, uiTheme.spacing.lg), paddingHorizontal: gutter }]}>
+          <AppButton
+            title="Open Live Screen"
+            iconRight="arrow-forward"
+            onPress={handleStartSession}
+            loading={loading}
+            style={styles.launchBtn}
+          />
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+// Height reserved at the bottom of the scroll content so the sticky footer never covers it.
+const FOOTER_SPACE = uiTheme.layout.buttonHeight + uiTheme.spacing.section + uiTheme.spacing.lg;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: uiTheme.colors.background,
   },
-  header: {
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: uiTheme.spacing.lg,
-    borderBottomWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+  headerBand: {
+    width: '100%',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: uiTheme.colors.divider,
     backgroundColor: uiTheme.colors.surface,
   },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: uiTheme.colors.elevated,
+  headerInner: {
+    maxWidth: uiTheme.layout.readableMax + 64,
+    alignSelf: 'center',
+    paddingVertical: uiTheme.spacing.xs,
   },
-  backBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.text,
-    fontSize: 13,
-    fontWeight: 'normal',
+  scrollContent: {
+    width: '100%',
+    maxWidth: uiTheme.layout.readableMax + 64,
+    alignSelf: 'center',
+    paddingTop: uiTheme.spacing.xxl,
   },
-  headerTitleWrap: {
-    alignItems: 'center',
+  groupCard: {
+    overflow: 'hidden',
+    marginBottom: uiTheme.spacing.xxl,
   },
-  title: { fontFamily: 'Manrope_700Bold',
-    color: '#FFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: uiTheme.spacing.md,
+    backgroundColor: alpha(uiTheme.colors.background, 0.96),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: uiTheme.colors.divider,
   },
-  headerSubtitle: { fontFamily: 'Manrope_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginTop: 1,
+  launchBtn: {
+    width: '100%',
+    maxWidth: uiTheme.layout.formMax,
+    alignSelf: 'center',
   },
-  scrollContent: { width: '100%', maxWidth: 760, alignSelf: 'center',
-    padding: uiTheme.spacing.lg,
-    paddingBottom: 36,
-  },
+  // ─── Hidden (feature-flagged) automation sections ───
   sectionCard: {
     backgroundColor: uiTheme.colors.surface,
-    borderRadius: 16,
+    borderRadius: uiTheme.radius.card,
     padding: uiTheme.spacing.lg,
     marginBottom: uiTheme.spacing.lg,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: uiTheme.colors.borderSubtle,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -601,26 +608,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiTheme.spacing.sm,
   },
-  sectionHeader: { fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-    color: '#FFF',
+  sectionHeader: {
+    ...uiTheme.type.headline,
+    color: uiTheme.colors.text,
   },
   activePill: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: uiTheme.spacing.sm,
+    paddingVertical: uiTheme.spacing.xs,
+    borderRadius: uiTheme.radius.xs,
     borderWidth: 1,
   },
-  activePillText: { fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  activePillText: {
+    ...uiTheme.type.caption,
+    fontFamily: uiTheme.fonts.strong,
   },
-  sectionDesc: { fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.caption.fontSize,
+  sectionDesc: {
+    ...uiTheme.type.footnote,
     color: uiTheme.colors.muted,
-    lineHeight: 17,
-    marginTop: 2,
+    marginTop: uiTheme.spacing.xxs,
     marginBottom: uiTheme.spacing.md,
   },
   goalGrid: {
@@ -629,22 +634,26 @@ const styles = StyleSheet.create({
   goalPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: 10,
-    paddingVertical: 10,
+    gap: uiTheme.spacing.sm,
+    minHeight: uiTheme.layout.touchTarget,
+    backgroundColor: uiTheme.colors.elevated,
+    borderRadius: uiTheme.radius.md,
+    paddingVertical: uiTheme.spacing.sm,
     paddingHorizontal: uiTheme.spacing.md,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: uiTheme.colors.border,
   },
-  goalPillText: { fontFamily: 'Inter_500Medium',
+  goalPillText: {
+    ...uiTheme.type.subhead,
     color: uiTheme.colors.muted,
-    fontSize: 12.5,
-    fontWeight: 'normal',
+  },
+  goalPillTextSelected: {
+    fontFamily: uiTheme.fonts.label,
+    color: uiTheme.colors.text,
   },
   divider: {
-    height: 1,
-    backgroundColor: '#221E33',
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: uiTheme.colors.divider,
     marginVertical: uiTheme.spacing.md,
   },
   stepperContainer: {
@@ -654,39 +663,40 @@ const styles = StyleSheet.create({
   },
   stepperTextContainer: {
     flex: 1,
-    paddingRight: 10,
+    minWidth: 0,
+    paddingRight: uiTheme.spacing.md,
   },
-  stepperLabel: { fontFamily: 'Inter_600SemiBold',
-    fontSize: 13.5,
-    fontWeight: 'normal',
-    color: '#FFF',
+  stepperLabel: {
+    ...uiTheme.type.label,
+    color: uiTheme.colors.text,
   },
-  stepperHelper: { fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.caption.fontSize,
+  stepperHelper: {
+    ...uiTheme.type.footnote,
     color: uiTheme.colors.muted,
-    marginTop: 2,
+    marginTop: uiTheme.spacing.xxs,
   },
   stepperControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
-    padding: 3,
+    backgroundColor: uiTheme.colors.elevated,
+    borderRadius: uiTheme.radius.md,
+    padding: uiTheme.spacing.xxs,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: uiTheme.colors.border,
   },
   stepBtn: {
     width: 44,
     height: 44,
-    borderRadius: 6,
-    backgroundColor: uiTheme.colors.elevated,
+    borderRadius: uiTheme.radius.sm,
+    backgroundColor: uiTheme.colors.elevatedHigh,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  stepperValue: { fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-    color: '#FFF',
+  stepperValue: {
+    ...uiTheme.type.label,
+    fontFamily: uiTheme.fonts.strong,
+    fontVariant: ['tabular-nums'],
+    color: uiTheme.colors.text,
     minWidth: 36,
     textAlign: 'center',
   },
@@ -696,10 +706,10 @@ const styles = StyleSheet.create({
     minWidth: 44,
     justifyContent: 'center',
   },
-  stepperUnit: { fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.caption.fontSize,
+  stepperUnit: {
+    ...uiTheme.type.caption,
     color: uiTheme.colors.muted,
-    marginLeft: 2,
+    marginLeft: uiTheme.spacing.xxs,
   },
   toggleHeaderRow: {
     flexDirection: 'row',
@@ -708,67 +718,65 @@ const styles = StyleSheet.create({
   },
   expandableContent: {
     marginTop: uiTheme.spacing.md,
-    borderTopWidth: 1,
-    borderColor: '#221E33',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: uiTheme.colors.divider,
     paddingTop: uiTheme.spacing.md,
   },
-  inputLabel: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    color: '#A09FB5',
-    marginBottom: 6,
+  inputLabel: {
+    ...uiTheme.type.label,
+    color: uiTheme.colors.textSecondary,
+    marginBottom: uiTheme.spacing.sm,
   },
-  textInput: { fontFamily: 'Inter_400Regular',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
+  textInput: {
+    ...uiTheme.type.callout,
+    backgroundColor: uiTheme.colors.elevated,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    paddingHorizontal: uiTheme.spacing.md,
+    borderColor: uiTheme.colors.border,
+    minHeight: uiTheme.layout.inputHeight,
+    paddingHorizontal: uiTheme.spacing.lg,
     paddingVertical: uiTheme.spacing.sm,
-    color: '#FFF',
-    fontSize: 12.5,
+    color: uiTheme.colors.text,
   },
-  textArea: { fontFamily: 'Inter_400Regular',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: 10,
+  textArea: {
+    ...uiTheme.type.callout,
+    backgroundColor: uiTheme.colors.elevated,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    padding: 10,
-    color: '#FFF',
-    fontSize: 12.5,
-    minHeight: 70,
+    borderColor: uiTheme.colors.border,
+    padding: uiTheme.spacing.md,
+    color: uiTheme.colors.text,
+    minHeight: 88,
     textAlignVertical: 'top',
   },
-  launchBtn: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: uiTheme.spacing.sm,
-    borderRadius: uiTheme.radius.input,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: uiTheme.spacing.sm,
-  },
-  launchBtnText: { fontFamily: 'Inter_700Bold',
-    fontSize: 14.5,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
-  },
+  // ─── Loading overlay ───
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(13, 11, 20, 0.96)',
+    backgroundColor: alpha(uiTheme.colors.background, 0.96),
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: uiTheme.spacing.xxl,
     zIndex: 999,
   },
-  loadingText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-    marginTop: 14,
+  loadingInner: {
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 360,
   },
-  loadingSubtext: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  loadingWell: {
+    width: 72,
+    height: 72,
+    borderRadius: uiTheme.radius.xl,
+    backgroundColor: uiTheme.colors.elevated,
+    borderWidth: 1,
+    borderColor: uiTheme.colors.hairline,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: uiTheme.spacing.lg,
+  },
+  loadingSubtext: {
     marginTop: uiTheme.spacing.xs,
   },
 });

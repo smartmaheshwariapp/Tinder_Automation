@@ -1,4 +1,3 @@
-import { theme as uiTheme } from '../../theme';
 // src/components/common/TimeRangeSlider.js
 // Two-thumb dual 24-hour time range slider (15-min increments) matching Desktop V2 AI Active Time track
 import React, { useRef, useState, useEffect } from 'react';
@@ -8,6 +7,11 @@ import {
   StyleSheet,
   PanResponder,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { theme as uiTheme } from '../../theme';
+
+// Visual constant only: 44pt thumb hit box.
+const THUMB_HIT = 44;
 
 export const timeToMins = (str) => {
   if (!str) return 0;
@@ -240,7 +244,7 @@ export default function TimeRangeSlider({
     <View style={[styles.container, disabled && styles.disabled]}>
       {/* Desktop V2 .at-track-row: Left Edge Label, Track, Right Edge Label */}
       <View style={styles.trackRow}>
-        <Text style={styles.edgeLabel}>{minsToDisplay(localStart)}</Text>
+        <Text style={styles.edgeLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{minsToDisplay(localStart)}</Text>
 
         <View
           ref={containerRef}
@@ -264,7 +268,9 @@ export default function TimeRangeSlider({
                   width: Math.max(endPos - startPos, 0),
                 },
               ]}
-            />
+            >
+              <LinearGradient colors={uiTheme.gradients.brandShort} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+            </View>
           </View>
 
           {/* Start Thumb (Left Side Handle) */}
@@ -272,7 +278,7 @@ export default function TimeRangeSlider({
             <View
               style={[
                 styles.thumbTouchArea,
-                { left: startPos - 18 },
+                { left: startPos - THUMB_HIT / 2 },
                 draggingThumb === 'start' && { zIndex: 10 },
               ]}
               accessible
@@ -304,7 +310,7 @@ export default function TimeRangeSlider({
             <View
               style={[
                 styles.thumbTouchArea,
-                { left: endPos - 18 },
+                { left: endPos - THUMB_HIT / 2 },
                 draggingThumb === 'end' && { zIndex: 10 },
               ]}
               accessible
@@ -332,15 +338,16 @@ export default function TimeRangeSlider({
           )}
         </View>
 
-        <Text style={[styles.edgeLabel, styles.edgeLabelEnd]}>{minsToDisplay(localEnd)}</Text>
+        <Text style={[styles.edgeLabel, styles.edgeLabelEnd]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{minsToDisplay(localEnd)}</Text>
       </View>
     </View>
   );
 }
 
+const c = uiTheme.colors;
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 6,
+    marginVertical: uiTheme.spacing.xs,
   },
   disabled: {
     opacity: 0.35,
@@ -348,13 +355,14 @@ const styles = StyleSheet.create({
   trackRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    gap: uiTheme.spacing.md,
   },
-  edgeLabel: { fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    color: uiTheme.colors.muted,
-    minWidth: 56,
+  edgeLabel: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.textSecondary,
+    fontVariant: ['tabular-nums'],
+    minWidth: 60,
     textAlign: 'left',
   },
   edgeLabelEnd: {
@@ -362,14 +370,15 @@ const styles = StyleSheet.create({
   },
   trackContainer: {
     flex: 1,
-    height: 36,
+    minWidth: 0,
+    height: THUMB_HIT,
     justifyContent: 'center',
     position: 'relative',
   },
   trackBase: {
-    height: 5,
-    backgroundColor: uiTheme.colors.elevated,
-    borderRadius: 999,
+    height: 4,
+    backgroundColor: c.elevatedHigh,
+    borderRadius: uiTheme.radius.pill,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -377,33 +386,29 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    backgroundColor: uiTheme.colors.success,
-    borderRadius: 999,
+    borderRadius: uiTheme.radius.pill,
+    overflow: 'hidden',
   },
   thumbTouchArea: {
     position: 'absolute',
     top: 0,
-    width: 36,
-    height: 36,
+    width: THUMB_HIT,
+    height: THUMB_HIT,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
   },
   thumbVisual: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 3.5,
-    borderColor: uiTheme.colors.success,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 3.5,
-    elevation: 4,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: c.white,
+    borderWidth: 3,
+    borderColor: c.primary,
+    ...uiTheme.shadows.sm,
   },
   thumbVisualActive: {
-    transform: [{ scale: 1.25 }],
-    borderColor: '#34D399',
+    transform: [{ scale: 1.12 }],
+    borderColor: c.accent,
   },
 });

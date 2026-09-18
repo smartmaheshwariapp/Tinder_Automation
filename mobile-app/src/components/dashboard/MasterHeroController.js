@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../../theme';
+import { theme as uiTheme, alpha } from '../../theme';
 // src/components/dashboard/MasterHeroController.js — Desktop V2 Master Control Center
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
@@ -11,24 +11,29 @@ import {
 } from 'react-native';
 import ActivityIndicator from '../common/SafeActivityIndicator';
 import { Ionicons } from '@expo/vector-icons';
+import { useMotionReduced } from '../common/Motion';
+
+const c = uiTheme.colors;
+// Tinted button palette built from theme tokens (tinted fill, stronger border, readable foreground).
+const tint = (color, fg = color) => ({ bgColor: alpha(color, 0.14), borderColor: alpha(color, 0.42), textColor: fg, shimmerColor: color });
 
 // ─── Phase Telemetry & Copywriting (1:1 with Desktop V2 status-display.js) ───
 const TELEMETRY_MAP = {
   checking:     { action: 'CHECKING',     detail: 'READING YOUR PROFILE',                color: uiTheme.colors.info },
   connecting:   { action: 'CONNECTING',   detail: 'YOUR WINGMAN IS COMING ONLINE',       color: uiTheme.colors.info },
-  initializing: { action: 'SETTING UP',   detail: 'YOUR AI WINGMAN IS READY',            color: '#A855F7' },
-  starting:     { action: 'ALMOST THERE', detail: 'LAUNCHING YOUR DATING GAME',          color: '#A855F7' },
+  initializing: { action: 'SETTING UP',   detail: 'YOUR AI WINGMAN IS READY',            color: uiTheme.colors.info },
+  starting:     { action: 'ALMOST THERE', detail: 'LAUNCHING YOUR DATING GAME',          color: uiTheme.colors.info },
   liking:       { action: 'SWIPING',      detail: 'AI TARGETING ACTIVE',                 color: uiTheme.colors.success },
   transitioning:{ action: 'COOLDOWN',     detail: 'PREPARING NEXT PHASE',                color: uiTheme.colors.success },
-  processing:   { action: 'ANALYZING',    detail: 'READING BETWEEN THE LINES',           color: '#A855F7' },
-  lead_scan:    { action: 'SCANNING',     detail: 'FINDING POTENTIAL DATES',             color: '#EC4899' },
-  messaging:    { action: 'MESSAGING',    detail: 'RIZZ LEVEL: MAXIMUM',                 color: '#EC4899' },
+  processing:   { action: 'ANALYZING',    detail: 'READING BETWEEN THE LINES',           color: uiTheme.colors.info },
+  lead_scan:    { action: 'SCANNING',     detail: 'FINDING POTENTIAL DATES',             color: uiTheme.colors.accent },
+  messaging:    { action: 'MESSAGING',    detail: 'RIZZ LEVEL: MAXIMUM',                 color: uiTheme.colors.accent },
   polling:      { action: 'AWAITING REPLIES', detail: 'RECHECKING SOON',                 color: uiTheme.colors.info },
   network_wait: { action: 'INTERRUPTED',  detail: 'HOLDING — WILL RESUME ON RECONNECT',  color: uiTheme.colors.warning },
   waiting:      { action: 'RESTING',      detail: 'RESTING BETWEEN SESSIONS — NEXT ROUND SOON', color: uiTheme.colors.warning },
   safety_lock:    { action: 'SAFETY PAUSE', detail: 'TAKING A QUICK BREAK TO PROTECT YOUR ACCOUNT', color: uiTheme.colors.warning },
-  likes_exhausted:{ action: 'LIKES REFILL', detail: 'DAILY SWIPES REFILL IN PROGRESS', color: '#6366F1' },
-  stopped:        { action: 'STANDBY',      detail: 'READY FOR ACTION',                    color: '#64748B' },
+  likes_exhausted:{ action: 'LIKES REFILL', detail: 'DAILY SWIPES REFILL IN PROGRESS', color: uiTheme.colors.info },
+  stopped:        { action: 'STANDBY',      detail: 'READY FOR ACTION',                    color: uiTheme.colors.muted },
 };
 
 function formatCountdown(ms) {
@@ -76,20 +81,24 @@ export default function MasterHeroController({
   const isStarting = isRunning && ['starting', 'initializing', 'checking', 'connecting'].includes(phase);
   const isWaitingCooldown = isRunning && phase === 'waiting' && !isSafetyLocked;
 
+  const reducedMotion = useMotionReduced();
+
   // ─── 1. Radar Spin Animation (for checking, connecting, scanning) ───
   const radarAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (reducedMotion) { radarAnim.setValue(0); return; }
     const loop = Animated.loop(
       Animated.timing(radarAnim, {
         toValue: 1,
         duration: 2000,
         easing: Easing.linear,
         useNativeDriver: true,
+        isInteraction: false,
       })
     );
     loop.start();
     return () => loop.stop();
-  }, [radarAnim]);
+  }, [radarAnim, reducedMotion]);
   const radarSpin = radarAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
@@ -100,7 +109,7 @@ export default function MasterHeroController({
   const rippleScale = useRef(new Animated.Value(1)).current;
   const rippleOpacity = useRef(new Animated.Value(0.6)).current;
   useEffect(() => {
-    if (phase === 'liking') {
+    if (phase === 'liking' && !reducedMotion) {
       const loop = Animated.loop(
         Animated.parallel([
           Animated.sequence([
@@ -127,14 +136,14 @@ export default function MasterHeroController({
       rippleScale.setValue(1);
       rippleOpacity.setValue(0);
     }
-  }, [phase, isRunning, isStarting, isSafetyLocked, isWaitingCooldown]);
+  }, [phase, isRunning, isStarting, isSafetyLocked, isWaitingCooldown, reducedMotion]);
 
   // ─── 3. Bouncing 3-Dots Messaging Animation ───
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (phase === 'messaging' || phase === 'lead_scan') {
+    if ((phase === 'messaging' || phase === 'lead_scan') && !reducedMotion) {
       const createDotAnim = (anim, delay) => {
         return Animated.loop(
           Animated.sequence([
@@ -151,18 +160,22 @@ export default function MasterHeroController({
       a1.start(); a2.start(); a3.start();
       return () => { a1.stop(); a2.stop(); a3.stop(); };
     }
-  }, [phase]);
+    dot1.setValue(0); dot2.setValue(0); dot3.setValue(0);
+  }, [phase, reducedMotion]);
 
   // ─── 4. Shimmer Progress Bar Animation ───
   const shimmerAnim = useRef(new Animated.Value(-1)).current;
   useEffect(() => {
-    if (isRunning || isSafetyLocked) {
+    if ((isRunning || isSafetyLocked) && reducedMotion) {
+      shimmerAnim.setValue(0);
+    } else if (isRunning || isSafetyLocked) {
       const loop = Animated.loop(
         Animated.timing(shimmerAnim, {
           toValue: 1,
           duration: 1600,
           easing: Easing.linear,
           useNativeDriver: true,
+          isInteraction: false,
         })
       );
       loop.start();
@@ -170,7 +183,7 @@ export default function MasterHeroController({
     } else {
       shimmerAnim.setValue(-1);
     }
-  }, [isRunning, isSafetyLocked, shimmerAnim]);
+  }, [isRunning, isSafetyLocked, shimmerAnim, reducedMotion]);
   const shimmerTranslateX = shimmerAnim.interpolate({
     inputRange: [-1, 1],
     outputRange: [-240, 240],
@@ -179,6 +192,7 @@ export default function MasterHeroController({
   // ─── 5. Tactile Button Press Spring Scale ───
   const pressScale = useRef(new Animated.Value(1)).current;
   const handlePressIn = () => {
+    if (reducedMotion) return;
     Animated.spring(pressScale, {
       toValue: 0.95,
       speed: 40,
@@ -187,6 +201,7 @@ export default function MasterHeroController({
     }).start();
   };
   const handlePressOut = () => {
+    if (reducedMotion) { pressScale.setValue(1); return; }
     Animated.spring(pressScale, {
       toValue: 1,
       speed: 30,
@@ -225,7 +240,7 @@ export default function MasterHeroController({
       return {
         action: 'LIKES REFILL',
         detail: countdown ? `FREE SWIPES REFILL IN ${countdown}` : 'DAILY SWIPES REFILL IN PROGRESS',
-        color: '#6366F1',
+        color: uiTheme.colors.info,
       };
     }
     if (isStarting) {
@@ -254,7 +269,7 @@ export default function MasterHeroController({
         return {
           action: `${currentMsgs} SENT`,
           detail: 'WINGMAN MESSAGING ACTIVE',
-          color: '#EC4899',
+          color: uiTheme.colors.accent,
         };
       }
       return TELEMETRY_MAP[phase] || (swipingEnabled ? TELEMETRY_MAP.liking : TELEMETRY_MAP.messaging);
@@ -269,10 +284,7 @@ export default function MasterHeroController({
         label: countdown ? `SAFETY PAUSE: ${countdown}` : 'SAFETY PAUSE',
         sublabel: 'Anti-ban safety break • Resumes automatically',
         icon: 'shield-checkmark',
-        bgColor: 'rgba(245, 158, 11, 0.15)',
-        borderColor: 'rgba(245, 158, 11, 0.6)',
-        textColor: '#FBBF24',
-        shimmerColor: uiTheme.colors.warning,
+        ...tint(c.warning),
       };
     }
     if (isLikesExhausted && !isRunning) {
@@ -280,10 +292,7 @@ export default function MasterHeroController({
         label: countdown ? `LIKES REFILL: ${countdown}` : 'LIKES REFILL',
         sublabel: 'Free swipes refilling • Tap to chat with existing matches',
         icon: 'hourglass-outline',
-        bgColor: 'rgba(99, 102, 241, 0.15)',
-        borderColor: 'rgba(99, 102, 241, 0.5)',
-        textColor: '#A5B4FC',
-        shimmerColor: '#6366F1',
+        ...tint(c.info),
       };
     }
     if (isStarting) {
@@ -291,10 +300,7 @@ export default function MasterHeroController({
         label: 'STARTING WINGMAN...',
         sublabel: 'Connecting to Tinder & calibrating...',
         icon: 'sync',
-        bgColor: 'rgba(129, 140, 248, 0.18)',
-        borderColor: 'rgba(129, 140, 248, 0.5)',
-        textColor: uiTheme.colors.info,
-        shimmerColor: uiTheme.colors.info,
+        ...tint(c.info),
         isLoading: true,
       };
     }
@@ -303,10 +309,7 @@ export default function MasterHeroController({
         label: 'STOP WINGMAN',
         sublabel: countdown ? `Resting between sessions • Next round in ${countdown}` : 'Session complete • Taking a quick break',
         icon: 'square',
-        bgColor: 'rgba(239, 68, 68, 0.15)',
-        borderColor: 'rgba(239, 68, 68, 0.45)',
-        textColor: '#FCA5A5',
-        shimmerColor: uiTheme.colors.error,
+        ...tint(c.error),
       };
     }
     if (isRunning) {
@@ -319,10 +322,7 @@ export default function MasterHeroController({
         label: !swipingEnabled ? 'STOP WINGMAN' : (!messagingEnabled ? 'STOP SWIPER' : 'STOP WINGMAN'),
         sublabel: sub,
         icon: 'square',
-        bgColor: 'rgba(239, 68, 68, 0.15)',
-        borderColor: 'rgba(239, 68, 68, 0.45)',
-        textColor: '#FCA5A5',
-        shimmerColor: uiTheme.colors.error,
+        ...tint(c.error),
       };
     }
     const swipingEnabled = settings?.autoSwipe !== false && (settings?.likesPerCycle ?? 50) > 0;
@@ -333,10 +333,7 @@ export default function MasterHeroController({
         label: 'AUTOMATION OFF',
         sublabel: 'Enable Swiping or Messaging in Automation tab',
         icon: 'pause',
-        bgColor: 'rgba(107, 114, 128, 0.15)',
-        borderColor: 'rgba(107, 114, 128, 0.45)',
-        textColor: '#D1D5DB',
-        shimmerColor: '#9CA3AF',
+        ...tint(c.muted, c.textSecondary),
       };
     }
 
@@ -345,10 +342,7 @@ export default function MasterHeroController({
         label: 'START SWIPER',
         sublabel: 'Auto-swiping on • Messaging is manual',
         icon: 'play',
-        bgColor: 'rgba(254, 60, 114, 0.15)',
-        borderColor: 'rgba(254, 60, 114, 0.45)',
-        textColor: '#FDA4AF',
-        shimmerColor: '#FE3C72',
+        ...tint(c.primary, c.accent),
       };
     }
 
@@ -357,10 +351,7 @@ export default function MasterHeroController({
         label: 'START WINGMAN',
         sublabel: 'Auto-swiping off • Wingman chats with your matches',
         icon: 'play',
-        bgColor: 'rgba(139, 92, 246, 0.15)',
-        borderColor: 'rgba(139, 92, 246, 0.45)',
-        textColor: '#C4B5FD',
-        shimmerColor: '#8B5CF6',
+        ...tint(c.info),
       };
     }
 
@@ -368,10 +359,7 @@ export default function MasterHeroController({
       label: 'START WINGMAN',
       sublabel: 'Auto-likes compatible matches & chats in your style',
       icon: 'play',
-      bgColor: 'rgba(16, 185, 129, 0.15)',
-      borderColor: 'rgba(16, 185, 129, 0.45)',
-      textColor: '#6EE7B7',
-      shimmerColor: uiTheme.colors.success,
+      ...tint(c.success),
     };
   }, [isRunning, isStarting, isSafetyLocked, isLikesExhausted, isWaitingCooldown, countdown, currentLikes, currentMsgs, settings]);
 
@@ -385,6 +373,7 @@ export default function MasterHeroController({
             {phase === 'liking' && isRunning && !isWaitingCooldown && (
               <View style={styles.heartWrapper}>
                 <Animated.View
+                  importantForAccessibility="no"
                   style={[
                     styles.heartRipple,
                     {
@@ -401,7 +390,7 @@ export default function MasterHeroController({
 
             {phase === 'messaging' && isRunning && !isWaitingCooldown && (
               <View style={styles.messagingIconWrap}>
-                <Ionicons name="chatbubble" size={18} color="#EC4899" />
+                <Ionicons name="chatbubble" size={18} color={uiTheme.colors.accent} />
                 <View style={styles.dotsRow}>
                   <Animated.View style={[styles.msgDot, { transform: [{ translateY: dot1 }] }]} />
                   <Animated.View style={[styles.msgDot, { transform: [{ translateY: dot2 }] }]} />
@@ -432,11 +421,11 @@ export default function MasterHeroController({
           {/* Status Label & Divider Telemetry */}
           <View style={styles.telemetryTextWrap}>
             <View style={styles.telemetryHeaderLine}>
-              <Text style={[styles.telemetryAction, { color: telemetry.color }]}>
+              <Text style={[styles.telemetryAction, { color: telemetry.color }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
                 {telemetry.action}
               </Text>
-              <Text style={styles.statusDivider}>//</Text>
-              <Text style={styles.telemetryDetail} numberOfLines={1}>
+              <Text style={styles.statusDivider} importantForAccessibility="no" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>//</Text>
+              <Text style={styles.telemetryDetail} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
                 {telemetry.detail}
               </Text>
             </View>
@@ -445,9 +434,9 @@ export default function MasterHeroController({
 
         {/* Next Run Countdown Badge (1:1 with desktop next-run-badge) */}
         {countdown && isRunning && (
-          <View style={styles.nextRunBadge}>
-            <Ionicons name="time" size={11} color={uiTheme.colors.warning} />
-            <Text style={styles.nextRunText}>{countdown}</Text>
+          <View style={styles.nextRunBadge} accessible accessibilityLabel={`Next run in ${countdown}`}>
+            <Ionicons name="time" size={12} color={uiTheme.colors.warning} />
+            <Text style={styles.nextRunText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{countdown}</Text>
           </View>
         )}
       </View>
@@ -455,6 +444,8 @@ export default function MasterHeroController({
       {/* ═════════ 2. The Master Desktop V2 Button ═════════ */}
       <Animated.View style={{ transform: [{ scale: pressScale }] }}>
         <TouchableOpacity accessibilityRole="button"
+          accessibilityLabel={`${buttonConfig.label}. ${buttonConfig.sublabel}`}
+          accessibilityState={{ busy: Boolean(buttonConfig.isLoading) }}
           style={[
             styles.masterBtn,
             {
@@ -470,18 +461,18 @@ export default function MasterHeroController({
           {/* Button Content Row */}
           <View style={styles.btnRow}>
             {buttonConfig.isLoading ? (
-              <ActivityIndicator size="small" color={buttonConfig.textColor} style={{ marginRight: 8 }} />
+              <View style={styles.btnIconContainer}><ActivityIndicator size="small" color={buttonConfig.textColor} /></View>
             ) : (
-              <View style={[styles.btnIconContainer, { backgroundColor: buttonConfig.borderColor }]}>
-                <Ionicons name={buttonConfig.icon} size={15} color={buttonConfig.textColor} />
+              <View style={[styles.btnIconContainer, { backgroundColor: buttonConfig.bgColor, borderColor: buttonConfig.borderColor }]}>
+                <Ionicons name={buttonConfig.icon} size={16} color={buttonConfig.textColor} />
               </View>
             )}
 
             <View style={styles.btnTextContent}>
-              <Text style={[styles.btnMainTitle, { color: buttonConfig.textColor }]}>
+              <Text style={[styles.btnMainTitle, { color: buttonConfig.textColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
                 {buttonConfig.label}
               </Text>
-              <Text style={styles.btnSubTitle} numberOfLines={1}>
+              <Text style={styles.btnSubTitle} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
                 {buttonConfig.sublabel}
               </Text>
             </View>
@@ -494,7 +485,7 @@ export default function MasterHeroController({
           </View>
 
           {/* Shimmering Flowing Progress Bar on the bottom border */}
-          <View style={styles.shimmerContainer}>
+          <View style={styles.shimmerContainer} importantForAccessibility="no-hide-descendants">
             <Animated.View
               style={[
                 styles.shimmerBar,
@@ -511,18 +502,18 @@ export default function MasterHeroController({
       {/* ═════════ 3. Bottom Quick Persona Metadata ═════════ */}
       <View style={styles.metaRow}>
         <View style={styles.metaBadge}>
-          <Ionicons name="flag-outline" size={11} color={uiTheme.colors.info} />
-          <Text style={styles.metaLabel}>Goal: <Text style={styles.metaVal}>{settings?.optimizingFor || 'Date Setup'}</Text></Text>
+          <Ionicons name="flag-outline" size={12} color={uiTheme.colors.info} />
+          <Text style={styles.metaLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Goal: <Text style={styles.metaVal}>{settings?.optimizingFor || 'Date Setup'}</Text></Text>
         </View>
 
         <View style={styles.metaBadge}>
-          <Ionicons name="color-wand-outline" size={11} color="#EC4899" />
-          <Text style={styles.metaLabel}>Tone: <Text style={styles.metaVal}>{settings?.tone || 'Playful'}</Text></Text>
+          <Ionicons name="color-wand-outline" size={12} color={uiTheme.colors.accent} />
+          <Text style={styles.metaLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Tone: <Text style={styles.metaVal}>{settings?.tone || 'Playful'}</Text></Text>
         </View>
 
         <View style={styles.metaBadge}>
-          <Ionicons name="shield-checkmark-outline" size={11} color={uiTheme.colors.success} />
-          <Text style={[styles.metaLabel, { color: uiTheme.colors.success }]}>
+          <Ionicons name="shield-checkmark-outline" size={12} color={uiTheme.colors.success} />
+          <Text style={[styles.metaLabel, { color: uiTheme.colors.success }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
             {settings?.safetyMode !== false ? 'Safe Paced' : 'Uncapped'}
           </Text>
         </View>
@@ -536,8 +527,8 @@ const styles = StyleSheet.create({
     backgroundColor: uiTheme.colors.surface,
     borderRadius: uiTheme.radius.card,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 14,
+    borderColor: uiTheme.colors.hairline,
+    padding: uiTheme.spacing.lg,
     marginBottom: uiTheme.spacing.md,
   },
 
@@ -546,6 +537,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: uiTheme.spacing.sm,
     marginBottom: uiTheme.spacing.md,
   },
   statusBannerLeft: {
@@ -553,11 +545,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiTheme.spacing.sm,
     flex: 1,
+    minWidth: 0,
   },
   iconHub: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -565,7 +558,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#64748B',
+    backgroundColor: uiTheme.colors.muted,
   },
   heartWrapper: {
     alignItems: 'center',
@@ -594,92 +587,99 @@ const styles = StyleSheet.create({
     width: 2,
     height: 2,
     borderRadius: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: uiTheme.colors.onPrimary,
   },
   telemetryTextWrap: {
     flex: 1,
+    minWidth: 0,
   },
   telemetryHeaderLine: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiTheme.spacing.xs,
   },
-  telemetryAction: { fontFamily: 'Inter_800ExtraBold',
+  telemetryAction: {
+    ...uiTheme.type.overline,
+    fontFamily: uiTheme.fonts.heavy,
     fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    lineHeight: 16,
     letterSpacing: 0.5,
+    flexShrink: 0,
+    maxWidth: '60%',
   },
-  statusDivider: { fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    color: 'rgba(255, 255, 255, 0.25)',
-    fontWeight: 'normal',
+  statusDivider: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.strong,
+    color: uiTheme.colors.textTertiary,
   },
-  telemetryDetail: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
-    color: '#CBD5E1',
-    fontWeight: 'normal',
+  telemetryDetail: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.label,
+    color: uiTheme.colors.textSecondary,
     letterSpacing: 0.2,
     flex: 1,
+    minWidth: 0,
   },
   nextRunBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiTheme.spacing.xs,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: uiTheme.colors.warningSoft,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.4)',
-    borderRadius: 5,
-    paddingHorizontal: 7,
+    borderColor: uiTheme.colors.warningBorder,
+    borderRadius: uiTheme.radius.pill,
+    paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 3,
   },
-  nextRunText: { fontFamily: 'Inter_800ExtraBold',
+  nextRunText: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.heavy,
+    fontVariant: ['tabular-nums'],
     color: uiTheme.colors.warning,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
     letterSpacing: 0.3,
   },
 
   // ─── Master Button (Desktop V2 Parity) ───
   masterBtn: {
-    borderRadius: 14,
+    minHeight: 64,
+    justifyContent: 'center',
+    borderRadius: uiTheme.radius.lg,
     borderWidth: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    paddingVertical: uiTheme.spacing.md,
+    paddingHorizontal: uiTheme.spacing.md,
     position: 'relative',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-    marginBottom: 10,
+    ...uiTheme.shadows.md,
+    marginBottom: uiTheme.spacing.md,
   },
   btnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: uiTheme.spacing.md,
   },
   btnIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnTextContent: {
     flex: 1,
+    minWidth: 0,
   },
-  btnMainTitle: { fontFamily: 'Manrope_800ExtraBold',
-    fontSize: 13.5,
-    fontWeight: 'normal',
+  btnMainTitle: {
+    ...uiTheme.type.label,
+    fontFamily: uiTheme.fonts.display,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
-  btnSubTitle: { fontFamily: 'Inter_500Medium',
-    fontSize: uiTheme.type.caption.fontSize,
+  btnSubTitle: {
+    ...uiTheme.type.footnote,
     color: uiTheme.colors.muted,
-    fontWeight: 'normal',
-    marginTop: 1,
+    marginTop: 2,
   },
 
   // ─── Shimmer Progress Bar ───
@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: uiTheme.colors.neutralSoft,
     overflow: 'hidden',
   },
   shimmerBar: {
@@ -702,30 +702,33 @@ const styles = StyleSheet.create({
   // ─── Meta Row ───
   metaRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 6,
-    paddingTop: 2,
   },
   metaBadge: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 90,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: uiTheme.spacing.xs,
-    backgroundColor: uiTheme.colors.background,
-    paddingVertical: 5,
-    paddingHorizontal: 6,
-    borderRadius: 7,
+    backgroundColor: uiTheme.colors.elevated,
+    paddingVertical: 6,
+    paddingHorizontal: uiTheme.spacing.sm,
+    borderRadius: uiTheme.radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: uiTheme.colors.borderSubtle,
   },
-  metaLabel: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
+  metaLabel: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.label,
     color: uiTheme.colors.muted,
-    fontWeight: 'normal',
+    flexShrink: 1,
   },
-  metaVal: { fontFamily: 'Inter_700Bold',
-    color: '#CBD5E1',
-    fontWeight: 'normal',
+  metaVal: {
+    fontFamily: uiTheme.fonts.strong,
+    color: uiTheme.colors.textSecondary,
   },
 });

@@ -13,13 +13,14 @@ import {
   Dimensions,
   Clipboard,
   Platform,
+  ScrollView,
   Animated,
   PanResponder,
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { AppButton, Badge, Chip, EmptyState, IconButton, IconWell, SectionHeader } from './ui';
 import NotificationService, { NOTIFICATION_CATEGORIES } from '../services/notifications';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -50,6 +51,19 @@ function formatTimeAgo(isoString) {
   const diffHrs = Math.floor(diffMin / 60);
   if (diffHrs < 24) return `${diffHrs}h ago`;
   return `${Math.floor(diffHrs / 24)}d ago`;
+}
+
+// Presentation-only section label for a notification timestamp.
+function dayGroupLabel(isoString) {
+  if (!isoString) return 'Today';
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return 'Earlier';
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return 'Earlier';
 }
 
 export default function NotificationCenterModal({
@@ -188,7 +202,7 @@ export default function NotificationCenterModal({
     }
   };
 
-  const renderNotificationCard = ({ item }) => {
+  const renderNotificationCard = ({ item, index }) => {
     const category =
       NOTIFICATION_CATEGORIES[item.type?.toUpperCase()] ||
       NOTIFICATION_CATEGORIES.NEW_MATCH;
@@ -196,115 +210,105 @@ export default function NotificationCenterModal({
     const isGoal = item.type === 'goal_unlocked' || item.type === 'date_secured';
     const isCopied = copiedId === item.id;
     const phone = item.data?.phone;
+    const isUnread = !item.is_read;
+    // Visual day grouping only — list order and filtering are untouched.
+    const group = dayGroupLabel(item.created_at);
+    const prev = index > 0 ? filteredNotifications[index - 1] : null;
+    const showGroup = !prev || dayGroupLabel(prev.created_at) !== group;
+    const iconTone = isGoal ? 'primary' : isUnread ? 'info' : 'neutral';
 
     return (
-      <TouchableOpacity accessibilityRole="button"
-        style={[
-          styles.cardWrapper,
-          !item.is_read && styles.cardWrapperUnread,
-          isGoal && styles.cardWrapperGoal,
-        ]}
-        onPress={() => handleItemPress(item)}
-        activeOpacity={0.88}
-      >
-        <LinearGradient
-          colors={
-            isGoal
-              ? ['#201524', '#15101A']
-              : !item.is_read
-              ? ['#1B192A', '#13111E']
-              : ['#14131F', '#0F0E17']
-          }
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.cardGradient}
+      <View>
+        {showGroup ? <SectionHeader title={group} style={styles.groupHeader} /> : null}
+        <TouchableOpacity accessibilityRole="button"
+          accessibilityLabel={`${isUnread ? 'Unread. ' : ''}${item.title || ''}. ${item.body || ''}. ${formatTimeAgo(item.created_at)}`}
+          accessibilityHint="Opens this notification"
+          style={[
+            styles.cardWrapper,
+            isUnread && styles.cardWrapperUnread,
+            isGoal && styles.cardWrapperGoal,
+          ]}
+          onPress={() => handleItemPress(item)}
+          activeOpacity={0.88}
         >
-          {/* Unread Indicator Bar */}
-          {!item.is_read && <View style={styles.unreadAccentBar} />}
+          <View style={styles.cardInner}>
+            {/* Unread Indicator Dot */}
+            <View style={[styles.unreadDot, !isUnread && styles.unreadDotHidden]} />
 
-          {/* Icon Badge */}
-          <View
-            style={[
-              styles.avatarBadge,
-              {
-                backgroundColor: isGoal
-                  ? 'rgba(254, 60, 114, 0.12)'
-                  : 'rgba(255, 255, 255, 0.05)',
-                borderColor: isGoal
-                  ? 'rgba(254, 60, 114, 0.35)'
-                  : 'rgba(255, 255, 255, 0.08)',
-              },
-            ]}
-          >
-            <Ionicons
-              name={category.icon || 'notifications-outline'}
-              size={17}
-              color={isGoal ? uiTheme.colors.primary : '#C7C5D8'}
-            />
-          </View>
+            {/* Icon Badge */}
+            <IconWell icon={category.icon || 'notifications-outline'} tone={iconTone} size={36} iconSize={17} />
 
-          {/* Center Content Body */}
-          <View style={styles.cardCenter}>
-            <View style={styles.cardTitleRow}>
-              <Text
-                style={[
-                  styles.cardTitle,
-                  !item.is_read && styles.cardTitleUnread,
-                ]}
-                numberOfLines={1}
-              >
-                {item.title}
-              </Text>
-              <Text style={styles.timeAgoText}>{formatTimeAgo(item.created_at)}</Text>
-            </View>
-
-            <Text style={styles.cardBody} numberOfLines={2}>
-              {item.body}
-            </Text>
-
-            {/* Action Pills */}
-            <View style={styles.cardActionsRow}>
-              {phone && (
-                <TouchableOpacity accessibilityRole="button"
-                  style={[styles.phonePill, isCopied && styles.phonePillCopied]}
-                  onPress={(e) => handleCopyPhone(item, e)}
-                  activeOpacity={0.8}
+            {/* Center Content Body */}
+            <View style={styles.cardCenter}>
+              <View style={styles.cardTitleRow}>
+                <Text
+                  style={[
+                    styles.cardTitle,
+                    isUnread && styles.cardTitleUnread,
+                  ]}
+                  numberOfLines={1}
                 >
-                  <Ionicons
-                    name={isCopied ? 'checkmark-circle-outline' : 'copy-outline'}
-                    size={11}
-                    color={isCopied ? uiTheme.colors.success : uiTheme.colors.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.phonePillText,
-                      isCopied && { color: uiTheme.colors.success },
-                    ]}
+                  {item.title}
+                </Text>
+                <Text style={styles.timeAgoText} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{formatTimeAgo(item.created_at)}</Text>
+              </View>
+
+              <Text style={styles.cardBody} numberOfLines={2}>
+                {item.body}
+              </Text>
+
+              {/* Action Pills */}
+              <View style={styles.cardActionsRow}>
+                {phone && (
+                  <TouchableOpacity accessibilityRole="button"
+                    accessibilityLabel={isCopied ? 'Phone number copied' : `Copy phone number ${phone}`}
+                    hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+                    style={[styles.phonePill, isCopied && styles.phonePillCopied]}
+                    onPress={(e) => handleCopyPhone(item, e)}
+                    activeOpacity={0.8}
                   >
-                    {isCopied ? 'Copied' : `Copy ${phone}`}
-                  </Text>
-                </TouchableOpacity>
-              )}
+                    <Ionicons
+                      name={isCopied ? 'checkmark-circle-outline' : 'copy-outline'}
+                      size={13}
+                      color={isCopied ? uiTheme.colors.success : uiTheme.colors.accent}
+                    />
+                    <Text
+                      style={[
+                        styles.phonePillText,
+                        isCopied && { color: uiTheme.colors.success },
+                      ]}
+                      numberOfLines={1}
+                      maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                    >
+                      {isCopied ? 'Copied' : `Copy ${phone}`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
-              {isGoal && (
-                <View style={styles.goalStatusPill}>
-                  <Ionicons name="checkmark-circle-outline" size={10} color={uiTheme.colors.success} />
-                  <Text style={styles.goalStatusPillText}>MILESTONE</Text>
+                {isGoal && (
+                  <Badge label="MILESTONE" tone="success" icon="checkmark-circle-outline" size="sm" />
+                )}
+
+                <View style={styles.tapActionWrap}>
+                  <Text style={styles.tapActionText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Open in Tinder</Text>
+                  <Ionicons name="chevron-forward" size={12} color={uiTheme.colors.textTertiary} />
                 </View>
-              )}
-
-              <View style={styles.tapActionWrap}>
-                <Text style={styles.tapActionText}>Open in Tinder</Text>
-                <Ionicons name="chevron-forward" size={11} color="#615F75" />
               </View>
             </View>
           </View>
-        </LinearGradient>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
     );
   };
 
   if (!visible) return null;
+
+  const FILTERS = [
+    { id: 'all', label: `All (${totalCount})` },
+    { id: 'milestones', label: `Milestones (${milestoneCount})` },
+    { id: 'matches', label: `Matches (${matchCount})` },
+    { id: 'automation', label: `Activity (${automationCount})` },
+  ];
 
   return (
     <Modal
@@ -318,6 +322,7 @@ export default function NotificationCenterModal({
         {/* Animated Dim Backdrop */}
         <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
           <TouchableOpacity accessibilityRole="button"
+            accessibilityLabel="Close notifications"
             style={styles.dismissArea}
             activeOpacity={1}
             onPress={handleDismiss}
@@ -326,6 +331,7 @@ export default function NotificationCenterModal({
 
         {/* Top-Down Sliding Shade Container */}
         <Animated.View
+          accessibilityViewIsModal
           style={[
             styles.shadeContainer,
             {
@@ -337,177 +343,111 @@ export default function NotificationCenterModal({
           {/* Header Bar */}
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
-              <View style={styles.bellBadge}>
-                <Ionicons name="notifications-outline" size={15} color="#FFFFFF" />
-              </View>
-              <Text style={styles.headerTitle}>Notification Center</Text>
-              {unreadCount > 0 && (
-                <View style={styles.unreadCountBadge}>
-                  <Text style={styles.unreadCountBadgeText}>{unreadCount}</Text>
-                </View>
-              )}
+              <IconWell icon="notifications-outline" tone="primary" size={36} iconSize={18} />
+              <Text style={styles.headerTitle} accessibilityRole="header" numberOfLines={1}>Notification Center</Text>
             </View>
-
-            <View style={styles.headerRightActions}>
-              {unreadCount > 0 && (
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.markAllBtn}
-                  onPress={() => {
-                    NotificationService.markAllAsRead();
-                    safeHaptic('light');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="checkmark-done" size={13} color={uiTheme.colors.text} />
-                  <Text style={styles.markAllBtnText}>Read</Text>
-                </TouchableOpacity>
-              )}
-
-              {totalCount > 0 && (
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.clearAllBtn}
-                  onPress={() => {
-                    NotificationService.clearAll();
-                    safeHaptic('light');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="trash-outline" size={12} color={uiTheme.colors.muted} />
-                  <Text style={styles.clearAllBtnText}>Clear</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity accessibilityRole="button"
-                style={styles.closeBtn}
-                onPress={handleDismiss}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="close" size={16} color={uiTheme.colors.muted} />
-              </TouchableOpacity>
-            </View>
+            <IconButton icon="close" size={40} iconSize={18} onPress={handleDismiss} accessibilityLabel="Close notifications" />
           </View>
+
+          {(unreadCount > 0 || totalCount > 0) && (
+            <View style={styles.headerActionsRow}>
+              {unreadCount > 0 ? (
+                <Badge label={`${unreadCount} unread`} tone="primary" dot />
+              ) : (
+                <Badge label="All caught up" tone="success" icon="checkmark" />
+              )}
+              <View style={styles.headerRightActions}>
+                {unreadCount > 0 && (
+                  <AppButton
+                    title="Mark all read"
+                    icon="checkmark-done"
+                    size="sm"
+                    variant="ghost"
+                    fullWidth={false}
+                    haptic={false}
+                    accessibilityLabel="Mark all notifications as read"
+                    style={styles.headerActionBtn}
+                    onPress={() => {
+                      NotificationService.markAllAsRead();
+                      safeHaptic('light');
+                    }}
+                  />
+                )}
+
+                {totalCount > 0 && (
+                  <AppButton
+                    title="Clear"
+                    icon="trash-outline"
+                    size="sm"
+                    variant="ghost"
+                    fullWidth={false}
+                    haptic={false}
+                    accessibilityLabel="Clear all notifications"
+                    style={styles.headerActionBtn}
+                    textStyle={styles.clearText}
+                    onPress={() => {
+                      NotificationService.clearAll();
+                      safeHaptic('light');
+                    }}
+                  />
+                )}
+              </View>
+            </View>
+          )}
 
           {/* Quick Metrics Bar */}
           <View style={styles.metricsBar}>
-            <View style={styles.metricItem}>
-              <Text style={styles.metricVal}>{milestoneCount}</Text>
-              <Text style={styles.metricLabel}>Milestones</Text>
+            <View style={styles.metricItem} accessible accessibilityLabel={`${milestoneCount} milestones`}>
+              <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{milestoneCount}</Text>
+              <Text style={styles.metricLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Milestones</Text>
             </View>
             <View style={styles.metricDivider} />
-            <View style={styles.metricItem}>
-              <Text style={styles.metricVal}>{matchCount}</Text>
-              <Text style={styles.metricLabel}>Matches</Text>
+            <View style={styles.metricItem} accessible accessibilityLabel={`${matchCount} matches`}>
+              <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{matchCount}</Text>
+              <Text style={styles.metricLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Matches</Text>
             </View>
             <View style={styles.metricDivider} />
-            <View style={styles.metricItem}>
-              <Text style={styles.metricVal}>{automationCount}</Text>
-              <Text style={styles.metricLabel}>Activity</Text>
+            <View style={styles.metricItem} accessible accessibilityLabel={`${automationCount} activity updates`}>
+              <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{automationCount}</Text>
+              <Text style={styles.metricLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Activity</Text>
             </View>
             <View style={styles.metricDivider} />
-            <View style={styles.metricItem}>
-              <Text style={[styles.metricVal, { color: uiTheme.colors.success }]}>Active</Text>
-              <Text style={styles.metricLabel}>Assistant</Text>
+            <View style={styles.metricItem} accessible accessibilityLabel="Assistant active">
+              <Text style={[styles.metricVal, { color: uiTheme.colors.success }]} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Active</Text>
+              <Text style={styles.metricLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Assistant</Text>
             </View>
           </View>
 
           {/* Category Filter Chips */}
-          <View style={styles.filterScroll}>
-            <TouchableOpacity accessibilityRole="button"
-              style={[
-                styles.filterChip,
-                activeFilter === 'all' && styles.filterChipActive,
-              ]}
-              onPress={() => {
-                setActiveFilter('all');
-                safeHaptic('light');
-              }}
-              activeOpacity={0.8}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  activeFilter === 'all' && styles.filterChipTextActive,
-                ]}
-              >
-                All ({totalCount})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity accessibilityRole="button"
-              style={[
-                styles.filterChip,
-                activeFilter === 'milestones' && styles.filterChipActive,
-              ]}
-              onPress={() => {
-                setActiveFilter('milestones');
-                safeHaptic('light');
-              }}
-              activeOpacity={0.8}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  activeFilter === 'milestones' && styles.filterChipTextActive,
-                ]}
-              >
-                Milestones ({milestoneCount})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity accessibilityRole="button"
-              style={[
-                styles.filterChip,
-                activeFilter === 'matches' && styles.filterChipActive,
-              ]}
-              onPress={() => {
-                setActiveFilter('matches');
-                safeHaptic('light');
-              }}
-              activeOpacity={0.8}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  activeFilter === 'matches' && styles.filterChipTextActive,
-                ]}
-              >
-                Matches ({matchCount})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity accessibilityRole="button"
-              style={[
-                styles.filterChip,
-                activeFilter === 'automation' && styles.filterChipActive,
-              ]}
-              onPress={() => {
-                setActiveFilter('automation');
-                safeHaptic('light');
-              }}
-              activeOpacity={0.8}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  activeFilter === 'automation' && styles.filterChipTextActive,
-                ]}
-              >
-                Activity ({automationCount})
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterScrollView}
+            contentContainerStyle={styles.filterScroll}
+            accessibilityRole="tablist"
+          >
+            {FILTERS.map((f) => (
+              <Chip
+                key={f.id}
+                label={f.label}
+                selected={activeFilter === f.id}
+                accessibilityRole="tab"
+                onPress={() => {
+                  setActiveFilter(f.id);
+                  safeHaptic('light');
+                }}
+              />
+            ))}
+          </ScrollView>
 
           {/* Notifications Feed */}
           {filteredNotifications.length === 0 ? (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIconCircle}>
-                <Ionicons name="notifications-outline" size={28} color="#454354" />
-              </View>
-              <Text style={styles.emptyTitle}>No Notifications</Text>
-              <Text style={styles.emptySubtitle}>
-                You have no unread alerts in this category.
-              </Text>
-            </View>
+            <EmptyState
+              compact
+              icon="notifications-off-outline"
+              title="No notifications"
+              message="You have no unread alerts in this category."
+            />
           ) : (
             <FlatList
               data={filteredNotifications}
@@ -519,9 +459,17 @@ export default function NotificationCenterModal({
           )}
 
           {/* Bottom Pull-Up Dismiss Handle Area */}
-          <View style={styles.bottomHandleBar} {...panResponder.panHandlers}>
+          <View
+            style={styles.bottomHandleBar}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Close notifications"
+            accessibilityHint="Swipe up to close"
+            onAccessibilityTap={handleDismiss}
+            {...panResponder.panHandlers}
+          >
             <View style={styles.bottomHandleIndicator} />
-            <Text style={styles.bottomHandleText}>Swipe up to close</Text>
+            <Text style={styles.bottomHandleText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Swipe up to close</Text>
           </View>
         </Animated.View>
       </View>
@@ -529,6 +477,7 @@ export default function NotificationCenterModal({
   );
 }
 
+const c = uiTheme.colors;
 const styles = StyleSheet.create({
   rootModalContainer: {
     flex: 1,
@@ -536,239 +485,184 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: c.scrim,
   },
   dismissArea: {
     flex: 1,
   },
   shadeContainer: {
-    backgroundColor: '#0C0B12',
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
+    backgroundColor: c.surface,
+    borderBottomLeftRadius: uiTheme.radius.sheet,
+    borderBottomRightRadius: uiTheme.radius.sheet,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: c.hairline,
     maxHeight: SCREEN_HEIGHT * 0.85,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.6,
-    shadowRadius: 32,
-    elevation: 25,
+    ...uiTheme.shadows.lg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: uiTheme.spacing.md,
     paddingHorizontal: uiTheme.spacing.xl,
-    marginTop: 6,
-    marginBottom: 14,
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.sm,
   },
   headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    gap: uiTheme.spacing.md,
+    flex: 1,
+    minWidth: 0,
   },
-  bellBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: uiTheme.colors.elevated,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+  headerTitle: {
+    ...uiTheme.type.title2,
+    color: c.text,
+    flexShrink: 1,
+  },
+  headerActionsRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
-  },
-  unreadCountBadge: {
-    backgroundColor: uiTheme.colors.primary,
-    borderRadius: 9,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  unreadCountBadgeText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.xl,
+    marginBottom: uiTheme.spacing.sm,
   },
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-  },
-  markAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: uiTheme.spacing.xs,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 10,
-    paddingHorizontal: 9,
-    paddingVertical: uiTheme.spacing.xs,
+    marginLeft: 'auto',
   },
-  markAllBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  headerActionBtn: {
+    minHeight: 40,
   },
-  clearAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 10,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: uiTheme.spacing.xs,
-  },
-  clearAllBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  closeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#1A1826',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  clearText: {
+    color: c.muted,
   },
   metricsBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    backgroundColor: '#13111C',
+    backgroundColor: c.elevated,
     marginHorizontal: uiTheme.spacing.lg,
-    borderRadius: uiTheme.radius.input,
-    paddingVertical: uiTheme.spacing.sm,
+    borderRadius: uiTheme.radius.md,
+    paddingVertical: uiTheme.spacing.md,
+    paddingHorizontal: uiTheme.spacing.xs,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: c.borderSubtle,
     marginBottom: uiTheme.spacing.md,
   },
   metricItem: {
+    flex: 1,
+    minWidth: 0,
     alignItems: 'center',
+    paddingHorizontal: 2,
   },
-  metricVal: { fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: 'normal',
+  metricVal: {
+    ...uiTheme.type.headline,
+    fontFamily: uiTheme.fonts.strong,
+    fontVariant: ['tabular-nums'],
+    color: c.text,
   },
-  metricLabel: { fontFamily: 'Inter_500Medium',
-    color: '#6E6C80',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  metricLabel: {
+    ...uiTheme.type.footnote,
+    color: c.muted,
     marginTop: 1,
   },
   metricDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    width: StyleSheet.hairlineWidth,
+    height: 24,
+    backgroundColor: c.divider,
+  },
+  filterScrollView: {
+    flexGrow: 0,
+    marginBottom: uiTheme.spacing.md,
   },
   filterScroll: {
     flexDirection: 'row',
     paddingHorizontal: uiTheme.spacing.lg,
-    gap: 6,
-    marginBottom: uiTheme.spacing.md,
-  },
-  filterChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    backgroundColor: '#161420',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  filterChipActive: {
-    backgroundColor: '#262235',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  filterChipText: { fontFamily: 'Inter_600SemiBold',
-    color: '#7E7C90',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  filterChipTextActive: { fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontWeight: 'normal',
+    paddingVertical: uiTheme.spacing.xs,
+    gap: uiTheme.spacing.sm,
   },
   listContent: {
     paddingHorizontal: uiTheme.spacing.lg,
     paddingBottom: uiTheme.spacing.lg,
     gap: uiTheme.spacing.sm,
   },
+  groupHeader: {
+    marginTop: uiTheme.spacing.xs,
+    marginBottom: uiTheme.spacing.xs,
+  },
   cardWrapper: {
-    borderRadius: 14,
+    borderRadius: uiTheme.radius.lg,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: c.borderSubtle,
+    backgroundColor: c.surface,
   },
   cardWrapperUnread: {
-    borderColor: 'rgba(254, 60, 114, 0.3)',
+    backgroundColor: c.elevated,
+    borderColor: c.hairline,
   },
   cardWrapperGoal: {
-    borderColor: 'rgba(254, 60, 114, 0.45)',
+    borderColor: c.primaryBorder,
   },
-  cardGradient: {
+  cardInner: {
     flexDirection: 'row',
-    padding: uiTheme.spacing.md,
-    gap: 10,
-    position: 'relative',
+    alignItems: 'flex-start',
+    paddingVertical: uiTheme.spacing.md,
+    paddingRight: uiTheme.spacing.md,
+    paddingLeft: uiTheme.spacing.sm,
+    gap: uiTheme.spacing.sm,
   },
-  unreadAccentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-    backgroundColor: uiTheme.colors.primary,
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 14,
+    backgroundColor: c.primary,
   },
-  avatarBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  unreadDotHidden: {
+    backgroundColor: 'transparent',
   },
   cardCenter: {
     flex: 1,
+    minWidth: 0,
+    marginLeft: uiTheme.spacing.xs,
   },
   cardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
     marginBottom: 2,
   },
-  cardTitle: { fontFamily: 'Inter_600SemiBold',
-    color: '#C7C5D8',
-    fontSize: 13,
-    fontWeight: 'normal',
+  cardTitle: {
+    ...uiTheme.type.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: c.textSecondary,
     flex: 1,
-    marginRight: 6,
+    minWidth: 0,
   },
-  cardTitleUnread: { fontFamily: 'Manrope_700Bold',
-    color: '#FFFFFF',
-    fontWeight: 'normal',
+  cardTitleUnread: {
+    fontFamily: uiTheme.fonts.heading,
+    color: c.text,
   },
-  timeAgoText: { fontFamily: 'Inter_500Medium',
-    color: '#555364',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  timeAgoText: {
+    ...uiTheme.type.footnote,
+    fontVariant: ['tabular-nums'],
+    color: c.muted,
   },
-  cardBody: { fontFamily: 'Inter_400Regular',
-    color: '#828094',
-    fontSize: uiTheme.type.caption.fontSize,
-    lineHeight: 16,
-    fontWeight: 'normal',
-    marginBottom: 6,
+  cardBody: {
+    ...uiTheme.type.footnote,
+    color: c.muted,
+    marginBottom: uiTheme.spacing.sm,
   },
   cardActionsRow: {
     flexDirection: 'row',
@@ -780,36 +674,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiTheme.spacing.xs,
-    backgroundColor: 'rgba(254, 60, 114, 0.1)',
+    maxWidth: '100%',
+    backgroundColor: c.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.25)',
-    borderRadius: uiTheme.radius.small,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
+    borderColor: c.primaryBorder,
+    borderRadius: uiTheme.radius.pill,
+    paddingHorizontal: uiTheme.spacing.sm,
+    paddingVertical: uiTheme.spacing.xs,
   },
   phonePillCopied: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderColor: 'rgba(16, 185, 129, 0.35)',
+    backgroundColor: c.successSoft,
+    borderColor: c.successBorder,
   },
-  phonePillText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  goalStatusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    borderRadius: 6,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  goalStatusPillText: { fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.success,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.4,
+  phonePillText: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.label,
+    color: c.accent,
+    flexShrink: 1,
   },
   tapActionWrap: {
     flexDirection: 'row',
@@ -817,60 +698,32 @@ const styles = StyleSheet.create({
     gap: 2,
     marginLeft: 'auto',
   },
-  tapActionText: { fontFamily: 'Inter_500Medium',
-    color: '#615F75',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  emptyState: {
-    paddingVertical: uiTheme.spacing.hero,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: uiTheme.spacing.section,
-  },
-  emptyIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#14121E',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  emptyTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#FFFFFF',
-    fontSize: 14.5,
-    fontWeight: 'normal',
-    marginBottom: uiTheme.spacing.xs,
-  },
-  emptySubtitle: { fontFamily: 'Inter_400Regular',
-    color: '#615F75',
-    fontSize: uiTheme.type.caption.fontSize,
-    lineHeight: 16,
-    textAlign: 'center',
+  tapActionText: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.caption,
+    color: c.muted,
   },
   bottomHandleBar: {
-    paddingVertical: 10,
+    minHeight: uiTheme.layout.touchTarget,
+    paddingVertical: uiTheme.spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    borderTopWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.04)',
-    backgroundColor: '#0C0B12',
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: c.divider,
+    backgroundColor: c.surface,
+    borderBottomLeftRadius: uiTheme.radius.sheet,
+    borderBottomRightRadius: uiTheme.radius.sheet,
   },
   bottomHandleIndicator: {
-    width: 32,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: c.borderStrong,
     marginBottom: uiTheme.spacing.xs,
   },
-  bottomHandleText: { fontFamily: 'Inter_600SemiBold',
-    color: '#555364',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  bottomHandleText: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
   },
 });

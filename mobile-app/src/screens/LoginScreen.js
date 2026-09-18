@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../theme';
+import { theme as uiTheme, alpha } from '../theme';
 // src/screens/LoginScreen.js — Upgraded Luxury Dark Dating App Login Screen
 // Featuring Cinematic Background Carousel, Luminous Aura Emblem, and Modern Glassmorphic Inputs
 import React, { useState, useRef, useEffect } from 'react';
@@ -7,7 +7,6 @@ import {
   Text,
   View,
   TextInput,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,14 +15,19 @@ import {
   Animated,
   Easing,
   Dimensions,
-  Modal,
   Linking,
-  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SupabaseService from '../services/supabase';
+import { AppButton, IconWell, Chip, BottomSheet, MotionTouchable, ContentTransition, FadeIn } from '../components/ui';
+import useResponsive from '../hooks/useResponsive';
+
+const COLORS = uiTheme.colors;
+const SPACE = uiTheme.spacing;
+const RADIUS = uiTheme.radius;
+const TYPE = uiTheme.type;
 
 // Safe haptics
 let Haptics;
@@ -80,6 +84,8 @@ const FLINT_EMBLEM_URI =
 
 export default function LoginScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const { gutter, isCompact, isShort } = useResponsive();
+  const passwordInputRef = useRef(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -289,6 +295,10 @@ export default function LoginScreen({ navigation, route }) {
     setAccountConflict(null);
   };
 
+  const emblemSize = isCompact || isShort ? 72 : 84;
+  const emblemRadius = Math.round(emblemSize * 0.3);
+  const cardPadding = isCompact ? SPACE.lg : SPACE.xxl;
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
@@ -308,18 +318,18 @@ export default function LoginScreen({ navigation, route }) {
                 },
               ]}
             >
-              <Image source={{ uri: slide.uri }} style={styles.carouselImage} resizeMode="cover" />
+              <Image source={{ uri: slide.uri }} style={styles.carouselImage} resizeMode="cover" accessible={false} />
             </Animated.View>
           ))}
         </View>
         {/* Scrim overlays with high zIndex */}
         <LinearGradient
-          colors={['rgba(10, 5, 13, 0.92)', 'rgba(18, 10, 23, 0.42)', 'transparent']}
+          colors={[alpha(COLORS.background, 0.92), alpha(COLORS.surface, 0.42), alpha(COLORS.background, 0)]}
           locations={[0, 0.45, 1]}
           style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}
         />
         <LinearGradient
-          colors={['transparent', 'rgba(14, 8, 18, 0.82)', uiTheme.colors.background]}
+          colors={[alpha(COLORS.background, 0), alpha(COLORS.background, 0.84), COLORS.background]}
           locations={[0.35, 0.68, 1]}
           style={[StyleSheet.absoluteFill, { zIndex: 1001 }]}
         />
@@ -335,7 +345,11 @@ export default function LoginScreen({ navigation, route }) {
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: Math.max(insets.top, 20) + 10, paddingBottom: Math.max(insets.bottom, 20) + 10 },
+            {
+              paddingHorizontal: gutter,
+              paddingTop: Math.max(insets.top, SPACE.xl) + SPACE.sm,
+              paddingBottom: Math.max(insets.bottom, SPACE.xl) + SPACE.sm,
+            },
           ]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -343,375 +357,380 @@ export default function LoginScreen({ navigation, route }) {
           bounces={false}
         >
           {/* Hero Branding */}
-          <View style={styles.brandContainer}>
+          <FadeIn style={styles.brandContainer}>
             <View style={styles.emblemWrapper}>
               <LinearGradient
-                colors={[uiTheme.colors.primary, uiTheme.colors.secondary, '#FFD166']}
+                colors={[COLORS.primary, COLORS.secondary, COLORS.warning]}
                 start={{ x: 0, y: 1 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.emblemFrame}
+                style={[styles.emblemFrame, { width: emblemSize, height: emblemSize, borderRadius: emblemRadius }]}
               >
-                <View style={styles.emblemInner}>
+                <View style={[styles.emblemInner, { borderRadius: emblemRadius - 3 }]}>
                   <Image
                     source={emblemFailed ? FALLBACK_LOGO_IMG : { uri: FLINT_EMBLEM_URI }}
                     onError={() => setEmblemFailed(true)}
                     style={styles.emblemImg}
                     resizeMode="cover"
+                    accessibilityIgnoresInvertColors
                   />
                 </View>
               </LinearGradient>
             </View>
 
-            <Text style={styles.brandTitle}>Flint</Text>
+            <Text style={styles.brandTitle} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Flint</Text>
             <Text style={styles.heroDialogue}>Strike the spark. Ignite real chemistry.</Text>
-          </View>
+          </FadeIn>
 
           {/* Frosted Glass Auth Card */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>
-              {isSignUp ? 'Create your account' : 'Welcome back'}
-            </Text>
-            <Text style={styles.cardSubtitle}>
-              {isSignUp
-                ? 'Join Flint to find genuine connections.'
-                : 'Sign in to resume finding great matches.'}
-            </Text>
+          <FadeIn delay={60}>
+            <View style={[styles.card, { padding: cardPadding }]}>
+              <ContentTransition transitionKey={isSignUp ? 'signup' : 'login'}>
+                <Text style={styles.cardTitle} accessibilityRole="header">
+                  {isSignUp ? 'Create your account' : 'Welcome back'}
+                </Text>
+                <Text style={styles.cardSubtitle}>
+                  {isSignUp
+                    ? 'Join Flint to find genuine connections.'
+                    : 'Sign in to resume finding great matches.'}
+                </Text>
+              </ContentTransition>
 
-
-            {/* Email Field */}
-            <View style={styles.inputGroup}>
-              <View style={styles.fieldLabelRow}>
-                <Text style={styles.inputLabel}>Email Address</Text>
-              </View>
-              <View style={[styles.inputBox, isFocusedEmail && styles.inputBoxFocused]}>
-                <Ionicons
-                  name="mail-outline"
-                  size={19}
-                  color={isFocusedEmail ? uiTheme.colors.secondary : uiTheme.colors.muted}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="name@example.com"
-                  placeholderTextColor={uiTheme.colors.muted}
-                  value={email}
-                  onChangeText={(t) => {
-                    setEmail(t);
-                    setErrorMessage('');
-                    if (accountConflict) setAccountConflict(null);
-                  }}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  spellCheck={false}
-                  selectionColor={uiTheme.colors.secondary}
-                  cursorColor={uiTheme.colors.secondary}
-                  underlineColorAndroid="transparent"
-                  keyboardType="email-address"
-                  onFocus={() => setIsFocusedEmail(true)}
-                  onBlur={() => setIsFocusedEmail(false)}
-                />
-                {Boolean(email) && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setEmail('');
+              {/* Email Field */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Email Address</Text>
+                <View
+                  style={[
+                    styles.inputBox,
+                    isFocusedEmail && styles.inputBoxFocused,
+                    Boolean(errorMessage) && styles.inputBoxError,
+                  ]}
+                >
+                  <Ionicons
+                    name="mail-outline"
+                    size={19}
+                    color={Boolean(errorMessage) ? COLORS.error : isFocusedEmail ? COLORS.accent : COLORS.muted}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="name@example.com"
+                    placeholderTextColor={COLORS.muted}
+                    value={email}
+                    onChangeText={(t) => {
+                      setEmail(t);
                       setErrorMessage('');
                       if (accountConflict) setAccountConflict(null);
                     }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={{ padding: 4 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Clear email"
-                  >
-                    <Ionicons name="close-circle" size={16} color={uiTheme.colors.muted} />
-                  </TouchableOpacity>
-                )}
-                {isValidEmail(email) && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={18}
-                    color="#4ECCA3"
-                    style={{ marginLeft: 4 }}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    selectionColor={COLORS.accent}
+                    cursorColor={COLORS.accent}
+                    underlineColorAndroid="transparent"
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
+                    keyboardAppearance="dark"
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => passwordInputRef.current?.focus()}
+                    maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                    accessibilityLabel="Email address"
+                    onFocus={() => setIsFocusedEmail(true)}
+                    onBlur={() => setIsFocusedEmail(false)}
                   />
-                )}
-              </View>
-              {/* Privacy Microcopy for Email */}
-              <View style={styles.fieldHintRow}>
-                <Ionicons name="shield-checkmark-outline" size={11.5} color="rgba(245, 230, 240, 0.52)" />
-                <Text style={styles.fieldHintText}>
-                  {isSignUp
-                    ? 'Never shown on your profile · Used for verification'
-                    : "We'll send a secure code to sign you in"}
-                </Text>
-              </View>
-
-              {/* Contextual Domain Suggestions: ONLY when typing before @ */}
-              {Boolean(email.length > 0 && !email.includes('@')) && (
-                <View style={styles.domainSection}>
-                  <Text style={styles.domainLabel}>Quick suggestions:</Text>
-                  <View style={styles.domainChipsRow}>
-                    {DOMAIN_SUGGESTIONS.map((d) => (
-                      <TouchableOpacity accessibilityRole="button"
-                        key={d}
-                        style={styles.domainChip}
-                        onPress={() => handleSelectDomain(d)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.domainChipText}>{d}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                  {Boolean(email) && (
+                    <MotionTouchable
+                      onPress={() => {
+                        setEmail('');
+                        setErrorMessage('');
+                        if (accountConflict) setAccountConflict(null);
+                      }}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      style={styles.iconAction}
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear email"
+                    >
+                      <Ionicons name="close-circle" size={17} color={COLORS.muted} />
+                    </MotionTouchable>
+                  )}
+                  {isValidEmail(email) && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={18}
+                      color={COLORS.success}
+                      style={styles.validIcon}
+                    />
+                  )}
                 </View>
-              )}
-            </View>
+                {/* Privacy Microcopy for Email */}
+                <ContentTransition transitionKey={isSignUp ? 'signup' : 'login'} style={styles.fieldHintRow}>
+                  <Ionicons name="shield-checkmark-outline" size={12} color={COLORS.muted} />
+                  <Text style={styles.fieldHintText}>
+                    {isSignUp
+                      ? 'Never shown on your profile · Used for verification'
+                      : "We'll send a secure code to sign you in"}
+                  </Text>
+                </ContentTransition>
 
-            {/* Password Field */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Password</Text>
-              <View style={[styles.inputBox, isFocusedPassword && styles.inputBoxFocused]}>
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={19}
-                  color={isFocusedPassword ? uiTheme.colors.secondary : uiTheme.colors.muted}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="••••••••"
-                  placeholderTextColor={uiTheme.colors.muted}
-                  value={password}
-                  onChangeText={setPassword}
-                  autoCorrect={false}
-                  spellCheck={false}
-                  selectionColor={uiTheme.colors.secondary}
-                  cursorColor={uiTheme.colors.secondary}
-                  underlineColorAndroid="transparent"
-                  secureTextEntry={!showPassword}
-                  onFocus={() => setIsFocusedPassword(true)}
-                  onBlur={() => setIsFocusedPassword(false)}
-                />
-                <TouchableOpacity accessibilityRole="button"
-                  onPress={() => setShowPassword(!showPassword)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  style={styles.eyeButton}
-                >
-                  <Ionicons
-                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                    size={19}
-                    color={uiTheme.colors.muted}
-                  />
-                </TouchableOpacity>
+                {/* Contextual Domain Suggestions: ONLY when typing before @ */}
+                {Boolean(email.length > 0 && !email.includes('@')) && (
+                  <View style={styles.domainSection}>
+                    <Text style={styles.domainLabel}>Quick suggestions:</Text>
+                    <View style={styles.domainChipsRow}>
+                      {DOMAIN_SUGGESTIONS.map((d) => (
+                        <Chip
+                          key={d}
+                          label={d}
+                          onPress={() => handleSelectDomain(d)}
+                          accessibilityLabel={`Use ${d}`}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                )}
               </View>
 
-              {!isSignUp && (
-                <TouchableOpacity
-                  style={styles.forgotPasswordButton}
+              {/* Password Field */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Password</Text>
+                <View style={[styles.inputBox, isFocusedPassword && styles.inputBoxFocused]}>
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={19}
+                    color={isFocusedPassword ? COLORS.accent : COLORS.muted}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    ref={passwordInputRef}
+                    style={styles.textInput}
+                    placeholder="••••••••"
+                    placeholderTextColor={COLORS.muted}
+                    value={password}
+                    onChangeText={setPassword}
+                    autoCorrect={false}
+                    spellCheck={false}
+                    selectionColor={COLORS.accent}
+                    cursorColor={COLORS.accent}
+                    underlineColorAndroid="transparent"
+                    secureTextEntry={!showPassword}
+                    textContentType="password"
+                    keyboardAppearance="dark"
+                    returnKeyType="done"
+                    maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                    accessibilityLabel="Password"
+                    onFocus={() => setIsFocusedPassword(true)}
+                    onBlur={() => setIsFocusedPassword(false)}
+                  />
+                  <MotionTouchable
+                    onPress={() => setShowPassword(!showPassword)}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    style={styles.eyeButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    <Ionicons
+                      name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                      size={19}
+                      color={COLORS.muted}
+                    />
+                  </MotionTouchable>
+                </View>
+
+                {!isSignUp && (
+                  <MotionTouchable
+                    style={styles.forgotPasswordButton}
+                    onPress={() => {
+                      safeHaptic('light');
+                      setSupportModalVisible(true);
+                    }}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Forgot Password?"
+                    accessibilityHint="Get login assistance from Flint concierge"
+                  >
+                    <Text style={styles.forgotPasswordText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Forgot Password?</Text>
+                  </MotionTouchable>
+                )}
+              </View>
+
+              {/* Mandatory 18+ & Terms Checkbox for Sign Up */}
+              {isSignUp && (
+                <MotionTouchable
+                  style={[
+                    styles.consentCheckboxRow,
+                    agreementError && styles.consentCheckboxRowError,
+                  ]}
+                  pressScale={0.99}
                   onPress={() => {
                     safeHaptic('light');
-                    setSupportModalVisible(true);
+                    setIsAgreed(!isAgreed);
+                    setAgreementError(false);
+                  }}
+                  activeOpacity={0.8}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isAgreed }}
+                  accessibilityLabel="Confirm 18+ and agree to Flint's Terms of Service and Privacy Policy"
+                >
+                  <View
+                    style={[
+                      styles.consentBox,
+                      isAgreed && styles.consentBoxChecked,
+                      agreementError && styles.consentBoxError,
+                    ]}
+                  >
+                    {isAgreed && <Ionicons name="checkmark" size={15} color={COLORS.onPrimary} />}
+                  </View>
+                  <Text style={styles.consentText}>
+                    I confirm I am 18+ and agree to Flint's{' '}
+                    <Text
+                      style={styles.legalLink}
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        openLegalModal('terms');
+                      }}
+                      accessibilityRole="link"
+                      accessibilityLabel="Terms of Service"
+                    >
+                      Terms of Service
+                    </Text>
+                    {' & '}
+                    <Text
+                      style={styles.legalLink}
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        openLegalModal('privacy');
+                      }}
+                      accessibilityRole="link"
+                      accessibilityLabel="Privacy Policy"
+                    >
+                      Privacy Policy
+                    </Text>.
+                  </Text>
+                </MotionTouchable>
+              )}
+
+              {/* Agreement Warning if unselected */}
+              {isSignUp && agreementError && (
+                <View style={styles.agreementWarningRow} accessibilityLiveRegion="polite">
+                  <Ionicons name="alert-circle" size={14} color={COLORS.error} style={styles.errorIcon} />
+                  <Text style={styles.agreementWarningText}>
+                    Please check the box to accept the Terms & 18+ policy to continue
+                  </Text>
+                </View>
+              )}
+
+              {/* Inline Existing Account Conflict Banner (Option 1) */}
+              {accountConflict === 'exists' && (
+                <FadeIn style={styles.conflictBanner}>
+                  <View style={styles.conflictBannerHeader}>
+                    <Ionicons name="information-circle" size={18} color={COLORS.secondary} />
+                    <Text style={styles.conflictBannerTitle}>
+                      An account with this email already exists.
+                    </Text>
+                  </View>
+                  <AppButton
+                    title="Sign In Instead"
+                    size="sm"
+                    iconRight="chevron-forward"
+                    fullWidth={false}
+                    haptic={false}
+                    onPress={handleSwitchToLogin}
+                    accessibilityLabel="Sign in with this email instead"
+                  />
+                </FadeIn>
+              )}
+
+              {/* Inline Account Not Found Banner (Option 1) */}
+              {accountConflict === 'not_found' && (
+                <FadeIn style={styles.conflictBanner}>
+                  <View style={styles.conflictBannerHeader}>
+                    <Ionicons name="information-circle" size={18} color={COLORS.secondary} />
+                    <Text style={styles.conflictBannerTitle}>
+                      No account found with this email.
+                    </Text>
+                  </View>
+                  <AppButton
+                    title="Create Account Instead"
+                    size="sm"
+                    iconRight="chevron-forward"
+                    fullWidth={false}
+                    haptic={false}
+                    onPress={handleSwitchToSignup}
+                    accessibilityLabel="Create a new account instead"
+                  />
+                </FadeIn>
+              )}
+
+              {/* Standard Error */}
+              {Boolean(errorMessage) && !accountConflict && (
+                <View style={styles.errorRow} accessibilityRole="alert" accessibilityLiveRegion="polite">
+                  <Ionicons name="alert-circle" size={15} color={COLORS.error} style={styles.errorIcon} />
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              )}
+
+              {/* Main Action Button */}
+              <AppButton
+                title={isSignUp ? 'Create Account' : 'Sign In'}
+                iconRight="chevron-forward"
+                onPress={handleAuthSubmit}
+                loading={isLoading}
+                haptic={false}
+                accessibilityLabel={isSignUp ? 'Create Account' : 'Sign In'}
+                style={[styles.primaryButton, isSignUp && !isAgreed && !isLoading && styles.primaryButtonMuted]}
+              />
+
+              {/* Footer Prompt */}
+              <View style={styles.footerContainer}>
+                <Text style={styles.footerText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                </Text>
+                <MotionTouchable
+                  style={styles.footerAction}
+                  onPress={() => {
+                    safeHaptic('light');
+                    setIsSignUp(!isSignUp);
+                    setErrorMessage('');
+                    setAccountConflict(null);
+                    setAgreementError(false);
                   }}
                   activeOpacity={0.7}
+                  hitSlop={{ left: 8, right: 8 }}
                   accessibilityRole="button"
-                  accessibilityLabel="Forgot Password?"
-                  accessibilityHint="Get login assistance from Flint concierge"
+                  accessibilityLabel={isSignUp ? 'Sign In' : 'Join Now'}
                 >
-                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+                  <Text style={styles.footerActionText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    {isSignUp ? 'Sign In' : 'Join Now'}
+                  </Text>
+                </MotionTouchable>
+              </View>
 
-            {/* Mandatory 18+ & Terms Checkbox for Sign Up */}
-            {isSignUp && (
-              <TouchableOpacity
-                style={[
-                  styles.consentCheckboxRow,
-                  agreementError && styles.consentCheckboxRowError,
-                ]}
-                onPress={() => {
-                  safeHaptic('light');
-                  setIsAgreed(!isAgreed);
-                  setAgreementError(false);
-                }}
-                activeOpacity={0.8}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isAgreed }}
-                accessibilityLabel="Confirm 18+ and agree to Flint's Terms of Service and Privacy Policy"
-              >
-                <View
-                  style={[
-                    styles.consentBox,
-                    isAgreed && styles.consentBoxChecked,
-                    agreementError && styles.consentBoxError,
-                  ]}
-                >
-                  {isAgreed && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
-                </View>
-                <Text style={styles.consentText}>
-                  I confirm I am 18+ and agree to Flint's{' '}
+              {/* Legal Links for Existing Users */}
+              {!isSignUp && (
+                <Text style={styles.legalDisclaimerText}>
+                  By signing in, you agree to Flint's{' '}
                   <Text
                     style={styles.legalLink}
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      openLegalModal('terms');
-                    }}
+                    onPress={() => openLegalModal('terms')}
                     accessibilityRole="link"
-                    accessibilityLabel="Terms of Service"
                   >
-                    Terms of Service
+                    Terms
                   </Text>
                   {' & '}
                   <Text
                     style={styles.legalLink}
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      openLegalModal('privacy');
-                    }}
+                    onPress={() => openLegalModal('privacy')}
                     accessibilityRole="link"
-                    accessibilityLabel="Privacy Policy"
                   >
                     Privacy Policy
                   </Text>.
                 </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Agreement Warning if unselected */}
-            {isSignUp && agreementError && (
-              <View style={styles.agreementWarningRow}>
-                <Ionicons name="alert-circle" size={13} color={uiTheme.colors.accent} />
-                <Text style={styles.agreementWarningText}>
-                  Please check the box to accept the Terms & 18+ policy to continue
-                </Text>
-              </View>
-            )}
-
-            {/* Inline Existing Account Conflict Banner (Option 1) */}
-            {accountConflict === 'exists' && (
-              <View style={styles.conflictBanner}>
-                <View style={styles.conflictBannerHeader}>
-                  <Ionicons name="information-circle" size={17} color={uiTheme.colors.secondary} />
-                  <Text style={styles.conflictBannerTitle}>
-                    An account with this email already exists.
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.conflictActionBtn}
-                  onPress={handleSwitchToLogin}
-                  activeOpacity={0.82}
-                  accessibilityRole="button"
-                  accessibilityLabel="Sign in with this email instead"
-                >
-                  <Text style={styles.conflictActionText}>Sign In Instead</Text>
-                  <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Inline Account Not Found Banner (Option 1) */}
-            {accountConflict === 'not_found' && (
-              <View style={styles.conflictBanner}>
-                <View style={styles.conflictBannerHeader}>
-                  <Ionicons name="information-circle" size={17} color={uiTheme.colors.secondary} />
-                  <Text style={styles.conflictBannerTitle}>
-                    No account found with this email.
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.conflictActionBtn}
-                  onPress={handleSwitchToSignup}
-                  activeOpacity={0.82}
-                  accessibilityRole="button"
-                  accessibilityLabel="Create a new account instead"
-                >
-                  <Text style={styles.conflictActionText}>Create Account Instead</Text>
-                  <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Standard Error */}
-            {Boolean(errorMessage) && !accountConflict && (
-              <View style={styles.errorRow}>
-                <Ionicons name="alert-circle" size={14} color={uiTheme.colors.accent} />
-                <Text style={styles.errorText}>{errorMessage}</Text>
-              </View>
-            )}
-
-            {/* Main Action Button (Stitch Velvet & Peach Gradient) */}
-            <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                isSignUp && !isAgreed && styles.primaryButtonMuted,
-              ]}
-              activeOpacity={0.88}
-              onPress={handleAuthSubmit}
-              accessibilityRole="button"
-              accessibilityLabel={isSignUp ? 'Create Account' : 'Sign In'}
-            >
-              <LinearGradient
-                colors={
-                  isSignUp && !isAgreed
-                    ? ['rgba(255, 51, 102, 0.55)', 'rgba(255, 94, 126, 0.55)', 'rgba(255, 170, 128, 0.55)']
-                    : [uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.primaryGradient}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {isSignUp ? 'Create Account' : 'Sign In'}
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Footer Prompt */}
-            <View style={styles.footerContainer}>
-              <Text style={styles.footerText}>
-                {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  safeHaptic('light');
-                  setIsSignUp(!isSignUp);
-                  setErrorMessage('');
-                  setAccountConflict(null);
-                  setAgreementError(false);
-                }}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={isSignUp ? 'Sign In' : 'Join Now'}
-              >
-                <Text style={styles.footerActionText}>
-                  {isSignUp ? 'Sign In' : 'Join Now'}
-                </Text>
-              </TouchableOpacity>
+              )}
             </View>
-
-            {/* Legal Links for Existing Users */}
-            {!isSignUp && (
-              <Text style={styles.legalDisclaimerText}>
-                By signing in, you agree to Flint's{' '}
-                <Text
-                  style={styles.legalLink}
-                  onPress={() => openLegalModal('terms')}
-                  accessibilityRole="link"
-                >
-                  Terms
-                </Text>
-                {' & '}
-                <Text
-                  style={styles.legalLink}
-                  onPress={() => openLegalModal('privacy')}
-                  accessibilityRole="link"
-                >
-                  Privacy Policy
-                </Text>.
-              </Text>
-            )}
-          </View>
+          </FadeIn>
 
           {/* Continue as Guest at Bottom (Apple HIG 44pt Touch Target & HitSlop) */}
-          <TouchableOpacity
+          <MotionTouchable
             style={styles.guestBottomLink}
             onPress={async () => {
               safeHaptic('light');
@@ -725,301 +744,223 @@ export default function LoginScreen({ navigation, route }) {
               });
             }}
             activeOpacity={0.6}
-            hitSlop={{ top: 14, bottom: 20, left: 24, right: 24 }}
+            hitSlop={{ top: 6, bottom: 12, left: 24, right: 24 }}
             accessibilityRole="button"
             accessibilityLabel="Continue as Guest"
             accessibilityHint="Browse Flint without logging in"
           >
-            <Text style={styles.guestBottomLinkText}>Continue as Guest</Text>
-          </TouchableOpacity>
+            <Text style={styles.guestBottomLinkText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Continue as Guest</Text>
+          </MotionTouchable>
         </ScrollView>
       </KeyboardAvoidingView>
 
       {/* ═══════════════════════════════════════════════════ */}
-      {/* LEGAL & PRIVACY IN-APP MODAL (App Store 5.1.1)    */}
+      {/* LEGAL & PRIVACY IN-APP SHEET (App Store 5.1.1)     */}
       {/* ═══════════════════════════════════════════════════ */}
-      <Modal
+      <BottomSheet
         visible={legalModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setLegalModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdropDismiss}
-            onPress={() => setLegalModalVisible(false)}
+        onClose={() => setLegalModalVisible(false)}
+        closeLabel="Close legal document"
+        title="Legal & Privacy"
+        subtitle="Flint Trust, Safety & Compliance"
+        maxHeightRatio={0.86}
+        footer={
+          <AppButton
+            title="I Understand & Agree"
+            accessibilityLabel="I Understand and Accept"
+            haptic={false}
+            onPress={() => {
+              safeHaptic('medium');
+              setIsAgreed(true);
+              setAgreementError(false);
+              setLegalModalVisible(false);
+            }}
           />
-          <View style={styles.modalCard}>
-            {/* Drag Pill Handle */}
-            <View style={styles.sheetHandle} />
-
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderTitleGroup}>
-                <Text style={styles.modalTitle}>Legal & Privacy</Text>
-                <Text style={styles.modalSub}>Flint Trust, Safety & Compliance</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setLegalModalVisible(false)}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                accessibilityRole="button"
-                accessibilityLabel="Close legal document"
-              >
-                <Ionicons name="close" size={22} color={uiTheme.colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Segmented Tab Switcher */}
-            <View style={styles.modalTabRow}>
-              <TouchableOpacity
-                style={[
-                  styles.modalTabBtn,
-                  legalTab === 'terms' && styles.modalTabBtnActive,
-                ]}
-                onPress={() => {
-                  safeHaptic('light');
-                  setLegalTab('terms');
-                }}
-                activeOpacity={0.8}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: legalTab === 'terms' }}
-              >
-                <Text
-                  style={[
-                    styles.modalTabText,
-                    legalTab === 'terms' && styles.modalTabTextActive,
-                  ]}
-                >
-                  Terms of Service
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.modalTabBtn,
-                  legalTab === 'privacy' && styles.modalTabBtnActive,
-                ]}
-                onPress={() => {
-                  safeHaptic('light');
-                  setLegalTab('privacy');
-                }}
-                activeOpacity={0.8}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: legalTab === 'privacy' }}
-              >
-                <Text
-                  style={[
-                    styles.modalTabText,
-                    legalTab === 'privacy' && styles.modalTabTextActive,
-                  ]}
-                >
-                  Privacy Policy
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Modal Body Scroll */}
-            <ScrollView
-              style={styles.modalScroll}
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={true}
-              bounces={false}
-            >
-              {legalTab === 'terms' ? (
-                <View style={styles.legalSection}>
-                  <View style={styles.legalBadgeRow}>
-                    <Ionicons name="shield-checkmark" size={14} color={uiTheme.colors.secondary} />
-                    <Text style={styles.legalBadgeText}>18+ Age Requirement & Community Honor Code</Text>
-                  </View>
-
-                  <Text style={styles.legalParagraphHead}>1. Eligibility & Age Restriction</Text>
-                  <Text style={styles.legalParagraph}>
-                    You must be at least 18 years of age to create an account on Flint and use our service. By creating an account or signing in, you affirm, represent, and warrant that you are at least 18 years old and are legally capable of entering into this binding agreement. Any account found to be operated by a minor will be immediately and permanently terminated.
-                  </Text>
-
-                  <Text style={styles.legalParagraphHead}>2. Member Conduct & Mutual Respect</Text>
-                  <Text style={styles.legalParagraph}>
-                    Flint is a community dedicated to real romantic chemistry, dignity, and authentic connections. We enforce a zero-tolerance policy against hate speech, harassment, impersonation, commercial solicitation, unsolicited explicit media, and scamming. Every profile is subject to automated and human trust screening.
-                  </Text>
-
-                  <Text style={styles.legalParagraphHead}>3. Safety & Profile Authenticity</Text>
-                  <Text style={styles.legalParagraph}>
-                    To maintain an authentic network, Flint may require live biometric liveness selfie checks to verify your identity. You agree to upload only your own authentic, recent photos and to represent yourself truthfully.
-                  </Text>
-
-                  <Text style={styles.legalParagraphHead}>4. Subscriptions & Account Termination</Text>
-                  <Text style={styles.legalParagraph}>
-                    You retain the right to delete your Flint account at any time in App Settings. Any premium subscriptions or boosts are managed through Apple App Store or Google Play Store billing terms.
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.legalSection}>
-                  <View style={styles.legalBadgeRow}>
-                    <Ionicons name="lock-closed" size={14} color={uiTheme.colors.secondary} />
-                    <Text style={styles.legalBadgeText}>256-Bit TLS Encryption & GDPR / CCPA Compliant</Text>
-                  </View>
-
-                  <Text style={styles.legalParagraphHead}>1. Personal Data We Collect</Text>
-                  <Text style={styles.legalParagraph}>
-                    We only collect information necessary to create your romantic match profile: your name, verified email, dating preferences, approximate geolocation (strictly while using the app, never tracked continuously in the background), and photos you explicitly upload.
-                  </Text>
-
-                  <Text style={styles.legalParagraphHead}>2. Zero Third-Party Data Brokers</Text>
-                  <Text style={styles.legalParagraph}>
-                    Flint does not sell, rent, or trade your personal data to advertisers or third-party data brokers. Your private chat messages are encrypted and only accessible to you and your match.
-                  </Text>
-
-                  <Text style={styles.legalParagraphHead}>3. Data Ownership & Deletion Rights</Text>
-                  <Text style={styles.legalParagraph}>
-                    Under GDPR, CCPA, and global privacy standards, you maintain total ownership over your data. You may request a complete export of your account data or trigger immediate permanent erasure by tapping "Delete Account" in Flint Settings.
-                  </Text>
-
-                  <Text style={styles.legalParagraphHead}>4. Data Protection Contact</Text>
-                  <Text style={styles.legalParagraph}>
-                    Questions regarding data security or privacy compliance may be addressed directly to our Data Protection Officer at privacy@flint.dating.
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-
-            {/* Bottom Modal CTA */}
-            <View style={styles.modalBottomBar}>
-              <TouchableOpacity
-                style={styles.modalAcceptBtn}
-                onPress={() => {
-                  safeHaptic('medium');
-                  setIsAgreed(true);
-                  setAgreementError(false);
-                  setLegalModalVisible(false);
-                }}
-                activeOpacity={0.88}
-                accessibilityRole="button"
-                accessibilityLabel="I Understand and Accept"
-              >
-                <LinearGradient
-                  colors={[uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.modalAcceptGradient}
-                >
-                  <Text style={styles.modalAcceptBtnText}>I Understand & Agree</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ═══════════════════════════════════════════════════ */}
-      {/* CONCIERGE SIGN-IN SUPPORT MODAL                   */}
-      {/* ═══════════════════════════════════════════════════ */}
-      <Modal
-        visible={supportModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setSupportModalVisible(false)}
+        }
       >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdropDismiss}
+        {/* Segmented Tab Switcher */}
+        <View style={styles.modalTabRow} accessibilityRole="tablist">
+          <MotionTouchable
+            style={[
+              styles.modalTabBtn,
+              legalTab === 'terms' && styles.modalTabBtnActive,
+            ]}
+            pressScale={0.98}
+            onPress={() => {
+              safeHaptic('light');
+              setLegalTab('terms');
+            }}
+            activeOpacity={0.8}
+            accessibilityRole="tab"
+            accessibilityLabel="Terms of Service"
+            accessibilityState={{ selected: legalTab === 'terms' }}
+          >
+            <Text
+              style={[
+                styles.modalTabText,
+                legalTab === 'terms' && styles.modalTabTextActive,
+              ]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+            >
+              Terms of Service
+            </Text>
+          </MotionTouchable>
+
+          <MotionTouchable
+            style={[
+              styles.modalTabBtn,
+              legalTab === 'privacy' && styles.modalTabBtnActive,
+            ]}
+            pressScale={0.98}
+            onPress={() => {
+              safeHaptic('light');
+              setLegalTab('privacy');
+            }}
+            activeOpacity={0.8}
+            accessibilityRole="tab"
+            accessibilityLabel="Privacy Policy"
+            accessibilityState={{ selected: legalTab === 'privacy' }}
+          >
+            <Text
+              style={[
+                styles.modalTabText,
+                legalTab === 'privacy' && styles.modalTabTextActive,
+              ]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+            >
+              Privacy Policy
+            </Text>
+          </MotionTouchable>
+        </View>
+
+        {/* Legal Document Body */}
+        <ContentTransition transitionKey={legalTab}>
+          {legalTab === 'terms' ? (
+            <View style={styles.legalSection}>
+              <View style={styles.legalBadgeRow}>
+                <Ionicons name="shield-checkmark" size={14} color={COLORS.secondary} />
+                <Text style={styles.legalBadgeText}>18+ Age Requirement & Community Honor Code</Text>
+              </View>
+
+              <Text style={styles.legalParagraphHead} accessibilityRole="header">1. Eligibility & Age Restriction</Text>
+              <Text style={styles.legalParagraph}>
+                You must be at least 18 years of age to create an account on Flint and use our service. By creating an account or signing in, you affirm, represent, and warrant that you are at least 18 years old and are legally capable of entering into this binding agreement. Any account found to be operated by a minor will be immediately and permanently terminated.
+              </Text>
+
+              <Text style={styles.legalParagraphHead} accessibilityRole="header">2. Member Conduct & Mutual Respect</Text>
+              <Text style={styles.legalParagraph}>
+                Flint is a community dedicated to real romantic chemistry, dignity, and authentic connections. We enforce a zero-tolerance policy against hate speech, harassment, impersonation, commercial solicitation, unsolicited explicit media, and scamming. Every profile is subject to automated and human trust screening.
+              </Text>
+
+              <Text style={styles.legalParagraphHead} accessibilityRole="header">3. Safety & Profile Authenticity</Text>
+              <Text style={styles.legalParagraph}>
+                To maintain an authentic network, Flint may require live biometric liveness selfie checks to verify your identity. You agree to upload only your own authentic, recent photos and to represent yourself truthfully.
+              </Text>
+
+              <Text style={styles.legalParagraphHead} accessibilityRole="header">4. Subscriptions & Account Termination</Text>
+              <Text style={styles.legalParagraph}>
+                You retain the right to delete your Flint account at any time in App Settings. Any premium subscriptions or boosts are managed through Apple App Store or Google Play Store billing terms.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.legalSection}>
+              <View style={styles.legalBadgeRow}>
+                <Ionicons name="lock-closed" size={14} color={COLORS.secondary} />
+                <Text style={styles.legalBadgeText}>256-Bit TLS Encryption & GDPR / CCPA Compliant</Text>
+              </View>
+
+              <Text style={styles.legalParagraphHead} accessibilityRole="header">1. Personal Data We Collect</Text>
+              <Text style={styles.legalParagraph}>
+                We only collect information necessary to create your romantic match profile: your name, verified email, dating preferences, approximate geolocation (strictly while using the app, never tracked continuously in the background), and photos you explicitly upload.
+              </Text>
+
+              <Text style={styles.legalParagraphHead} accessibilityRole="header">2. Zero Third-Party Data Brokers</Text>
+              <Text style={styles.legalParagraph}>
+                Flint does not sell, rent, or trade your personal data to advertisers or third-party data brokers. Your private chat messages are encrypted and only accessible to you and your match.
+              </Text>
+
+              <Text style={styles.legalParagraphHead} accessibilityRole="header">3. Data Ownership & Deletion Rights</Text>
+              <Text style={styles.legalParagraph}>
+                Under GDPR, CCPA, and global privacy standards, you maintain total ownership over your data. You may request a complete export of your account data or trigger immediate permanent erasure by tapping "Delete Account" in Flint Settings.
+              </Text>
+
+              <Text style={styles.legalParagraphHead} accessibilityRole="header">4. Data Protection Contact</Text>
+              <Text style={styles.legalParagraph}>
+                Questions regarding data security or privacy compliance may be addressed directly to our Data Protection Officer at privacy@flint.dating.
+              </Text>
+            </View>
+          )}
+        </ContentTransition>
+      </BottomSheet>
+
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* CONCIERGE SIGN-IN SUPPORT SHEET                    */}
+      {/* ═══════════════════════════════════════════════════ */}
+      <BottomSheet
+        visible={supportModalVisible}
+        onClose={() => setSupportModalVisible(false)}
+        closeLabel="Close support"
+        title="Sign-In Concierge"
+        subtitle="Fast assistance with your Flint account"
+        maxHeightRatio={0.8}
+        footer={
+          <AppButton
+            title="Back to Sign In"
+            variant="ghost"
             onPress={() => setSupportModalVisible(false)}
           />
-          <View style={[styles.modalCard, styles.supportModalCard]}>
-            {/* Drag Pill Handle */}
-            <View style={styles.sheetHandle} />
-
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderTitleGroup}>
-                <Text style={styles.modalTitle}>Sign-In Concierge</Text>
-                <Text style={styles.modalSub}>Fast assistance with your Flint account</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setSupportModalVisible(false)}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                accessibilityRole="button"
-                accessibilityLabel="Close support"
-              >
-                <Ionicons name="close" size={22} color={uiTheme.colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={styles.modalScroll}
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={false}
-              bounces={false}
-            >
-              {/* Tip 1 */}
-              <View style={styles.supportTipCard}>
-                <View style={styles.supportTipIconWrap}>
-                  <Ionicons name="mail" size={18} color={uiTheme.colors.secondary} />
-                </View>
-                <View style={styles.supportTipBody}>
-                  <Text style={styles.supportTipTitle}>Trouble Signing In?</Text>
-                  <Text style={styles.supportTipText}>
-                    Ensure you are using the exact email associated with your account. If you registered via Google or Apple, select the matching option.
-                  </Text>
-                </View>
-              </View>
-
-              {/* Tip 2 */}
-              <View style={styles.supportTipCard}>
-                <View style={styles.supportTipIconWrap}>
-                  <Ionicons name="sync" size={18} color={uiTheme.colors.secondary} />
-                </View>
-                <View style={styles.supportTipBody}>
-                  <Text style={styles.supportTipTitle}>Forgot Your Password?</Text>
-                  <Text style={styles.supportTipText}>
-                    We can dispatch a secure single-use magic reset link or 6-digit OTP directly to your inbox.
-                  </Text>
-                </View>
-              </View>
-
-              {/* Tip 3 */}
-              <View style={styles.supportTipCard}>
-                <View style={styles.supportTipIconWrap}>
-                  <Ionicons name="shield-checkmark" size={18} color={uiTheme.colors.secondary} />
-                </View>
-                <View style={styles.supportTipBody}>
-                  <Text style={styles.supportTipTitle}>Account Status & Inquiries</Text>
-                  <Text style={styles.supportTipText}>
-                    If your account was temporarily locked or flagged for verification, our concierge team will assist you immediately.
-                  </Text>
-                </View>
-              </View>
-
-              {/* Direct Concierge Contact Button */}
-              <TouchableOpacity
-                style={styles.conciergeContactBtn}
-                onPress={() => {
-                  safeHaptic('medium');
-                  Linking.openURL('mailto:support@flint.dating?subject=Flint%20Login%20Assistance').catch(() => { });
-                }}
-                activeOpacity={0.88}
-                accessibilityRole="button"
-                accessibilityLabel="Email Flint Concierge Support"
-              >
-                <Ionicons name="chatbubbles" size={18} color={uiTheme.colors.secondary} />
-                <Text style={styles.conciergeContactBtnText}>Contact Flint Concierge</Text>
-                <Ionicons name="open-outline" size={16} color={uiTheme.colors.muted} />
-              </TouchableOpacity>
-            </ScrollView>
-
-            <View style={styles.modalBottomBar}>
-              <TouchableOpacity accessibilityRole="button"
-                style={styles.modalDismissSimpleBtn}
-                onPress={() => setSupportModalVisible(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.modalDismissSimpleText}>Back to Sign In</Text>
-              </TouchableOpacity>
-            </View>
+        }
+      >
+        {/* Tip 1 */}
+        <View style={styles.supportTipCard}>
+          <IconWell icon="mail" tone="secondary" size={36} />
+          <View style={styles.supportTipBody}>
+            <Text style={styles.supportTipTitle}>Trouble Signing In?</Text>
+            <Text style={styles.supportTipText}>
+              Ensure you are using the exact email associated with your account. If you registered via Google or Apple, select the matching option.
+            </Text>
           </View>
         </View>
-      </Modal>
+
+        {/* Tip 2 */}
+        <View style={styles.supportTipCard}>
+          <IconWell icon="sync" tone="secondary" size={36} />
+          <View style={styles.supportTipBody}>
+            <Text style={styles.supportTipTitle}>Forgot Your Password?</Text>
+            <Text style={styles.supportTipText}>
+              We can dispatch a secure single-use magic reset link or 6-digit OTP directly to your inbox.
+            </Text>
+          </View>
+        </View>
+
+        {/* Tip 3 */}
+        <View style={styles.supportTipCard}>
+          <IconWell icon="shield-checkmark" tone="secondary" size={36} />
+          <View style={styles.supportTipBody}>
+            <Text style={styles.supportTipTitle}>Account Status & Inquiries</Text>
+            <Text style={styles.supportTipText}>
+              If your account was temporarily locked or flagged for verification, our concierge team will assist you immediately.
+            </Text>
+          </View>
+        </View>
+
+        {/* Direct Concierge Contact Button */}
+        <AppButton
+          title="Contact Flint Concierge"
+          variant="secondary"
+          icon="chatbubbles"
+          iconRight="open-outline"
+          haptic={false}
+          style={styles.conciergeContactBtn}
+          onPress={() => {
+            safeHaptic('medium');
+            Linking.openURL('mailto:support@flint.dating?subject=Flint%20Login%20Assistance').catch(() => { });
+          }}
+          accessibilityLabel="Email Flint Concierge Support"
+        />
+      </BottomSheet>
     </View>
   );
 }
@@ -1027,7 +968,7 @@ export default function LoginScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a050d',
+    backgroundColor: COLORS.background,
     overflow: 'hidden',
   },
   carouselImage: {
@@ -1038,44 +979,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    width: '100%', maxWidth: 480, alignSelf: 'center',
+    width: '100%',
+    maxWidth: uiTheme.layout.formMax,
+    alignSelf: 'center',
     flexGrow: 1,
-    paddingHorizontal: uiTheme.spacing.xxl,
     justifyContent: 'center',
   },
 
   // ── Brand Header ──
   brandContainer: {
     alignItems: 'center',
-    marginBottom: uiTheme.spacing.xxl,
+    marginBottom: SPACE.xxl,
   },
   emblemWrapper: {
-    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: SPACE.lg,
   },
   emblemFrame: {
-    width: 84,
-    height: 84,
-    borderRadius: 26,
-    padding: 2.5,
+    padding: 3,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
+    ...uiTheme.shadows.md,
   },
   emblemInner: {
     width: '100%',
     height: '100%',
-    borderRadius: uiTheme.radius.card,
     overflow: 'hidden',
-    backgroundColor: 'rgba(18, 10, 23, 0.96)',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: alpha(COLORS.white, 0.2),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1084,580 +1017,370 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   brandTitle: {
-    fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 42,
-    fontWeight: 'normal',
-    letterSpacing: -0.7,
-    marginBottom: uiTheme.spacing.xs,
-    textShadowColor: 'rgba(255, 51, 102, 0.45)',
+    ...TYPE.largeTitle,
+    color: COLORS.text,
+    textShadowColor: alpha(COLORS.primary, 0.45),
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 12,
   },
   heroDialogue: {
-    fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 240, 245, 0.92)',
-    fontSize: 15.5,
-    fontWeight: 'normal',
+    ...TYPE.bodyStrong,
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    letterSpacing: 0.2,
-    marginTop: uiTheme.spacing.xs,
+    marginTop: SPACE.xs,
     maxWidth: 320,
-    lineHeight: 22,
-    textShadowColor: 'rgba(0, 0, 0, 0.65)',
+    textShadowColor: alpha(COLORS.black, 0.65),
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
   },
 
   // ── Card ──
   card: {
-    backgroundColor: 'rgba(22, 14, 28, 0.78)',
+    backgroundColor: alpha(COLORS.surface, 0.9),
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 26,
-    padding: uiTheme.spacing.xxl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 8,
+    borderColor: COLORS.hairline,
+    borderRadius: RADIUS.xl,
+    ...uiTheme.shadows.lg,
   },
   cardTitle: {
-    fontFamily: 'Manrope_800ExtraBold',
-    fontSize: 22,
-    fontWeight: 'normal',
-    color: '#FFFFFF',
-    letterSpacing: -0.2,
-    marginBottom: uiTheme.spacing.xs,
+    ...TYPE.title,
+    color: COLORS.text,
+    marginBottom: SPACE.xs,
     textAlign: 'center',
   },
   cardSubtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13.5,
-    color: 'rgba(245, 235, 240, 0.75)',
+    ...TYPE.callout,
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    marginBottom: uiTheme.spacing.xl,
+    marginBottom: SPACE.xxl,
   },
 
   // ── Input Fields ──
   inputGroup: {
-    marginBottom: uiTheme.spacing.lg,
+    marginBottom: SPACE.lg,
   },
-  fieldLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 7,
+  inputLabel: {
+    ...TYPE.label,
+    color: COLORS.text,
+    marginBottom: SPACE.sm,
   },
   fieldHintRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginTop: 6,
-    paddingLeft: uiTheme.spacing.xs,
+    gap: SPACE.xs + 2,
+    marginTop: SPACE.sm,
+    paddingLeft: SPACE.xxs,
   },
   fieldHintText: {
-    fontFamily: 'Inter_400Regular',
-    color: 'rgba(237, 221, 241, 0.52)',
-    fontSize: uiTheme.type.caption.fontSize,
-    lineHeight: 15,
+    ...TYPE.footnote,
+    flex: 1,
+    color: COLORS.muted,
   },
 
   // ── Domain Chips ──
   domainSection: {
-    marginTop: 10,
-    marginBottom: uiTheme.spacing.xs,
+    marginTop: SPACE.md,
   },
   domainLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginBottom: 6,
+    ...TYPE.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: COLORS.muted,
+    marginBottom: SPACE.sm,
   },
   domainChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: uiTheme.spacing.sm,
-  },
-  domainChip: {
-    backgroundColor: 'rgba(59, 49, 64, 0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: uiTheme.radius.small,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  domainChipText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  inputLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    color: 'rgba(237, 221, 241, 0.65)',
-    marginBottom: 7,
-    letterSpacing: 0.4,
+    gap: SPACE.sm,
   },
   inputBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(18, 10, 23, 0.85)',
+    backgroundColor: COLORS.elevated,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 14,
-    height: 50,
-    paddingHorizontal: 14,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.input,
+    height: uiTheme.layout.inputHeight,
+    paddingLeft: SPACE.md + 2,
+    paddingRight: SPACE.sm,
   },
   inputBoxFocused: {
-    borderColor: uiTheme.colors.secondary,
-    backgroundColor: 'rgba(32, 20, 40, 0.92)',
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.elevatedHigh,
+  },
+  inputBoxError: {
+    borderColor: COLORS.error,
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: SPACE.sm + 2,
   },
   textInput: {
-    fontFamily: 'Inter_400Regular',
+    ...TYPE.body,
+    lineHeight: undefined,
     flex: 1,
-    fontSize: 14.5,
-    color: uiTheme.colors.text,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+    minWidth: 0,
+    color: COLORS.text,
+    paddingVertical: 0,
+    height: '100%',
+  },
+  iconAction: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  validIcon: {
+    marginLeft: SPACE.xxs,
+    marginRight: SPACE.xs,
   },
   eyeButton: {
-    padding: uiTheme.spacing.xs,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   forgotPasswordButton: {
     alignSelf: 'flex-end',
-    marginTop: uiTheme.spacing.sm,
+    minHeight: uiTheme.layout.touchTarget,
+    justifyContent: 'center',
+    paddingLeft: SPACE.md,
+    marginTop: SPACE.xs,
+    marginBottom: -SPACE.sm,
   },
   forgotPasswordText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12.5,
-    color: uiTheme.colors.secondary,
-    fontWeight: 'normal',
+    ...TYPE.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: COLORS.secondary,
   },
 
-  // ── Primary CTA (Stitch Velvet & Peach Gradient) ──
+  // ── Primary CTA ──
   primaryButton: {
-    borderRadius: 26,
-    overflow: 'hidden',
-    marginTop: uiTheme.spacing.sm,
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.38,
-    shadowRadius: 16,
-    elevation: 6,
+    marginTop: SPACE.sm,
   },
   primaryButtonMuted: {
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  primaryGradient: {
-    height: 54,
-    borderRadius: 26,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: uiTheme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.35)',
-  },
-  primaryButtonText: {
-    fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+    opacity: 0.7,
   },
 
   // ── Mandatory Consent Checkbox & Warning ──
   consentCheckboxRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: uiTheme.spacing.md,
-    paddingHorizontal: 2,
-    paddingVertical: 6,
-    marginTop: uiTheme.spacing.xs,
-    marginBottom: 14,
+    gap: SPACE.md,
+    minHeight: uiTheme.layout.touchTarget,
+    paddingVertical: SPACE.sm,
+    marginBottom: SPACE.sm,
   },
   consentCheckboxRowError: {},
   consentBox: {
     width: 22,
     height: 22,
-    borderRadius: 7,
+    borderRadius: RADIUS.xs,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
-    backgroundColor: 'rgba(12, 6, 16, 0.85)',
+    borderColor: COLORS.borderStrong,
+    backgroundColor: COLORS.elevated,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 1,
   },
   consentBoxChecked: {
-    backgroundColor: uiTheme.colors.primary,
-    borderColor: uiTheme.colors.accent,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   consentBoxError: {
-    borderColor: '#FF4D6D',
-    backgroundColor: 'rgba(255, 77, 109, 0.25)',
+    borderColor: COLORS.error,
+    backgroundColor: COLORS.errorSoft,
   },
   consentText: {
-    fontFamily: 'Inter_400Regular',
+    ...TYPE.footnote,
     flex: 1,
-    color: 'rgba(245, 235, 240, 0.82)',
-    fontSize: 12.5,
-    lineHeight: 18,
+    minWidth: 0,
+    color: COLORS.textSecondary,
   },
   agreementWarningRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: uiTheme.spacing.sm,
-    paddingHorizontal: uiTheme.spacing.xs,
+    alignItems: 'flex-start',
+    gap: SPACE.xs + 2,
+    marginBottom: SPACE.md,
   },
   agreementWarningText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.accent,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    ...TYPE.footnote,
+    flex: 1,
+    color: COLORS.error,
   },
 
   // ── Account Conflict Banner (Option 1 Inline Switcher) ──
   conflictBanner: {
-    backgroundColor: 'rgba(255, 170, 128, 0.12)',
+    backgroundColor: COLORS.secondarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(255, 170, 128, 0.35)',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: uiTheme.spacing.md,
-    marginBottom: 14,
-    gap: 10,
+    borderColor: COLORS.secondaryBorder,
+    borderRadius: RADIUS.md,
+    padding: SPACE.md,
+    marginBottom: SPACE.lg,
+    gap: SPACE.md,
   },
   conflictBannerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    gap: SPACE.sm,
   },
   conflictBannerTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.text,
-    fontSize: 13,
-    fontWeight: 'normal',
+    ...TYPE.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: COLORS.text,
     flex: 1,
-    lineHeight: 18,
-  },
-  conflictActionBtn: {
-    backgroundColor: uiTheme.colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-  },
-  conflictActionText: {
-    fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: 'normal',
-    letterSpacing: 0.1,
   },
   errorRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: uiTheme.spacing.md,
-    paddingLeft: 2,
+    alignItems: 'flex-start',
+    gap: SPACE.xs + 2,
+    marginBottom: SPACE.md,
+  },
+  errorIcon: {
+    marginTop: 1,
   },
   errorText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.accent,
-    fontSize: 13,
-    fontWeight: 'normal',
+    ...TYPE.footnote,
+    fontFamily: uiTheme.fonts.label,
+    color: COLORS.error,
+    flexShrink: 1,
   },
 
   // ── Guest Link ──
   guestBottomLink: {
     alignItems: 'center',
-    paddingVertical: 14,
-    minHeight: 44,
+    alignSelf: 'center',
+    minHeight: uiTheme.layout.touchTarget,
     justifyContent: 'center',
-    marginTop: uiTheme.spacing.sm,
+    paddingHorizontal: SPACE.md,
+    marginTop: SPACE.md,
   },
   guestBottomLinkText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(245, 230, 211, 0.72)',
-    fontSize: 13.5,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+    ...TYPE.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: COLORS.textSecondary,
   },
 
   // ── Footer ──
   footerContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 18,
-    marginBottom: uiTheme.spacing.md,
+    marginTop: SPACE.md,
+    marginBottom: SPACE.xs,
   },
   footerText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13.5,
-    color: uiTheme.colors.textSecondary,
+    ...TYPE.callout,
+    color: COLORS.textSecondary,
+  },
+  footerAction: {
+    minHeight: uiTheme.layout.touchTarget,
+    justifyContent: 'center',
   },
   footerActionText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 13.5,
-    fontWeight: 'normal',
-    color: uiTheme.colors.secondary,
+    ...TYPE.callout,
+    fontFamily: uiTheme.fonts.strong,
+    color: COLORS.secondary,
   },
 
   // ── Legal & Links ──
   legalDisclaimerText: {
-    fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+    ...TYPE.footnote,
+    color: COLORS.muted,
     textAlign: 'center',
-    lineHeight: 18,
+    paddingHorizontal: SPACE.sm,
   },
   legalLink: {
-    fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.secondary,
-    fontWeight: 'normal',
+    fontFamily: uiTheme.fonts.label,
+    color: COLORS.secondary,
   },
 
-  // ── Modals & Bottom Sheets (Apple HIG & App Store Compliance) ──
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(5, 2, 8, 0.82)',
-    justifyContent: 'flex-end',
-  },
-  modalBackdropDismiss: {
-    flex: 1,
-  },
-  modalCard: {
-    backgroundColor: uiTheme.colors.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderBottomWidth: 0,
-    maxHeight: '86%',
-    minHeight: 460,
-    paddingTop: uiTheme.spacing.md,
-    paddingHorizontal: 22,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 22,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    elevation: 20,
-  },
-  supportModalCard: {
-    minHeight: 420,
-    maxHeight: '75%',
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4.5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    alignSelf: 'center',
-    marginBottom: uiTheme.spacing.lg,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: uiTheme.spacing.lg,
-  },
-  modalHeaderTitleGroup: {
-    flex: 1,
-  },
-  modalTitle: {
-    fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 21,
-    fontWeight: 'normal',
-    letterSpacing: -0.3,
-  },
-  modalSub: {
-    fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: 12.5,
-    marginTop: 2,
-  },
-  modalCloseBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // ── Sheets (legal + support) ──
   modalTabRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 14,
-    padding: 3,
-    marginBottom: uiTheme.spacing.lg,
+    backgroundColor: COLORS.elevated,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
+    borderRadius: RADIUS.md,
+    padding: SPACE.xs,
+    marginBottom: SPACE.lg,
   },
   modalTabBtn: {
     flex: 1,
-    paddingVertical: 10,
+    minHeight: 40,
+    paddingHorizontal: SPACE.sm,
     alignItems: 'center',
-    borderRadius: 11,
+    justifyContent: 'center',
+    borderRadius: RADIUS.sm,
   },
   modalTabBtnActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: COLORS.elevatedHigh,
+    borderWidth: 1,
+    borderColor: COLORS.hairline,
   },
   modalTabText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    fontWeight: 'normal',
-    color: uiTheme.colors.muted,
+    ...TYPE.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: COLORS.muted,
   },
   modalTabTextActive: {
-    fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontWeight: 'normal',
-  },
-  modalScroll: {
-    flexGrow: 0,
-    maxHeight: 340,
-  },
-  modalScrollContent: {
-    paddingBottom: uiTheme.spacing.lg,
+    color: COLORS.text,
   },
   legalSection: {
-    gap: uiTheme.spacing.md,
+    gap: SPACE.sm,
   },
   legalBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-    backgroundColor: 'rgba(255, 51, 102, 0.12)',
+    gap: SPACE.sm,
+    backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.25)',
-    borderRadius: 10,
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: uiTheme.spacing.sm,
-    marginBottom: 6,
+    borderColor: COLORS.primaryBorder,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.sm,
+    marginBottom: SPACE.xs,
   },
   legalBadgeText: {
-    fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.secondary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    ...TYPE.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: COLORS.secondary,
+    flex: 1,
   },
   legalParagraphHead: {
-    fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-    marginTop: 6,
+    ...TYPE.headline,
+    color: COLORS.text,
+    marginTop: SPACE.sm,
   },
   legalParagraph: {
-    fontFamily: 'Inter_400Regular',
-    color: 'rgba(245, 235, 240, 0.78)',
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  modalBottomBar: {
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    marginTop: 6,
-  },
-  modalAcceptBtn: {
-    borderRadius: uiTheme.radius.sheet,
-    overflow: 'hidden',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  modalAcceptGradient: {
-    height: 48,
-    borderRadius: uiTheme.radius.sheet,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalAcceptBtnText: {
-    fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+    ...TYPE.callout,
+    color: COLORS.textSecondary,
   },
   supportTipCard: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    alignItems: 'flex-start',
+    backgroundColor: COLORS.elevated,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    gap: uiTheme.spacing.md,
-  },
-  supportTipIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 170, 128, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
+    borderColor: COLORS.borderSubtle,
+    borderRadius: RADIUS.lg,
+    padding: SPACE.md + 2,
+    marginBottom: SPACE.sm + 2,
+    gap: SPACE.md,
   },
   supportTipBody: {
     flex: 1,
+    minWidth: 0,
   },
   supportTipTitle: {
-    fontFamily: 'Manrope_700Bold',
-    color: uiTheme.colors.text,
-    fontSize: 13.5,
-    fontWeight: 'normal',
-    marginBottom: uiTheme.spacing.xs,
+    ...TYPE.headline,
+    color: COLORS.text,
+    marginBottom: SPACE.xs,
   },
   supportTipText: {
-    fontFamily: 'Inter_400Regular',
-    color: 'rgba(245, 235, 240, 0.7)',
-    fontSize: 12.5,
+    ...TYPE.footnote,
     lineHeight: 18,
+    color: COLORS.textSecondary,
   },
   conciergeContactBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: uiTheme.spacing.sm,
-    backgroundColor: 'rgba(255, 51, 102, 0.14)',
-    borderWidth: 1.2,
-    borderColor: uiTheme.colors.accent,
-    borderRadius: 22,
-    paddingVertical: uiTheme.spacing.md,
-    marginTop: uiTheme.spacing.sm,
-    marginBottom: uiTheme.spacing.xs,
-  },
-  conciergeContactBtnText: {
-    fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-  },
-  modalDismissSimpleBtn: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  modalDismissSimpleText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: 13.5,
-    fontWeight: 'normal',
+    marginTop: SPACE.sm,
   },
 });

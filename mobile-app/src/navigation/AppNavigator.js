@@ -17,8 +17,10 @@ export default function AppNavigator({ initialRouteName = 'Auth', initialUser = 
       initialRouteName={initialRouteName}
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#08050B', overflow: 'hidden' },
+        contentStyle: { backgroundColor: uiTheme.colors.background, overflow: 'hidden' },
         animation: 'slide_from_right',
+        animationDuration: 280,
+        gestureEnabled: true,
       }}
     >
       <Stack.Screen name="Auth" component={AuthScreen} />

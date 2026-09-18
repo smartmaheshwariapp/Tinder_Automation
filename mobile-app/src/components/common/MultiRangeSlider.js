@@ -1,4 +1,3 @@
-import { theme as uiTheme } from '../../theme';
 // src/components/common/MultiRangeSlider.js
 // Two-thumb dual range slider on a single track with smooth touch response matching Desktop V2 UI
 import React, { useRef, useState, useEffect } from 'react';
@@ -8,6 +7,12 @@ import {
   StyleSheet,
   PanResponder,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { theme as uiTheme } from '../../theme';
+
+// Visual constants only: 44pt thumb hit box, fixed-width value bubble.
+const THUMB_HIT = 44;
+const BUBBLE_W = 96;
 
 export default function MultiRangeSlider({
   min = 18,
@@ -205,12 +210,12 @@ export default function MultiRangeSlider({
           style={[
             styles.floatingBubble,
             {
-              left: (minPos + maxPos) / 2,
-              transform: [{ translateX: -42 }],
+              left: Math.min(Math.max((minPos + maxPos) / 2, BUBBLE_W / 2), Math.max(trackWidth - BUBBLE_W / 2, BUBBLE_W / 2)),
+              transform: [{ translateX: -BUBBLE_W / 2 }],
             },
           ]}
         >
-          <Text style={styles.bubbleText}>
+          <Text style={styles.bubbleText} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
             {localMin} – {localMax} {unit}
           </Text>
           <View style={styles.bubbleArrow} />
@@ -240,7 +245,9 @@ export default function MultiRangeSlider({
                 width: Math.max(maxPos - minPos, 0),
               },
             ]}
-          />
+          >
+            <LinearGradient colors={uiTheme.gradients.brandShort} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+          </View>
         </View>
 
         {/* Min Thumb (Left Side Handle) */}
@@ -248,7 +255,7 @@ export default function MultiRangeSlider({
           <View
             style={[
               styles.thumbTouchArea,
-              { left: minPos - 20 },
+              { left: minPos - THUMB_HIT / 2 },
               draggingThumb === 'min' && { zIndex: 10 },
             ]}
             accessible
@@ -280,7 +287,7 @@ export default function MultiRangeSlider({
           <View
             style={[
               styles.thumbTouchArea,
-              { left: maxPos - 20 },
+              { left: maxPos - THUMB_HIT / 2 },
               draggingThumb === 'max' && { zIndex: 10 },
             ]}
             accessible
@@ -310,17 +317,18 @@ export default function MultiRangeSlider({
 
       {/* Min & Max Limit Markers */}
       <View style={styles.limitsRow}>
-        <Text style={styles.limitText}>{min} yrs</Text>
-        <Text style={styles.limitText}>{max} yrs</Text>
+        <Text style={styles.limitText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{min} yrs</Text>
+        <Text style={styles.limitText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{max} yrs</Text>
       </View>
     </View>
   );
 }
 
+const c = uiTheme.colors;
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 10,
-    paddingTop: 18,
+    marginVertical: uiTheme.spacing.sm,
+    paddingTop: uiTheme.spacing.xl,
     position: 'relative',
   },
   disabled: {
@@ -328,47 +336,45 @@ const styles = StyleSheet.create({
   },
   floatingBubble: {
     position: 'absolute',
-    top: -8,
-    width: 84,
+    top: -uiTheme.spacing.sm,
+    width: BUBBLE_W,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: uiTheme.colors.primary,
-    paddingVertical: 3.5,
-    borderRadius: 6,
+    backgroundColor: c.primary,
+    paddingVertical: uiTheme.spacing.xs,
+    paddingHorizontal: uiTheme.spacing.sm,
+    borderRadius: uiTheme.radius.xs,
     zIndex: 20,
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-    elevation: 5,
+    ...uiTheme.shadows.sm,
   },
-  bubbleText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  bubbleText: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.onPrimary,
     textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   bubbleArrow: {
     position: 'absolute',
-    bottom: -3.5,
+    bottom: -4,
     width: 0,
     height: 0,
-    borderLeftWidth: 4,
-    borderRightWidth: 4,
-    borderTopWidth: 4,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 5,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: uiTheme.colors.primary,
+    borderTopColor: c.primary,
   },
   trackContainer: {
-    height: 40,
+    height: THUMB_HIT,
     justifyContent: 'center',
     position: 'relative',
   },
   trackBase: {
-    height: 7,
-    backgroundColor: uiTheme.colors.elevated,
-    borderRadius: 999,
+    height: 4,
+    backgroundColor: c.elevatedHigh,
+    borderRadius: uiTheme.radius.pill,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -376,44 +382,40 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    backgroundColor: uiTheme.colors.primary,
-    borderRadius: 999,
+    borderRadius: uiTheme.radius.pill,
+    overflow: 'hidden',
   },
   thumbTouchArea: {
     position: 'absolute',
     top: 0,
-    width: 40,
-    height: 40,
+    width: THUMB_HIT,
+    height: THUMB_HIT,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
   },
   thumbVisual: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 4,
-    borderColor: uiTheme.colors.primary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 3.5,
-    elevation: 4,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: c.white,
+    borderWidth: 3,
+    borderColor: c.primary,
+    ...uiTheme.shadows.sm,
   },
   thumbVisualActive: {
-    transform: [{ scale: 1.25 }],
-    borderColor: '#FF6584',
+    transform: [{ scale: 1.12 }],
+    borderColor: c.accent,
   },
   limitsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 2,
-    marginTop: -2,
+    paddingHorizontal: uiTheme.spacing.xxs,
+    marginTop: -uiTheme.spacing.xxs,
   },
-  limitText: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  limitText: {
+    ...uiTheme.type.footnote,
+    color: c.muted,
+    fontVariant: ['tabular-nums'],
   },
 });

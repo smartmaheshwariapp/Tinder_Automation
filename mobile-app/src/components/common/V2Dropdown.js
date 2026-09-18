@@ -1,7 +1,6 @@
-import { theme as uiTheme } from '../../theme';
 // src/components/common/V2Dropdown.js
 // Custom animated Dropdown component matching Desktop Plugin V2 UI trigger and options list (5 items visible + scroll)
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,8 +10,12 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { theme as uiTheme } from '../../theme';
+import { useMotionReduced } from './Motion';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -29,6 +32,16 @@ export default function V2Dropdown({
   maxVisibleItems = 5,
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const reducedMotion = useMotionReduced();
+  const chevron = useRef(new Animated.Value(0)).current;
+
+  // Visual only: rotates the chevron to mirror the open state.
+  useEffect(() => {
+    chevron.stopAnimation();
+    if (reducedMotion) { chevron.setValue(isOpen ? 1 : 0); return; }
+    Animated.timing(chevron, { toValue: isOpen ? 1 : 0, duration: uiTheme.motion.fast, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [isOpen, reducedMotion, chevron]);
+  const chevronRotate = chevron.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
   const toggleDropdown = () => {
     if (disabled) return;
@@ -54,8 +67,8 @@ export default function V2Dropdown({
     <View style={[styles.container, disabled && styles.disabled]}>
       {label && (
         <View style={styles.labelRow}>
-          <Text style={styles.dropdownLabel}>{label}</Text>
-          {sublabel && <Text style={styles.dropdownSublabel}>{sublabel}</Text>}
+          <Text style={styles.dropdownLabel} maxFontSizeMultiplier={uiTheme.fontScale.body}>{label}</Text>
+          {sublabel && <Text style={styles.dropdownSublabel} maxFontSizeMultiplier={uiTheme.fontScale.body}>{sublabel}</Text>}
         </View>
       )}
 
@@ -69,14 +82,16 @@ export default function V2Dropdown({
         accessibilityLabel={`${label || 'Select option'}: ${displayLabel}`}
         accessibilityState={{ expanded: isOpen, disabled }}
       >
-        <Text style={styles.triggerValue} numberOfLines={1}>
+        <Text style={[styles.triggerValue, !selectedOption && styles.triggerPlaceholder]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
           {displayLabel}
         </Text>
-        <Ionicons
-          name={isOpen ? 'chevron-up' : 'chevron-down'}
-          size={16}
-          color={uiTheme.colors.muted}
-        />
+        <Animated.View style={{ transform: [{ rotate: chevronRotate }] }}>
+          <Ionicons
+            name="chevron-down"
+            size={18}
+            color={isOpen ? uiTheme.colors.accent : uiTheme.colors.muted}
+          />
+        </Animated.View>
       </TouchableOpacity>
 
       {/* Expandable Options List capped to 5 visible items with ScrollView */}
@@ -106,17 +121,17 @@ export default function V2Dropdown({
                     {opt.icon && (
                       <Ionicons
                         name={opt.icon}
-                        size={15}
-                        color={isSelected ? uiTheme.colors.primary : uiTheme.colors.muted}
-                        style={{ marginRight: 8 }}
+                        size={16}
+                        color={isSelected ? uiTheme.colors.accent : uiTheme.colors.muted}
+                        style={styles.optionIcon}
                       />
                     )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                    <View style={styles.optionCopy}>
+                      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]} maxFontSizeMultiplier={uiTheme.fontScale.body}>
                         {opt.label}
                       </Text>
                       {opt.desc && (
-                        <Text style={styles.optionDesc} numberOfLines={1}>
+                        <Text style={styles.optionDesc} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.body}>
                           {opt.desc}
                         </Text>
                       )}
@@ -124,7 +139,7 @@ export default function V2Dropdown({
                   </View>
 
                   {isSelected && (
-                    <Ionicons name="checkmark" size={16} color={uiTheme.colors.primary} />
+                    <Ionicons name="checkmark" size={18} color={uiTheme.colors.accent} style={styles.optionCheck} />
                   )}
                 </TouchableOpacity>
               );
@@ -136,9 +151,10 @@ export default function V2Dropdown({
   );
 }
 
+const c = uiTheme.colors;
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 6,
+    marginVertical: uiTheme.spacing.xs,
   },
   disabled: {
     opacity: 0.5,
@@ -147,50 +163,54 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 6,
-    gap: 6,
+    marginBottom: uiTheme.spacing.sm,
+    columnGap: uiTheme.spacing.sm,
+    rowGap: uiTheme.spacing.xxs,
   },
-  dropdownLabel: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.text,
-    fontSize: 13,
-    fontWeight: 'normal',
+  dropdownLabel: {
+    ...uiTheme.type.label,
+    color: c.text,
+    flexShrink: 1,
   },
-  dropdownSublabel: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  dropdownSublabel: {
+    ...uiTheme.type.footnote,
+    color: c.muted,
+    flexShrink: 1,
   },
   trigger: {
-    minHeight: 48,
-    paddingVertical: uiTheme.spacing.md,
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: 10,
+    minHeight: uiTheme.layout.inputHeight,
+    paddingVertical: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.lg,
+    backgroundColor: c.elevated,
+    borderRadius: uiTheme.radius.input,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderColor: c.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
+    gap: uiTheme.spacing.sm,
   },
   triggerOpen: {
-    borderColor: uiTheme.colors.primary,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
+    borderColor: c.accent,
   },
-  triggerValue: { fontFamily: 'Inter_600SemiBold',
-    color: '#FFF',
-    fontSize: 13.5,
-    fontWeight: 'normal',
+  triggerValue: {
+    ...uiTheme.type.bodyStrong,
+    color: c.text,
     flex: 1,
-    marginRight: uiTheme.spacing.sm,
+    minWidth: 0,
+  },
+  triggerPlaceholder: {
+    fontFamily: uiTheme.fonts.body,
+    color: c.muted,
   },
   optionsList: {
-    backgroundColor: uiTheme.colors.surface,
+    marginTop: uiTheme.spacing.xs,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: uiTheme.colors.primary,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
+    borderColor: c.border,
+    borderRadius: uiTheme.radius.input,
     overflow: 'hidden',
+    ...uiTheme.shadows.md,
   },
   optionsScrollView: {
     width: '100%',
@@ -199,36 +219,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: uiTheme.colors.elevated,
+    paddingVertical: uiTheme.spacing.sm + 2,
+    paddingHorizontal: uiTheme.spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.divider,
     minHeight: 48,
   },
   optionItemSelected: {
-    backgroundColor: 'rgba(254, 60, 114, 0.08)',
+    backgroundColor: c.primarySoft,
   },
   optionContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
   },
-  optionFlag: { fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.body.fontSize,
+  optionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  optionIcon: {
     marginRight: uiTheme.spacing.sm,
   },
-  optionText: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.textSecondary,
-    fontSize: 13,
-    fontWeight: 'normal',
+  optionCheck: {
+    marginLeft: uiTheme.spacing.sm,
   },
-  optionTextSelected: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontWeight: 'normal',
+  optionFlag: {
+    ...uiTheme.type.body,
+    marginRight: uiTheme.spacing.sm,
   },
-  optionDesc: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  optionText: {
+    ...uiTheme.type.callout,
+    fontFamily: uiTheme.fonts.caption,
+    color: c.textSecondary,
+  },
+  optionTextSelected: {
+    fontFamily: uiTheme.fonts.label,
+    color: c.accent,
+  },
+  optionDesc: {
+    ...uiTheme.type.footnote,
+    color: c.muted,
     marginTop: 1,
   },
 });

@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../theme';
+import { theme as uiTheme, alpha } from '../theme';
 // src/screens/OnboardingScreen.js — 6-Step Onboarding matching Desktop Plugin
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -24,6 +24,7 @@ import {
   LayoutAnimation,
   UIManager,
   PanResponder,
+  useWindowDimensions,
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -31,10 +32,13 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StackActions } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import trackingService from '../services/trackingService';
+import { AppButton, Badge, Chip, ContentTransition, IconButton, IconWell } from '../components/ui';
+import { useMotionReduced } from '../components/common/Motion';
+import useResponsive from '../hooks/useResponsive';
 import {
   generateDynamicAiConversation,
   fetchLiveAiChatReply,
@@ -61,6 +65,18 @@ const safeHaptic = (type) => {
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 
+// Design-system shorthands (see DESIGN_SYSTEM.md).
+const C = uiTheme.colors;
+const TY = uiTheme.type;
+const SP = uiTheme.spacing;
+const RD = uiTheme.radius;
+
+// Presentational step metadata for the progress header (eyebrow per step).
+const STEP_EYEBROWS = ['Welcome', 'Your region', 'Your goals', 'Chat style', 'Preview'];
+// Approximate heights of fixed chrome, used to size the step 5 deck so it fits without scrolling.
+const TOP_BAR_HEIGHT = 64;
+const FOOTER_HEIGHT = 112;
+
 // ── Real Generated Profiles for Live Sliding Showcase ──
 const PREVIEW_PROFILES = [
   {
@@ -71,9 +87,9 @@ const PREVIEW_PROFILES = [
     image: require('../../assets/profiles/sarah_card.jpg'),
     opener: "Noticed your trip to Kyoto—did you find that hidden matcha spot by the canal?",
     tags: [
-      { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
-      { icon: 'shield-checkmark-outline', label: 'Verified profile', color: '#00E676' },
-      { icon: 'time-outline', label: 'Natural timing', color: uiTheme.colors.secondary },
+      { icon: 'heart-outline', label: 'Shared interests', color: C.accent },
+      { icon: 'shield-checkmark-outline', label: 'Verified profile', color: C.success },
+      { icon: 'time-outline', label: 'Natural timing', color: C.secondary },
     ],
   },
   {
@@ -84,9 +100,9 @@ const PREVIEW_PROFILES = [
     image: require('../../assets/profiles/maya_card.jpg'),
     opener: "That outdoor cafe looks cozy! What's your go-to coffee order on a Sunday morning?",
     tags: [
-      { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
-      { icon: 'shield-checkmark-outline', label: 'Verified profile', color: '#00E676' },
-      { icon: 'sparkles-outline', label: 'Active now', color: uiTheme.colors.secondary },
+      { icon: 'heart-outline', label: 'Shared interests', color: C.accent },
+      { icon: 'shield-checkmark-outline', label: 'Verified profile', color: C.success },
+      { icon: 'sparkles-outline', label: 'Active now', color: C.secondary },
     ],
   },
   {
@@ -97,9 +113,9 @@ const PREVIEW_PROFILES = [
     image: require('../../assets/profiles/elena_card.jpg'),
     opener: "Golden hour rooftop views can't be beat. Have you caught live jazz around there?",
     tags: [
-      { icon: 'heart-outline', label: 'Shared interests', color: '#FF6B8B' },
-      { icon: 'shield-checkmark-outline', label: 'Verified profile', color: '#00E676' },
-      { icon: 'time-outline', label: 'Natural timing', color: uiTheme.colors.secondary },
+      { icon: 'heart-outline', label: 'Shared interests', color: C.accent },
+      { icon: 'shield-checkmark-outline', label: 'Verified profile', color: C.success },
+      { icon: 'time-outline', label: 'Natural timing', color: C.secondary },
     ],
   },
 ];
@@ -521,36 +537,40 @@ const GOALS = [
     title: 'Set up a Date',
     desc: 'Suggests drinks, coffee, or dinner once there is a good vibe.',
     icon: 'calendar',
-    gradient: [uiTheme.colors.primary, uiTheme.colors.secondary],
-    accentColor: uiTheme.colors.primary,
-    bgActive: 'rgba(255, 51, 102, 0.12)',
+    gradient: [C.primary, C.secondary],
+    accentColor: C.primary,
+    tone: 'primary',
+    bgActive: C.primarySoft,
   },
   {
     id: 'phone',
     title: 'Get Her Number',
     desc: 'Asks for her number so you can text or WhatsApp directly.',
     icon: 'call',
-    gradient: ['#00E676', '#00B0FF'],
-    accentColor: '#00E676',
-    bgActive: 'rgba(0, 230, 118, 0.10)',
+    gradient: [C.success, C.info],
+    accentColor: C.success,
+    tone: 'success',
+    bgActive: C.successSoft,
   },
   {
     id: 'social',
     title: 'Exchange Socials',
     desc: 'Swaps Instagram or Snapchat to check out photos and stories.',
     icon: 'logo-instagram',
-    gradient: ['#E040FB', '#7C4DFF'],
-    accentColor: '#E040FB',
-    bgActive: 'rgba(224, 64, 251, 0.10)',
+    gradient: [C.info, C.accent],
+    accentColor: C.info,
+    tone: 'info',
+    bgActive: C.infoSoft,
   },
   {
     id: 'never_stop',
     title: 'Casual Chat & Banter',
     desc: 'Keeps the conversation fun and playful with no rush to meet.',
     icon: 'chatbubbles',
-    gradient: ['#00E5FF', '#2979FF'],
-    accentColor: '#00E5FF',
-    bgActive: 'rgba(0, 229, 255, 0.10)',
+    gradient: [C.secondary, C.accent],
+    accentColor: C.secondary,
+    tone: 'secondary',
+    bgActive: C.secondarySoft,
   },
 ];
 
@@ -594,22 +614,16 @@ const CARD_SPRING = { mass: 1, stiffness: 170, damping: 26 };
 const POP_SPRING = { mass: 0.6, stiffness: 260, damping: 18 }; // snappier, for checkmark
 const COUNTER_SPRING = { mass: 0.5, stiffness: 300, damping: 20 }; // for header counter pulse
 
-// ── 5-Layer Native-Driver Animated Goal Card ──
+// ── Selectable Goal Card (native-driver selection, press and check animations) ──
 const GoalCardItem = React.memo(({ goal, isSelected, onToggle }) => {
+  const reduceMotion = useMotionReduced();
   const progress = useRef(new Animated.Value(isSelected ? 1 : 0)).current;
   const pressScale = useRef(new Animated.Value(1)).current;
   const checkProgress = useRef(new Animated.Value(isSelected ? 1 : 0.6)).current;
   const ripple = useRef(new Animated.Value(0)).current;
-  const reduceMotion = useRef(false);
 
   useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then((v) => {
-      reduceMotion.current = v;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (reduceMotion.current) {
+    if (reduceMotion) {
       progress.setValue(isSelected ? 1 : 0);
       checkProgress.setValue(isSelected ? 1 : 0.6);
       if (isSelected) ripple.setValue(1);
@@ -632,16 +646,17 @@ const GoalCardItem = React.memo(({ goal, isSelected, onToggle }) => {
       ripple.setValue(0);
       Animated.timing(ripple, {
         toValue: 1,
-        duration: 420,
+        duration: uiTheme.motion.slow,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }).start();
     }
-  }, [isSelected]);
+  }, [isSelected, reduceMotion]);
 
   const handlePressIn = () => {
+    if (reduceMotion) return;
     Animated.spring(pressScale, {
-      toValue: 0.965,
+      toValue: uiTheme.motion.press.scale,
       mass: 0.5,
       stiffness: 300,
       damping: 20,
@@ -650,6 +665,10 @@ const GoalCardItem = React.memo(({ goal, isSelected, onToggle }) => {
   };
 
   const handlePressOut = () => {
+    if (reduceMotion) {
+      pressScale.setValue(1);
+      return;
+    }
     Animated.spring(pressScale, {
       toValue: 1,
       mass: 0.5,
@@ -659,54 +678,17 @@ const GoalCardItem = React.memo(({ goal, isSelected, onToggle }) => {
     }).start();
   };
 
-  // Layer 2: Lift + scale (transform-only, 100% GPU on native thread)
-  const cardTranslateY = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -3],
-  });
-  const cardLiftScale = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.018],
-  });
-
-  // Layer 1: Ambient halo glow behind card
-  const glowOpacity = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 0.32],
-  });
-  const glowScale = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.92, 1.04],
-  });
-
-  // Dedicated Shadow View (separate from elevation - avoids re-rasterization on Android)
-  const shadowOpacity = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.08, 0.24],
-  });
-  const shadowScale = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.96, 1.05],
-  });
-
-  // Layer 4: Icon disk micro-rotation + modest overshoot
-  const iconRotate = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['-3deg', '0deg'],
-  });
   const iconScale = progress.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 1.06],
   });
-
-  // Layer 5: Checkmark ripple ring
   const ringOpacity = ripple.interpolate({
     inputRange: [0, 1],
     outputRange: [0.65, 0],
   });
   const ringScale = ripple.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 1.5],
+    outputRange: [1, 1.6],
   });
 
   return (
@@ -719,129 +701,39 @@ const GoalCardItem = React.memo(({ goal, isSelected, onToggle }) => {
       accessibilityLabel={`${goal.title}: ${goal.desc}`}
       style={styles.goalCardWrap}
     >
-      {/* Layer 1: Ambient Halo Glow */}
-      <Animated.View
-        style={[
-          styles.goalGlow,
-          {
-            backgroundColor: goal.accentColor,
-            opacity: glowOpacity,
-            transform: [{ scale: glowScale }],
-          },
-        ]}
-        pointerEvents="none"
-      />
-
-      {/* Layer 2: Dedicated GPU Shadow (avoids Android elevation re-rasterization) */}
-      <Animated.View
-        style={[
-          styles.goalShadow,
-          {
-            opacity: shadowOpacity,
-            transform: [{ scale: shadowScale }, { translateY: 3 }],
-          },
-        ]}
-        pointerEvents="none"
-      />
-
-      {/* Layer 3: Card Surface with Lift & Scale */}
-      <Animated.View
-        style={[
-          styles.goalCard,
-          {
-            transform: [
-              { translateY: cardTranslateY },
-              { scale: cardLiftScale },
-              { scale: pressScale },
-            ],
-          },
-        ]}
-      >
-        {/* Pre-rendered Gradient Sheen with Native Opacity */}
+      <Animated.View style={[styles.goalCard, { transform: [{ scale: pressScale }] }]}>
+        {/* Selected fill + border, faded in on the native thread */}
         <Animated.View
-          style={[StyleSheet.absoluteFill, { opacity: progress }]}
-          pointerEvents="none"
-        >
-          <LinearGradient
-            colors={[`${goal.accentColor}26`, `${goal.accentColor}02`]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-
-        {/* Specular Border with Native Opacity */}
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            styles.goalSpecularBorder,
-            { borderColor: goal.accentColor, opacity: progress },
-          ]}
+          style={[StyleSheet.absoluteFill, styles.goalCardSelectedLayer, { opacity: progress }]}
           pointerEvents="none"
         />
 
-        {/* Layer 4: Icon Disk with Micro-Rotation */}
-        <Animated.View
-          style={[
-            styles.goalIconDisk,
-            {
-              transform: [{ rotate: iconRotate }, { scale: iconScale }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={
-              isSelected
-                ? goal.gradient
-                : ['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.03)']
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Ionicons
-            name={goal.icon}
-            size={20}
-            color={isSelected ? '#FFFFFF' : 'rgba(245, 230, 240, 0.6)'}
-          />
+        <Animated.View style={{ transform: [{ scale: iconScale }] }}>
+          <IconWell icon={goal.icon} tone={isSelected ? goal.tone : 'neutral'} size={44} iconSize={20} />
         </Animated.View>
 
-        {/* Content Info */}
         <View style={styles.goalInfo}>
-          <Text style={[styles.goalTitle, isSelected && styles.goalTitleSelected]}>
+          <Text style={styles.goalTitle} maxFontSizeMultiplier={uiTheme.fontScale.body}>
             {goal.title}
           </Text>
-          <Text style={[styles.goalDesc, isSelected && styles.goalDescSelected]}>
+          <Text style={[styles.goalDesc, isSelected && styles.goalDescSelected]} maxFontSizeMultiplier={uiTheme.fontScale.body}>
             {goal.desc}
           </Text>
         </View>
 
-        {/* Layer 5: Checkmark Squircle & Expanding Ripple Ring */}
         <View style={styles.goalCheckWrap}>
           <Animated.View
-            style={[
-              styles.goalRippleRing,
-              {
-                borderColor: goal.accentColor,
-                opacity: ringOpacity,
-                transform: [{ scale: ringScale }],
-              },
-            ]}
+            style={[styles.goalRippleRing, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]}
             pointerEvents="none"
           />
           <Animated.View
             style={[
-              styles.goalCheckSquircle,
-              {
-                backgroundColor: isSelected ? goal.accentColor : 'rgba(255, 255, 255, 0.04)',
-                borderColor: isSelected ? goal.accentColor : 'rgba(255, 255, 255, 0.22)',
-                transform: [{ scale: checkProgress }],
-              },
+              styles.goalCheck,
+              isSelected && styles.goalCheckSelected,
+              { transform: [{ scale: checkProgress }] },
             ]}
           >
-            {isSelected && (
-              <Ionicons name="checkmark" size={13} color="#FFFFFF" />
-            )}
+            {isSelected && <Ionicons name="checkmark" size={14} color={C.onPrimary} />}
           </Animated.View>
         </View>
       </Animated.View>
@@ -882,7 +774,7 @@ const PERSONALITIES = [
     label: 'Freestyle',
     tagline: 'Context-Smart',
     icon: 'sparkles',
-    accentColor: uiTheme.colors.primary,
+    accentColor: C.primary,
     previewOpener: "Hey! Love the energy in your profile. How's your week treating you so far?",
     vibeDesc: 'Adapts to photos and bio cues for natural chemistry.',
   },
@@ -891,7 +783,7 @@ const PERSONALITIES = [
     label: 'Flirty',
     tagline: 'Teasing & Warm',
     icon: 'flame',
-    accentColor: uiTheme.colors.accent,
+    accentColor: C.accent,
     previewOpener: "Had to swipe right — that smile definitely caught my eye. What's your secret?",
     vibeDesc: 'Playful compliments and charm to spark chemistry fast.',
   },
@@ -900,7 +792,7 @@ const PERSONALITIES = [
     label: 'Confident',
     tagline: 'Direct & Bold',
     icon: 'diamond',
-    accentColor: '#00E5FF',
+    accentColor: C.info,
     previewOpener: "Hey, good taste! Let's skip the small talk — what are you most passionate about right now?",
     vibeDesc: 'Direct, bold questions that cut past small talk.',
   },
@@ -909,7 +801,7 @@ const PERSONALITIES = [
     label: 'Witty',
     tagline: 'Sharp Banter',
     icon: 'bulb',
-    accentColor: '#B388FF',
+    accentColor: C.info,
     previewOpener: "Quick question: what's the craziest story behind your third travel photo?",
     vibeDesc: 'Clever banter and humor to get her smiling right away.',
   },
@@ -918,7 +810,7 @@ const PERSONALITIES = [
     label: 'Charming',
     tagline: 'Smooth & Polite',
     icon: 'heart',
-    accentColor: uiTheme.colors.secondary,
+    accentColor: C.secondary,
     previewOpener: "Honestly couldn't just scroll past without saying hi. What's something fun you've been up to?",
     vibeDesc: 'Smooth curiosity with classic gentlemanly warmth.',
   },
@@ -927,7 +819,7 @@ const PERSONALITIES = [
     label: 'Playful',
     tagline: 'High Energy',
     icon: 'happy',
-    accentColor: '#FFD600',
+    accentColor: C.warning,
     previewOpener: 'Swiped right for the vibe, stayed to see if your humor matches mine 😏',
     vibeDesc: 'Lively teasing and fun energy to keep chats exciting.',
   },
@@ -936,7 +828,7 @@ const PERSONALITIES = [
     label: 'Bold',
     tagline: 'Direct & Daring',
     icon: 'flash',
-    accentColor: '#FF3D00',
+    accentColor: C.error,
     previewOpener: "Let's be real — we'd probably have great chemistry over coffee or drinks.",
     vibeDesc: 'Daring, memorable openers that stand out instantly.',
   },
@@ -945,7 +837,7 @@ const PERSONALITIES = [
     label: 'Romantic',
     tagline: 'Sweet & Sincere',
     icon: 'rose',
-    accentColor: '#F48FB1',
+    accentColor: C.accent,
     previewOpener: "Love the energy in your photos. What's something that always brings a smile to your face?",
     vibeDesc: 'Sweet, sincere questions that spark real feelings.',
   },
@@ -954,7 +846,7 @@ const PERSONALITIES = [
     label: 'Gentle',
     tagline: 'Relaxed & Kind',
     icon: 'cafe',
-    accentColor: '#00E676',
+    accentColor: C.success,
     previewOpener: 'Hey there! Loved your profile, you seem to have really warm, down-to-earth energy.',
     vibeDesc: 'Relaxed, warm curiosity with zero pressure or rush.',
   },
@@ -963,7 +855,7 @@ const PERSONALITIES = [
     label: 'Deep Connection',
     tagline: 'Authentic & Real',
     icon: 'compass',
-    accentColor: '#448AFF',
+    accentColor: C.info,
     previewOpener: "Looking for something real and genuine. What's a passion project you love working on?",
     vibeDesc: 'Authentic, thoughtful questions for deeper connections.',
   },
@@ -978,6 +870,11 @@ export default function OnboardingScreen({ navigation }) {
     trackingService.trackEvent('onboarding_started', { step: 1 });
   }, []);
   const totalSteps = 5;
+
+  // ── Layout & motion environment (presentation only) ──
+  const reduceMotion = useMotionReduced();
+  const insets = useSafeAreaInsets();
+  const { gutter, height: windowHeight, contentWidth } = useResponsive();
 
   // ── Step Selections State ──
   const selectedPlatform = 'tinder'; // Tinder-dedicated app
@@ -1153,7 +1050,7 @@ export default function OnboardingScreen({ navigation }) {
 
   // Living shield beacon pulse loop (when safeMode is active)
   useEffect(() => {
-    if (!safeMode) {
+    if (!safeMode || reduceMotion) {
       shieldPulse.setValue(1);
       return;
     }
@@ -1165,7 +1062,7 @@ export default function OnboardingScreen({ navigation }) {
     );
     pulseLoop.start();
     return () => pulseLoop.stop();
-  }, [safeMode, shieldPulse]);
+  }, [safeMode, shieldPulse, reduceMotion]);
 
   const currentPersonalityObj = useMemo(
     () => PERSONALITIES.find((p) => p.id === personality) || PERSONALITIES[0],
@@ -1319,6 +1216,10 @@ export default function OnboardingScreen({ navigation }) {
 
   // Blinking cursor loop
   useEffect(() => {
+    if (reduceMotion) {
+      voiceCursorOpacity.setValue(1);
+      return undefined;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(voiceCursorOpacity, { toValue: 0, duration: 420, useNativeDriver: true }),
@@ -1327,10 +1228,16 @@ export default function OnboardingScreen({ navigation }) {
     );
     loop.start();
     return () => loop.stop();
-  }, [voiceCursorOpacity]);
+  }, [voiceCursorOpacity, reduceMotion]);
 
   // Bouncing typing dots loop
   useEffect(() => {
+    if (reduceMotion) {
+      typingDot1.setValue(0);
+      typingDot2.setValue(0);
+      typingDot3.setValue(0);
+      return undefined;
+    }
     const bounce = (anim, delay) => {
       return Animated.loop(
         Animated.sequence([
@@ -1355,10 +1262,16 @@ export default function OnboardingScreen({ navigation }) {
       d2.stop();
       d3.stop();
     };
-  }, [typingDot1, typingDot2, typingDot3]);
+  }, [typingDot1, typingDot2, typingDot3, reduceMotion]);
 
   // Audio / Vibe Waveform Visualizer loop
   useEffect(() => {
+    if (reduceMotion) {
+      waveBar1.setValue(0.6);
+      waveBar2.setValue(0.9);
+      waveBar3.setValue(0.5);
+      return undefined;
+    }
     const wave = (anim, toVal, dur) => {
       return Animated.loop(
         Animated.sequence([
@@ -1378,7 +1291,7 @@ export default function OnboardingScreen({ navigation }) {
       w2.stop();
       w3.stop();
     };
-  }, [waveBar1, waveBar2, waveBar3]);
+  }, [waveBar1, waveBar2, waveBar3, reduceMotion]);
 
   // Interactive Typewriter Stream Controller
   useEffect(() => {
@@ -1918,10 +1831,21 @@ export default function OnboardingScreen({ navigation }) {
   const cursorOpacity = useRef(new Animated.Value(1)).current;
   const marqueeAnim = useRef(new Animated.Value(0)).current;
 
-  // ── 1. Static Mount: Living Ambient Aurora Loops ──
+  // ── 1. Living Ambient Aurora & Cursor Loops (native driver, paused under reduced motion) ──
   useEffect(() => {
+    if (reduceMotion) {
+      auroraFloat1.setValue(0);
+      auroraScale1.setValue(1.0);
+      auroraOpacity1.setValue(0.28);
+      auroraFloat2.setValue(0);
+      auroraScale2.setValue(1.05);
+      auroraOpacity2.setValue(0.22);
+      cursorOpacity.setValue(1);
+      return undefined;
+    }
+
     // Ambient Aurora Orb 1 Loop
-    Animated.loop(
+    const aurora1 = Animated.loop(
       Animated.sequence([
         Animated.parallel([
           Animated.timing(auroraFloat1, {
@@ -1962,10 +1886,10 @@ export default function OnboardingScreen({ navigation }) {
           }),
         ]),
       ])
-    ).start();
+    );
 
     // Ambient Aurora Orb 2 Loop
-    Animated.loop(
+    const aurora2 = Animated.loop(
       Animated.sequence([
         Animated.parallel([
           Animated.timing(auroraFloat2, {
@@ -2006,10 +1930,10 @@ export default function OnboardingScreen({ navigation }) {
           }),
         ]),
       ])
-    ).start();
+    );
 
     // Shimmering Cursor Blink Loop
-    Animated.loop(
+    const cursorBlink = Animated.loop(
       Animated.sequence([
         Animated.timing(cursorOpacity, {
           toValue: 0,
@@ -2024,17 +1948,31 @@ export default function OnboardingScreen({ navigation }) {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
 
+    aurora1.start();
+    aurora2.start();
+    cursorBlink.start();
+    return () => {
+      aurora1.stop();
+      aurora2.stop();
+      cursorBlink.stop();
+    };
+  }, [reduceMotion]);
+
+  // ── Static Mount: initial marquee loop + goal feedback timer cleanup ──
+  useEffect(() => {
     // Infinite Smooth Non-Stop Marquee Slide Loop
-    Animated.loop(
-      Animated.timing(marqueeAnim, {
-        toValue: -TRACK_WIDTH,
-        duration: 22000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
+    if (!reduceMotion) {
+      Animated.loop(
+        Animated.timing(marqueeAnim, {
+          toValue: -TRACK_WIDTH,
+          duration: 22000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+    }
 
     return () => {
       if (goalFeedbackTimer.current) clearTimeout(goalFeedbackTimer.current);
@@ -2044,7 +1982,7 @@ export default function OnboardingScreen({ navigation }) {
   // ── Step 1: Infinite Smooth Non-Stop Marquee Slide Loop ──
   useEffect(() => {
     let anim;
-    if (currentStep === 1) {
+    if (currentStep === 1 && !reduceMotion) {
       marqueeAnim.setValue(0);
       anim = Animated.loop(
         Animated.timing(marqueeAnim, {
@@ -2059,7 +1997,7 @@ export default function OnboardingScreen({ navigation }) {
     return () => {
       if (anim) anim.stop();
     };
-  }, [currentStep]);
+  }, [currentStep, reduceMotion]);
 
   // ── 2. Executive Confirmation & Setup Readiness on Step 5 ──
   useEffect(() => {
@@ -2226,7 +2164,7 @@ export default function OnboardingScreen({ navigation }) {
 
     Animated.timing(stepIndexAnim, {
       toValue: newStep,
-      duration: 320,
+      duration: reduceMotion ? 0 : 320,
       easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
       useNativeDriver: true,
     }).start();
@@ -2455,14 +2393,14 @@ export default function OnboardingScreen({ navigation }) {
         stepNumber: '01 / 03',
         category: 'YOUR DATING GOAL',
         icon: 'heart',
-        iconColor: '#FF6584',
+        iconColor: C.accent,
         title: goalsSummary.title,
         detail: goalsSummary.detail,
         suit: '♥',
-        badgeBg: 'rgba(255, 101, 132, 0.18)',
-        gradient: ['rgba(44, 16, 32, 0.96)', 'rgba(22, 8, 18, 0.98)'],
-        borderColor: 'rgba(255, 101, 132, 0.45)',
-        accentGlow: '#FF3366',
+        badgeBg: alpha(C.accent, 0.18),
+        gradient: [C.elevatedHigh, C.surface],
+        borderColor: C.primaryBorder,
+        accentGlow: C.primary,
       },
       {
         id: 'vibe',
@@ -2473,9 +2411,9 @@ export default function OnboardingScreen({ navigation }) {
         title: `${currentPersonalityObj.label} & Charming`,
         detail: 'Tailored opening lines and banter drafted in your authentic voice.',
         suit: '★',
-        badgeBg: `${currentPersonalityObj.accentColor}25`,
-        gradient: ['rgba(38, 18, 52, 0.96)', 'rgba(18, 8, 28, 0.98)'],
-        borderColor: `${currentPersonalityObj.accentColor}50`,
+        badgeBg: alpha(currentPersonalityObj.accentColor, 0.16),
+        gradient: [C.elevatedHigh, C.surface],
+        borderColor: alpha(currentPersonalityObj.accentColor, 0.34),
         accentGlow: currentPersonalityObj.accentColor,
       },
       {
@@ -2483,14 +2421,14 @@ export default function OnboardingScreen({ navigation }) {
         stepNumber: '03 / 03',
         category: 'LOCAL DATING',
         icon: 'location-sharp',
-        iconColor: '#00E676',
+        iconColor: C.success,
         title: `Made for ${country} ${getCountryFlag(country)}`,
         detail: 'Paced naturally to match how people actually connect in your city.',
         suit: '✦',
-        badgeBg: 'rgba(0, 230, 118, 0.18)',
-        gradient: ['rgba(14, 38, 28, 0.96)', 'rgba(8, 22, 16, 0.98)'],
-        borderColor: 'rgba(0, 230, 118, 0.45)',
-        accentGlow: '#00E676',
+        badgeBg: C.successSoft,
+        gradient: [C.elevatedHigh, C.surface],
+        borderColor: C.successBorder,
+        accentGlow: C.success,
       },
     ],
     [goalsSummary, currentPersonalityObj, country]
@@ -2501,29 +2439,42 @@ export default function OnboardingScreen({ navigation }) {
   const nextMatch = PREVIEW_PROFILES[(activeProfileIdx + 1) % PREVIEW_PROFILES.length];
   const thirdMatch = PREVIEW_PROFILES[(activeProfileIdx + 2) % PREVIEW_PROFILES.length];
 
+  // ── Responsive layout (presentation only) ──
+  // Step 5 is a non-scrolling swipe deck: size the cards to the space left between the chrome.
+  const stageHeight = windowHeight - insets.top - insets.bottom - TOP_BAR_HEIGHT - FOOTER_HEIGHT;
+  const step5Reserved = 292; // step header + game plan deck + deck peek/margins
+  const deckCardHeight = Math.round(Math.max(280, Math.min(385, stageHeight - step5Reserved)));
+  const deckCardWidth = Math.round(Math.min(315, contentWidth, deckCardHeight * 0.82));
+  const step5NeedsScroll = stageHeight - step5Reserved < 280;
+  const scrollPadding = { paddingHorizontal: gutter };
+  const ctaLabel = currentStep === 1 ? 'Get Started' : currentStep === totalSteps ? 'Start Meeting Matches' : 'Continue';
+
+  const renderLanguageChip = (lang) => {
+    const isSelected = selectedLanguages.includes(lang);
+    return (
+      <Chip
+        key={lang}
+        label={lang}
+        selected={isSelected}
+        onPress={() => toggleLanguage(lang)}
+        accessibilityLabel={`${lang}, ${isSelected ? 'selected' : 'not selected'}`}
+      />
+    );
+  };
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* ── 1. Luxury Atmospheric Base Gradient ── */}
+      {/* ── 1. Atmospheric Base Gradient ── */}
       <LinearGradient
-        colors={['#08050B', '#0D0714', '#120A1A', '#160E20']}
-        locations={[0, 0.35, 0.7, 1]}
+        colors={[C.background, C.background, C.surface]}
+        locations={[0, 0.6, 1]}
         style={StyleSheet.absoluteFill}
       />
 
       {/* ── 2. Living Ambient Aurora Orbs (Strictly Clipped Within Screen Boundary) ── */}
-      <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: SCREEN_WIDTH,
-          height: SCREEN_HEIGHT,
-          overflow: 'hidden',
-        }}
-        pointerEvents="none"
-      >
+      <View style={styles.auroraClip} pointerEvents="none">
         <Animated.View
           style={[
             styles.auroraOrb1,
@@ -2537,7 +2488,7 @@ export default function OnboardingScreen({ navigation }) {
           ]}
         >
           <LinearGradient
-            colors={['rgba(255, 51, 102, 0.40)', 'rgba(255, 94, 126, 0.28)', 'rgba(255, 170, 128, 0.14)', 'transparent']}
+            colors={[alpha(C.primary, 0.4), alpha(C.accent, 0.28), alpha(C.secondary, 0.14), 'transparent']}
             locations={[0, 0.35, 0.7, 1]}
             style={StyleSheet.absoluteFill}
             start={{ x: 0.2, y: 0.1 }}
@@ -2558,7 +2509,7 @@ export default function OnboardingScreen({ navigation }) {
           ]}
         >
           <LinearGradient
-            colors={['rgba(121, 40, 202, 0.42)', 'rgba(147, 51, 234, 0.30)', 'rgba(255, 0, 128, 0.16)', 'transparent']}
+            colors={[alpha(C.info, 0.32), alpha(C.info, 0.2), alpha(C.primary, 0.14), 'transparent']}
             locations={[0, 0.35, 0.7, 1]}
             style={StyleSheet.absoluteFill}
             start={{ x: 0.1, y: 0.2 }}
@@ -2569,17 +2520,63 @@ export default function OnboardingScreen({ navigation }) {
 
       {/* ── 3. Subtle Vignette Scrim ── */}
       <LinearGradient
-        colors={['rgba(8, 5, 11, 0.45)', 'rgba(8, 5, 11, 0.78)', '#08050B']}
+        colors={[alpha(C.background, 0.45), alpha(C.background, 0.78), C.background]}
         locations={[0, 0.45, 0.95]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
 
       <SafeAreaView style={styles.safeArea}>
+        {/* ── Progress Header: back + step X of N + segmented bar ── */}
+        <View style={[styles.topBar, scrollPadding]}>
+          <View style={styles.topBarInner}>
+            <IconButton
+              icon="chevron-back"
+              onPress={handleBack}
+              accessibilityLabel={currentStep === 1 ? 'Return to Welcome' : 'Go back'}
+            />
+            <View style={styles.progressCol}>
+              <View style={styles.progressLabelRow}>
+                <ContentTransition transitionKey={currentStep}>
+                  <Text style={styles.progressLabel} maxFontSizeMultiplier={uiTheme.fontScale.chrome} numberOfLines={1}>
+                    {`STEP ${currentStep} OF ${totalSteps}`}
+                  </Text>
+                </ContentTransition>
+                <Text style={styles.progressStepName} maxFontSizeMultiplier={uiTheme.fontScale.chrome} numberOfLines={1}>
+                  {STEP_EYEBROWS[currentStep - 1]}
+                </Text>
+              </View>
+              <View
+                style={styles.progressTrack}
+                accessible
+                accessibilityRole="progressbar"
+                accessibilityLabel={`Step ${currentStep} of ${totalSteps}`}
+                accessibilityValue={{ min: 1, max: totalSteps, now: currentStep }}
+              >
+                {Array.from({ length: totalSteps }).map((_, i) => (
+                  <View
+                    key={i}
+                    style={[styles.progressSegment, i < currentStep - 1 && styles.progressSegmentDone]}
+                  >
+                    {i === currentStep - 1 && (
+                      <LinearGradient
+                        colors={uiTheme.gradients.brandShort}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                    )}
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+
         {/* ── Animated Step Viewport ── */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
+          style={styles.flex}
         >
           <View style={styles.stageViewport}>
             {/* ── Step 1 Stage Layer ── */}
@@ -2595,46 +2592,31 @@ export default function OnboardingScreen({ navigation }) {
             >
               <ScrollView
                 style={styles.scrollFlex}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, scrollPadding]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                <View>
-                  {/* Hero Header */}
-                  <View style={styles.heroWrap}>
-                    <View style={styles.heroHeaderRow}>
-                      <TouchableOpacity
-                        style={styles.backArrowBtn}
-                        onPress={handleBack}
-                        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-                        activeOpacity={0.7}
-                        accessibilityRole="button"
-                        accessibilityLabel="Return to Welcome"
-                      >
-                        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <View style={styles.heroTextWrap}>
-                        <Text style={styles.stepTitle}>Better Dates, Less Effort</Text>
-                        <Text style={styles.stepSubtitle}>
-                          Flint finds people you'll actually like, sparks natural conversations, and helps you meet up in real life.
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
+                <View style={styles.columnWide}>
+                  <StepHeader
+                    eyebrow={STEP_EYEBROWS[0]}
+                    title="Better Dates, Less Effort"
+                    subtitle="Flint finds people you'll actually like, sparks natural conversations, and helps you meet up in real life."
+                  />
 
                   {/* Non-Stop Smooth Sliding Cards Showcase */}
-                  <View style={styles.marqueeSectionWrap}>
+                  <View style={[styles.marqueeSectionWrap, { marginHorizontal: -gutter }]}>
                     <View style={styles.marqueeWindow}>
                       <Animated.View
                         style={[
                           styles.marqueeTrack,
-                          { transform: [{ translateX: marqueeAnim }] },
+                          { paddingLeft: gutter, transform: [{ translateX: marqueeAnim }] },
                         ]}
                       >
                         {DISPLAY_CARDS.map((card, idx) => (
                           <View key={`${card.id}-${idx}`} style={styles.cockpitCardContainer}>
                             <LinearGradient
-                              colors={['rgba(255, 51, 102, 0.16)', 'rgba(179, 136, 255, 0.08)', 'rgba(22, 14, 32, 0.94)']}
+                              colors={[alpha(C.primary, 0.12), C.surface, C.surface]}
+                              locations={[0, 0.55, 1]}
                               start={{ x: 0, y: 0 }}
                               end={{ x: 1, y: 1 }}
                               style={styles.cockpitCardGradient}
@@ -2652,8 +2634,8 @@ export default function OnboardingScreen({ navigation }) {
 
                                 <View style={styles.cockpitProfileMeta}>
                                   <View style={styles.cockpitNameRow}>
-                                    <Text style={styles.cockpitProfileName}>{card.name}</Text>
-                                    <Ionicons name="checkmark-circle" size={13} color="#00E676" style={{ marginLeft: 5 }} />
+                                    <Text style={styles.cockpitProfileName} numberOfLines={1}>{card.name}</Text>
+                                    <Ionicons name="checkmark-circle" size={14} color={C.success} />
                                   </View>
                                   <Text style={styles.cockpitProfileSub} numberOfLines={1}>
                                     {card.sub}
@@ -2661,8 +2643,8 @@ export default function OnboardingScreen({ navigation }) {
                                 </View>
 
                                 <View style={styles.cockpitScoreWrap}>
-                                  <Ionicons name="sparkles" size={13} color="#00E676" style={{ marginRight: 4 }} />
-                                  <Text style={styles.cockpitScoreText}>{card.matchScore}</Text>
+                                  <Ionicons name="sparkles" size={13} color={C.success} />
+                                  <Text style={styles.cockpitScoreText} numberOfLines={1}>{card.matchScore}</Text>
                                 </View>
                               </View>
 
@@ -2672,7 +2654,7 @@ export default function OnboardingScreen({ navigation }) {
                               {/* Simulated Real-Time Opener Box */}
                               <View style={styles.cockpitOpenerBox}>
                                 <View style={styles.cockpitOpenerHeader}>
-                                  <Ionicons name="chatbubble-outline" size={12} color="#B388FF" style={{ marginRight: 5 }} />
+                                  <Ionicons name="chatbubble-outline" size={12} color={C.info} />
                                   <Text style={styles.cockpitOpenerLabel}>Suggested message</Text>
                                 </View>
                                 <Text style={styles.cockpitOpenerText}>
@@ -2684,13 +2666,10 @@ export default function OnboardingScreen({ navigation }) {
                               {/* Live Match Reassurance Strip */}
                               <View style={styles.cockpitFooterStrip}>
                                 {card.tags.map((tag, tIdx) => (
-                                  <React.Fragment key={tIdx}>
-                                    {tIdx > 0 && <View style={styles.cockpitFooterDot} />}
-                                    <View style={styles.cockpitFooterItem}>
-                                      <Ionicons name={tag.icon} size={12} color={tag.color} />
-                                      <Text style={styles.cockpitFooterItemText}>{tag.label}</Text>
-                                    </View>
-                                  </React.Fragment>
+                                  <View key={tIdx} style={styles.cockpitFooterItem}>
+                                    <Ionicons name={tag.icon} size={12} color={tag.color} />
+                                    <Text style={styles.cockpitFooterItemText} numberOfLines={1}>{tag.label}</Text>
+                                  </View>
                                 ))}
                               </View>
                             </LinearGradient>
@@ -2704,14 +2683,7 @@ export default function OnboardingScreen({ navigation }) {
                   <View style={styles.featureList}>
                     {/* Pillar 1: Quality Matches */}
                     <View style={styles.featureRow}>
-                      <View style={styles.featureIconOuterGlow}>
-                        <LinearGradient
-                          colors={['rgba(255, 51, 102, 0.28)', 'rgba(255, 51, 102, 0.08)']}
-                          style={styles.featureIconWrap}
-                        >
-                          <Ionicons name="compass-outline" size={20} color={uiTheme.colors.primary} />
-                        </LinearGradient>
-                      </View>
+                      <IconWell icon="compass-outline" tone="primary" size={44} iconSize={20} />
                       <View style={styles.featureInfo}>
                         <Text style={styles.featureTitle}>Quality Matches</Text>
                         <Text style={styles.featureDesc}>
@@ -2722,14 +2694,7 @@ export default function OnboardingScreen({ navigation }) {
 
                     {/* Pillar 2: Thoughtful Icebreakers */}
                     <View style={styles.featureRow}>
-                      <View style={styles.featureIconOuterGlow}>
-                        <LinearGradient
-                          colors={['rgba(179, 136, 255, 0.28)', 'rgba(179, 136, 255, 0.08)']}
-                          style={styles.featureIconWrap}
-                        >
-                          <Ionicons name="chatbubble-ellipses-outline" size={20} color="#B388FF" />
-                        </LinearGradient>
-                      </View>
+                      <IconWell icon="chatbubble-ellipses-outline" tone="info" size={44} iconSize={20} />
                       <View style={styles.featureInfo}>
                         <Text style={styles.featureTitle}>Thoughtful Icebreakers</Text>
                         <Text style={styles.featureDesc}>
@@ -2740,14 +2705,7 @@ export default function OnboardingScreen({ navigation }) {
 
                     {/* Pillar 3: Real-World Dates */}
                     <View style={styles.featureRow}>
-                      <View style={styles.featureIconOuterGlow}>
-                        <LinearGradient
-                          colors={['rgba(255, 170, 128, 0.28)', 'rgba(255, 170, 128, 0.08)']}
-                          style={styles.featureIconWrap}
-                        >
-                          <Ionicons name="calendar-outline" size={20} color={uiTheme.colors.secondary} />
-                        </LinearGradient>
-                      </View>
+                      <IconWell icon="calendar-outline" tone="secondary" size={44} iconSize={20} />
                       <View style={styles.featureInfo}>
                         <Text style={styles.featureTitle}>Real-World Dates</Text>
                         <Text style={styles.featureDesc}>
@@ -2774,324 +2732,218 @@ export default function OnboardingScreen({ navigation }) {
             >
               <ScrollView
                 style={styles.scrollFlex}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, scrollPadding]}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
                 showsVerticalScrollIndicator={false}
               >
-                <View>
-                  <View style={styles.heroWrap}>
-                    <View style={styles.heroHeaderRow}>
-                      <TouchableOpacity
-                        style={styles.backArrowBtn}
-                        onPress={handleBack}
-                        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-                        activeOpacity={0.7}
-                        accessibilityRole="button"
-                        accessibilityLabel="Go back"
-                      >
-                        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <View style={styles.heroTextWrap}>
-                        <Text style={styles.stepTitle}>About you</Text>
-                        <Text style={styles.stepSubtitle}>
-                          Flint adapts your conversation tone and references so chats feel completely natural in your area.
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
+                <View style={styles.columnForm}>
+                  <StepHeader
+                    eyebrow={STEP_EYEBROWS[1]}
+                    title="About you"
+                    subtitle="Flint adapts your conversation tone and references so chats feel completely natural in your area."
+                  />
 
                   {/* Regional Dating Context Card */}
-                  <View style={styles.step2GlassCard}>
-                    <LinearGradient
-                      colors={['rgba(255, 51, 102, 0.10)', 'rgba(179, 136, 255, 0.05)', 'rgba(22, 14, 32, 0.94)']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.step2CardGradient}
+                  <View style={styles.card}>
+                    {/* Sub-section 1: Where you date */}
+                    <SectionHead
+                      icon="location-sharp"
+                      tone="primary"
+                      title="Where you date"
+                      subtitle="Matches your city, timezone & local slang"
+                      right={<Badge label={dialCode} tone="primary" />}
+                    />
+
+                    <Text style={styles.fieldLabel}>Country</Text>
+                    <TouchableOpacity
+                      style={styles.selectField}
+                      onPress={() => {
+                        safeHaptic('light');
+                        setCountrySearch('');
+                        setCountryModalVisible(true);
+                      }}
+                      activeOpacity={0.82}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Country selector, currently selected: ${country}`}
+                      accessibilityHint="Opens the country list"
                     >
-                      {/* Sub-section 1: Where you date */}
-                      <View style={styles.step2SectionHeader}>
-                        <View style={styles.step2IconDiskCoral}>
-                          <Ionicons name="location-sharp" size={16} color={uiTheme.colors.primary} />
-                        </View>
-                        <View style={styles.step2HeaderTextWrap}>
-                          <View style={styles.step2TitleWithPillRow}>
-                            <Text style={styles.step2SectionTitle}>Where you date</Text>
-                            <View style={styles.step2CoralBadgePill}>
-                              <Text style={styles.step2CoralBadgeText}>{dialCode}</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.step2SectionSub}>Matches your city, timezone & local slang</Text>
-                        </View>
+                      <View style={styles.flagDisk}>
+                        <Text style={styles.flagEmoji}>{getCountryFlag(country)}</Text>
                       </View>
+                      <Text style={styles.selectFieldText} numberOfLines={1}>{country}</Text>
+                      <Ionicons name="chevron-down" size={18} color={C.muted} />
+                    </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={styles.step2SelectTrigger}
-                        onPress={() => {
-                          safeHaptic('light');
-                          setCountrySearch('');
-                          setCountryModalVisible(true);
-                        }}
-                        activeOpacity={0.82}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Country selector, currently selected: ${country}`}
-                      >
-                        <View style={styles.step2SelectTriggerLeft}>
-                          <View style={styles.step2FlagDisk}>
-                            <Text style={styles.step2FlagEmoji}>{getCountryFlag(country)}</Text>
-                          </View>
-                          <Text style={styles.step2SelectTriggerText} numberOfLines={1}>{country}</Text>
-                        </View>
-                        <View style={styles.step2ChevronWrap}>
-                          <Ionicons name="chevron-down" size={16} color="rgba(245, 230, 240, 0.6)" />
-                        </View>
-                      </TouchableOpacity>
+                    {/* Hairline Divider */}
+                    <View style={styles.cardDivider} />
 
-                      {/* Hairline Divider */}
-                      <View style={styles.step2Divider} />
+                    {/* Sub-section 2: Languages you speak */}
+                    <SectionHead
+                      icon="chatbubbles"
+                      tone="info"
+                      title="Languages you speak"
+                      subtitle="Flint crafts native openers in these languages"
+                      right={<Badge label={`${selectedLanguages.length} selected`} tone="info" />}
+                    />
 
-                      {/* Sub-section 2: Languages you speak */}
-                      <View style={styles.step2SectionHeader}>
-                        <View style={styles.step2IconDiskAmethyst}>
-                          <Ionicons name="chatbubbles" size={16} color="#B388FF" />
-                        </View>
-                        <View style={styles.step2HeaderTextWrap}>
-                          <View style={styles.step2TitleWithPillRow}>
-                            <Text style={styles.step2SectionTitle}>Languages you speak</Text>
-                            <View style={styles.step2LangCountPill}>
-                              <Text style={styles.step2LangCountText}>
-                                {selectedLanguages.length} selected
-                              </Text>
-                            </View>
-                          </View>
-                          <Text style={styles.step2SectionSub}>Flint crafts native openers in these languages</Text>
-                        </View>
-                      </View>
+                    {/* Compact Primary Chips (Top 3 Regional + Active) + Inline Expand Pill */}
+                    <View style={styles.chipWrap}>
+                      {primaryLanguages.map(renderLanguageChip)}
 
-                      {/* Compact Primary Chips (Top 3 Regional + Active) + Inline Expand Pill */}
-                      <View style={styles.langChipsContainer}>
-                        {primaryLanguages.map((lang) => {
-                          const isSelected = selectedLanguages.includes(lang);
-                          return (
-                            <TouchableOpacity
-                              key={lang}
-                              style={[
-                                styles.langChip,
-                                isSelected && styles.langChipSelected,
-                              ]}
-                              onPress={() => toggleLanguage(lang)}
-                              activeOpacity={0.78}
-                              accessibilityRole="button"
-                              accessibilityLabel={`${lang}, ${isSelected ? 'selected' : 'not selected'}`}
-                            >
-                              <Text
-                                style={[
-                                  styles.langChipText,
-                                  isSelected && styles.langChipTextSelected,
-                                ]}
-                              >
-                                {lang}
-                              </Text>
-                              {isSelected && (
-                                <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.primary} />
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
-
-                        {hiddenLanguagesCount > 0 && (
-                          <TouchableOpacity
-                            style={styles.moreLangChip}
-                            onPress={handleToggleLanguagesExpand}
-                            activeOpacity={0.75}
-                            accessibilityRole="button"
-                            accessibilityLabel={showAllLanguages ? 'Show fewer languages' : 'Show more languages'}
+                      {hiddenLanguagesCount > 0 && (
+                        <TouchableOpacity
+                          style={styles.moreChip}
+                          onPress={handleToggleLanguagesExpand}
+                          activeOpacity={0.75}
+                          hitSlop={{ top: 4, bottom: 4 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={showAllLanguages ? 'Show fewer languages' : 'Show more languages'}
+                          accessibilityState={{ expanded: showAllLanguages }}
+                        >
+                          <Text style={styles.moreChipText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                            {showAllLanguages ? 'Show Less' : `+ ${hiddenLanguagesCount} More`}
+                          </Text>
+                          <Animated.View
+                            style={{
+                              transform: [
+                                {
+                                  rotate: langExpandAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['0deg', '180deg'],
+                                  }),
+                                },
+                              ],
+                            }}
                           >
-                            <Text style={styles.moreLangChipText}>
-                              {showAllLanguages ? 'Show Less' : `+ ${hiddenLanguagesCount} More`}
-                            </Text>
-                            <Animated.View
-                              style={{
-                                transform: [
-                                  {
-                                    rotate: langExpandAnim.interpolate({
-                                      inputRange: [0, 1],
-                                      outputRange: ['0deg', '180deg'],
-                                    }),
-                                  },
-                                ],
-                              }}
-                            >
-                              <Ionicons
-                                name="chevron-down"
-                                size={13}
-                                color={uiTheme.colors.secondary}
-                              />
-                            </Animated.View>
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                            <Ionicons name="chevron-down" size={14} color={C.secondary} />
+                          </Animated.View>
+                        </TouchableOpacity>
+                      )}
+                    </View>
 
-                      {/* Smooth Collapsible Secondary Chips Accordion */}
-                      <Animated.View
-                        style={[
-                          styles.secondaryLangWrap,
-                          {
-                            maxHeight: langExpandAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [0, 360],
-                            }),
-                            opacity: langExpandAnim.interpolate({
-                              inputRange: [0, 0.35, 1],
-                              outputRange: [0, 0.5, 1],
-                            }),
-                            transform: [
-                              {
-                                translateY: langExpandAnim.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: [-6, 0],
-                                }),
-                              },
-                            ],
-                          },
-                        ]}
-                      >
-                        <View style={styles.langChipsContainerSecondary}>
-                          {secondaryLanguages.map((lang) => {
-                            const isSelected = selectedLanguages.includes(lang);
-                            return (
-                              <TouchableOpacity
-                                key={lang}
-                                style={[
-                                  styles.langChip,
-                                  isSelected && styles.langChipSelected,
-                                ]}
-                                onPress={() => toggleLanguage(lang)}
-                                activeOpacity={0.78}
-                                accessibilityRole="button"
-                                accessibilityLabel={`${lang}, ${isSelected ? 'selected' : 'not selected'}`}
-                              >
-                                <Text
-                                  style={[
-                                    styles.langChipText,
-                                    isSelected && styles.langChipTextSelected,
-                                  ]}
-                                >
-                                  {lang}
-                                </Text>
-                                {isSelected && (
-                                  <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.primary} />
-                                )}
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      </Animated.View>
-                    </LinearGradient>
+                    {/* Smooth Collapsible Secondary Chips Accordion */}
+                    <Animated.View
+                      style={[
+                        styles.secondaryLangWrap,
+                        {
+                          maxHeight: langExpandAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, 360],
+                          }),
+                          opacity: langExpandAnim.interpolate({
+                            inputRange: [0, 0.35, 1],
+                            outputRange: [0, 0.5, 1],
+                          }),
+                          transform: [
+                            {
+                              translateY: langExpandAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [-6, 0],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    >
+                      <View style={styles.chipWrapSecondary}>
+                        {secondaryLanguages.map(renderLanguageChip)}
+                      </View>
+                    </Animated.View>
                   </View>
 
-                  {/* Instant Date Alerts Glass Card */}
-                  <View style={styles.step2GlassCardEmerald}>
-                    <LinearGradient
-                      colors={['rgba(0, 230, 118, 0.09)', 'rgba(22, 14, 32, 0.94)']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.step2CardGradient}
-                    >
-                      <View style={styles.step2SectionHeader}>
-                        <View style={styles.step2IconDiskEmerald}>
-                          <Ionicons name="logo-whatsapp" size={17} color="#00E676" />
-                        </View>
-                        <View style={styles.step2HeaderTextWrap}>
-                          <View style={styles.step2TitleWithPillRow}>
-                            <Text style={styles.step2SectionTitle}>Instant Date Alerts</Text>
-                            <View style={styles.step2OptionalPill}>
-                              <Text style={styles.step2OptionalText}>VIP Alerts</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.step2SectionSub}>Get a private ping when a match wants to meet up</Text>
-                        </View>
-                      </View>
+                  {/* Instant Date Alerts Card */}
+                  <View style={styles.card}>
+                    <SectionHead
+                      icon="logo-whatsapp"
+                      tone="success"
+                      title="Instant Date Alerts"
+                      subtitle="Get a private ping when a match wants to meet up"
+                      right={<Badge label="VIP Alerts" tone="success" />}
+                    />
 
-                      <View
-                        style={[
-                          styles.phoneInputWrap,
-                          isPhoneFocused && styles.phoneInputWrapFocused,
-                          isPhoneTooShort && styles.phoneInputWrapError,
-                          Boolean(whatsapp && !isPhoneTooShort) && styles.phoneInputWrapOk,
-                        ]}
+                    <Text style={styles.fieldLabel}>WhatsApp number</Text>
+                    <View
+                      style={[
+                        styles.phoneInputWrap,
+                        isPhoneFocused && styles.phoneInputWrapFocused,
+                        isPhoneTooShort && styles.phoneInputWrapError,
+                        Boolean(whatsapp && !isPhoneTooShort) && styles.phoneInputWrapOk,
+                      ]}
+                    >
+                      <TouchableOpacity
+                        style={styles.dialCodeBtn}
+                        onPress={() => {
+                          safeHaptic('light');
+                          setDialSearch('');
+                          setDialModalVisible(true);
+                        }}
+                        activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Country dial code, selected: ${dialCode}`}
                       >
+                        <Text style={styles.dialFlagText}>{getCountryFlag(country)}</Text>
+                        <Text style={styles.dialCodeText}>{dialCode}</Text>
+                        <Ionicons name="chevron-down" size={14} color={C.muted} />
+                      </TouchableOpacity>
+                      <View style={styles.dialDivider} />
+                      <TextInput
+                        style={styles.phoneInput}
+                        placeholder={currentPhoneExample}
+                        placeholderTextColor={C.muted}
+                        selectionColor={C.accent}
+                        cursorColor={C.accent}
+                        maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                        value={whatsapp}
+                        onChangeText={handleWhatsappChange}
+                        onFocus={() => setIsPhoneFocused(true)}
+                        onBlur={() => setIsPhoneFocused(false)}
+                        keyboardType="phone-pad"
+                        returnKeyType="done"
+                        maxLength={maxPhoneLength}
+                        accessibilityLabel="WhatsApp phone number for instant date alerts"
+                      />
+                      {Boolean(whatsapp) && (
                         <TouchableOpacity
-                          style={styles.dialCodeBtn}
                           onPress={() => {
                             safeHaptic('light');
-                            setDialSearch('');
-                            setDialModalVisible(true);
+                            setWhatsapp('');
                           }}
-                          activeOpacity={0.8}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={styles.inputIconBtn}
                           accessibilityRole="button"
-                          accessibilityLabel={`Country dial code, selected: ${dialCode}`}
+                          accessibilityLabel="Clear phone number"
                         >
-                          <Text style={styles.dialFlagText}>{getCountryFlag(country)}</Text>
-                          <Text style={styles.dialCodeText}>{dialCode}</Text>
-                          <Ionicons name="chevron-down" size={13} color="rgba(245, 230, 240, 0.6)" />
+                          <Ionicons name="close-circle" size={18} color={C.muted} />
                         </TouchableOpacity>
-                        <View style={styles.dialDivider} />
-                        <TextInput
-                          style={styles.phoneInput}
-                          placeholder={currentPhoneExample}
-                          placeholderTextColor="rgba(245, 230, 240, 0.3)"
-                          value={whatsapp}
-                          onChangeText={handleWhatsappChange}
-                          onFocus={() => setIsPhoneFocused(true)}
-                          onBlur={() => setIsPhoneFocused(false)}
-                          keyboardType="phone-pad"
-                          returnKeyType="done"
-                          maxLength={maxPhoneLength}
-                          accessibilityLabel="WhatsApp phone number for instant date alerts"
-                        />
-                        {Boolean(whatsapp) && (
-                          <TouchableOpacity
-                            onPress={() => {
-                              safeHaptic('light');
-                              setWhatsapp('');
-                            }}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            style={{ padding: 4 }}
-                            accessibilityRole="button"
-                            accessibilityLabel="Clear phone number"
-                          >
-                            <Ionicons name="close-circle" size={16} color="rgba(245, 230, 240, 0.45)" />
-                          </TouchableOpacity>
-                        )}
-                        {Boolean(whatsapp && !isPhoneTooShort) && (
-                          <Ionicons name="checkmark-circle" size={18} color="#00E676" style={{ marginLeft: 4 }} />
-                        )}
-                      </View>
-
-                      {isPhoneTooShort ? (
-                        <View style={styles.phoneFeedbackRow}>
-                          <Ionicons name="alert-circle" size={13} color={uiTheme.colors.accent} style={{ marginRight: 6 }} />
-                          <Text style={styles.hintTextError}>
-                            Number looks too short for {dialCode} (min {minPhoneLength} digits)
-                          </Text>
-                        </View>
-                      ) : Boolean(whatsapp && !isPhoneTooShort) ? (
-                        <View style={styles.phoneFeedbackRow}>
-                          <Ionicons name="checkmark-circle" size={13} color="#00E676" style={{ marginRight: 6 }} />
-                          <Text style={styles.privacyReassuranceActiveText}>
-                            Alerts active • Stored on your device only • Never shared
-                          </Text>
-                        </View>
-                      ) : (
-                        <View style={styles.phoneFeedbackRow}>
-                          <Ionicons name="shield-checkmark" size={13} color="#00E676" style={{ marginRight: 6 }} />
-                          <Text style={styles.privacyReassuranceText}>
-                            Optional • Stored on your device only • Never shared
-                          </Text>
-                        </View>
                       )}
-                    </LinearGradient>
+                      {Boolean(whatsapp && !isPhoneTooShort) && (
+                        <Ionicons name="checkmark-circle" size={18} color={C.success} />
+                      )}
+                    </View>
+
+                    {isPhoneTooShort ? (
+                      <View style={styles.phoneFeedbackRow} accessibilityLiveRegion="polite">
+                        <Ionicons name="alert-circle" size={14} color={C.error} />
+                        <Text style={[styles.helperText, styles.helperTextError]}>
+                          Number looks too short for {dialCode} (min {minPhoneLength} digits)
+                        </Text>
+                      </View>
+                    ) : Boolean(whatsapp && !isPhoneTooShort) ? (
+                      <View style={styles.phoneFeedbackRow} accessibilityLiveRegion="polite">
+                        <Ionicons name="checkmark-circle" size={14} color={C.success} />
+                        <Text style={[styles.helperText, styles.helperTextSuccess]}>
+                          Alerts active • Stored on your device only • Never shared
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.phoneFeedbackRow}>
+                        <Ionicons name="shield-checkmark" size={14} color={C.success} />
+                        <Text style={styles.helperText}>
+                          Optional • Stored on your device only • Never shared
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </ScrollView>
@@ -3111,63 +2963,33 @@ export default function OnboardingScreen({ navigation }) {
             >
               <ScrollView
                 style={styles.scrollFlex}
-                contentContainerStyle={[styles.scrollContent, styles.scrollContentStep3]}
+                contentContainerStyle={[styles.scrollContent, scrollPadding]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                <View>
-                  <View style={styles.step3HeroWrap}>
-                    <View style={styles.heroHeaderRow}>
-                      <TouchableOpacity
-                        style={styles.backArrowBtn}
-                        onPress={handleBack}
-                        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-                        activeOpacity={0.7}
-                        accessibilityRole="button"
-                        accessibilityLabel="Go back"
-                      >
-                        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <View style={styles.heroTextWrap}>
-                        <Text style={styles.stepTitle}>What's Your Goal?</Text>
-                        <View style={styles.goalSubtitleRow}>
-                          <Text style={[styles.stepSubtitle, { flex: 1 }]}>
-                            {selectedGoals.includes('never_stop')
-                              ? 'Relaxed chat mode is active.'
-                              : "Pick up to 3 things you'd like from your matches."}
-                          </Text>
-                          <Animated.View
-                            style={[
-                              styles.goalCountPill,
-                              selectedGoals.includes('never_stop') && styles.goalCountPillContinuous,
-                              { transform: [{ scale: counterPulse }] },
-                            ]}
-                          >
-                            <Ionicons
-                              name={selectedGoals.includes('never_stop') ? 'infinite' : 'checkmark-circle'}
-                              size={13}
-                              color={selectedGoals.includes('never_stop') ? '#00E5FF' : '#FF3366'}
-                              style={{ marginRight: 4 }}
-                            />
-                            <Text
-                              style={[
-                                styles.goalCountText,
-                                selectedGoals.includes('never_stop') && styles.goalCountTextContinuous,
-                              ]}
-                            >
-                              {selectedGoals.includes('never_stop')
-                                ? 'Casual Chat'
-                                : `${selectedGoals.length} of 3 chosen`}
-                            </Text>
-                          </Animated.View>
-                        </View>
-                      </View>
+                <View style={styles.columnForm}>
+                  <StepHeader eyebrow={STEP_EYEBROWS[2]} title="What's Your Goal?">
+                    <View style={styles.goalSubtitleRow}>
+                      <Text style={[styles.stepSubtitle, styles.flexShrink]}>
+                        {selectedGoals.includes('never_stop')
+                          ? 'Relaxed chat mode is active.'
+                          : "Pick up to 3 things you'd like from your matches."}
+                      </Text>
+                      <Animated.View style={{ transform: [{ scale: counterPulse }] }}>
+                        <Badge
+                          icon={selectedGoals.includes('never_stop') ? 'infinite' : 'checkmark-circle'}
+                          tone={selectedGoals.includes('never_stop') ? 'info' : 'primary'}
+                          label={selectedGoals.includes('never_stop')
+                            ? 'Casual Chat'
+                            : `${selectedGoals.length} of 3 chosen`}
+                        />
+                      </Animated.View>
                     </View>
-                  </View>
+                  </StepHeader>
 
                   {Boolean(goalFeedback) && (
-                    <View style={styles.goalFeedbackBanner}>
-                      <Ionicons name="information-circle" size={14} color={uiTheme.colors.secondary} style={{ marginRight: 5 }} />
+                    <View style={styles.goalFeedbackBanner} accessibilityLiveRegion="polite" accessibilityRole="alert">
+                      <Ionicons name="information-circle" size={16} color={C.secondary} />
                       <Text style={styles.goalFeedbackText}>{goalFeedback}</Text>
                     </View>
                   )}
@@ -3184,26 +3006,15 @@ export default function OnboardingScreen({ navigation }) {
                   </View>
 
                   {/* Friendly Game Plan Preview */}
-                  <View style={styles.strategyCardWrapper}>
-                    <LinearGradient
-                      colors={['rgba(255, 51, 102, 0.08)', 'rgba(22, 14, 32, 0.95)']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.strategyCard}
-                    >
-                      <View style={styles.strategyHeaderRow}>
-                        <View style={styles.strategyIconDisk}>
-                          <Ionicons name="sparkles" size={12} color={uiTheme.colors.secondary} />
-                        </View>
-                        <Text style={styles.strategyHeaderTitle}>How Flint will help you</Text>
-                        <View style={styles.strategyGamePlanBadge}>
-                          <Text style={styles.strategyGamePlanBadgeText}>Your Game Plan</Text>
-                        </View>
-                      </View>
-                      <Animated.Text style={[styles.strategySummaryText, { opacity: strategyFadeAnim }]}>
-                        {strategyText}
-                      </Animated.Text>
-                    </LinearGradient>
+                  <View style={[styles.card, styles.strategyCard]}>
+                    <View style={styles.strategyHeaderRow}>
+                      <IconWell icon="sparkles" tone="secondary" size={28} iconSize={14} />
+                      <Text style={styles.strategyHeaderTitle} numberOfLines={1}>How Flint will help you</Text>
+                      <Badge label="Your Game Plan" tone="secondary" />
+                    </View>
+                    <Animated.Text style={[styles.strategySummaryText, { opacity: strategyFadeAnim }]}>
+                      {strategyText}
+                    </Animated.Text>
                   </View>
                 </View>
               </ScrollView>
@@ -3223,323 +3034,249 @@ export default function OnboardingScreen({ navigation }) {
             >
               <ScrollView
                 style={styles.scrollFlex}
-                contentContainerStyle={[styles.scrollContent, styles.scrollContentStep3]}
+                contentContainerStyle={[styles.scrollContent, scrollPadding]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                <View>
-                  <View style={styles.step3HeroWrap}>
-                    <View style={styles.heroHeaderRow}>
-                      <TouchableOpacity
-                        style={styles.backArrowBtn}
-                        onPress={handleBack}
-                        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-                        activeOpacity={0.7}
-                        accessibilityRole="button"
-                        accessibilityLabel="Go back"
-                      >
-                        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <View style={styles.heroTextWrap}>
-                        <Text style={styles.stepTitle}>Behavior & Style</Text>
-                        <Text style={styles.stepSubtitle}>
-                          Fine-tune how Flint talks and how actively he replies for you.
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
+                <View style={styles.columnForm}>
+                  <StepHeader
+                    eyebrow={STEP_EYEBROWS[3]}
+                    title="Behavior & Style"
+                    subtitle="Fine-tune how Flint talks and how actively he replies for you."
+                  />
 
-                  {/* Unified Luxury Glass Settings Card */}
-                  <View style={styles.step4GlassCard}>
-                    <LinearGradient
-                      colors={['rgba(255, 51, 102, 0.08)', 'rgba(179, 136, 255, 0.05)', 'rgba(22, 14, 32, 0.94)']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.step4CardGradient}
+                  {/* Unified Settings Card */}
+                  <View style={styles.card}>
+                    {/* Sub-section 1: Conversation Tone & Personality */}
+                    <SectionHead
+                      icon="sparkles"
+                      tone="info"
+                      title="Conversation Tone"
+                      subtitle="Tap any tone to hear Flint's opening style"
+                    />
+
+                    {/* Smooth Horizontal Smart Tone Rail (All 10 Personalities, Zero Clutter) */}
+                    <ScrollView
+                      ref={toneScrollRef}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.toneScroll}
+                      contentContainerStyle={styles.toneScrollTrack}
                     >
-                      {/* Sub-section 1: Conversation Tone & Personality */}
-                      <View style={styles.step4SectionHeader}>
-                        <View style={styles.step4IconDiskAmethyst}>
-                          <Ionicons name="sparkles" size={15} color="#B388FF" />
+                      {PERSONALITIES.map((p) => (
+                        <Chip
+                          key={p.id}
+                          label={p.label}
+                          icon={p.icon}
+                          selected={personality === p.id}
+                          onPress={() => handleSelectPersonality(p.id)}
+                          accessibilityLabel={`${p.label} personality mode`}
+                        />
+                      ))}
+                    </ScrollView>
+
+                    {/* Live "Voice of Flint" Preview with Real-Time Typing Animation */}
+                    <TouchableOpacity
+                      activeOpacity={0.95}
+                      onPress={() => {
+                        if (isTypingOpener || isDrafting) {
+                          if (draftingTimerRef.current) clearTimeout(draftingTimerRef.current);
+                          if (typingTimerRef.current) clearInterval(typingTimerRef.current);
+                          setIsDrafting(false);
+                          setIsTypingOpener(false);
+                          setTypedOpener(currentPersonalityObj.previewOpener);
+                          safeHaptic('light');
+                        }
+                      }}
+                      style={styles.voicePreview}
+                      accessibilityRole="button"
+                      accessibilityLabel="Voice of Flint preview. Tap to reveal full message"
+                    >
+                      <View style={styles.voiceHeaderRow}>
+                        <View style={styles.voiceHeaderLeft}>
+                          <View style={[styles.voiceIconDisk, { backgroundColor: alpha(currentPersonalityObj.accentColor, 0.16), borderColor: alpha(currentPersonalityObj.accentColor, 0.34) }]}>
+                            <Ionicons name="chatbubble-ellipses" size={12} color={currentPersonalityObj.accentColor} />
+                          </View>
+                          <Text style={styles.voiceHeaderTitle} numberOfLines={1}>Voice of Flint</Text>
+                          <View style={styles.voiceLiveBeaconRow}>
+                            <View style={[styles.voiceLiveDot, { backgroundColor: currentPersonalityObj.accentColor }]} />
+                            <Text style={[styles.voiceLiveText, { color: currentPersonalityObj.accentColor }]} numberOfLines={1}>
+                              {isDrafting ? 'Drafting...' : isTypingOpener ? 'Typing...' : 'Live Preview'}
+                            </Text>
+                          </View>
                         </View>
-                        <View style={styles.step4HeaderTextWrap}>
-                          <Text numberOfLines={1} style={styles.step4SectionTitle}>Conversation Tone</Text>
-                          <Text style={styles.step4SectionSub}>Tap any tone to hear Flint's opening style</Text>
+
+                        <View style={[styles.voiceTagBadge, { borderColor: alpha(currentPersonalityObj.accentColor, 0.34), backgroundColor: alpha(currentPersonalityObj.accentColor, 0.14) }]}>
+                          <Text style={[styles.voiceTagBadgeText, { color: currentPersonalityObj.accentColor }]} numberOfLines={1}>
+                            {currentPersonalityObj.tagline}
+                          </Text>
                         </View>
                       </View>
 
-                      {/* Smooth Horizontal Smart Tone Rail (All 10 Personalities, Zero Clutter) */}
-                      <ScrollView
-                        ref={toneScrollRef}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.toneScrollTrack}
-                      >
-                        {PERSONALITIES.map((p) => {
-                          const isSelected = personality === p.id;
-                          return (
-                            <TouchableOpacity
-                              key={p.id}
-                              style={[
-                                styles.personalityPill,
-                                isSelected && {
-                                  backgroundColor: `${p.accentColor}25`,
-                                  borderColor: p.accentColor,
-                                },
-                              ]}
-                              onPress={() => handleSelectPersonality(p.id)}
-                              activeOpacity={0.8}
-                              accessibilityRole="button"
-                              accessibilityLabel={`${p.label} personality mode`}
-                            >
-                              <Ionicons
-                                name={p.icon}
-                                size={12}
-                                color={isSelected ? p.accentColor : 'rgba(245, 230, 240, 0.65)'}
-                                style={{ marginRight: 4 }}
-                              />
-                              <Text
-                                style={[
-                                  styles.personalityPillText,
-                                  isSelected && { fontFamily: 'Inter_800ExtraBold', color: '#FFFFFF', fontWeight: 'normal' },
-                                ]}
-                              >
-                                {p.label}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </ScrollView>
-
-                      {/* Live "Voice of Flint" Interactive AI Studio with Real-Time Typing Animation */}
-                      <TouchableOpacity
-                        activeOpacity={0.95}
-                        onPress={() => {
-                          if (isTypingOpener || isDrafting) {
-                            if (draftingTimerRef.current) clearTimeout(draftingTimerRef.current);
-                            if (typingTimerRef.current) clearInterval(typingTimerRef.current);
-                            setIsDrafting(false);
-                            setIsTypingOpener(false);
-                            setTypedOpener(currentPersonalityObj.previewOpener);
-                            safeHaptic('light');
-                          }
-                        }}
-                        style={[styles.voicePreviewWrapper, { borderColor: `${currentPersonalityObj.accentColor}40` }]}
-                        accessibilityRole="button"
-                        accessibilityLabel="Voice of Flint preview. Tap to reveal full message"
-                      >
+                      {/* Outgoing chat bubble (Flint's message) */}
+                      <View style={styles.voiceBubble}>
                         <LinearGradient
-                          colors={[`${currentPersonalityObj.accentColor}15`, 'rgba(16, 9, 24, 0.96)']}
+                          colors={uiTheme.gradients.brandShort}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
-                          style={styles.voicePreviewCard}
-                        >
-                          <View style={styles.voiceHeaderRow}>
-                            <View style={styles.voiceHeaderLeft}>
-                              <View style={[styles.voiceIconDisk, { backgroundColor: `${currentPersonalityObj.accentColor}25` }]}>
-                                <Ionicons name="chatbubble-ellipses" size={10} color={currentPersonalityObj.accentColor} />
-                              </View>
-                              <Text style={styles.voiceHeaderTitle}>Voice of Flint</Text>
-                              <View style={styles.voiceLiveBeaconRow}>
-                                <View style={[styles.voiceLiveDot, { backgroundColor: currentPersonalityObj.accentColor }]} />
-                                <Text style={[styles.voiceLiveText, { color: currentPersonalityObj.accentColor }]}>
-                                  {isDrafting ? 'Drafting...' : isTypingOpener ? 'Typing...' : 'Live Preview'}
-                                </Text>
-                              </View>
+                          style={StyleSheet.absoluteFill}
+                        />
+                        {isDrafting ? (
+                          <View style={styles.voiceDraftingRow}>
+                            <View style={styles.typingDotsRow}>
+                              <Animated.View style={[styles.typingDot, { transform: [{ translateY: typingDot1 }] }]} />
+                              <Animated.View style={[styles.typingDot, { transform: [{ translateY: typingDot2 }] }]} />
+                              <Animated.View style={[styles.typingDot, { transform: [{ translateY: typingDot3 }] }]} />
                             </View>
-
-                            <View style={[styles.voiceTagBadge, { borderColor: `${currentPersonalityObj.accentColor}45`, backgroundColor: `${currentPersonalityObj.accentColor}18` }]}>
-                              <Text style={[styles.voiceTagBadgeText, { color: currentPersonalityObj.accentColor }]}>
-                                {currentPersonalityObj.tagline}
-                              </Text>
-                            </View>
+                            <Text style={styles.voiceDraftingText}>Flint is tailoring an opener...</Text>
                           </View>
-
-                          <View style={styles.voiceBubble}>
-                            {isDrafting ? (
-                              <View style={styles.voiceDraftingRow}>
-                                <View style={styles.typingDotsRow}>
-                                  <Animated.View style={[styles.typingDot, { backgroundColor: currentPersonalityObj.accentColor, transform: [{ translateY: typingDot1 }] }]} />
-                                  <Animated.View style={[styles.typingDot, { backgroundColor: currentPersonalityObj.accentColor, transform: [{ translateY: typingDot2 }] }]} />
-                                  <Animated.View style={[styles.typingDot, { backgroundColor: currentPersonalityObj.accentColor, transform: [{ translateY: typingDot3 }] }]} />
-                                </View>
-                                <Text style={styles.voiceDraftingText}>Flint is tailoring an opener...</Text>
-                              </View>
-                            ) : (
-                              <Text style={styles.voiceOpenerText}>
-                                "{typedOpener}
-                                {isTypingOpener && (
-                                  <Animated.Text style={{ fontFamily: 'Inter_800ExtraBold', opacity: voiceCursorOpacity, color: currentPersonalityObj.accentColor, fontWeight: 'normal' }}>
-                                    |
-                                  </Animated.Text>
-                                )}
-                                "
-                              </Text>
+                        ) : (
+                          <Text style={styles.voiceOpenerText}>
+                            "{typedOpener}
+                            {isTypingOpener && (
+                              <Animated.Text style={[styles.voiceCursor, { opacity: voiceCursorOpacity }]}>
+                                |
+                              </Animated.Text>
                             )}
-                          </View>
-
-                          <View style={styles.voiceVibeRow}>
-                            <View style={styles.voiceEqualizerRow}>
-                              <Animated.View style={[styles.voiceEqualizerBar, { backgroundColor: currentPersonalityObj.accentColor, transform: [{ scaleY: waveBar1 }] }]} />
-                              <Animated.View style={[styles.voiceEqualizerBar, { backgroundColor: currentPersonalityObj.accentColor, transform: [{ scaleY: waveBar2 }] }]} />
-                              <Animated.View style={[styles.voiceEqualizerBar, { backgroundColor: currentPersonalityObj.accentColor, transform: [{ scaleY: waveBar3 }] }]} />
-                            </View>
-                            <Text style={styles.voiceVibeDesc} numberOfLines={2}>
-                              {currentPersonalityObj.vibeDesc}
-                            </Text>
-                          </View>
-                        </LinearGradient>
-                      </TouchableOpacity>
-
-                      {/* Hairline Divider */}
-                      <View style={styles.step4Divider} />
-
-                      {/* Sub-section 2: Reply Speed (Intelligent Cadence Bar) */}
-                      <View style={styles.step4SectionHeader}>
-                        <View style={styles.step4IconDiskCoral}>
-                          <Ionicons name="timer" size={15} color={uiTheme.colors.primary} />
-                        </View>
-                        <View style={styles.step4HeaderTextWrap}>
-                          <Text numberOfLines={1} style={styles.step4SectionTitle}>Reply Speed</Text>
-                          <Text style={styles.step4SectionSub}>How often Flint checks for new matches and replies</Text>
-                        </View>
+                            "
+                          </Text>
+                        )}
                       </View>
 
-                      {/* Compact Segmented Cadence Track with Smooth Animated Slider */}
-                      <View
-                        style={styles.cadenceSegmentTrack}
-                        onLayout={(e) => setCadenceTrackWidth(e.nativeEvent.layout.width)}
-                      >
-                        {cadenceSegmentWidth > 0 && (
-                          <Animated.View
-                            style={[
-                              styles.cadenceSliderThumb,
-                              {
-                                width: cadenceSegmentWidth,
-                                transform: [{ translateX: cadenceSliderTranslateX }],
-                              },
-                            ]}
-                          >
-                            <LinearGradient
-                              colors={['rgba(255, 51, 102, 0.35)', 'rgba(255, 94, 126, 0.22)']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={StyleSheet.absoluteFillObject}
-                            />
-                          </Animated.View>
-                        )}
+                      <View style={styles.voiceVibeRow}>
+                        <View style={styles.voiceEqualizerRow}>
+                          <Animated.View style={[styles.voiceEqualizerBar, { backgroundColor: currentPersonalityObj.accentColor, transform: [{ scaleY: waveBar1 }] }]} />
+                          <Animated.View style={[styles.voiceEqualizerBar, { backgroundColor: currentPersonalityObj.accentColor, transform: [{ scaleY: waveBar2 }] }]} />
+                          <Animated.View style={[styles.voiceEqualizerBar, { backgroundColor: currentPersonalityObj.accentColor, transform: [{ scaleY: waveBar3 }] }]} />
+                        </View>
+                        <Text style={styles.voiceVibeDesc} numberOfLines={2}>
+                          {currentPersonalityObj.vibeDesc}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
 
-                        {FREQUENCIES.map((freq) => {
-                          const isSelected = frequency === freq.value;
-                          return (
-                            <TouchableOpacity
-                              key={freq.value}
-                              style={styles.cadenceSegmentBtn}
-                              onPress={() => handleSelectFrequency(freq.value)}
-                              activeOpacity={0.85}
-                              accessibilityRole="button"
-                              accessibilityLabel={`${freq.label}, ${freq.time}, ${freq.sub}`}
-                            >
+                    {/* Hairline Divider */}
+                    <View style={styles.cardDivider} />
+
+                    {/* Sub-section 2: Reply Speed (Intelligent Cadence Bar) */}
+                    <SectionHead
+                      icon="timer"
+                      tone="primary"
+                      title="Reply Speed"
+                      subtitle="How often Flint checks for new matches and replies"
+                    />
+
+                    {/* Segmented Cadence Track with Smooth Animated Slider */}
+                    <View
+                      style={styles.cadenceSegmentTrack}
+                      onLayout={(e) => setCadenceTrackWidth(e.nativeEvent.layout.width)}
+                      accessibilityRole="radiogroup"
+                    >
+                      {cadenceSegmentWidth > 0 && (
+                        <Animated.View
+                          style={[
+                            styles.cadenceSliderThumb,
+                            {
+                              width: cadenceSegmentWidth,
+                              transform: [{ translateX: cadenceSliderTranslateX }],
+                            },
+                          ]}
+                        />
+                      )}
+
+                      {FREQUENCIES.map((freq) => {
+                        const isSelected = frequency === freq.value;
+                        return (
+                          <TouchableOpacity
+                            key={freq.value}
+                            style={styles.cadenceSegmentBtn}
+                            onPress={() => handleSelectFrequency(freq.value)}
+                            activeOpacity={0.85}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected: isSelected, checked: isSelected }}
+                            accessibilityLabel={`${freq.label}, ${freq.time}, ${freq.sub}`}
+                          >
+                            <View style={styles.cadenceSegmentTop}>
                               <Ionicons
                                 name={freq.icon}
-                                size={12}
-                                color={isSelected ? uiTheme.colors.primary : 'rgba(245, 230, 240, 0.55)'}
-                                style={{ marginRight: 4 }}
+                                size={13}
+                                color={isSelected ? C.accent : C.muted}
                               />
-                              <Text style={[styles.cadenceSegmentLabel, isSelected && styles.cadenceSegmentLabelActive]}>
+                              <Text
+                                style={[styles.cadenceSegmentLabel, isSelected && styles.cadenceSegmentLabelActive]}
+                                numberOfLines={1}
+                                maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                              >
                                 {freq.label}
                               </Text>
-                              <View style={[styles.cadenceTimePill, isSelected && styles.cadenceTimePillActive]}>
-                                <Text style={[styles.cadenceTimeText, isSelected && styles.cadenceTimeTextActive]}>
-                                  {freq.time}
-                                </Text>
-                              </View>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
+                            </View>
+                            <Text
+                              style={[styles.cadenceTimeText, isSelected && styles.cadenceTimeTextActive]}
+                              numberOfLines={1}
+                              maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                            >
+                              {freq.time}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
 
-                      {/* Live Dynamic Cadence Insight (Compact & Anti-Cutoff) */}
-                      <Animated.View style={[styles.cadenceInsightRow, { opacity: cadenceFadeAnim }]}>
-                        <View style={styles.cadenceInsightDot} />
-                        <Text style={styles.cadenceInsightText} numberOfLines={2}>
-                          {currentFreqObj.insight}
-                        </Text>
-                      </Animated.View>
+                    {/* Live Dynamic Cadence Insight */}
+                    <Animated.View style={[styles.cadenceInsightRow, { opacity: cadenceFadeAnim }]}>
+                      <View style={styles.cadenceInsightDot} />
+                      <Text style={styles.cadenceInsightText} numberOfLines={2}>
+                        {currentFreqObj.insight}
+                      </Text>
+                    </Animated.View>
 
-                      {/* Hairline Divider */}
-                      <View style={styles.step4Divider} />
+                    {/* Hairline Divider */}
+                    <View style={styles.cardDivider} />
 
-                      {/* Sub-section 3: Smart Protection (Living Human Shield) */}
-                      <View style={styles.step4SectionHeader}>
-                        <View style={[styles.step4IconDiskEmerald, !safeMode && styles.step4IconDiskDimmed]}>
-                          <Ionicons
-                            name={safeMode ? "shield-checkmark" : "shield-outline"}
-                            size={15}
-                            color={safeMode ? "#00E676" : "#8E8E93"}
-                          />
-                        </View>
-                        <View style={styles.step4HeaderTextWrap}>
-                          <View style={styles.step4TitleWithPillRow}>
-                            <Text numberOfLines={1} style={styles.step4SectionTitle}>Smart Protection</Text>
-                            <Switch
-                              value={safeMode}
-                              onValueChange={(val) => {
-                                safeHaptic('medium');
-                                setSafeMode(val);
-                              }}
-                              trackColor={{ false: 'rgba(255, 255, 255, 0.14)', true: '#00E676' }}
-                              thumbColor="#FFFFFF"
-                              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }], marginRight: -4 }}
-                            />
-                          </View>
-                          <Text style={styles.step4SectionSub}>
-                            {safeMode
-                              ? 'Mimics natural human texting habits to keep your account safe'
-                              : 'Instant mode: Replies send immediately with zero delay (testing)'}
-                          </Text>
-                        </View>
-                      </View>
+                    {/* Sub-section 3: Smart Protection */}
+                    <SectionHead
+                      icon={safeMode ? 'shield-checkmark' : 'shield-outline'}
+                      tone="success"
+                      dimmed={!safeMode}
+                      title="Smart Protection"
+                      subtitle={safeMode
+                        ? 'Mimics natural human texting habits to keep your account safe'
+                        : 'Instant mode: Replies send immediately with zero delay (testing)'}
+                      right={
+                        <Switch
+                          value={safeMode}
+                          onValueChange={(val) => {
+                            safeHaptic('medium');
+                            setSafeMode(val);
+                          }}
+                          trackColor={{ false: C.elevatedHigh, true: C.success }}
+                          thumbColor={C.white}
+                          ios_backgroundColor={C.elevatedHigh}
+                          accessibilityLabel="Smart Protection"
+                        />
+                      }
+                    />
 
-                      {/* 3-Pillar Living Security Matrix */}
-                      <View style={[styles.shieldMatrixRow, !safeMode && { opacity: 0.38 }]}>
-                        <View style={[styles.shieldPillarCard, !safeMode && styles.shieldPillarCardDimmed]}>
+                    {/* 3-Pillar Security Matrix */}
+                    <View style={[styles.shieldMatrixRow, !safeMode && styles.shieldMatrixRowDimmed]}>
+                      {[
+                        { icon: 'time', title: 'Natural Typing', sub: '2–5s human delay' },
+                        { icon: 'moon', title: 'Night Rest', sub: 'Natural sleep hours' },
+                        { icon: 'shield-checkmark', title: 'Safe Pace', sub: 'Within daily limits' },
+                      ].map((pillar) => (
+                        <View key={pillar.title} style={[styles.shieldPillarCard, !safeMode && styles.shieldPillarCardDimmed]}>
                           <View style={styles.shieldPillarTop}>
-                            <Ionicons name="time" size={11} color={safeMode ? "#00E676" : "#8E8E93"} />
+                            <Ionicons name={pillar.icon} size={13} color={safeMode ? C.success : C.muted} />
                             <Text numberOfLines={1} style={[styles.shieldPillarTitle, !safeMode && styles.shieldPillarTitleDimmed]}>
-                              Natural Typing
+                              {pillar.title}
                             </Text>
                           </View>
-                          <Text numberOfLines={1} style={styles.shieldPillarSub}>
-                            2–5s human delay
+                          <Text numberOfLines={2} style={styles.shieldPillarSub}>
+                            {pillar.sub}
                           </Text>
                         </View>
-
-                        <View style={[styles.shieldPillarCard, !safeMode && styles.shieldPillarCardDimmed]}>
-                          <View style={styles.shieldPillarTop}>
-                            <Ionicons name="moon" size={11} color={safeMode ? "#00E676" : "#8E8E93"} />
-                            <Text numberOfLines={1} style={[styles.shieldPillarTitle, !safeMode && styles.shieldPillarTitleDimmed]}>
-                              Night Rest
-                            </Text>
-                          </View>
-                          <Text numberOfLines={1} style={styles.shieldPillarSub}>
-                            Natural sleep hours
-                          </Text>
-                        </View>
-
-                        <View style={[styles.shieldPillarCard, !safeMode && styles.shieldPillarCardDimmed]}>
-                          <View style={styles.shieldPillarTop}>
-                            <Ionicons name="shield-checkmark" size={11} color={safeMode ? "#00E676" : "#8E8E93"} />
-                            <Text numberOfLines={1} style={[styles.shieldPillarTitle, !safeMode && styles.shieldPillarTitleDimmed]}>
-                              Safe Pace
-                            </Text>
-                          </View>
-                          <Text numberOfLines={1} style={styles.shieldPillarSub}>
-                            Within daily limits
-                          </Text>
-                        </View>
-                      </View>
-                    </LinearGradient>
+                      ))}
+                    </View>
                   </View>
                 </View>
               </ScrollView>
@@ -3559,37 +3296,22 @@ export default function OnboardingScreen({ navigation }) {
             >
               <ScrollView
                 style={styles.scrollFlex}
-                contentContainerStyle={[styles.scrollContent, styles.scrollContentStep5]}
-                scrollEnabled={false}
+                contentContainerStyle={[styles.scrollContent, styles.scrollContentStep5, scrollPadding]}
+                scrollEnabled={step5NeedsScroll}
                 bounces={false}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.step5Container}>
-                  {/* Hero Header matching Steps 1-4 */}
-                  <View style={styles.heroWrap}>
-                    <View style={styles.heroHeaderRow}>
-                      <TouchableOpacity
-                        style={styles.backArrowBtn}
-                        onPress={handleBack}
-                        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-                        activeOpacity={0.7}
-                        accessibilityRole="button"
-                        accessibilityLabel="Go back"
-                      >
-                        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <View style={styles.heroTextWrap}>
-                        <Text style={styles.stepTitle}>Ready to Match</Text>
-                        <Text style={styles.stepSubtitle}>
-                          {currentMatch.name.split(',')[0]} is waiting in your deck · Flint is live & drafting
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
+                <View style={[styles.columnWide, styles.step5Container]}>
+                  <StepHeader
+                    eyebrow={STEP_EYEBROWS[4]}
+                    title="Ready to Match"
+                    subtitle={`${currentMatch.name.split(',')[0]} is waiting in your deck · Flint is live & drafting`}
+                    subtitleLines={2}
+                  />
 
-                  {/* ── 3D Dating Deck: Pure Physical 3-Card Stack Loop (Zoom-In & Dim-to-Bright) ── */}
-                  <View style={styles.deckStackWrap}>
+                  {/* ── Dating Deck: Physical 3-Card Stack Loop (Zoom-In & Dim-to-Bright) ── */}
+                  <View style={[styles.deckStackWrap, { height: deckCardHeight + 26 }]}>
                     {PREVIEW_PROFILES.map((profile, profileIdx) => {
                       const anim = profileCardAnims[profileIdx];
                       const isFront = profileSlotsRef.current[0] === profileIdx;
@@ -3605,9 +3327,12 @@ export default function OnboardingScreen({ navigation }) {
                           key={profile.id}
                           {...(isFront ? panResponder.panHandlers : {})}
                           pointerEvents={isFront ? 'auto' : 'none'}
+                          accessibilityLabel={isFront ? `${profile.name}. ${profile.sub}. Swipe left or right to see the next profile.` : undefined}
                           style={[
                             styles.heroMatchCard,
                             {
+                              width: deckCardWidth,
+                              height: deckCardHeight,
                               position: 'absolute',
                               zIndex: zIdx,
                               elevation: zIdx * 4,
@@ -3630,53 +3355,53 @@ export default function OnboardingScreen({ navigation }) {
 
                           {/* Top Vignette Gradient for Badges */}
                           <LinearGradient
-                            colors={['rgba(10, 4, 15, 0.65)', 'transparent']}
+                            colors={[alpha(C.background, 0.65), 'transparent']}
                             style={styles.heroTopScrim}
                           />
 
                           {/* Top Floating Badges Row */}
                           <View style={styles.heroTopBadgesRow}>
                             <View style={styles.heroCompatibilityBadge}>
-                              <Ionicons name="flame" size={13} color="#FF5E7E" />
-                              <Text style={styles.heroCompatibilityText}>{profile.matchScore || '98% Match'}</Text>
+                              <Ionicons name="flame" size={13} color={C.accent} />
+                              <Text style={styles.heroCompatibilityText} numberOfLines={1}>{profile.matchScore || '98% Match'}</Text>
                             </View>
                             {isFront && (
                               <View style={styles.heroSwipeHintBadge}>
-                                <Ionicons name="swap-horizontal" size={12} color="rgba(255, 255, 255, 0.7)" />
-                                <Text style={styles.heroSwipeHintText}>Swipe card</Text>
+                                <Ionicons name="swap-horizontal" size={12} color={alpha(C.white, 0.8)} />
+                                <Text style={styles.heroSwipeHintText} numberOfLines={1}>Swipe card</Text>
                               </View>
                             )}
                           </View>
 
-                          {/* Glowing LIKE Stamp (reveals on drag right, front card only) */}
+                          {/* LIKE Stamp (reveals on drag right, front card only) */}
                           {isFront && (
                             <Animated.View style={[styles.stampLikeWrap, { opacity: likeStampOpacity }]} pointerEvents="none">
-                              <View style={styles.stampLikeBorder}>
-                                <Text style={styles.stampLikeText}>LIKE</Text>
+                              <View style={[styles.stampBorder, styles.stampLikeBorder]}>
+                                <Text style={[styles.stampText, styles.stampLikeText]}>LIKE</Text>
                               </View>
                             </Animated.View>
                           )}
 
-                          {/* Glowing NOPE Stamp (reveals on drag left, front card only) */}
+                          {/* NOPE Stamp (reveals on drag left, front card only) */}
                           {isFront && (
                             <Animated.View style={[styles.stampNopeWrap, { opacity: nopeStampOpacity }]} pointerEvents="none">
-                              <View style={styles.stampNopeBorder}>
-                                <Text style={styles.stampNopeText}>NOPE</Text>
+                              <View style={[styles.stampBorder, styles.stampNopeBorder]}>
+                                <Text style={[styles.stampText, styles.stampNopeText]}>NOPE</Text>
                               </View>
                             </Animated.View>
                           )}
 
-                          {/* ── Sleek Frosted Gradient Bottom Dock ── */}
+                          {/* ── Frosted Gradient Bottom Dock ── */}
                           <LinearGradient
-                            colors={['transparent', 'rgba(10, 4, 15, 0.72)', 'rgba(8, 3, 12, 0.96)']}
+                            colors={['transparent', alpha(C.background, 0.72), alpha(C.background, 0.96)]}
                             locations={[0, 0.32, 1]}
                             style={styles.heroFrostedDock}
                           >
                             <View style={styles.heroDockHeader}>
                               <View style={styles.heroIdentityCol}>
                                 <View style={styles.heroNameRow}>
-                                  <Text style={styles.heroNameText}>{profile.name}</Text>
-                                  <Ionicons name="checkmark-circle" size={15} color="#00E676" style={{ marginLeft: 5 }} />
+                                  <Text style={styles.heroNameText} numberOfLines={1}>{profile.name}</Text>
+                                  <Ionicons name="checkmark-circle" size={16} color={C.success} />
                                 </View>
                                 <Text style={styles.heroLocationText} numberOfLines={1}>
                                   {profile.sub.split('&')[0].trim()} · 2 miles away
@@ -3684,26 +3409,27 @@ export default function OnboardingScreen({ navigation }) {
                               </View>
 
                               {isFront && (
-                                <TouchableOpacity
+                                <IconButton
+                                  icon="refresh"
+                                  size={36}
+                                  iconSize={16}
+                                  variant="plain"
+                                  color={C.secondary}
+                                  style={styles.shuffleCircleBtn}
                                   onPress={() => {
                                     safeHaptic('light');
                                     setCardOpenerIndex((prev) => prev + 1);
                                   }}
-                                  activeOpacity={0.7}
-                                  style={styles.shuffleCircleBtn}
-                                  accessibilityRole="button"
                                   accessibilityLabel="Shuffle opener"
-                                >
-                                  <Ionicons name="refresh" size={13} color="#FFAA80" />
-                                </TouchableOpacity>
+                                />
                               )}
                             </View>
 
                             {/* AI Wingman Icebreaker Pill */}
                             <View style={styles.icebreakerPill}>
                               <View style={styles.icebreakerHeaderRow}>
-                                <Ionicons name="sparkles" size={11} color={currentPersonalityObj.accentColor} />
-                                <Text style={[styles.icebreakerTag, { color: currentPersonalityObj.accentColor }]}>
+                                <Ionicons name="sparkles" size={12} color={currentPersonalityObj.accentColor} />
+                                <Text style={[styles.icebreakerTag, { color: currentPersonalityObj.accentColor }]} numberOfLines={1}>
                                   Flint Icebreaker · {currentPersonalityObj.label}
                                 </Text>
                               </View>
@@ -3713,11 +3439,11 @@ export default function OnboardingScreen({ navigation }) {
                             </View>
                           </LinearGradient>
 
-                          {/* ── Dimmer Overlay: Makes 2nd & 3rd cards dimmed, smoothly un-dimming to 0 (bright!) on zoom-in ── */}
+                          {/* ── Dimmer Overlay: dims 2nd & 3rd cards, un-dimming to bright on zoom-in ── */}
                           <Animated.View
                             style={[
                               StyleSheet.absoluteFillObject,
-                              { backgroundColor: '#07030B', opacity: anim.dimmer },
+                              { backgroundColor: C.background, opacity: anim.dimmer },
                             ]}
                             pointerEvents="none"
                           />
@@ -3726,23 +3452,24 @@ export default function OnboardingScreen({ navigation }) {
                     })}
                   </View>
 
-                  {/* ── Soulful Match Blueprint Playing Cards Stack Carousel ── */}
+                  {/* ── Match Blueprint Playing Cards Stack Carousel ── */}
                   <View style={styles.blueprintDeckSection}>
-                    {/* Header Row: Title + Card Deck Pips + Tap to Flip Hint */}
+                    {/* Header Row: Title + Card Deck Pips + Tap to Cycle Hint */}
                     <View style={styles.blueprintDeckHeader}>
                       <View style={styles.blueprintHeaderLeft}>
-                        <Ionicons name="sparkles" size={13} color="#FF6584" />
-                        <Text style={styles.blueprintDeckTitle}>Your Dating Game Plan</Text>
+                        <Ionicons name="sparkles" size={14} color={C.accent} />
+                        <Text style={styles.blueprintDeckTitle} numberOfLines={1} accessibilityRole="header">Your Dating Game Plan</Text>
                       </View>
                       <TouchableOpacity
                         activeOpacity={0.7}
                         onPress={cycleBlueprintCard}
                         style={styles.blueprintCycleHintBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         accessibilityRole="button"
                         accessibilityLabel="Cycle blueprint card"
                       >
-                        <Text style={styles.blueprintCycleHintText}>Tap to cycle</Text>
-                        <Ionicons name="refresh" size={11} color="rgba(255, 170, 128, 0.85)" />
+                        <Text style={styles.blueprintCycleHintText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Tap to cycle</Text>
+                        <Ionicons name="refresh" size={12} color={C.secondary} />
                         <View style={styles.blueprintPipsRow}>
                           {[0, 1, 2].map((idx) => (
                             <View
@@ -3757,7 +3484,7 @@ export default function OnboardingScreen({ navigation }) {
                       </TouchableOpacity>
                     </View>
 
-                    {/* Interactive 3D Stack of Playing Cards (Native-Driven Apple/Revolut Slot Physics) */}
+                    {/* Interactive Stack of Playing Cards (Native-Driven Slot Physics) */}
                     <TouchableOpacity
                       activeOpacity={0.92}
                       onPress={cycleBlueprintCard}
@@ -3798,8 +3525,8 @@ export default function OnboardingScreen({ navigation }) {
                             >
                               <View style={styles.blueprintCardTopRow}>
                                 <View style={[styles.blueprintCardBadge, { backgroundColor: card.badgeBg }]}>
-                                  <Ionicons name={card.icon} size={11} color={card.iconColor} />
-                                  <Text style={[styles.blueprintCardBadgeText, { color: card.iconColor }]}>
+                                  <Ionicons name={card.icon} size={12} color={card.iconColor} />
+                                  <Text style={[styles.blueprintCardBadgeText, { color: card.iconColor }]} numberOfLines={1}>
                                     {card.category}
                                   </Text>
                                 </View>
@@ -3822,92 +3549,81 @@ export default function OnboardingScreen({ navigation }) {
           </View>
         </KeyboardAvoidingView>
 
-        {/* ── Sticky Bottom Footer with Tactile CTA Dock ── */}
-        <View style={styles.footer}>
-          <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
-            <TouchableOpacity
-              style={styles.continueBtn}
-              onPress={handleNext}
-              onPressIn={handleBtnPressIn}
-              onPressOut={handleBtnPressOut}
-              activeOpacity={0.88}
-              accessibilityRole="button"
-              accessibilityLabel={currentStep === 1 ? 'Get Started' : currentStep === totalSteps ? 'Start Meeting Matches' : 'Continue'}
-            >
-              <LinearGradient
-                colors={[uiTheme.colors.primary, uiTheme.colors.accent, uiTheme.colors.secondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.continueGradient}
-              >
-                <Text style={styles.continueBtnText}>
-                  {currentStep === 1 ? 'Get Started' : currentStep === totalSteps ? 'Start Meeting Matches' : 'Continue'}
-                </Text>
-                <Ionicons
-                  name={currentStep === totalSteps ? 'flame' : 'chevron-forward'}
-                  size={18}
-                  color="#FFFFFF"
-                  style={{ marginLeft: 4 }}
-                />
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
+        {/* ── Sticky Bottom Footer with Primary CTA ── */}
+        <View style={[styles.footer, scrollPadding]}>
+          <View style={styles.footerInner}>
+            <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
+              <AppButton
+                title={ctaLabel}
+                iconRight={currentStep === totalSteps ? 'flame' : 'chevron-forward'}
+                onPress={handleNext}
+                onPressIn={handleBtnPressIn}
+                onPressOut={handleBtnPressOut}
+                haptic={false}
+                accessibilityLabel={ctaLabel}
+              />
+            </Animated.View>
 
-          {/* ── Fixed-Height Footer Sub-Slot (Keeps CTA Button 100% Locked in Place Across All Steps) ── */}
-          <View style={styles.footerSubSlot}>
-            {currentStep === 1 && (
-              <View style={styles.ctaReassuranceRow}>
-                <Ionicons name="shield-checkmark" size={12} color="rgba(255, 255, 255, 0.45)" style={{ marginRight: 5 }} />
-                <Text style={styles.ctaReassuranceText}>Takes under 60 seconds • Completely private</Text>
-              </View>
-            )}
+            {/* ── Fixed-Height Footer Sub-Slot (Keeps the CTA locked in place across all steps) ── */}
+            <ContentTransition transitionKey={currentStep} style={styles.footerSubSlot}>
+              {currentStep === 1 && (
+                <View style={styles.ctaReassuranceRow}>
+                  <Ionicons name="shield-checkmark" size={13} color={C.muted} />
+                  <Text style={styles.ctaReassuranceText} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    Takes under 60 seconds • Completely private
+                  </Text>
+                </View>
+              )}
 
-            {currentStep > 1 && currentStep < totalSteps && (
-              <View style={styles.ctaReassuranceRow}>
-                <Ionicons name="shield-checkmark" size={12} color="rgba(255, 255, 255, 0.35)" style={{ marginRight: 5 }} />
-                <Text style={styles.ctaReassuranceText}>Encrypted & private • Change anytime</Text>
-              </View>
-            )}
+              {currentStep > 1 && currentStep < totalSteps && (
+                <View style={styles.ctaReassuranceRow}>
+                  <Ionicons name="shield-checkmark" size={13} color={C.muted} />
+                  <Text style={styles.ctaReassuranceText} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    Encrypted & private • Change anytime
+                  </Text>
+                </View>
+              )}
 
-            {currentStep === totalSteps && (
-              <TouchableOpacity
-                style={styles.signInFooterBtn}
-                onPress={() => {
-                  safeHaptic('light');
-                  navigation.dispatch(
-                    StackActions.push('Auth', {
-                      initialMode: 'login',
-                      forceAuth: true,
-                      onboardingData: {
-                        platform: selectedPlatform,
-                        country,
-                        languages: selectedLanguages,
-                        dialCode,
-                        whatsapp,
-                        goals: selectedGoals,
-                        frequency,
-                        personality,
-                        safeMode,
-                      },
-                    })
-                  );
-                }}
-                activeOpacity={0.75}
-                hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
-                accessibilityRole="button"
-                accessibilityLabel="Already have an account? Sign In"
-              >
-                <Text style={styles.signInFooterText}>
-                  Already have an account?{' '}
-                  <Text style={styles.signInFooterHighlight}>Sign In</Text>
-                </Text>
-              </TouchableOpacity>
-            )}
+              {currentStep === totalSteps && (
+                <TouchableOpacity
+                  style={styles.signInFooterBtn}
+                  onPress={() => {
+                    safeHaptic('light');
+                    navigation.dispatch(
+                      StackActions.push('Auth', {
+                        initialMode: 'login',
+                        forceAuth: true,
+                        onboardingData: {
+                          platform: selectedPlatform,
+                          country,
+                          languages: selectedLanguages,
+                          dialCode,
+                          whatsapp,
+                          goals: selectedGoals,
+                          frequency,
+                          personality,
+                          safeMode,
+                        },
+                      })
+                    );
+                  }}
+                  activeOpacity={0.75}
+                  hitSlop={{ top: 6, bottom: 6, left: 16, right: 16 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Already have an account? Sign In"
+                >
+                  <Text style={styles.signInFooterText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    Already have an account?{' '}
+                    <Text style={styles.signInFooterHighlight}>Sign In</Text>
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </ContentTransition>
           </View>
         </View>
       </SafeAreaView>
 
-      {/* ── Country Picker Frosted Modal (iOS Industry Standard) ── */}
+      {/* ── Country Picker Sheet ── */}
       <Modal
         visible={countryModalVisible}
         transparent
@@ -3922,7 +3638,9 @@ export default function OnboardingScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalBackdrop}
         >
-          <TouchableOpacity accessibilityRole="button"
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Close country selector"
             style={styles.modalDismissArea}
             activeOpacity={1}
             onPress={() => {
@@ -3931,80 +3649,74 @@ export default function OnboardingScreen({ navigation }) {
               setCountryModalVisible(false);
             }}
           />
-          <View style={styles.modalContent}>
-            <LinearGradient
-              colors={['#1E122A', '#140D1E', '#0D0714']}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
+          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, SP.lg) }]} accessibilityViewIsModal>
             <View style={styles.sheetHandle} />
 
             {/* Header */}
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
-                <View style={styles.modalHeaderIconDiskCoral}>
-                  <Ionicons name="location-sharp" size={17} color={uiTheme.colors.primary} />
-                </View>
+                <IconWell icon="location-sharp" tone="primary" size={40} iconSize={18} />
                 <View style={styles.modalHeaderTitleGroup}>
-                  <Text style={styles.modalTitle}>Select Country</Text>
-                  <Text style={styles.modalSub}>Matches your city, timezone & local slang</Text>
+                  <Text style={styles.modalTitle} accessibilityRole="header" numberOfLines={1}>Select Country</Text>
+                  <Text style={styles.modalSub} numberOfLines={2}>Matches your city, timezone & local slang</Text>
                 </View>
               </View>
-              <TouchableOpacity
+              <IconButton
+                icon="close"
+                size={40}
+                iconSize={18}
                 onPress={() => {
                   safeHaptic('light');
                   Keyboard.dismiss();
                   setCountrySearch('');
                   setCountryModalVisible(false);
                 }}
-                style={styles.modalCloseBtn}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                accessibilityRole="button"
                 accessibilityLabel="Close country selector"
-              >
-                <Ionicons name="close" size={18} color="#FFFFFF" />
-              </TouchableOpacity>
+              />
             </View>
 
-            {/* High-Contrast Frosted Search Bar */}
+            {/* Search Field */}
             <View
               style={[
                 styles.modalSearchWrap,
-                isCountrySearchFocused && styles.modalSearchWrapFocusedCoral,
+                isCountrySearchFocused && styles.modalSearchWrapFocused,
               ]}
             >
               <Ionicons
                 name="search"
-                size={17}
-                color={isCountrySearchFocused ? uiTheme.colors.primary : 'rgba(255, 255, 255, 0.55)'}
+                size={18}
+                color={isCountrySearchFocused ? C.accent : C.muted}
               />
               <TextInput
                 style={styles.modalSearchInput}
                 placeholder="Search 95+ countries..."
-                placeholderTextColor="rgba(255, 255, 255, 0.42)"
+                placeholderTextColor={C.muted}
+                selectionColor={C.accent}
+                cursorColor={C.accent}
+                maxFontSizeMultiplier={uiTheme.fontScale.chrome}
                 value={countrySearch}
                 onChangeText={setCountrySearch}
                 onFocus={() => setIsCountrySearchFocused(true)}
                 onBlur={() => setIsCountrySearchFocused(false)}
                 autoCorrect={false}
                 returnKeyType="search"
+                accessibilityLabel="Search countries"
               />
               {Boolean(countrySearch) && (
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
                   onPress={() => {
                     safeHaptic('light');
                     setCountrySearch('');
                   }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={{ padding: 4 }}
+                  style={styles.inputIconBtn}
                 >
-                  <Ionicons name="close-circle" size={16} color="rgba(255, 255, 255, 0.65)" />
+                  <Ionicons name="close-circle" size={18} color={C.muted} />
                 </TouchableOpacity>
               )}
-              <View style={styles.modalMatchCountPill}>
-                <Text style={styles.modalMatchCountText}>{filteredCountries.length}</Text>
-              </View>
+              <Badge label={String(filteredCountries.length)} tone="neutral" />
             </View>
 
             <FlatList
@@ -4013,14 +3725,14 @@ export default function OnboardingScreen({ navigation }) {
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               style={styles.modalList}
-              contentContainerStyle={{ paddingBottom: 40 }}
+              contentContainerStyle={styles.modalListContent}
               initialNumToRender={20}
               maxToRenderPerBatch={25}
               windowSize={10}
               ItemSeparatorComponent={() => <View style={styles.modalHairline} />}
               ListEmptyComponent={
                 <View style={styles.modalEmptyWrap}>
-                  <Ionicons name="search-outline" size={28} color="rgba(255, 255, 255, 0.25)" />
+                  <Ionicons name="search-outline" size={28} color={C.muted} />
                   <Text style={styles.modalEmptyTitle}>No countries found</Text>
                   <Text style={styles.modalEmptySub}>Try a different spelling or name</Text>
                 </View>
@@ -4029,7 +3741,10 @@ export default function OnboardingScreen({ navigation }) {
                 const isSelected = country === item;
                 const matchDial = DIAL_CODES.find((d) => d.name === item)?.dial;
                 return (
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={matchDial ? `${item}, ${matchDial}` : item}
+                    accessibilityState={{ selected: isSelected }}
                     style={[
                       styles.modalListItem,
                       isSelected && styles.modalListItemSelected,
@@ -4059,7 +3774,7 @@ export default function OnboardingScreen({ navigation }) {
                         </Text>
                       )}
                       {isSelected && (
-                        <Ionicons name="checkmark-circle" size={20} color={uiTheme.colors.primary} style={{ marginLeft: 8 }} />
+                        <Ionicons name="checkmark-circle" size={20} color={C.accent} />
                       )}
                     </View>
                   </TouchableOpacity>
@@ -4070,7 +3785,7 @@ export default function OnboardingScreen({ navigation }) {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Dial Code Picker Frosted Modal (iOS Industry Standard) ── */}
+      {/* ── Dial Code Picker Sheet ── */}
       <Modal
         visible={dialModalVisible}
         transparent
@@ -4085,7 +3800,9 @@ export default function OnboardingScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalBackdrop}
         >
-          <TouchableOpacity accessibilityRole="button"
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Close dial code selector"
             style={styles.modalDismissArea}
             activeOpacity={1}
             onPress={() => {
@@ -4094,80 +3811,74 @@ export default function OnboardingScreen({ navigation }) {
               setDialModalVisible(false);
             }}
           />
-          <View style={styles.modalContent}>
-            <LinearGradient
-              colors={['#10221A', '#0D1A14', '#08120D']}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
+          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, SP.lg) }]} accessibilityViewIsModal>
             <View style={styles.sheetHandle} />
 
             {/* Header */}
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
-                <View style={styles.modalHeaderIconDiskEmerald}>
-                  <Ionicons name="call" size={16} color="#00E676" />
-                </View>
+                <IconWell icon="call" tone="success" size={40} iconSize={18} />
                 <View style={styles.modalHeaderTitleGroup}>
-                  <Text style={styles.modalTitle}>Country Dial Code</Text>
-                  <Text style={styles.modalSub}>Select prefix for instant date alerts</Text>
+                  <Text style={styles.modalTitle} accessibilityRole="header" numberOfLines={1}>Country Dial Code</Text>
+                  <Text style={styles.modalSub} numberOfLines={2}>Select prefix for instant date alerts</Text>
                 </View>
               </View>
-              <TouchableOpacity
+              <IconButton
+                icon="close"
+                size={40}
+                iconSize={18}
                 onPress={() => {
                   safeHaptic('light');
                   Keyboard.dismiss();
                   setDialSearch('');
                   setDialModalVisible(false);
                 }}
-                style={styles.modalCloseBtn}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                accessibilityRole="button"
                 accessibilityLabel="Close dial code selector"
-              >
-                <Ionicons name="close" size={18} color="#FFFFFF" />
-              </TouchableOpacity>
+              />
             </View>
 
-            {/* High-Contrast Frosted Search Bar */}
+            {/* Search Field */}
             <View
               style={[
                 styles.modalSearchWrap,
-                isDialSearchFocused && styles.modalSearchWrapFocusedEmerald,
+                isDialSearchFocused && styles.modalSearchWrapFocused,
               ]}
             >
               <Ionicons
                 name="search"
-                size={17}
-                color={isDialSearchFocused ? '#00E676' : 'rgba(255, 255, 255, 0.55)'}
+                size={18}
+                color={isDialSearchFocused ? C.accent : C.muted}
               />
               <TextInput
                 style={styles.modalSearchInput}
                 placeholder="Search country or dial code..."
-                placeholderTextColor="rgba(255, 255, 255, 0.42)"
+                placeholderTextColor={C.muted}
+                selectionColor={C.accent}
+                cursorColor={C.accent}
+                maxFontSizeMultiplier={uiTheme.fontScale.chrome}
                 value={dialSearch}
                 onChangeText={setDialSearch}
                 onFocus={() => setIsDialSearchFocused(true)}
                 onBlur={() => setIsDialSearchFocused(false)}
                 autoCorrect={false}
                 returnKeyType="search"
+                accessibilityLabel="Search dial codes"
               />
               {Boolean(dialSearch) && (
-                <TouchableOpacity accessibilityRole="button"
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
                   onPress={() => {
                     safeHaptic('light');
                     setDialSearch('');
                   }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={{ padding: 4 }}
+                  style={styles.inputIconBtn}
                 >
-                  <Ionicons name="close-circle" size={16} color="rgba(255, 255, 255, 0.65)" />
+                  <Ionicons name="close-circle" size={18} color={C.muted} />
                 </TouchableOpacity>
               )}
-              <View style={styles.modalMatchCountPill}>
-                <Text style={styles.modalMatchCountText}>{filteredDialCodes.length}</Text>
-              </View>
+              <Badge label={String(filteredDialCodes.length)} tone="neutral" />
             </View>
 
             <FlatList
@@ -4176,14 +3887,14 @@ export default function OnboardingScreen({ navigation }) {
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               style={styles.modalList}
-              contentContainerStyle={{ paddingBottom: 40 }}
+              contentContainerStyle={styles.modalListContent}
               initialNumToRender={20}
               maxToRenderPerBatch={25}
               windowSize={10}
               ItemSeparatorComponent={() => <View style={styles.modalHairline} />}
               ListEmptyComponent={
                 <View style={styles.modalEmptyWrap}>
-                  <Ionicons name="search-outline" size={28} color="rgba(255, 255, 255, 0.25)" />
+                  <Ionicons name="search-outline" size={28} color={C.muted} />
                   <Text style={styles.modalEmptyTitle}>No dial codes found</Text>
                   <Text style={styles.modalEmptySub}>Try searching by country or dial prefix</Text>
                 </View>
@@ -4191,10 +3902,13 @@ export default function OnboardingScreen({ navigation }) {
               renderItem={({ item }) => {
                 const isSelected = dialCode === item.dial && (country === item.name || !DIAL_CODES.some(d => d.dial === item.dial && d.name === country));
                 return (
-                  <TouchableOpacity accessibilityRole="button"
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.name}, ${item.dial}`}
+                    accessibilityState={{ selected: isSelected }}
                     style={[
                       styles.modalListItem,
-                      isSelected && styles.modalListItemSelectedEmerald,
+                      isSelected && styles.modalListItemSelected,
                     ]}
                     onPress={() => {
                       Keyboard.dismiss();
@@ -4207,7 +3921,7 @@ export default function OnboardingScreen({ navigation }) {
                       <Text
                         style={[
                           styles.modalListText,
-                          isSelected && styles.modalListTextSelectedEmerald,
+                          isSelected && styles.modalListTextSelected,
                         ]}
                         numberOfLines={1}
                       >
@@ -4221,7 +3935,7 @@ export default function OnboardingScreen({ navigation }) {
                         </Text>
                       </View>
                       {isSelected && (
-                        <Ionicons name="checkmark-circle" size={18} color="#00E676" style={{ marginLeft: 8 }} />
+                        <Ionicons name="checkmark-circle" size={20} color={C.accent} />
                       )}
                     </View>
                   </TouchableOpacity>
@@ -4235,17 +3949,64 @@ export default function OnboardingScreen({ navigation }) {
   );
 }
 
+// ── Consistent step header: overline eyebrow, title, one-line description ──
+function StepHeader({ eyebrow, title, subtitle, subtitleLines, children }) {
+  return (
+    <View style={styles.stepHeader}>
+      {eyebrow ? (
+        <Text style={styles.stepEyebrow} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+          {String(eyebrow).toUpperCase()}
+        </Text>
+      ) : null}
+      <Text style={styles.stepTitle} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text style={styles.stepSubtitle} numberOfLines={subtitleLines}>{subtitle}</Text>
+      ) : null}
+      {children}
+    </View>
+  );
+}
+
+// ── Card section heading: icon well, title (+ trailing badge/control), description ──
+function SectionHead({ icon, tone = 'primary', dimmed = false, title, subtitle, right }) {
+  return (
+    <View style={styles.sectionHead}>
+      <IconWell icon={icon} tone={dimmed ? 'neutral' : tone} size={36} iconSize={17} />
+      <View style={styles.sectionHeadText}>
+        <View style={styles.sectionHeadTitleRow}>
+          <Text style={styles.sectionHeadTitle} numberOfLines={1} accessibilityRole="header">{title}</Text>
+          {right}
+        </View>
+        {subtitle ? <Text style={styles.sectionHeadSub}>{subtitle}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#08050B',
+    backgroundColor: C.background,
     overflow: 'hidden',
   },
   safeArea: {
     flex: 1,
   },
+  flex: {
+    flex: 1,
+  },
+  flexShrink: {
+    flex: 1,
+    minWidth: 0,
+  },
 
   // ── Ambient Background Living Aurora Orbs ──
+  auroraClip: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
   auroraOrb1: {
     position: 'absolute',
     top: -60,
@@ -4257,7 +4018,7 @@ const styles = StyleSheet.create({
   },
   auroraOrb2: {
     position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.10,
+    bottom: SCREEN_HEIGHT * 0.1,
     left: -SCREEN_WIDTH * 0.12,
     width: SCREEN_WIDTH * 0.85,
     height: SCREEN_WIDTH * 0.85,
@@ -4265,24 +4026,56 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // ── Hero Header Row with Back Arrow Beside Title ──
-  heroHeaderRow: {
+  // ── Progress Header ──
+  topBar: {
+    paddingTop: SP.sm,
+    paddingBottom: SP.md,
+  },
+  topBarInner: {
+    width: '100%',
+    maxWidth: uiTheme.layout.readableMax,
+    alignSelf: 'center',
     flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  backArrowBtn: {
-    marginRight: 14,
-    marginTop: Platform.OS === 'ios' ? 4 : 5,
-    paddingRight: 2,
-    paddingVertical: 2,
-    justifyContent: 'center',
     alignItems: 'center',
+    gap: SP.md,
   },
-  heroTextWrap: {
+  progressCol: {
     flex: 1,
+    minWidth: 0,
+    gap: SP.sm,
+  },
+  progressLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SP.sm,
+  },
+  progressLabel: {
+    ...TY.overline,
+    color: C.textSecondary,
+  },
+  progressStepName: {
+    ...TY.caption,
+    color: C.muted,
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  progressTrack: {
+    flexDirection: 'row',
+    gap: SP.xs,
+  },
+  progressSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: RD.pill,
+    backgroundColor: C.elevatedHigh,
+    overflow: 'hidden',
+  },
+  progressSegmentDone: {
+    backgroundColor: C.primary,
   },
 
-  // ── Content Scroll ──
+  // ── Stage & Content Columns ──
   stageViewport: {
     flex: 1,
     overflow: 'hidden',
@@ -4292,91 +4085,131 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stageShadowLayer: {
-    shadowColor: '#000',
+    shadowColor: C.black,
     shadowOffset: { width: -12, height: 0 },
     shadowOpacity: 0.55,
     shadowRadius: 22,
     elevation: 14,
   },
   scrollContent: {
-    paddingHorizontal: 22,
-    paddingBottom: 28,
-  },
-  scrollContentStep3: {
-    paddingBottom: 20,
-    paddingTop: 6,
+    flexGrow: 1,
+    paddingTop: SP.xs,
+    paddingBottom: SP.section,
   },
   scrollContentStep5: {
-    paddingBottom: 12,
-    paddingTop: 6,
+    paddingBottom: SP.md,
   },
-  stepContainer: {
+  columnWide: {
     width: '100%',
+    maxWidth: uiTheme.layout.readableMax,
+    alignSelf: 'center',
   },
-  heroWrap: {
-    marginTop: 8,
-    marginBottom: 18,
-  },
-  stepTitle: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: -0.6,
-    marginBottom: uiTheme.spacing.sm,
-  },
-  stepSubtitle: {
-    color: '#ac888b',
-    fontSize: 14.5,
-    lineHeight: 21,
-    fontWeight: '500',
+  columnForm: {
+    width: '100%',
+    maxWidth: uiTheme.layout.formMax,
+    alignSelf: 'center',
   },
 
-  // ── Living Cockpit Sliding Showcase ──
+  // ── Step Header ──
+  stepHeader: {
+    marginBottom: SP.xl,
+  },
+  stepEyebrow: {
+    ...TY.overline,
+    color: C.secondary,
+    marginBottom: SP.xs,
+  },
+  stepTitle: {
+    ...TY.title,
+    color: C.text,
+    marginBottom: SP.xs,
+  },
+  stepSubtitle: {
+    ...TY.body,
+    color: C.muted,
+  },
+
+  // ── Shared Card & Section Heading ──
+  card: {
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
+    borderRadius: RD.card,
+    padding: SP.lg,
+    marginBottom: SP.lg,
+  },
+  cardDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: C.divider,
+    marginVertical: SP.lg,
+  },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.md,
+    marginBottom: SP.md,
+  },
+  sectionHeadText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sectionHeadTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SP.sm,
+  },
+  sectionHeadTitle: {
+    ...TY.headline,
+    color: C.text,
+    flexShrink: 1,
+  },
+  sectionHeadSub: {
+    ...TY.footnote,
+    color: C.muted,
+    marginTop: SP.xxs,
+  },
+
+  // ── Step 1: Sliding Showcase ──
   marqueeSectionWrap: {
-    marginHorizontal: -22,
-    marginTop: uiTheme.spacing.xs,
-    marginBottom: uiTheme.spacing.xl,
+    marginTop: SP.xs,
+    marginBottom: SP.xxl,
   },
   marqueeWindow: {
     width: '100%',
     overflow: 'hidden',
-    paddingVertical: 6,
+    paddingVertical: SP.sm,
   },
   marqueeTrack: {
     flexDirection: 'row',
     width: (CARD_WIDTH + CARD_GAP) * DISPLAY_CARDS.length + 100,
-    paddingLeft: 22,
   },
   cockpitCardContainer: {
     width: CARD_WIDTH,
     flexShrink: 0,
     marginRight: CARD_GAP,
-    borderRadius: 22,
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 102, 136, 0.24)',
+    borderRadius: RD.card,
+    borderWidth: 1,
+    borderColor: C.primaryBorder,
     overflow: 'hidden',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    elevation: 8,
+    backgroundColor: C.surface,
   },
   cockpitCardGradient: {
-    padding: uiTheme.spacing.lg,
+    padding: SP.lg,
   },
   cockpitHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SP.md,
   },
   cockpitAvatarWrap: {
     position: 'relative',
-    marginRight: uiTheme.spacing.md,
   },
   cockpitAvatarImage: {
     width: 48,
     height: 48,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: RD.md,
+    backgroundColor: C.elevated,
   },
   cockpitAvatarLiveBeacon: {
     position: 'absolute',
@@ -4385,1242 +4218,641 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#00E676',
+    backgroundColor: C.success,
     borderWidth: 2,
-    borderColor: '#160E20',
+    borderColor: C.surface,
   },
   cockpitProfileMeta: {
     flex: 1,
+    minWidth: 0,
   },
   cockpitNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    gap: SP.xs,
+    marginBottom: SP.xxs,
   },
   cockpitProfileName: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
+    ...TY.headline,
+    color: C.text,
+    flexShrink: 1,
   },
   cockpitProfileSub: {
-    fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    ...TY.caption,
+    color: C.muted,
   },
   cockpitScoreWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 2,
-    paddingHorizontal: 2,
+    gap: SP.xs,
   },
   cockpitScoreText: {
-    fontFamily: 'Inter_700Bold',
-    color: '#00E676',
-    fontSize: 12.5,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+    ...TY.subhead,
+    fontFamily: uiTheme.fonts.strong,
+    color: C.success,
   },
   cockpitHairline: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    marginVertical: uiTheme.spacing.md,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: C.divider,
+    marginVertical: SP.md,
   },
   cockpitOpenerBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    backgroundColor: C.elevated,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 14,
-    padding: uiTheme.spacing.md,
-    marginBottom: uiTheme.spacing.md,
+    borderColor: C.hairline,
+    borderRadius: RD.md,
+    padding: SP.md,
+    marginBottom: SP.md,
   },
   cockpitOpenerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    gap: SP.xs,
+    marginBottom: SP.xs,
   },
   cockpitOpenerLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    color: '#C49BFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+    ...TY.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: C.info,
   },
   cockpitOpenerText: {
-    fontFamily: 'Inter_500Medium',
-    color: '#FFFFFF',
-    fontSize: 12.8,
-    lineHeight: 18,
-    fontWeight: 'normal',
+    ...TY.callout,
+    color: C.text,
     fontStyle: 'italic',
   },
   cockpitCursor: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.primary,
-    fontWeight: 'normal',
-    fontSize: uiTheme.type.label.fontSize,
+    ...TY.callout,
+    fontFamily: uiTheme.fonts.heavy,
+    color: C.primary,
   },
   cockpitFooterStrip: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 2,
+    columnGap: SP.md,
+    rowGap: SP.xs,
   },
   cockpitFooterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
+    gap: SP.xs,
   },
   cockpitFooterItemText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  cockpitFooterDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    ...TY.caption,
+    color: C.muted,
   },
 
-  // ── Step 1: Feature List (Apple HIG Borderless with Specular Disks) ──
+  // ── Step 1: Feature List ──
   featureList: {
-    gap: uiTheme.spacing.lg,
-    marginTop: uiTheme.spacing.xs,
+    gap: SP.lg,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-  },
-  featureIconOuterGlow: {
-    borderRadius: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-  },
-  featureIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    gap: SP.md,
   },
   featureInfo: {
     flex: 1,
+    minWidth: 0,
   },
   featureTitle: {
-    fontFamily: 'Manrope_700Bold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
-    marginBottom: 3,
+    ...TY.headline,
+    color: C.text,
+    marginBottom: SP.xxs,
   },
   featureDesc: {
-    fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: 12.5,
-    lineHeight: 17.5,
-    fontWeight: 'normal',
+    ...TY.callout,
+    color: C.muted,
   },
 
-  // ── Step 2: About You (Regional Context & VIP Alerts) ──
-  step2GlassCard: {
-    borderRadius: 22,
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 102, 136, 0.22)',
-    overflow: 'hidden',
-    marginBottom: uiTheme.spacing.lg,
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.16,
-    shadowRadius: 16,
-    elevation: 6,
+  // ── Step 2: Fields, Chips & Phone ──
+  fieldLabel: {
+    ...TY.label,
+    color: C.textSecondary,
+    marginBottom: SP.sm,
   },
-  step2GlassCardEmerald: {
-    borderRadius: 22,
-    borderWidth: 1.2,
-    borderColor: 'rgba(0, 230, 118, 0.22)',
-    overflow: 'hidden',
-    marginBottom: uiTheme.spacing.lg,
-    shadowColor: '#00E676',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  step2CardGradient: {
-    padding: uiTheme.spacing.lg,
-  },
-  step2SectionHeader: {
+  selectField: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: uiTheme.spacing.md,
-  },
-  step2IconDiskCoral: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 51, 102, 0.14)',
+    gap: SP.md,
+    backgroundColor: C.elevated,
     borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.28)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: uiTheme.spacing.md,
+    borderColor: C.border,
+    borderRadius: RD.input,
+    minHeight: uiTheme.layout.inputHeight,
+    paddingHorizontal: SP.md,
   },
-  step2IconDiskAmethyst: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(179, 136, 255, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(179, 136, 255, 0.28)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: uiTheme.spacing.md,
-  },
-  step2IconDiskEmerald: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0, 230, 118, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 230, 118, 0.28)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: uiTheme.spacing.md,
-  },
-  step2HeaderTextWrap: {
-    flex: 1,
-  },
-  step2TitleWithPillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingRight: 2,
-  },
-  step2SectionTitle: {
-    fontFamily: 'Manrope_700Bold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
-  },
-  step2CoralBadgePill: {
-    backgroundColor: 'rgba(255, 51, 102, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.28)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: uiTheme.radius.small,
-  },
-  step2CoralBadgeText: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.secondary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  step2LangCountPill: {
-    backgroundColor: 'rgba(179, 136, 255, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(179, 136, 255, 0.28)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: uiTheme.radius.small,
-  },
-  step2LangCountText: {
-    fontFamily: 'Inter_700Bold',
-    color: '#B388FF',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  step2OptionalPill: {
-    backgroundColor: 'rgba(0, 230, 118, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 230, 118, 0.28)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: uiTheme.radius.small,
-  },
-  step2OptionalText: {
-    fontFamily: 'Inter_700Bold',
-    color: '#00E676',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  step2SectionSub: {
-    fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginTop: 2,
-  },
-  step2SelectTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(10, 6, 14, 0.65)',
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
-    borderRadius: 15,
-    height: 52,
-    paddingHorizontal: 13,
-  },
-  step2SelectTriggerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  step2FlagDisk: {
+  flagDisk: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: C.neutralSoft,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: C.neutralBorder,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
   },
-  step2FlagEmoji: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.section.fontSize,
+  flagEmoji: {
+    fontSize: TY.section.fontSize,
     lineHeight: 22,
   },
-  step2SelectTriggerText: {
-    fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontSize: 14.5,
-    fontWeight: 'normal',
-    flexShrink: 1,
+  selectFieldText: {
+    ...TY.bodyStrong,
+    color: C.text,
+    flex: 1,
+    minWidth: 0,
   },
-  step2ChevronWrap: {
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.sm,
+  },
+  chipWrapSecondary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.sm,
+    paddingTop: SP.sm,
+  },
+  moreChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    minHeight: 36,
+    backgroundColor: C.secondarySoft,
+    borderWidth: 1,
+    borderColor: C.secondaryBorder,
+    borderRadius: RD.pill,
+    paddingHorizontal: SP.md,
+  },
+  moreChipText: {
+    ...TY.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: C.secondary,
+  },
+  secondaryLangWrap: {
+    overflow: 'hidden',
+  },
+  phoneInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    backgroundColor: C.elevated,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: RD.input,
+    height: uiTheme.layout.inputHeight,
+    paddingHorizontal: SP.sm,
+  },
+  phoneInputWrapFocused: {
+    borderColor: C.accent,
+  },
+  phoneInputWrapError: {
+    borderColor: C.error,
+    backgroundColor: C.errorSoft,
+  },
+  phoneInputWrapOk: {
+    borderColor: C.successBorder,
+  },
+  dialCodeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    minHeight: uiTheme.layout.touchTarget,
+    paddingHorizontal: SP.xs,
+  },
+  dialFlagText: {
+    fontSize: TY.body.fontSize,
+  },
+  dialCodeText: {
+    ...TY.bodyStrong,
+    fontFamily: uiTheme.fonts.strong,
+    color: C.text,
+  },
+  dialDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: C.border,
+    marginHorizontal: SP.xs,
+  },
+  phoneInput: {
+    ...TY.body,
+    flex: 1,
+    minWidth: 0,
+    height: '100%',
+    color: C.text,
+    paddingVertical: 0,
+  },
+  inputIconBtn: {
+    padding: SP.xs,
+  },
+  phoneFeedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginTop: SP.sm,
+  },
+  helperText: {
+    ...TY.footnote,
+    color: C.muted,
+    flex: 1,
+    minWidth: 0,
+  },
+  helperTextError: {
+    color: C.error,
+  },
+  helperTextSuccess: {
+    color: C.success,
+  },
+
+  // ── Step 3: Goals ──
+  goalSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: SP.sm,
+  },
+  goalFeedbackBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    backgroundColor: C.secondarySoft,
+    borderWidth: 1,
+    borderColor: C.secondaryBorder,
+    borderRadius: RD.md,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    marginBottom: SP.md,
+  },
+  goalFeedbackText: {
+    ...TY.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: C.secondary,
+    flex: 1,
+    minWidth: 0,
+  },
+  goalsList: {
+    gap: SP.md,
+  },
+  goalCardWrap: {
+    borderRadius: RD.lg,
+  },
+  goalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.md,
+    minHeight: 72,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: RD.lg,
+    paddingVertical: SP.md,
+    paddingHorizontal: SP.lg,
+    overflow: 'hidden',
+  },
+  goalCardSelectedLayer: {
+    backgroundColor: C.primarySoft,
+    borderWidth: 1,
+    borderColor: C.primaryBorder,
+    borderRadius: RD.lg,
+  },
+  goalInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  goalTitle: {
+    ...TY.headline,
+    color: C.text,
+    marginBottom: SP.xxs,
+  },
+  goalDesc: {
+    ...TY.footnote,
+    color: C.muted,
+  },
+  goalDescSelected: {
+    color: C.textSecondary,
+  },
+  goalCheckWrap: {
     width: 24,
     height: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  step2Divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    marginVertical: uiTheme.spacing.lg,
-  },
-  langChipsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: uiTheme.spacing.sm,
-  },
-  langChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(10, 6, 14, 0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
-    borderRadius: 18,
-    paddingHorizontal: 13,
-    paddingVertical: 7.5,
-  },
-  langChipSelected: {
-    borderColor: uiTheme.colors.primary,
-    backgroundColor: 'rgba(255, 51, 102, 0.16)',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-  },
-  langChipText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: '#D8D0DD',
-    fontSize: 12.5,
-    fontWeight: 'normal',
-  },
-  langChipTextSelected: {
-    fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontWeight: 'normal',
-  },
-  moreLangChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255, 170, 128, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 170, 128, 0.25)',
-    borderRadius: 18,
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: 7.5,
-  },
-  moreLangChipText: {
-    fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.secondary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  secondaryLangWrap: {
-    overflow: 'hidden',
-  },
-  langChipsContainerSecondary: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: uiTheme.spacing.sm,
-    paddingTop: uiTheme.spacing.sm,
-  },
-  phoneInputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(10, 6, 14, 0.65)',
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
-    borderRadius: 15,
-    height: 52,
-    paddingHorizontal: uiTheme.spacing.md,
-  },
-  phoneInputWrapFocused: {
-    borderColor: 'rgba(0, 230, 118, 0.55)',
-    backgroundColor: 'rgba(10, 6, 14, 0.85)',
-  },
-  phoneInputWrapError: {
-    borderColor: '#FF4D6D',
-    backgroundColor: 'rgba(255, 77, 109, 0.1)',
-  },
-  phoneInputWrapOk: {
-    borderColor: 'rgba(0, 230, 118, 0.45)',
-  },
-  dialCodeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: uiTheme.spacing.xs,
-  },
-  dialFlagText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.body.fontSize,
-    marginRight: uiTheme.spacing.xs,
-  },
-  dialCodeText: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-  },
-  dialDivider: {
-    width: 1,
-    height: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    marginHorizontal: uiTheme.spacing.sm,
-  },
-  phoneInput: {
-    fontFamily: 'Inter_600SemiBold',
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14.5,
-    fontWeight: 'normal',
-  },
-  phoneFeedbackRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    paddingHorizontal: 2,
-  },
-  privacyReassuranceText: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(245, 230, 240, 0.6)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    lineHeight: 16,
-  },
-  privacyReassuranceActiveText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: '#00E676',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    lineHeight: 16,
-  },
-  hintTextError: {
-    fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.accent,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    lineHeight: 16,
-  },
-
-  // ── Step 3: Goals ──
-  step3HeroWrap: {
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  step3Title: {
-    color: '#FFFFFF',
-    fontSize: 27,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-    marginBottom: 6,
-  },
-  goalSubtitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: uiTheme.spacing.sm,
-  },
-  step3Subtitle: {
-    color: uiTheme.colors.muted,
-    fontSize: 13.5,
-    lineHeight: 18,
-    fontFamily: 'Inter_500Medium',
-    flex: 1,
-  },
-  goalCountPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 51, 102, 0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: uiTheme.spacing.xs,
-    borderRadius: uiTheme.radius.card,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.25)',
-  },
-  goalCountPillContinuous: {
-    backgroundColor: 'rgba(0, 229, 255, 0.12)',
-    borderColor: 'rgba(0, 229, 255, 0.28)',
-  },
-  goalCountText: {
-    fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
-  },
-  goalCountTextContinuous: {
-    color: '#00E5FF',
-  },
-  goalFeedbackBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 170, 128, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 170, 128, 0.28)',
-    borderRadius: uiTheme.radius.input,
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: 7,
-    marginBottom: 10,
-  },
-  goalFeedbackText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.secondary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  goalsList: {
-    gap: 10,
-  },
-  goalCardWrap: {
-    marginVertical: 0,
-  },
-  goalGlow: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: uiTheme.radius.card,
-  },
-  goalShadow: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 18,
-    backgroundColor: '#000000',
-  },
-  goalCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(22, 14, 30, 0.82)',
-    borderWidth: 1.4,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 18,
-    paddingVertical: uiTheme.spacing.md,
-    paddingHorizontal: 14,
-    overflow: 'hidden',
-  },
-  goalSpecularBorder: {
-    borderRadius: 18,
-    borderWidth: 1.4,
-  },
-  goalIconDisk: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 13,
-    overflow: 'hidden',
-  },
-  goalInfo: {
-    flex: 1,
-    paddingRight: uiTheme.spacing.sm,
-  },
-  goalTitle: {
-    fontFamily: 'Manrope_800ExtraBold',
-    color: 'rgba(255, 255, 255, 0.95)',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-    marginBottom: 3,
-    letterSpacing: 0.1,
-  },
-  goalTitleSelected: {
-    color: '#FFFFFF',
-  },
-  goalDesc: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(245, 230, 240, 0.80)',
-    fontSize: 12.5,
-    lineHeight: 17,
-    fontWeight: 'normal',
-  },
-  goalDescSelected: {
-    color: 'rgba(255, 255, 255, 0.95)',
-  },
-  goalCheckWrap: {
-    position: 'relative',
-    width: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   goalRippleRing: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 7,
+    borderRadius: RD.pill,
     borderWidth: 1.5,
+    borderColor: C.primary,
   },
-  goalCheckSquircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 7,
-    borderWidth: 1.4,
+  goalCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: RD.pill,
+    borderWidth: 1.5,
+    borderColor: C.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // ── Dynamic Game Plan Strategy Preview ──
-  strategyCardWrapper: {
-    marginTop: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 170, 128, 0.20)',
-    overflow: 'hidden',
+  goalCheckSelected: {
+    backgroundColor: C.primary,
+    borderColor: C.primary,
   },
+
+  // ── Game Plan Strategy Preview ──
   strategyCard: {
-    paddingVertical: uiTheme.spacing.md,
-    paddingHorizontal: 14,
+    marginTop: SP.lg,
   },
   strategyHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
-  },
-  strategyIconDisk: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 170, 128, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: uiTheme.spacing.sm,
+    gap: SP.sm,
+    marginBottom: SP.sm,
   },
   strategyHeaderTitle: {
-    fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: 'normal',
-    letterSpacing: 0.15,
+    ...TY.label,
+    color: C.text,
     flex: 1,
-  },
-  strategyGamePlanBadge: {
-    backgroundColor: 'rgba(255, 170, 128, 0.12)',
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 170, 128, 0.25)',
-  },
-  strategyGamePlanBadgeText: {
-    fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.secondary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    minWidth: 0,
   },
   strategySummaryText: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(245, 230, 240, 0.92)',
-    fontSize: 12.5,
-    lineHeight: 18,
-    fontWeight: 'normal',
+    ...TY.callout,
+    color: C.textSecondary,
   },
 
-  // ── Step 4: Behavior & Style (Luxury Obsidian Glass Card) ──
-  step4GlassCard: {
-    backgroundColor: 'rgba(22, 14, 30, 0.72)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 22,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  step4CardGradient: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 14,
-  },
-  step4SectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-  },
-  step4IconDiskAmethyst: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(179, 136, 255, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(179, 136, 255, 0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  step4IconDiskCoral: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 51, 102, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  step4IconDiskEmerald: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 230, 118, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 230, 118, 0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  step4IconDiskDimmed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  step4HeaderTextWrap: {
-    flex: 1,
-  },
-  step4TitleWithPillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: uiTheme.spacing.sm,
-  },
-  step4SectionTitle: {
-    fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 14.5,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
-  },
-  step4SectionSub: {
-    fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginTop: 1,
-  },
-  step4AmethystBadgePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(179, 136, 255, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(179, 136, 255, 0.32)',
-    borderRadius: uiTheme.radius.small,
-    paddingHorizontal: 7.5,
-    paddingVertical: 2,
-    height: 22,
-  },
-  step4AmethystBadgeText: {
-    fontFamily: 'Inter_700Bold',
-    color: '#B388FF',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    includeFontPadding: false,
-  },
-  step4CoralBadgePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 51, 102, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.32)',
-    borderRadius: uiTheme.radius.small,
-    paddingHorizontal: 7.5,
-    paddingVertical: 2,
-    height: 22,
-  },
-  step4CoralBadgeText: {
-    fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    includeFontPadding: false,
-  },
-  step4Divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    marginVertical: 11,
+  // ── Step 4: Tone, Voice Preview, Cadence & Protection ──
+  toneScroll: {
+    marginHorizontal: -SP.lg,
+    marginBottom: SP.md,
   },
   toneScrollTrack: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingBottom: 11,
-    paddingHorizontal: 2,
+    gap: SP.sm,
+    paddingHorizontal: SP.lg,
+    paddingVertical: SP.xs,
   },
-  personalityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(12, 7, 18, 0.72)',
+  voicePreview: {
+    backgroundColor: C.elevated,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: uiTheme.radius.input,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-  },
-  personalityPillText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(245, 230, 240, 0.75)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  voicePreviewWrapper: {
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginBottom: 2,
-  },
-  voicePreviewCard: {
-    padding: 11,
+    borderColor: C.hairline,
+    borderRadius: RD.lg,
+    padding: SP.md,
   },
   voiceHeaderRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 7,
+    columnGap: SP.sm,
+    rowGap: SP.xs,
+    marginBottom: SP.md,
   },
   voiceHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    flex: 1,
+    gap: SP.sm,
+    flexShrink: 1,
   },
   voiceIconDisk: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   voiceHeaderTitle: {
-    fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+    ...TY.label,
+    color: C.text,
+    flexShrink: 1,
   },
   voiceLiveBeaconRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    marginLeft: uiTheme.spacing.xs,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    gap: SP.xs,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xxs,
+    borderRadius: RD.pill,
+    backgroundColor: C.neutralSoft,
   },
   voiceLiveDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   voiceLiveText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
-    includeFontPadding: false,
+    ...TY.caption,
+    fontFamily: uiTheme.fonts.strong,
   },
   voiceTagBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xxs,
+    borderRadius: RD.pill,
     borderWidth: 1,
-    height: 20,
   },
   voiceTagBadgeText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    includeFontPadding: false,
+    ...TY.caption,
+    fontFamily: uiTheme.fonts.strong,
   },
   voiceBubble: {
-    backgroundColor: 'rgba(0, 0, 0, 0.40)',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    paddingHorizontal: 11,
-    paddingVertical: uiTheme.spacing.sm,
+    alignSelf: 'flex-end',
+    maxWidth: '94%',
     minHeight: 48,
     justifyContent: 'center',
-    marginBottom: 6,
+    borderRadius: RD.lg,
+    borderBottomRightRadius: RD.xs,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    marginBottom: SP.md,
+    overflow: 'hidden',
   },
   voiceDraftingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-    paddingVertical: 2,
+    gap: SP.sm,
   },
   typingDotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingLeft: 2,
+    gap: SP.xs,
   },
   typingDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.onPrimary,
   },
   voiceDraftingText: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    ...TY.callout,
+    color: C.onPrimary,
     fontStyle: 'italic',
+    flexShrink: 1,
   },
   voiceOpenerText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.caption.fontSize,
+    ...TY.body,
+    color: C.onPrimary,
+  },
+  voiceCursor: {
+    fontFamily: uiTheme.fonts.heavy,
     fontWeight: 'normal',
-    fontStyle: 'italic',
-    lineHeight: 17,
+    color: C.onPrimary,
   },
   voiceVibeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 2,
-    marginTop: 2,
+    gap: SP.sm,
   },
   voiceEqualizerRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    height: 10,
+    height: 12,
     gap: 2,
     flexShrink: 0,
   },
   voiceEqualizerBar: {
-    width: 2.5,
-    height: 10,
-    borderRadius: 1.25,
+    width: 3,
+    height: 12,
+    borderRadius: 1.5,
   },
   voiceVibeDesc: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(245, 230, 240, 0.72)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    lineHeight: 15,
+    ...TY.footnote,
+    color: C.muted,
     flex: 1,
+    minWidth: 0,
   },
-  // ── Reply Speed: Compact Segmented Cadence Track & Dynamic Insight ──
   cadenceSegmentTrack: {
     flexDirection: 'row',
     position: 'relative',
-    backgroundColor: 'rgba(10, 5, 15, 0.75)',
-    borderRadius: 13,
+    backgroundColor: C.elevated,
+    borderRadius: RD.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: C.hairline,
     padding: 3,
-    marginBottom: 6,
+    marginBottom: SP.sm,
   },
   cadenceSliderThumb: {
     position: 'absolute',
     top: 3,
     bottom: 3,
     left: 3,
-    borderRadius: 10,
+    borderRadius: RD.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.65)',
-    overflow: 'hidden',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.40,
-    shadowRadius: 5,
-    elevation: 4,
+    borderColor: C.primaryBorder,
+    backgroundColor: C.primarySoft,
   },
   cadenceSegmentBtn: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 7,
-    paddingHorizontal: 2,
-    borderRadius: 10,
+    minHeight: 52,
+    paddingVertical: SP.xs,
+    paddingHorizontal: SP.xxs,
+    borderRadius: RD.sm,
     zIndex: 1,
   },
+  cadenceSegmentTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    maxWidth: '100%',
+  },
   cadenceSegmentLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(245, 230, 240, 0.70)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginRight: uiTheme.spacing.xs,
+    ...TY.subhead,
+    color: C.muted,
+    flexShrink: 1,
   },
   cadenceSegmentLabelActive: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
-    fontWeight: 'normal',
-  },
-  cadenceTimePill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 5,
-  },
-  cadenceTimePillActive: {
-    backgroundColor: 'rgba(255, 51, 102, 0.35)',
+    fontFamily: uiTheme.fonts.label,
+    color: C.text,
   },
   cadenceTimeText: {
-    fontFamily: 'Inter_700Bold',
-    color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    includeFontPadding: false,
+    ...TY.caption,
+    color: C.muted,
+    marginTop: SP.xxs,
   },
   cadenceTimeTextActive: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.secondary,
-    fontWeight: 'normal',
+    fontFamily: uiTheme.fonts.strong,
+    color: C.secondary,
   },
   cadenceInsightRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 3,
-    marginTop: 2,
-    gap: 6,
+    gap: SP.sm,
+    paddingHorizontal: SP.xs,
   },
   cadenceInsightDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: uiTheme.colors.primary,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.primary,
     flexShrink: 0,
   },
   cadenceInsightText: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(245, 230, 240, 0.75)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    lineHeight: 15,
+    ...TY.footnote,
+    color: C.textSecondary,
     flex: 1,
-  },
-
-  // ── Smart Protection: Living Human Shield Matrix ──
-  smartProtectionTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  shieldBeaconPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 230, 118, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 230, 118, 0.30)',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    gap: uiTheme.spacing.xs,
-  },
-  shieldBeaconPillDimmed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderColor: 'rgba(255, 255, 255, 0.10)',
-  },
-  shieldBeaconDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#00E676',
-  },
-  shieldBeaconDotDimmed: {
-    backgroundColor: '#8E8E93',
-  },
-  shieldBeaconText: {
-    fontFamily: 'Inter_700Bold',
-    color: '#00E676',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
-    includeFontPadding: false,
-  },
-  shieldBeaconTextDimmed: {
-    color: '#8E8E93',
+    minWidth: 0,
   },
   shieldMatrixRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: uiTheme.spacing.sm,
+    flexWrap: 'wrap',
+    gap: SP.sm,
+  },
+  shieldMatrixRowDimmed: {
+    opacity: 0.5,
   },
   shieldPillarCard: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 230, 118, 0.07)',
+    flexGrow: 1,
+    flexBasis: 88,
+    backgroundColor: C.successSoft,
     borderWidth: 1,
-    borderColor: 'rgba(0, 230, 118, 0.25)',
-    borderRadius: 10,
-    paddingVertical: 5.5,
-    paddingHorizontal: 6,
+    borderColor: C.successBorder,
+    borderRadius: RD.sm,
+    paddingVertical: SP.sm,
+    paddingHorizontal: SP.sm,
   },
   shieldPillarCardDimmed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: C.neutralSoft,
+    borderColor: C.neutralBorder,
   },
   shieldPillarTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3.5,
-    marginBottom: 2,
+    gap: SP.xs,
+    marginBottom: SP.xxs,
   },
   shieldPillarTitle: {
-    fontFamily: 'Manrope_700Bold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    includeFontPadding: false,
+    ...TY.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: C.text,
+    flexShrink: 1,
   },
   shieldPillarTitleDimmed: {
-    color: '#8E8E93',
+    color: C.muted,
   },
   shieldPillarSub: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(245, 230, 240, 0.60)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    ...TY.caption,
+    color: C.muted,
   },
 
-  // ── Step 5: Grand Match Hero & Swipe Deck ──
+  // ── Step 5: Swipe Deck ──
   step5Container: {
-    width: '100%',
-    paddingTop: 0,
-    paddingBottom: 0,
     overflow: 'visible',
   },
-  // ── Step 5: 3D Dating Deck Physics with Harmonious Margins & Centered Faces ──
   deckStackWrap: {
     position: 'relative',
     width: '100%',
-    height: 410,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 18,
-    marginBottom: 4,
-  },
-  deckBackCard2: {
-    position: 'absolute',
-    width: 315,
-    height: 385,
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    backgroundColor: '#160B20',
-    zIndex: 1,
-  },
-  deckBackCard1: {
-    position: 'absolute',
-    width: 315,
-    height: 385,
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 102, 136, 0.32)',
-    backgroundColor: '#160B20',
-    zIndex: 2,
-  },
-  deckBackImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  deckBackOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(12, 6, 18, 0.15)',
-  },
-  deckBackOverlay1: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(12, 6, 18, 0.20)',
-    zIndex: 1,
-  },
-  deckBackOverlay2: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(12, 6, 18, 0.35)',
-    zIndex: 1,
-  },
-  deckBackBadgeRowLeft: {
-    position: 'absolute',
-    top: 14,
-    left: 14,
-  },
-  deckBackBadgeRowRight: {
-    position: 'absolute',
-    top: 14,
-    right: 14,
-  },
-  deckBackBadge: {
-    backgroundColor: 'rgba(14, 7, 20, 0.82)',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-  },
-  deckBackBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
+    marginTop: SP.sm,
   },
   heroMatchCard: {
     position: 'relative',
-    width: 315,
-    height: 385,
-    borderRadius: 24,
+    borderRadius: RD.xl,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 80, 130, 0.45)',
-    backgroundColor: '#160B20',
-    shadowColor: '#FF3366',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 10,
+    borderWidth: 1,
+    borderColor: C.primaryBorder,
+    backgroundColor: C.elevated,
+    ...uiTheme.shadows.md,
     zIndex: 3,
     justifyContent: 'space-between',
   },
@@ -5635,51 +4867,52 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 58,
+    height: 64,
     zIndex: 1,
   },
   heroTopBadgesRow: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    right: 12,
+    top: SP.md,
+    left: SP.md,
+    right: SP.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: SP.sm,
     zIndex: 2,
   },
   heroCompatibilityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(14, 7, 20, 0.82)',
+    gap: SP.xs,
+    backgroundColor: alpha(C.background, 0.82),
     borderWidth: 1,
-    borderColor: 'rgba(255, 94, 126, 0.45)',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 4.5,
+    borderColor: C.primaryBorder,
+    borderRadius: RD.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+    flexShrink: 1,
   },
   heroCompatibilityText: {
-    fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
+    ...TY.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: C.white,
   },
   heroSwipeHintBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(14, 7, 20, 0.65)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    gap: SP.xs,
+    backgroundColor: alpha(C.background, 0.7),
+    borderRadius: RD.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: C.neutralBorder,
   },
   heroSwipeHintText: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 10.5,
-    fontWeight: '600',
+    ...TY.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: alpha(C.white, 0.85),
   },
   heroFrostedDock: {
     position: 'absolute',
@@ -5687,557 +4920,439 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 2,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 10,
+    paddingHorizontal: SP.md,
+    paddingTop: SP.lg,
+    paddingBottom: SP.md,
   },
   heroDockHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 5,
+    gap: SP.sm,
+    marginBottom: SP.sm,
   },
   heroIdentityCol: {
     flex: 1,
+    minWidth: 0,
   },
   heroNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SP.xs,
   },
   heroNameText: {
-    color: '#FFFFFF',
-    fontSize: 19,
-    fontWeight: '800',
-    letterSpacing: -0.4,
+    ...TY.title2,
+    color: C.white,
+    flexShrink: 1,
   },
   heroLocationText: {
-    color: 'rgba(245, 230, 240, 0.75)',
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 1,
+    ...TY.caption,
+    color: alpha(C.white, 0.8),
   },
   shuffleCircleBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: RD.pill,
+    backgroundColor: alpha(C.white, 0.12),
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
+    borderColor: alpha(C.white, 0.18),
   },
   icebreakerPill: {
-    backgroundColor: 'rgba(20, 10, 28, 0.78)',
-    borderRadius: 12,
+    backgroundColor: alpha(C.background, 0.78),
+    borderRadius: RD.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    gap: 2,
+    borderColor: C.neutralBorder,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    gap: SP.xxs,
   },
   icebreakerHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: SP.xs,
   },
   icebreakerTag: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    letterSpacing: 0.1,
+    ...TY.caption,
+    fontFamily: uiTheme.fonts.strong,
+    flexShrink: 1,
   },
   icebreakerQuoteText: {
-    color: '#FFF8F4',
-    fontSize: 11,
-    lineHeight: 14,
+    ...TY.subhead,
+    fontFamily: uiTheme.fonts.body,
+    color: C.white,
     fontStyle: 'italic',
-    fontWeight: '400',
   },
   stampLikeWrap: {
     position: 'absolute',
     top: 50,
-    left: 20,
+    left: SP.xl,
     zIndex: 10,
     transform: [{ rotate: '-15deg' }],
-  },
-  stampLikeBorder: {
-    borderWidth: 3,
-    borderColor: '#00E676',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(0, 230, 118, 0.15)',
-  },
-  stampLikeText: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: '#00E676',
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: 1.5,
   },
   stampNopeWrap: {
     position: 'absolute',
     top: 50,
-    right: 20,
+    right: SP.xl,
     zIndex: 10,
     transform: [{ rotate: '15deg' }],
   },
-  stampNopeBorder: {
+  stampBorder: {
     borderWidth: 3,
-    borderColor: '#FF3366',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(255, 51, 102, 0.15)',
+    borderRadius: RD.small,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.xs,
   },
-  stampNopeText: {
-    color: '#FF3366',
-    fontSize: 24,
-    fontWeight: '900',
+  stampLikeBorder: {
+    borderColor: C.success,
+    backgroundColor: C.successSoft,
+  },
+  stampNopeBorder: {
+    borderColor: C.primary,
+    backgroundColor: C.primarySoft,
+  },
+  stampText: {
+    ...TY.title,
+    fontFamily: uiTheme.fonts.heavy,
     letterSpacing: 1.5,
   },
+  stampLikeText: {
+    color: C.success,
+  },
+  stampNopeText: {
+    color: C.primary,
+  },
 
-  // ── Step 5: Soulful Playing Card Deck Stack Styles ──
+  // ── Step 5: Game Plan Card Stack ──
   blueprintDeckSection: {
-    width: '92%',
-    alignSelf: 'center',
-    marginTop: 8,
-    marginBottom: 4,
+    width: '100%',
+    marginTop: SP.md,
   },
   blueprintDeckHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
-    paddingHorizontal: 4,
+    gap: SP.sm,
+    marginBottom: SP.sm,
   },
   blueprintHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: SP.sm,
+    flexShrink: 1,
   },
   blueprintDeckTitle: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: -0.2,
+    ...TY.label,
+    color: C.text,
+    flexShrink: 1,
   },
   blueprintCycleHintBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: SP.xs,
+    minHeight: 28,
   },
   blueprintCycleHintText: {
-    color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 10.5,
-    fontWeight: '600',
+    ...TY.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: C.muted,
   },
   blueprintPipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    marginLeft: 3,
+    marginLeft: SP.xxs,
   },
   blueprintPip: {
-    width: 4.5,
-    height: 4.5,
-    borderRadius: 2.25,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: C.borderStrong,
   },
   blueprintPipActive: {
     width: 12,
-    backgroundColor: '#FF6584',
+    backgroundColor: C.accent,
   },
   blueprintCardsWrap: {
     position: 'relative',
     width: '100%',
-    height: 110,
+    height: 104,
     alignItems: 'center',
   },
   blueprintCardSingle: {
     position: 'absolute',
     width: '100%',
-    height: 92,
-    borderRadius: 18,
+    height: 88,
+    borderRadius: RD.lg,
     overflow: 'hidden',
-    shadowColor: '#FF3366',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    elevation: 5,
+    ...uiTheme.shadows.sm,
   },
   blueprintCardGradient: {
     flex: 1,
-    borderWidth: 1.2,
-    borderRadius: 18,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
+    borderWidth: 1,
+    borderRadius: RD.lg,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
     justifyContent: 'space-between',
   },
   blueprintCardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: SP.sm,
   },
   blueprintCardBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    gap: SP.xs,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xxs,
+    borderRadius: RD.small,
+    flexShrink: 1,
   },
   blueprintCardBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    ...TY.overline,
+    letterSpacing: 0.6,
   },
   blueprintCardRightTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: SP.xs,
   },
   blueprintSuitPill: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 10.5,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    ...TY.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: C.muted,
   },
   blueprintCardTitle: {
-    color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-    marginTop: 1,
+    ...TY.headline,
+    color: C.text,
   },
   blueprintCardDetail: {
-    color: 'rgba(245, 230, 240, 0.65)',
-    fontSize: 10.5,
-    fontWeight: '400',
-    marginBottom: 1,
+    ...TY.footnote,
+    color: C.muted,
   },
 
-  // ── Sticky Bottom Footer (Visually Matches Create Account / Sign In) ──
+  // ── Sticky Bottom Footer ──
   footer: {
-    paddingHorizontal: 22,
-    paddingTop: uiTheme.spacing.md,
-    paddingBottom: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
-    backgroundColor: 'rgba(8, 5, 11, 0.94)',
+    paddingTop: SP.md,
+    paddingBottom: SP.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: C.divider,
+    backgroundColor: alpha(C.background, 0.94),
   },
-  continueBtn: {
-    borderRadius: 26,
-    overflow: 'hidden',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.38,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  continueGradient: {
-    height: 54,
-    borderRadius: 26,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: uiTheme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.35)',
-  },
-  continueBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Manrope_700Bold',
-    letterSpacing: 0.2,
+  footerInner: {
+    width: '100%',
+    maxWidth: uiTheme.layout.formMax,
+    alignSelf: 'center',
   },
   footerSubSlot: {
-    height: 32,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: SP.xs,
   },
   ctaReassuranceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: SP.xs,
   },
   ctaReassuranceText: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(255, 255, 255, 0.45)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+    ...TY.caption,
+    color: C.muted,
+    flexShrink: 1,
   },
   signInFooterBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
+    minHeight: 36,
+    paddingHorizontal: SP.sm,
   },
   signInFooterText: {
-    color: 'rgba(245, 230, 240, 0.75)',
-    fontSize: 13.5,
-    fontWeight: '500',
+    ...TY.subhead,
+    color: C.textSecondary,
   },
   signInFooterHighlight: {
-    color: '#FFAA80',
-    fontWeight: '700',
+    fontFamily: uiTheme.fonts.label,
+    color: C.secondary,
   },
 
-  // ── Modals (iOS Industry Standard Luxury Sheet) ──
+  // ── Picker Sheets ──
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: C.scrim,
     justifyContent: 'flex-end',
   },
   modalDismissArea: {
     flex: 1,
   },
   modalContent: {
-    backgroundColor: '#140D1F',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderTopWidth: 1.2,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
     height: '82%',
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingTop: uiTheme.spacing.sm,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
+    backgroundColor: C.surface,
+    borderTopLeftRadius: RD.sheet,
+    borderTopRightRadius: RD.sheet,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: C.hairline,
+    paddingHorizontal: SP.lg,
+    paddingTop: SP.sm,
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.65,
-    shadowRadius: 24,
-    elevation: 24,
+    ...uiTheme.shadows.lg,
   },
   sheetHandle: {
-    width: 38,
-    height: 4.5,
-    borderRadius: 2.25,
-    backgroundColor: 'rgba(255, 255, 255, 0.32)',
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: C.borderStrong,
     alignSelf: 'center',
-    marginTop: uiTheme.spacing.xs,
-    marginBottom: uiTheme.spacing.lg,
-  },
-  modalHandle: {
-    width: 38,
-    height: 4.5,
-    borderRadius: 2.25,
-    backgroundColor: 'rgba(255, 255, 255, 0.32)',
-    alignSelf: 'center',
-    marginTop: uiTheme.spacing.xs,
-    marginBottom: uiTheme.spacing.lg,
+    marginTop: SP.xs,
+    marginBottom: SP.lg,
   },
   modalList: {
     flex: 1,
   },
+  modalListContent: {
+    paddingBottom: SP.hero,
+  },
   modalHairline: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    marginLeft: 54,
+    backgroundColor: C.divider,
+    marginLeft: 56,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: uiTheme.spacing.xs,
-    marginBottom: uiTheme.spacing.lg,
+    gap: SP.md,
+    paddingHorizontal: SP.xs,
+    marginBottom: SP.lg,
   },
   modalHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.md,
+    gap: SP.md,
     flex: 1,
-  },
-  modalHeaderIconDiskCoral: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 51, 102, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 51, 102, 0.30)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalHeaderIconDiskEmerald: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(0, 230, 118, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 230, 118, 0.30)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    minWidth: 0,
   },
   modalHeaderTitleGroup: {
     flex: 1,
+    minWidth: 0,
   },
   modalTitle: {
-    fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 19,
-    fontWeight: 'normal',
-    letterSpacing: -0.3,
+    ...TY.title2,
+    color: C.text,
   },
   modalSub: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(255, 255, 255, 0.65)',
-    fontSize: 13,
-    fontWeight: 'normal',
-    marginTop: 2,
-  },
-  modalCloseBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...TY.footnote,
+    color: C.muted,
+    marginTop: SP.xxs,
   },
   modalSearchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 14,
+    gap: SP.sm,
+    backgroundColor: C.elevated,
+    borderRadius: RD.input,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 14,
-    height: 48,
-    marginBottom: uiTheme.spacing.md,
+    borderColor: C.border,
+    paddingHorizontal: SP.md,
+    height: uiTheme.layout.inputHeight,
+    marginBottom: SP.md,
   },
-  modalSearchWrapFocusedCoral: {
-    borderColor: uiTheme.colors.primary,
-    backgroundColor: 'rgba(255, 51, 102, 0.08)',
-  },
-  modalSearchWrapFocusedEmerald: {
-    borderColor: '#00E676',
-    backgroundColor: 'rgba(0, 230, 118, 0.08)',
+  modalSearchWrapFocused: {
+    borderColor: C.accent,
   },
   modalSearchInput: {
-    fontFamily: 'Inter_500Medium',
+    ...TY.body,
     flex: 1,
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-  },
-  modalMatchCountPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.10)',
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  modalMatchCountText: {
-    fontFamily: 'Inter_700Bold',
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    minWidth: 0,
+    height: '100%',
+    color: C.text,
+    paddingVertical: 0,
   },
   modalListItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 13,
-    paddingHorizontal: uiTheme.spacing.md,
-    borderRadius: uiTheme.radius.input,
+    gap: SP.md,
+    minHeight: 56,
+    paddingVertical: SP.sm,
+    paddingHorizontal: SP.md,
+    borderRadius: RD.md,
   },
   modalListItemSelected: {
-    backgroundColor: 'rgba(255, 51, 102, 0.12)',
-  },
-  modalListItemSelectedEmerald: {
-    backgroundColor: 'rgba(0, 230, 118, 0.12)',
+    backgroundColor: C.primarySoft,
   },
   modalListItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.md,
+    gap: SP.md,
     flex: 1,
+    minWidth: 0,
   },
   modalItemFlag: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.title.fontSize,
+    fontSize: TY.title.fontSize,
+    lineHeight: 30,
     width: 32,
     textAlign: 'center',
   },
   modalListText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'normal',
+    ...TY.bodyStrong,
+    fontFamily: uiTheme.fonts.body,
+    color: C.text,
     flex: 1,
-    letterSpacing: -0.2,
+    minWidth: 0,
   },
   modalListTextSelected: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.accent,
-    fontWeight: 'normal',
-  },
-  modalListTextSelectedEmerald: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: '#00E676',
-    fontWeight: 'normal',
+    fontFamily: uiTheme.fonts.label,
+    color: C.accent,
   },
   modalListItemRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SP.sm,
   },
   modalItemDialText: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(255, 255, 255, 0.42)',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
+    ...TY.subhead,
+    color: C.muted,
   },
   modalItemDialTextSelected: {
-    fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.secondary,
-    fontWeight: 'normal',
+    fontFamily: uiTheme.fonts.strong,
+    color: C.secondary,
   },
   modalDialBadge: {
-    backgroundColor: 'rgba(0, 230, 118, 0.10)',
-    paddingHorizontal: 10,
-    paddingVertical: uiTheme.spacing.xs,
-    borderRadius: uiTheme.radius.small,
+    backgroundColor: C.neutralSoft,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xxs,
+    borderRadius: RD.small,
     borderWidth: 1,
-    borderColor: 'rgba(0, 230, 118, 0.25)',
+    borderColor: C.neutralBorder,
   },
   modalDialBadgeSelected: {
-    backgroundColor: 'rgba(0, 230, 118, 0.22)',
-    borderColor: 'rgba(0, 230, 118, 0.55)',
+    backgroundColor: C.primarySoft,
+    borderColor: C.primaryBorder,
   },
   modalDialText: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: '#00E676',
-    fontSize: 13,
-    fontWeight: 'normal',
+    ...TY.subhead,
+    fontFamily: uiTheme.fonts.strong,
+    color: C.textSecondary,
   },
   modalDialTextSelected: {
-    fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
-    fontWeight: 'normal',
+    color: C.text,
   },
   modalEmptyWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 56,
-    gap: uiTheme.spacing.sm,
+    paddingVertical: SP.spacious,
+    gap: SP.sm,
   },
   modalEmptyTitle: {
-    fontFamily: 'Manrope_700Bold',
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'normal',
+    ...TY.headline,
+    color: C.text,
   },
   modalEmptySub: {
-    fontFamily: 'Inter_500Medium',
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 13,
-    fontWeight: 'normal',
+    ...TY.footnote,
+    color: C.muted,
   },
 });

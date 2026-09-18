@@ -12,10 +12,12 @@ import {
   Dimensions,
   Platform,
   Clipboard,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import IconWell from './ui/IconWell';
 import NotificationService, { NOTIFICATION_CATEGORIES } from '../services/notifications';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -39,6 +41,7 @@ const safeHaptic = (type = 'notification') => {
 
 export default function InAppNotificationBanner({ onNavigateToStream }) {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const [currentNotif, setCurrentNotif] = useState(null);
   const [copied, setCopied] = useState(false);
 
@@ -166,12 +169,28 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
     }
   };
 
+  const iconName =
+    currentNotif.type === 'goal_unlocked'
+      ? 'call-outline'
+      : currentNotif.type === 'date_secured'
+      ? 'calendar-outline'
+      : currentNotif.type === 'new_match'
+      ? 'heart-outline'
+      : currentNotif.type === 'cycle_complete'
+      ? 'checkmark-circle-outline'
+      : 'notifications-outline';
+  const iconTone = isGoal ? 'primary' : currentNotif.type === 'cycle_complete' ? 'success' : currentNotif.type === 'new_match' ? 'secondary' : 'info';
+  // Floating card: inset from the edges, centered and capped on tablets.
+  const sideInset = Math.max(uiTheme.spacing.md, (windowWidth - BANNER_MAX_WIDTH) / 2);
+
   return (
     <Animated.View
       style={[
         styles.bannerContainer,
         {
-          top: Math.max(insets.top, 14),
+          top: Math.max(insets.top, 14) + uiTheme.spacing.xs,
+          left: sideInset,
+          right: sideInset,
           transform: [{ translateY }, { scale }],
           opacity,
         },
@@ -179,16 +198,15 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
       {...panResponder.panHandlers}
     >
       <TouchableOpacity accessibilityRole="button"
+        accessibilityLabel={`${currentNotif.title || 'Notification'}. ${currentNotif.body || ''}`}
+        accessibilityHint="Opens the notification. Swipe up to dismiss."
+        accessibilityLiveRegion="polite"
         style={styles.touchableCard}
         onPress={handleTap}
         activeOpacity={0.92}
       >
         <LinearGradient
-          colors={
-            isGoal
-              ? ['#261528', '#1A1020', '#130C18']
-              : [uiTheme.colors.elevated, '#151322', '#100E1A']
-          }
+          colors={isGoal ? uiTheme.gradients.hero : [uiTheme.colors.elevatedHigh, uiTheme.colors.elevated]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[
@@ -199,11 +217,11 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
           {/* Top Bar Header: App Title + Timestamp + Dismiss Handle */}
           <View style={styles.bannerHeader}>
             <View style={styles.bannerHeaderLeft}>
-              <View style={[styles.appBadge, { backgroundColor: 'rgba(255, 255, 255, 0.08)' }]}>
-                <Ionicons name="shield-checkmark" size={10} color={uiTheme.colors.text} />
-                <Text style={styles.appBadgeText}>FLIRTEASY</Text>
+              <View style={styles.appBadge}>
+                <Ionicons name="shield-checkmark" size={11} color={uiTheme.colors.text} />
+                <Text style={styles.appBadgeText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>FLIRTEASY</Text>
               </View>
-              <Text style={styles.timestampText}>Just now</Text>
+              <Text style={styles.timestampText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Just now</Text>
             </View>
 
             <View style={styles.topHandleBar} />
@@ -212,23 +230,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
           {/* Main Content Row: Icon/Avatar + Text + Action */}
           <View style={styles.mainContentRow}>
             {/* Category Icon Badge */}
-            <View style={[styles.iconBadge, { backgroundColor: isGoal ? 'rgba(254, 60, 114, 0.15)' : 'rgba(255, 255, 255, 0.08)', borderColor: isGoal ? uiTheme.colors.primary : 'rgba(255, 255, 255, 0.15)' }]}>
-              <Ionicons
-                name={
-                  currentNotif.type === 'goal_unlocked'
-                    ? 'call-outline'
-                    : currentNotif.type === 'date_secured'
-                    ? 'calendar-outline'
-                    : currentNotif.type === 'new_match'
-                    ? 'heart-outline'
-                    : currentNotif.type === 'cycle_complete'
-                    ? 'checkmark-circle-outline'
-                    : 'notifications-outline'
-                }
-                size={18}
-                color={isGoal ? uiTheme.colors.primary : '#FFFFFF'}
-              />
-            </View>
+            <IconWell icon={iconName} tone={iconTone} size={40} iconSize={19} />
 
             {/* Notification Text Body */}
             <View style={styles.textContainer}>
@@ -245,16 +247,22 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
           <View style={styles.actionsBar}>
             {phone ? (
               <TouchableOpacity accessibilityRole="button"
+                accessibilityLabel={copied ? 'Phone number copied to clipboard' : `Copy phone number ${phone}`}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                 style={[styles.actionPill, copied && styles.actionPillSuccess]}
                 onPress={handleCopyPhone}
                 activeOpacity={0.8}
               >
                 <Ionicons
                   name={copied ? 'checkmark-circle-outline' : 'copy-outline'}
-                  size={12}
-                  color={copied ? uiTheme.colors.success : '#FFFFFF'}
+                  size={13}
+                  color={copied ? uiTheme.colors.success : uiTheme.colors.accent}
                 />
-                <Text style={[styles.actionPillText, copied && { color: uiTheme.colors.success }]}>
+                <Text
+                  style={[styles.actionPillText, copied && { color: uiTheme.colors.success }]}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                >
                   {copied ? 'Copied to Clipboard' : `Copy ${phone}`}
                 </Text>
               </TouchableOpacity>
@@ -263,8 +271,8 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
             )}
 
             <View style={styles.actionPillSecondary}>
-              <Text style={styles.actionPillSecondaryText}>Open Tinder</Text>
-              <Ionicons name="chevron-forward" size={11} color={uiTheme.colors.muted} />
+              <Text style={styles.actionPillSecondaryText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Open Tinder</Text>
+              <Ionicons name="chevron-forward" size={12} color={uiTheme.colors.muted} />
             </View>
           </View>
         </LinearGradient>
@@ -273,17 +281,12 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
   );
 }
 
+const BANNER_MAX_WIDTH = 560;
 const styles = StyleSheet.create({
   bannerContainer: {
     position: 'absolute',
-    left: 12,
-    right: 12,
     zIndex: 9999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.55,
-    shadowRadius: 28,
-    elevation: 20,
+    ...uiTheme.shadows.lg,
   },
   touchableCard: {
     borderRadius: uiTheme.radius.card,
@@ -291,125 +294,117 @@ const styles = StyleSheet.create({
   },
   bannerCard: {
     borderRadius: uiTheme.radius.card,
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 14,
-    paddingTop: 10,
+    borderWidth: 1,
+    borderColor: uiTheme.colors.hairline,
+    paddingHorizontal: uiTheme.spacing.lg,
+    paddingTop: uiTheme.spacing.md,
     paddingBottom: uiTheme.spacing.md,
   },
   bannerCardGoal: {
-    borderColor: 'rgba(254, 60, 114, 0.5)',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
+    borderColor: uiTheme.colors.primaryBorder,
   },
   bannerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.md,
   },
   bannerHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiTheme.spacing.sm,
+    flexShrink: 1,
   },
   appBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiTheme.spacing.xs,
-    borderRadius: uiTheme.radius.input,
+    backgroundColor: uiTheme.colors.neutralSoft,
+    borderWidth: 1,
+    borderColor: uiTheme.colors.neutralBorder,
+    borderRadius: uiTheme.radius.pill,
     paddingHorizontal: uiTheme.spacing.sm,
     paddingVertical: 2,
   },
-  appBadgeText: { fontFamily: 'Inter_800ExtraBold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  appBadgeText: {
+    ...uiTheme.type.overline,
+    fontFamily: uiTheme.fonts.heavy,
+    fontSize: 10,
+    lineHeight: 13,
     letterSpacing: 0.8,
+    color: uiTheme.colors.text,
   },
-  timestampText: { fontFamily: 'Inter_700Bold',
+  timestampText: {
+    ...uiTheme.type.footnote,
     color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.4,
   },
   topHandleBar: {
-    width: 32,
+    width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: uiTheme.colors.borderStrong,
   },
   mainContentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiTheme.spacing.md,
   },
-  iconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    borderWidth: 1.5,
-    overflow: 'hidden',
-  },
-  iconGradient: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   textContainer: {
     flex: 1,
+    minWidth: 0,
   },
-  titleText: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
+  titleText: {
+    ...uiTheme.type.headline,
+    fontFamily: uiTheme.fonts.heading,
+    color: uiTheme.colors.text,
     marginBottom: 2,
   },
-  bodyText: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    lineHeight: 16.5,
-    fontWeight: 'normal',
+  bodyText: {
+    ...uiTheme.type.subhead,
+    fontFamily: uiTheme.fonts.body,
+    color: uiTheme.colors.textSecondary,
   },
   actionsBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 10,
+    gap: uiTheme.spacing.sm,
+    marginTop: uiTheme.spacing.md,
     paddingTop: uiTheme.spacing.sm,
-    borderTopWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: uiTheme.colors.divider,
   },
   actionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
+    gap: 6,
+    flexShrink: 1,
+    minHeight: 30,
+    backgroundColor: uiTheme.colors.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
-    borderRadius: 14,
-    paddingHorizontal: 10,
+    borderColor: uiTheme.colors.primaryBorder,
+    borderRadius: uiTheme.radius.pill,
+    paddingHorizontal: uiTheme.spacing.md,
     paddingVertical: uiTheme.spacing.xs,
   },
   actionPillSuccess: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: 'rgba(16, 185, 129, 0.4)',
+    backgroundColor: uiTheme.colors.successSoft,
+    borderColor: uiTheme.colors.successBorder,
   },
-  actionPillText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  actionPillText: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.label,
+    color: uiTheme.colors.accent,
+    flexShrink: 1,
   },
   actionPillSecondary: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
   },
-  actionPillSecondaryText: { fontFamily: 'Inter_600SemiBold',
+  actionPillSecondaryText: {
+    ...uiTheme.type.footnote,
+    fontFamily: uiTheme.fonts.label,
     color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
   },
 });

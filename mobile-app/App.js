@@ -10,6 +10,8 @@ import InAppNotificationBanner from './src/components/InAppNotificationBanner';
 import ExternalRedirectModal from './src/components/ExternalRedirectModal';
 import NotificationService from './src/services/notifications';
 import { useFonts } from 'expo-font';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
 import { Manrope_800ExtraBold } from '@expo-google-fonts/manrope/800ExtraBold';
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
@@ -110,10 +112,13 @@ export default function App() {
   if (!isReady || (!fontsLoaded && !fontError)) {
     return (
       <View style={styles.splashContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#18101d" />
-        <SafeActivityIndicator size="large" color="#ff4f73" />
-        <Text style={styles.splashTitle}>Flint</Text>
-        <Text style={styles.splashStatus}>{updateStatus}</Text>
+        <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
+        <LinearGradient colors={theme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.splashMark}>
+          <Ionicons name="flame" size={34} color={theme.colors.onPrimary} />
+        </LinearGradient>
+        <Text style={styles.splashTitle} accessibilityRole="header">Flint</Text>
+        <Text style={styles.splashStatus} accessibilityLiveRegion="polite">{updateStatus}</Text>
+        <SafeActivityIndicator size={20} color={theme.colors.accent} style={styles.splashSpinner} />
       </View>
     );
   }
@@ -147,22 +152,34 @@ export default function App() {
 const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
-    backgroundColor: '#18101d',
+    backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: theme.spacing.xl,
   },
+  splashMark: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.glow,
+  },
+  // Fonts may still be loading here, so the splash relies on system weights.
   splashTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#edddf1',
-    marginTop: 16,
-    letterSpacing: 0.5,
+    fontSize: 30,
+    fontWeight: '800',
+    color: theme.colors.text,
+    marginTop: theme.spacing.xl,
+    letterSpacing: -0.5,
   },
   splashStatus: {
     fontSize: 14,
-    color: '#ac888b',
-    marginTop: 8,
+    color: theme.colors.muted,
+    marginTop: theme.spacing.sm,
     textAlign: 'center',
+  },
+  splashSpinner: {
+    marginTop: theme.spacing.xxl,
   },
 });

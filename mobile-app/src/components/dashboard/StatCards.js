@@ -2,7 +2,9 @@ import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/StatCards.js — High-end Glassmorphic Stat Metrics
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import IconWell from '../ui/IconWell';
+import Badge from '../ui/Badge';
+import CountUp from '../ui/CountUp';
 
 function formatNumber(n) {
   if (typeof n !== 'number' || isNaN(n)) return '0';
@@ -11,23 +13,32 @@ function formatNumber(n) {
   return String(n);
 }
 
-function StatCard({ iconName, label, value, todayDelta, accentColor }) {
+function StatCard({ iconName, label, value, todayDelta, tone }) {
+  const hasDelta = todayDelta > 0;
   return (
-    <View style={[styles.card, { borderColor: accentColor + '30' }]}>
-      <View style={[styles.iconWrap, { backgroundColor: accentColor + '15' }]}>
-        <Ionicons name={iconName} size={16} color={accentColor} />
-      </View>
-      <Text style={[styles.cardValue, { color: '#FFF' }]}>{formatNumber(value)}</Text>
-      <Text style={styles.cardLabel}>{label}</Text>
-      {todayDelta > 0 ? (
-        <View style={[styles.badge, { backgroundColor: accentColor + '18', borderColor: accentColor + '40' }]}>
-          <Text style={[styles.badgeText, { color: accentColor }]}>+{todayDelta} today</Text>
-        </View>
-      ) : (
-        <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)' }]}>
-          <Text style={[styles.badgeText, { color: uiTheme.colors.muted }]}>Total</Text>
-        </View>
-      )}
+    <View
+      style={styles.card}
+      accessible
+      accessibilityLabel={`${label}: ${formatNumber(value)}${hasDelta ? `, plus ${todayDelta} today` : ', total'}`}
+    >
+      <IconWell icon={iconName} tone={tone} size={32} iconSize={16} />
+      <CountUp
+        value={typeof value === 'number' && !isNaN(value) ? value : 0}
+        format={v => formatNumber(Math.round(v))}
+        style={styles.cardValue}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+        importantForAccessibility="no"
+      />
+      <Text style={styles.cardLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{label}</Text>
+      <Badge
+        label={hasDelta ? `+${todayDelta} today` : 'Total'}
+        tone={hasDelta ? tone : 'neutral'}
+        size="sm"
+        style={styles.badge}
+      />
     </View>
   );
 }
@@ -49,21 +60,21 @@ export default function StatCards({ lifetimeStats }) {
         label="Swipes"
         value={totalSwipes}
         todayDelta={todaySwipes}
-        accentColor={uiTheme.colors.primary}
+        tone="primary"
       />
       <StatCard
         iconName="chatbubbles"
         label="Messages"
         value={totalMessages}
         todayDelta={todayMessages}
-        accentColor="#EC4899"
+        tone="secondary"
       />
       <StatCard
         iconName="sparkles"
         label="Matches"
         value={totalMatches}
         todayDelta={activeChats}
-        accentColor={uiTheme.colors.info}
+        tone="info"
       />
     </View>
   );
@@ -77,41 +88,33 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: uiTheme.colors.surface,
-    borderRadius: 14,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1,
+    borderColor: uiTheme.colors.borderSubtle,
     paddingVertical: uiTheme.spacing.md,
     paddingHorizontal: uiTheme.spacing.sm,
     alignItems: 'center',
   },
-  iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: uiTheme.radius.small,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
+  cardValue: {
+    ...uiTheme.type.title2,
+    fontFamily: uiTheme.fonts.strong,
+    fontVariant: ['tabular-nums'],
+    color: uiTheme.colors.text,
+    marginTop: uiTheme.spacing.sm,
+    alignSelf: 'stretch',
+    textAlign: 'center',
   },
-  cardValue: { fontFamily: 'Inter_800ExtraBold',
-    fontSize: uiTheme.type.section.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.4,
-  },
-  cardLabel: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
+  cardLabel: {
+    ...uiTheme.type.overline,
     color: uiTheme.colors.muted,
-    fontWeight: 'normal',
-    marginTop: 2,
+    textTransform: 'uppercase',
+    marginTop: uiTheme.spacing.xxs,
   },
   badge: {
-    marginTop: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 1,
-  },
-  badgeText: { fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    marginTop: uiTheme.spacing.sm,
+    alignSelf: 'center',
+    maxWidth: '100%',
   },
 });

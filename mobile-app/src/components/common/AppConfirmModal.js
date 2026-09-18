@@ -5,9 +5,9 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import AppButton from '../ui/AppButton';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../theme';
 import DialogContent from './DialogContent';
@@ -16,8 +16,8 @@ export default function AppConfirmModal({
   visible,
   icon = 'alert-circle-outline',
   iconColor = theme.colors.primary,
-  iconBg = 'rgba(255, 51, 102, 0.12)',
-  iconBorder = 'rgba(255, 51, 102, 0.3)',
+  iconBg = theme.colors.primarySoft,
+  iconBorder = theme.colors.primaryBorder,
   title,
   message,
   confirmText = 'Confirm',
@@ -54,13 +54,7 @@ export default function AppConfirmModal({
   if (!visible) return null;
 
   const isDestructive = confirmVariant === 'destructive';
-  const isWarning = confirmVariant === 'warning';
-
-  const confirmBtnBg = isDestructive
-    ? '#DC2626'
-    : isWarning
-      ? '#D97706'
-      : theme.colors.primary;
+  
 
   return (
     <Modal
@@ -96,32 +90,24 @@ export default function AppConfirmModal({
             </View>
 
             {/* Title & Message */}
-            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.title} accessibilityRole="header">{title}</Text>
             {!!message && <Text style={styles.message}>{message}</Text>}
 
             {/* Action Buttons */}
             <View style={styles.actions}>
-              <TouchableOpacity
-                style={[styles.btn, { backgroundColor: confirmBtnBg }]}
+              <AppButton
+                title={confirmText}
                 onPress={onConfirm}
-                disabled={busy}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel={confirmText}
-              >
-                <Text style={styles.confirmBtnText}>{confirmText}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.btn, styles.cancelBtn]}
+                loading={busy}
+                variant={isDestructive || confirmVariant === 'warning' ? 'danger' : 'primary'}
+                style={confirmVariant === 'warning' ? styles.warningBtn : null}
+              />
+              <AppButton
+                title={cancelText}
                 onPress={onCancel}
                 disabled={busy}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel={cancelText}
-              >
-                <Text style={styles.cancelBtnText}>{cancelText}</Text>
-              </TouchableOpacity>
+                variant="secondary"
+              />
             </View>
           </DialogContent>
         </Animated.View>
@@ -139,7 +125,7 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(8, 4, 12, 0.82)',
+    backgroundColor: theme.colors.scrim,
   },
   cardWrapper: {
     width: '100%',
@@ -148,17 +134,13 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    backgroundColor: '#18101E',
-    borderRadius: 24,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.sheet,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 24,
+    borderColor: theme.colors.hairline,
+    padding: theme.spacing.xxl,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    elevation: 12,
+    ...theme.shadows.lg,
   },
   iconCircle: {
     width: 60,
@@ -170,49 +152,22 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 20,
-    lineHeight: 26,
-    color: '#FFF',
+    ...theme.type.title2,
+    color: theme.colors.text,
     textAlign: 'center',
-    fontWeight: '700',
   },
   message: {
-    fontFamily: theme.fonts.body,
-    fontSize: 14,
-    lineHeight: 21,
+    ...theme.type.callout,
     color: theme.colors.muted,
     textAlign: 'center',
     marginTop: 10,
-    marginBottom: 20,
+    marginBottom: theme.spacing.xxl,
   },
   actions: {
     width: '100%',
     gap: 10,
   },
-  btn: {
-    width: '100%',
-    minHeight: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  confirmBtnText: {
-    fontFamily: theme.fonts.label,
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFF',
-  },
-  cancelBtn: {
-    backgroundColor: '#26182C',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  cancelBtnText: {
-    fontFamily: theme.fonts.label,
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
+  warningBtn: {
+    backgroundColor: '#B8741A',
   },
 });

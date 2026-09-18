@@ -2,16 +2,15 @@ import { theme as uiTheme } from '../theme';
 import React from 'react';
 import {
   StyleSheet,
-  Text,
   View,
-  TouchableOpacity,
   StatusBar,
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import useExtensionStats from '../hooks/useExtensionStats';
+import useResponsive from '../hooks/useResponsive';
 import { DashboardPanel } from '../components/dashboard';
+import { AppText, AppButton, IconButton, IconWell, Badge, Card } from '../components/ui';
 import { resolveLocalUrl } from '../utils/network';
 
 const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
@@ -19,6 +18,7 @@ const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 export default function CloudDashboardScreen({ route, navigation }) {
   const { orchestratorUrl: rawOrchestratorUrl = 'https://api.smartmaheshwari.com', vpsUrl, platform = 'Tinder' } = route.params || {};
   const orchestratorUrl = resolveLocalUrl(rawOrchestratorUrl);
+  const { gutter, isCompact } = useResponsive();
 
   // Always poll live stats from the cloud VPS or local orchestrator
   const { stats, loading, error } = useExtensionStats(orchestratorUrl, true);
@@ -44,38 +44,35 @@ export default function CloudDashboardScreen({ route, navigation }) {
       <StatusBar barStyle="light-content" backgroundColor={uiTheme.colors.background} />
 
       {/* Header Bar */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity accessibilityRole="button" style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={20} color={uiTheme.colors.text} />
-          </TouchableOpacity>
-          <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" />
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.headerTitle}>Flint Assistant</Text>
-              <View style={styles.proTag}>
-                <Text style={styles.proTagText}>LIVE</Text>
-              </View>
+      <View style={styles.headerBand}>
+        <View style={[styles.header, { paddingHorizontal: gutter }]}>
+          <IconButton icon="chevron-back" onPress={() => navigation.goBack()} accessibilityLabel="Go back" />
+          <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" accessibilityIgnoresInvertColors />
+          <View style={styles.headerCopy}>
+            <View style={styles.headerTitleRow}>
+              <AppText variant="headline" numberOfLines={1} style={styles.headerTitle} accessibilityRole="header">Flint Assistant</AppText>
+              <Badge label="LIVE" tone="primary" size="sm" dot />
             </View>
-            <Text style={styles.headerSub}>Dating Assistant & Live Dashboard</Text>
+            {!isCompact ? (
+              <AppText variant="caption" numberOfLines={1}>Dating Assistant & Live Dashboard</AppText>
+            ) : null}
           </View>
-        </View>
 
-        {vpsUrl ? (
-          <TouchableOpacity accessibilityRole="button"
-            style={styles.streamBtn}
-            onPress={() => navigation.navigate('Browser', { vpsUrl, platform, proxyIp: '' })}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="videocam-outline" size={14} color={uiTheme.colors.primary} />
-            <Text style={styles.streamBtnText}>Live Screen</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.liveIndicator}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>Ready</Text>
-          </View>
-        )}
+          {vpsUrl ? (
+            <AppButton
+              title={isCompact ? 'Live' : 'Live Screen'}
+              icon="videocam-outline"
+              variant="secondary"
+              size="sm"
+              fullWidth={false}
+              haptic={false}
+              accessibilityLabel="Open live screen"
+              onPress={() => navigation.navigate('Browser', { vpsUrl, platform, proxyIp: '' })}
+            />
+          ) : (
+            <Badge label="Ready" tone="success" dot />
+          )}
+        </View>
       </View>
 
       {/* Main Dashboard & Automation V2 Panel */}
@@ -89,25 +86,23 @@ export default function CloudDashboardScreen({ route, navigation }) {
         onConnect={vpsUrl ? () => navigation.navigate('Browser', { vpsUrl, platform, proxyIp: '' }) : undefined}
         isLoggedIn={Boolean(stats?.tinderAccount?.isLoggedIn ?? true)}
         controlsContent={
-          <View style={styles.infoBox}>
+          <Card style={styles.infoBox}>
             <View style={styles.infoTitleRow}>
-              <Ionicons name="sparkles" size={18} color={uiTheme.colors.primary} />
-              <Text style={styles.infoTitle}>Tinder Assistant Active</Text>
+              <IconWell icon="sparkles" tone="primary" size={36} />
+              <AppText variant="section" style={styles.infoTitle} numberOfLines={2}>Tinder Assistant Active</AppText>
             </View>
-            <Text style={styles.infoText}>
+            <AppText variant="callout" color="textSecondary">
               Flint is actively finding compatible matches and chatting in your unique personal style.
-            </Text>
+            </AppText>
             {vpsUrl && (
-              <TouchableOpacity accessibilityRole="button"
+              <AppButton
+                title="View Live Tinder Screen"
+                icon="phone-portrait-outline"
                 style={styles.openStreamBtn}
                 onPress={() => navigation.navigate('Browser', { vpsUrl, platform, proxyIp: '' })}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="phone-portrait-outline" size={16} color="#FFF" />
-                <Text style={styles.openStreamBtnText}>View Live Tinder Screen</Text>
-              </TouchableOpacity>
+              />
             )}
-          </View>
+          </Card>
         }
       />
     </SafeAreaView>
@@ -119,135 +114,53 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: uiTheme.colors.background,
   },
-  header: {
+  headerBand: {
     width: '100%',
-    maxWidth: 760,
-    alignSelf: 'center',
-    flexWrap: 'wrap',
-    gap: uiTheme.spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: uiTheme.spacing.lg,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: uiTheme.colors.elevated,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: uiTheme.colors.divider,
     backgroundColor: uiTheme.colors.surface,
   },
-  headerLeft: {
+  header: {
+    width: '100%',
+    maxWidth: uiTheme.layout.contentMax,
+    alignSelf: 'center',
+    gap: uiTheme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 9,
-    backgroundColor: uiTheme.colors.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: uiTheme.spacing.sm,
+    minHeight: 60,
   },
   headerLogo: {
     width: 32,
     height: 32,
     borderRadius: uiTheme.radius.small,
   },
-  headerTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFF',
-    fontSize: 15.5,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
   },
-  proTag: {
-    backgroundColor: uiTheme.colors.primary,
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 4,
-  },
-  proTagText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  headerSub: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginTop: 1,
-  },
-  streamBtn: {
+  headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
+    gap: uiTheme.spacing.sm,
   },
-  streamBtnText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  liveIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: uiTheme.spacing.xs,
-    borderRadius: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: uiTheme.colors.success,
-  },
-  liveText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.success,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  headerTitle: {
+    flexShrink: 1,
   },
   infoBox: {
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: uiTheme.colors.elevated,
-    padding: uiTheme.spacing.lg,
-    margin: 14,
+    margin: uiTheme.spacing.md,
   },
   infoTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-    marginBottom: uiTheme.spacing.sm,
+    gap: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.md,
   },
-  infoTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-  },
-  infoText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.textSecondary,
-    fontSize: 12.5,
-    lineHeight: 18,
+  infoTitle: {
+    flex: 1,
+    minWidth: 0,
   },
   openStreamBtn: {
     marginTop: uiTheme.spacing.lg,
-    backgroundColor: uiTheme.colors.primary,
-    borderRadius: 10,
-    paddingVertical: uiTheme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: uiTheme.spacing.sm,
-  },
-  openStreamBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: 13.5,
-    fontWeight: 'normal',
   },
 });

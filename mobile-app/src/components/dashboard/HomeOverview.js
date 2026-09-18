@@ -1,12 +1,16 @@
-import { theme as uiTheme } from "../../theme";
 import React from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  Animated,
+  Easing,
+  Platform,
 } from "react-native";
-import { MotionTouchable as TouchableOpacity } from "../common/Motion";
+import { BlurView } from "expo-blur";
+import * as Haptics from "expo-haptics";
+import { MotionTouchable as TouchableOpacity, FadeIn, useMotionReduced } from "../common/Motion";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,11 +18,21 @@ import ActivityIndicator from "../common/SafeActivityIndicator";
 import MasterControlOrb from "./MasterControlOrb";
 import { getLikesReplenishStatus } from "../../utils/sessionManager";
 import TinderCollections from "./TinderCollections";
+import Badge from "../ui/Badge";
+import LiveDot from "../ui/LiveDot";
+import IconButton from "../ui/IconButton";
+import useResponsive from "../../hooks/useResponsive";
+import { theme as uiTheme, alpha } from "../../theme";
+
+const c = uiTheme.colors;
+const t = uiTheme.type;
+const sp = uiTheme.spacing;
+const r = uiTheme.radius;
 
 const titleCase = (value) =>
   String(value || "")
     .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
 const GOALS = {
   date: "Dates",
   phone: "Phone",
@@ -27,21 +41,55 @@ const GOALS = {
   never: "Conversation",
 };
 
+// Tinder plan → Badge tone/icon/label (tiers use the dedicated tier tokens).
+const PLAN_BADGES = {
+  platinum: { tone: "platinum", icon: "diamond", label: "Platinum" },
+  gold: { tone: "gold", icon: "star", label: "Gold" },
+  plus: { tone: "plus", icon: "flash", label: "Plus" },
+};
+const FREE_PLAN_BADGE = { tone: "neutral", icon: undefined, label: "Free" };
+
+// Stagger step for section entrances (≤ 60ms per the motion guidelines).
+const STAGGER = 60;
+
+const greetingFor = (date = new Date()) => {
+  const hour = date.getHours();
+  if (hour < 5) return "Good night";
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+};
+
+const displayNameFor = (settings, user) => {
+  const raw =
+    settings?.accountProfile?.name ||
+    settings?.userProfile?.name ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    (user?.email ? String(user.email).split("@")[0] : "");
+  return String(raw || "").trim().split(/\s+/)[0] || "there";
+};
+
 export default function HomeOverview({
   stats,
   agentState,
   settings,
+  user,
   isLoggedIn,
   starting,
   checking,
   checkingAuth,
   latencyMs,
+  unreadCount = 0,
   onOpenBrowser,
   onToggleAgent,
   onAutomation,
   onSettings,
   onActivity,
+  onNotifications,
+  onProfile,
 }) {
+  const { gutter, isCompact } = useResponsive();
   const effectiveStats = stats || agentState || {};
   const state = effectiveStats?.agentState || effectiveStats || {};
   const totals = effectiveStats?.lifetimeStats || state?.stats || {};
@@ -87,239 +135,268 @@ export default function HomeOverview({
         state?.currentCycle?.likesCompleted ?? 0
       ),
       icon: "heart-outline",
-      color: uiTheme.colors.primary,
+      color: c.primary,
     },
     {
       label: "MATCHES",
       value:
         totals.totalMatches ?? totals.matchesCreated ?? totals.matches ?? 0,
       icon: "people-outline",
-      color: uiTheme.colors.secondary,
+      color: c.secondary,
     },
     {
       label: "REPLIES",
       value:
         totals.totalMessages ?? totals.messagesSent ?? totals.messages ?? 0,
       icon: "chatbubble-outline",
-      color: "#6ED2B1",
+      color: c.success,
     },
   ];
+
+  const planBadge = PLAN_BADGES[settings?.userProfile?.tinderPlan] || FREE_PLAN_BADGE;
+  const latencyLabel =
+    isLoggedIn && Number.isFinite(latencyMs)
+      ? `${Math.round(latencyMs)}ms`
+      : "—";
+
+  const stateTitle = busy
+    ? "Connecting"
+    : !isLoggedIn
+      ? "Not Connected"
+      : state?.waitingReason === "safety_lock"
+        ? "Safety Pause"
+        : state?.waitingReason === "likes_exhausted"
+          ? (running ? "Wingman Chatting" : "Daily Likes Refill")
+        : running
+          ? (state?.currentPhase === "messaging"
+              ? "Wingman Messaging"
+              : state?.currentPhase === "transitioning"
+                ? "Wingman Resting"
+                : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
+                  ? "Awaiting Replies"
+                  : "Wingman Active")
+          : "Wingman Standby";
+  const statusLabel = busy
+    ? "Starting"
+    : !isLoggedIn
+      ? "Connect to Start"
+      : state?.waitingReason === "safety_lock"
+        ? "Safety Pause"
+        : state?.waitingReason === "likes_exhausted"
+          ? (running ? "Messaging" : "Refilling")
+        : running
+          ? (state?.currentPhase === "messaging"
+              ? "Replying"
+              : state?.currentPhase === "transitioning"
+                ? "Resting"
+                : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
+                  ? "Checking"
+                  : (settings?.autoSwipe === false || settings?.likesPerCycle <= 0 ? "Messaging" : "Swiping"))
+          : (settings?.autoSwipe === false || settings?.likesPerCycle <= 0 ? "Ready to Chat" : "Ready to Swipe");
+  // Status tone mirrors the previous dot colours: live → success, offline → neutral,
+  // likes refill → info, otherwise brand.
+  const statusTone = running
+    ? "success"
+    : !isLoggedIn
+      ? "neutral"
+      : state?.waitingReason === "likes_exhausted"
+        ? "info"
+        : "primary";
+  const statusColor = { success: c.success, neutral: c.textTertiary, info: c.info, primary: c.accent }[statusTone];
+
+  // Cycle progress (presentation of the same likes counters the orb shows).
+  const cycleLikes = state?.currentCycle?.likesCompleted ?? 0;
+  const cycleTarget = settings?.likesPerCycle || 50;
+  const showCycle = isLoggedIn && running && cycleLikes > 0 && settings?.autoSwipe !== false;
+
+  const name = displayNameFor(settings, user);
+  const initials = name === "there" ? "" : name.slice(0, 1).toUpperCase();
 
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingHorizontal: gutter }]}
     >
-      <View style={styles.introduction}>
-        <Text style={styles.welcomeLabel}>A LITTLE SPARK. MORE POSSIBILITY.</Text>
-        <Text style={styles.welcomeTitle}>Make room for connection.</Text>
-        <Text style={styles.welcomeBody}>Your assistant takes care of the introductions.</Text>
-      </View>
-      <TouchableOpacity
-        style={styles.instance}
-        onPress={onOpenBrowser}
-        disabled={starting}
-        activeOpacity={0.75}
-        accessibilityRole="button"
-        accessibilityLabel={
-          isLoggedIn ? "Open Tinder account" : "Connect Tinder account"
-        }
-      >
-        <View style={styles.flameWrap}>
-          <LinearGradient
-            colors={[
-              uiTheme.colors.primary,
-              uiTheme.colors.accent,
-              uiTheme.colors.secondary,
-            ]}
-            style={styles.flame}
-          >
-            <Ionicons name="flame" size={29} color="#FFFFFF" />
+      <AmbientGlow />
+
+      {/* ── Personal header ── */}
+      <FadeIn style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.identity}
+          onPress={onProfile}
+          disabled={!onProfile}
+          accessibilityRole="button"
+          accessibilityLabel={`${greetingFor()}, ${name}. Open profile`}
+        >
+          <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarRing}>
+            <View style={styles.avatar}>
+              {initials ? (
+                <Text style={styles.avatarText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{initials}</Text>
+              ) : (
+                <Ionicons name="person" size={20} color={c.textSecondary} />
+              )}
+            </View>
           </LinearGradient>
-          <View style={[styles.onlineDot, !isLoggedIn && styles.offlineDot]} />
-        </View>
-        <View style={styles.instanceInfo}>
-          <View style={styles.instanceTitleRow}>
-            <Text style={styles.instanceTitle}>Tinder Instance</Text>
-            <View
-              style={[styles.liveBadge, !isLoggedIn && styles.offlineBadge]}
-            >
-              <Text
-                style={[styles.liveText, !isLoggedIn && styles.offlineText]}
-              >
-                {isLoggedIn ? "LIVE" : "OFFLINE"}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.instanceMetaRow}>
-            <Text style={styles.location} numberOfLines={1}>
-              {settings?.locationCity || "Choose your location"}
+          <View style={styles.greetingCopy}>
+            <Text style={styles.greetingLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+              {greetingFor()}
             </Text>
-            {isLoggedIn && (
-              <View
-                style={[
-                  styles.planBadge,
-                  settings?.userProfile?.tinderPlan === "platinum" && styles.planBadgePlatinum,
-                  settings?.userProfile?.tinderPlan === "gold" && styles.planBadgeGold,
-                  settings?.userProfile?.tinderPlan === "plus" && styles.planBadgePlus,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.planBadgeText,
-                    settings?.userProfile?.tinderPlan === "platinum" && styles.planTextPlatinum,
-                    settings?.userProfile?.tinderPlan === "gold" && styles.planTextGold,
-                    settings?.userProfile?.tinderPlan === "plus" && styles.planTextPlus,
-                  ]}
-                >
-                  {settings?.userProfile?.tinderPlan === "platinum"
-                    ? "💎 Platinum"
-                    : settings?.userProfile?.tinderPlan === "gold"
-                      ? "👑 Gold"
-                      : settings?.userProfile?.tinderPlan === "plus"
-                        ? "⚡ Plus"
-                        : "Free"}
-                </Text>
-              </View>
-            )}
+            <Text style={styles.greetingName} numberOfLines={1} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+              {name === "there" ? "Welcome back" : name}
+            </Text>
           </View>
-          {isLoggedIn && likesStatus.isExhausted && !isPaidPlan && (!checking || !likesStatus.isFallback) && (
-            <View style={styles.refillPill}>
-              <Ionicons name="time" size={10} color="#FB923C" />
-              <Text style={styles.refillPillText} numberOfLines={1}>
-                Refills in {likesStatus.formattedCountdown}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.latency}>
-          <Text style={styles.latencyLabel}>LATENCY</Text>
-          <Text style={styles.latencyValue}>
-            {isLoggedIn && Number.isFinite(latencyMs)
-              ? `${Math.round(latencyMs)}ms`
-              : "—"}
-          </Text>
-        </View>
-        {starting ? (
-          <ActivityIndicator size="small" color={uiTheme.colors.primary} />
-        ) : (
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color={uiTheme.colors.muted}
+        </TouchableOpacity>
+        {onNotifications ? (
+          <IconButton
+            icon="notifications-outline"
+            onPress={onNotifications}
+            accessibilityLabel={`Notifications, ${unreadCount} unread`}
+            badge={unreadCount > 0}
+            style={styles.roundButton}
           />
-        )}
-      </TouchableOpacity>
+        ) : null}
+      </FadeIn>
 
-      <View style={styles.agentCard}>
-        <View style={styles.cardHeading}>
-          <View style={styles.stateCopy}>
-            <Text style={styles.eyebrow}>SYSTEM STATE</Text>
-            <Text style={styles.stateTitle}>
-              {busy
-                ? "Connecting"
-                : !isLoggedIn
-                  ? "Not Connected"
-                  : state?.waitingReason === "safety_lock"
-                    ? "Safety Pause"
-                    : state?.waitingReason === "likes_exhausted"
-                      ? (running ? "Wingman Chatting" : "Daily Likes Refill")
-                    : running
-                      ? (state?.currentPhase === "messaging"
-                          ? "Wingman Messaging"
-                          : state?.currentPhase === "transitioning"
-                            ? "Wingman Resting"
-                            : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
-                              ? "Awaiting Replies"
-                              : "Wingman Active")
-                      : "Wingman Standby"}
-            </Text>
-          </View>
-          <View style={styles.readyBadge}>
-            <View
-              style={[
-                styles.statusDot,
-                { backgroundColor: running ? "#48CB8D" : (!isLoggedIn ? uiTheme.colors.muted : (state?.waitingReason === "likes_exhausted" ? "#6366F1" : "#FE3C72")) },
-              ]}
-            />
-            <Text style={styles.readyText}>
-              {busy
-                ? "Starting"
-                : !isLoggedIn
-                  ? "Connect to Start"
-                  : state?.waitingReason === "safety_lock"
-                    ? "Safety Pause"
-                    : state?.waitingReason === "likes_exhausted"
-                      ? (running ? "Messaging" : "Refilling")
-                    : running
-                      ? (state?.currentPhase === "messaging"
-                          ? "Replying"
-                          : state?.currentPhase === "transitioning"
-                            ? "Resting"
-                            : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
-                              ? "Checking"
-                              : (settings?.autoSwipe === false || settings?.likesPerCycle <= 0 ? "Messaging" : "Swiping"))
-                      : (settings?.autoSwipe === false || settings?.likesPerCycle <= 0 ? "Ready to Chat" : "Ready to Swipe")}
-            </Text>
-          </View>
-        </View>
-        <View pointerEvents="none" style={styles.chipArtwork}>
-          <Ionicons name="hardware-chip-outline" size={94} color="#28182F" />
-        </View>
+      {/* ── Control center hero ── */}
+      <FadeIn delay={STAGGER}>
+        <View style={styles.hero}>
+          <LinearGradient
+            pointerEvents="none"
+            colors={uiTheme.gradients.hero}
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={[alpha(c.primary, 0.18), alpha(c.primary, 0)]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 0.6 }}
+            style={styles.heroGlow}
+          />
 
-        <MasterControlOrb
-          stats={effectiveStats}
-          settings={settings}
-          isLoggedIn={isLoggedIn}
-          busy={busy}
-          onToggleAgent={onToggleAgent}
-          onOpenBrowser={onOpenBrowser}
-        />
-
-        {false && <View style={styles.tiles}>
-          {[
-            {
-              label: "GOAL",
-              value: GOALS[goal] || titleCase(goal),
-              icon: "flag-outline",
-              action: onAutomation,
-            },
-            {
-              label: "TONE",
-              value: titleCase(tone),
-              icon: "mic-outline",
-              action: onAutomation,
-            },
-            {
-              label: "SPEED",
-              value: safe ? "Human" : "Fast",
-              icon: "timer-outline",
-              action: onSettings,
-            },
-          ].map((tile) => (
-            <TouchableOpacity
-              key={tile.label}
-              style={styles.tile}
-              onPress={tile.action}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`Edit ${tile.label.toLowerCase()}: ${tile.value}`}
-            >
-              <View style={styles.tileHeader}>
-                <Ionicons
-                  name={tile.icon}
-                  size={18}
-                  color={uiTheme.colors.textSecondary}
-                />
-                <Text style={styles.tileLabel}>{tile.label}</Text>
-              </View>
-              <Text style={styles.tileValue} numberOfLines={1}>
-                {tile.value}
+          {/* Connection strip: Tinder session, location, plan, latency */}
+          <TouchableOpacity
+            style={styles.connection}
+            onPress={onOpenBrowser}
+            disabled={starting}
+            activeOpacity={0.8}
+            pressScale={0.98}
+            accessibilityRole="button"
+            accessibilityLabel={
+              `${isLoggedIn ? "Open Tinder account" : "Connect Tinder account"}. ${isLoggedIn ? "Live" : "Offline"}` +
+              `${settings?.locationCity ? `, ${settings.locationCity}` : ""}${isLoggedIn ? `, ${planBadge.label} plan, latency ${latencyLabel === "—" ? "unavailable" : latencyLabel}` : ""}`
+            }
+            accessibilityState={{ disabled: Boolean(starting), busy: Boolean(starting) }}
+          >
+            <View style={styles.flameWrap}>
+              <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.flame}>
+                <Ionicons name="flame" size={18} color={c.onPrimary} />
+              </LinearGradient>
+              <LiveDot style={styles.onlineDot} size={10} active={isLoggedIn} color={isLoggedIn ? c.success : c.textTertiary} ringColor={c.elevated} />
+            </View>
+            <View style={styles.connectionCopy}>
+              <Text style={styles.connectionTitle} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                {isLoggedIn ? "Tinder connected" : "Connect Tinder"}
               </Text>
-            </TouchableOpacity>
-          ))}
-        </View>}
-      </View>
+              <View style={styles.connectionMeta}>
+                <Ionicons name="location-outline" size={12} color={c.muted} />
+                <Text style={styles.metaText} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  {settings?.locationCity || "Choose your location"}
+                </Text>
+                {isLoggedIn ? (
+                  <>
+                    <View style={styles.metaDivider} />
+                    <Text style={styles.metaNumber} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{latencyLabel}</Text>
+                  </>
+                ) : null}
+              </View>
+            </View>
+            {isLoggedIn && !isCompact ? (
+              <Badge label={planBadge.label} tone={planBadge.tone} icon={planBadge.icon} size="sm" />
+            ) : null}
+            {starting ? (
+              <ActivityIndicator size="small" color={c.primary} />
+            ) : (
+              <Ionicons name="chevron-forward" size={18} color={c.muted} />
+            )}
+          </TouchableOpacity>
+
+          {/* Live status */}
+          <View style={styles.statusBlock} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${stateTitle}. ${statusLabel}`}>
+            <View style={styles.statusLine}>
+              <LiveDot size={8} active={running || busy} color={statusColor} />
+              <Text style={[styles.statusLabel, { color: statusColor }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                {statusLabel.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={styles.stateTitle} numberOfLines={2} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+              {stateTitle}
+            </Text>
+            {isLoggedIn && likesStatus.isExhausted && !isPaidPlan && (!checking || !likesStatus.isFallback) ? (
+              <Badge
+                label={`Refills in ${likesStatus.formattedCountdown}`}
+                tone="warning"
+                icon="time"
+                size="sm"
+                style={styles.refillBadge}
+              />
+            ) : null}
+          </View>
+
+          <MasterControlOrb
+            stats={effectiveStats}
+            settings={settings}
+            isLoggedIn={isLoggedIn}
+            busy={busy}
+            onToggleAgent={onToggleAgent}
+            onOpenBrowser={onOpenBrowser}
+            wellColor={c.background}
+          />
+
+          {showCycle ? (
+            <CycleProgress value={cycleLikes} total={cycleTarget} />
+          ) : null}
+
+          {false && <View style={styles.tiles}>
+            {[
+              {
+                label: "GOAL",
+                value: GOALS[goal] || titleCase(goal),
+                icon: "flag-outline",
+                action: onAutomation,
+              },
+              {
+                label: "TONE",
+                value: titleCase(tone),
+                icon: "mic-outline",
+                action: onAutomation,
+              },
+              {
+                label: "SPEED",
+                value: safe ? "Human" : "Fast",
+                icon: "timer-outline",
+                action: onSettings,
+              },
+            ].map((tile) => (
+              <TouchableOpacity
+                key={tile.label}
+                style={styles.tile}
+                onPress={tile.action}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${tile.label.toLowerCase()}: ${tile.value}`}
+              >
+                <View style={styles.tileHeader}>
+                  <Ionicons name={tile.icon} size={18} color={c.textSecondary} />
+                  <Text style={styles.tileLabel}>{tile.label}</Text>
+                </View>
+                <Text style={styles.tileValue} numberOfLines={1}>{tile.value}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>}
+        </View>
+      </FadeIn>
 
       {false && <View style={styles.metrics}>
         {metrics.map((metric) => (
@@ -332,479 +409,560 @@ export default function HomeOverview({
           >
             <Text style={styles.metricLabel}>{metric.label}</Text>
             <View style={styles.metricValueRow}>
-              <Text style={styles.metricValue}>
-                {Number(metric.value).toLocaleString()}
-              </Text>
+              <Text style={styles.metricValue}>{Number(metric.value).toLocaleString()}</Text>
               <Ionicons name={metric.icon} size={17} color={metric.color} />
             </View>
           </TouchableOpacity>
         ))}
       </View>}
-      {/* <TouchableOpacity
-        style={styles.activityLink}
-        onPress={onActivity}
-        accessibilityRole="button"
-      >
-        <View style={styles.activityIcon}>
-          <Ionicons
-            name="pulse-outline"
-            size={18}
-            color={uiTheme.colors.accent}
-          />
-        </View>
-        <View style={styles.instanceInfo}>
-          <Text style={styles.activityTitle}>Your activity</Text>
-          <Text style={styles.location}>Follow every new connection</Text>
-        </View>
-        <Ionicons name="arrow-forward" size={18} color={uiTheme.colors.muted} />
-      </TouchableOpacity> */}
-      <TinderCollections settings={settings} onConnect={onOpenBrowser} />
+
+      <FadeIn delay={STAGGER * 2}>
+        <TinderCollections settings={settings} onConnect={onOpenBrowser} />
+      </FadeIn>
     </ScrollView>
   );
 }
 
-export function HomeBottomNavigation({ activeTab, onSelect }) {
-  const insets = useSafeAreaInsets();
+// Animated cycle progress bar (grows with native-driven scaleX).
+function CycleProgress({ value, total }) {
+  const reduced = useMotionReduced();
+  const ratio = Math.max(0, Math.min(1, total > 0 ? value / total : 0));
+  const progress = React.useRef(new Animated.Value(reduced ? ratio : 0)).current;
+  React.useEffect(() => {
+    if (reduced) { progress.setValue(ratio); return; }
+    Animated.timing(progress, { toValue: ratio, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [ratio, reduced, progress]);
   return (
     <View
-      style={[styles.navigationWrap, { bottom: insets.bottom + 10 }]}
+      style={styles.cycle}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Likes this cycle"
+      accessibilityValue={{ min: 0, max: total, now: Math.min(value, total) }}
+    >
+      <View style={styles.cycleHeader}>
+        <Text style={styles.cycleLabel} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>LIKES THIS CYCLE</Text>
+        <Text style={styles.cycleValue} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+          {value}<Text style={styles.cycleTotal}> / {total}</Text>
+        </Text>
+      </View>
+      <View style={styles.cycleTrack}>
+        <Animated.View style={[styles.cycleFill, { transform: [{ scaleX: progress }] }]}>
+          <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+      </View>
+    </View>
+  );
+}
+
+// Soft drifting brand glow behind the header (Revolut / Arc style ambient backdrop).
+function AmbientGlow() {
+  const reduced = useMotionReduced();
+  const drift = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    if (reduced) return undefined;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(drift, { toValue: 1, duration: 7000, easing: Easing.inOut(Easing.sin), useNativeDriver: true, isInteraction: false }),
+      Animated.timing(drift, { toValue: 0, duration: 7000, easing: Easing.inOut(Easing.sin), useNativeDriver: true, isInteraction: false }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [reduced, drift]);
+  const move = (x, y) => ({
+    transform: [
+      { translateX: drift.interpolate({ inputRange: [0, 1], outputRange: [0, x] }) },
+      { translateY: drift.interpolate({ inputRange: [0, 1], outputRange: [0, y] }) },
+    ],
+  });
+  return (
+    <View pointerEvents="none" style={styles.ambient} importantForAccessibility="no-hide-descendants">
+      <Animated.View style={[styles.blob, styles.blobPink, move(-24, 14)]}>
+        <LinearGradient colors={[alpha(c.primary, 0.22), alpha(c.primary, 0)]} start={{ x: 0.5, y: 0.2 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} />
+      </Animated.View>
+      <Animated.View style={[styles.blob, styles.blobPeach, move(20, -10)]}>
+        <LinearGradient colors={[alpha(c.secondary, 0.16), alpha(c.secondary, 0)]} start={{ x: 0.5, y: 0.2 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} />
+      </Animated.View>
+    </View>
+  );
+}
+
+// ── Bottom dock ─────────────────────────────────────────────────────────────
+// Same four tabs, ids and handlers as before; `short` is the visible caption,
+// `label` stays the accessibility label. The raised centre action opens Tinder
+// through the existing "browser" tab route.
+const NAV_TABS = [
+  { id: "home", icon: "home-outline", activeIcon: "home", label: "Home", short: "Home" },
+  { id: "automation", icon: "compass-outline", activeIcon: "compass", label: "Automation", short: "Automate" },
+  { id: "activity", icon: "analytics-outline", activeIcon: "analytics", label: "Activity", short: "Activity" },
+  { id: "appSettings", icon: "settings-outline", activeIcon: "settings", label: "App settings", short: "Settings" },
+];
+// Slot layout: two tabs, centre action, two tabs.
+const NAV_SLOTS = [0, 1, null, 2, 3];
+const NAV_PAD = 6;
+const FAB_SIZE = 58;
+
+export function HomeBottomNavigation({ activeTab, onSelect }) {
+  const insets = useSafeAreaInsets();
+  const { gutter } = useResponsive();
+  const reduced = useMotionReduced();
+  const [barWidth, setBarWidth] = React.useState(0);
+  const tabIndex = NAV_TABS.findIndex((tab) => tab.id === activeTab);
+  const slotIndex = Math.max(0, NAV_SLOTS.indexOf(tabIndex));
+  const slotWidth = barWidth ? (barWidth - NAV_PAD * 2) / NAV_SLOTS.length : 0;
+  const slide = React.useRef(new Animated.Value(slotIndex)).current;
+  React.useEffect(() => {
+    if (reduced) { slide.setValue(slotIndex); return; }
+    Animated.spring(slide, { toValue: slotIndex, damping: 18, stiffness: 220, mass: 0.9, useNativeDriver: true }).start();
+  }, [slotIndex, reduced, slide]);
+
+  const select = (id) => {
+    if (activeTab !== id) Haptics.selectionAsync().catch(() => {});
+    onSelect(id);
+  };
+
+  return (
+    <View
+      style={[styles.navigationWrap, { bottom: insets.bottom + 10, left: gutter, right: gutter }]}
       pointerEvents="box-none"
     >
-      <LinearGradient
-        colors={[
-          "rgba(59, 32, 48, 0.9)",
-          "rgba(32, 20, 40, 0.88)",
-          "rgba(22, 14, 28, 0.86)",
-        ]}
-        locations={[0, 0.48, 1]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={styles.navigation}
-        accessibilityRole="tablist"
-      >
-        {[
-          { id: "home", icon: "home", label: "Home" },
-          // {
-          //   id: "browser",
-          //   icon: "chatbubble-outline",
-          //   label: "Tinder browser",
-          // },
-          { id: "automation", icon: "compass-outline", label: "Automation" },
-          { id: "activity", icon: "analytics-outline", label: "Activity" },
-          { id: "appSettings", icon: "settings-outline", label: "App settings" },
-        ].map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={styles.navSlot}
-            onPress={() => onSelect(tab.id)}
-            accessibilityRole="tab"
-            accessibilityLabel={tab.label}
-            accessibilityState={{ selected: activeTab === tab.id }}
-            activeOpacity={0.75}
-          >
-            {activeTab === tab.id ? (
-              <LinearGradient
-                colors={[
-                  uiTheme.colors.primary,
-                  uiTheme.colors.accent,
-                  uiTheme.colors.secondary,
-                ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.navActive}
-              >
-                <Ionicons name={tab.icon} size={21} color="#FFFFFF" />
-              </LinearGradient>
+      <View style={styles.navigationShadow}>
+        <View
+          style={styles.navigation}
+          accessibilityRole="tablist"
+          onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
+        >
+          {Platform.OS === "ios" ? (
+            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          ) : null}
+          <LinearGradient
+            colors={Platform.OS === "ios" ? [alpha(c.elevated, 0.55), alpha(c.surface, 0.72)] : uiTheme.gradients.nav}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          {slotWidth > 0 && tabIndex >= 0 ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.navIndicator, { width: slotWidth, transform: [{ translateX: Animated.multiply(slide, slotWidth) }] }]}
+            >
+              <LinearGradient colors={uiTheme.gradients.brandShort} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.navIndicatorBar} />
+              <View style={styles.navIndicatorGlow} />
+            </Animated.View>
+          ) : null}
+          {NAV_SLOTS.map((index) =>
+            index === null ? (
+              <View key="fab-slot" style={styles.navSlot} pointerEvents="none" />
             ) : (
-              <Ionicons
-                name={tab.icon}
-                size={21}
-                color={uiTheme.colors.muted}
+              <NavTab
+                key={NAV_TABS[index].id}
+                tab={NAV_TABS[index]}
+                active={activeTab === NAV_TABS[index].id}
+                reduced={reduced}
+                onPress={() => select(NAV_TABS[index].id)}
               />
-            )}
-          </TouchableOpacity>
-        ))}
-      </LinearGradient>
+            )
+          )}
+        </View>
+      </View>
+      <CenterAction onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); onSelect("browser"); }} />
+    </View>
+  );
+}
+
+function NavTab({ tab, active, reduced, onPress }) {
+  const pop = React.useRef(new Animated.Value(1)).current;
+  React.useEffect(() => {
+    if (!active || reduced) { pop.setValue(1); return; }
+    pop.setValue(0.72);
+    Animated.spring(pop, { toValue: 1, speed: 16, bounciness: 14, useNativeDriver: true }).start();
+  }, [active, reduced, pop]);
+  return (
+    <TouchableOpacity
+      style={styles.navSlot}
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityLabel={tab.label}
+      accessibilityState={{ selected: active }}
+      activeOpacity={0.75}
+      pressScale={0.9}
+    >
+      <Animated.View style={[styles.navIcon, { transform: [{ scale: pop }] }]}>
+        <Ionicons name={active ? tab.activeIcon : tab.icon} size={22} color={active ? c.text : c.muted} />
+      </Animated.View>
+      <Text
+        style={[styles.navLabel, active && styles.navLabelActive]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+        maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+        importantForAccessibility="no"
+      >
+        {tab.short}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// Raised gradient action in the middle of the dock (Instagram / Venmo style centre action).
+function CenterAction({ onPress }) {
+  return (
+    <View style={styles.fabAnchor} pointerEvents="box-none">
+      <TouchableOpacity
+        onPress={onPress}
+        pressScale={0.9}
+        accessibilityRole="button"
+        accessibilityLabel="Open Tinder"
+        accessibilityHint="Opens your live Tinder session"
+        style={styles.fabRing}
+      >
+        <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
+          <LinearGradient
+            pointerEvents="none"
+            colors={[alpha(c.white, 0.35), alpha(c.white, 0)]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 0.6 }}
+            style={styles.fabGloss}
+          />
+          <Ionicons name="flame" size={26} color={c.onPrimary} />
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  introduction: { gap: 10, paddingTop: 4, paddingBottom: 4 },
-  welcomeLabel: { ...uiTheme.type.caption, color: uiTheme.colors.secondary, letterSpacing: 1.2 },
-  welcomeTitle: { ...uiTheme.type.display, color: uiTheme.colors.text, letterSpacing: -0.7 },
-  welcomeBody: { ...uiTheme.type.body, color: uiTheme.colors.muted },
   content: {
     width: "100%",
-    maxWidth: 600,
+    maxWidth: uiTheme.layout.readableMax,
     alignSelf: "center",
-    paddingHorizontal: 22,
-    paddingTop: 17,
-    paddingBottom: 100,
-    gap: 22,
+    paddingTop: sp.sm,
+    // Clears the floating dock and its raised centre action.
+    paddingBottom: uiTheme.layout.navHeight + sp.hero + sp.xxl,
+    gap: sp.xxl,
   },
-  instance: {
+
+  // ── Personal header ──
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    padding: uiTheme.spacing.lg,
-    backgroundColor: uiTheme.colors.surface,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    borderRadius: 28,
+    justifyContent: "space-between",
+    gap: sp.md,
   },
-  flameWrap: { position: "relative" },
-  flame: {
+  identity: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: sp.md,
+  },
+  avatarRing: {
     width: 48,
     height: 48,
-    borderRadius: 15,
+    borderRadius: 24,
+    padding: 2,
+  },
+  avatar: {
+    flex: 1,
+    borderRadius: 22,
+    backgroundColor: c.elevated,
+    borderWidth: 2,
+    borderColor: c.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    ...t.section,
+    color: c.text,
+  },
+  greetingCopy: { flex: 1, minWidth: 0 },
+  greetingLabel: {
+    ...t.subhead,
+    color: c.muted,
+  },
+  greetingName: {
+    ...t.title,
+    color: c.text,
+  },
+  roundButton: { borderRadius: r.pill },
+
+  // ── Hero ──
+  hero: {
+    borderRadius: r.xxl,
+    borderWidth: 1,
+    borderColor: c.hairline,
+    padding: sp.lg,
+    paddingBottom: sp.xl,
+    overflow: "hidden",
+    backgroundColor: c.surface,
+    ...uiTheme.shadows.md,
+  },
+  heroGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 220,
+  },
+  connection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: sp.md,
+    padding: sp.md,
+    borderRadius: r.lg,
+    backgroundColor: alpha(c.elevated, 0.7),
+    borderWidth: 1,
+    borderColor: c.hairline,
+  },
+  flameWrap: { position: "relative", flexShrink: 0 },
+  flame: {
+    width: 38,
+    height: 38,
+    borderRadius: r.sm + 2,
     alignItems: "center",
     justifyContent: "center",
   },
   onlineDot: {
     position: "absolute",
-    bottom: -2,
-    right: -2,
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-    backgroundColor: "#47D18C",
-    borderWidth: 3,
-    borderColor: uiTheme.colors.surface,
+    bottom: -3,
+    right: -3,
   },
-  offlineDot: { backgroundColor: "#727277" },
-  instanceInfo: { flex: 1, minWidth: 0, overflow: "hidden" },
-  instanceTitleRow: {
+  connectionCopy: { flex: 1, minWidth: 0 },
+  connectionTitle: {
+    ...t.headline,
+    fontSize: 15,
+    color: c.text,
+  },
+  connectionMeta: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 7,
+    gap: sp.xs,
+    marginTop: 2,
   },
-  instanceTitle: {
-    fontFamily: "Manrope_700Bold",
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: "normal",
-    letterSpacing: -0.3,
+  metaText: {
+    ...t.footnote,
+    color: c.muted,
+    flexShrink: 1,
   },
-  liveBadge: {
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-    backgroundColor: "#10261B",
+  metaDivider: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: c.textTertiary,
+    marginHorizontal: 2,
   },
-  liveText: {
-    fontFamily: "Inter_800ExtraBold",
-    color: "#56CE90",
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: "normal",
-    letterSpacing: 0.7,
-  },
-  offlineBadge: { backgroundColor: "#281824" },
-  offlineText: { color: uiTheme.colors.muted },
-  instanceMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 5,
-  },
-  location: {
-    fontFamily: "Inter_400Regular",
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-  },
-  planBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
-  },
-  planBadgePlatinum: {
-    backgroundColor: "rgba(56, 189, 248, 0.15)",
-    borderColor: "rgba(56, 189, 248, 0.45)",
-  },
-  planBadgeGold: {
-    backgroundColor: "rgba(234, 179, 8, 0.15)",
-    borderColor: "rgba(234, 179, 8, 0.45)",
-  },
-  planBadgePlus: {
-    backgroundColor: "rgba(168, 85, 247, 0.15)",
-    borderColor: "rgba(168, 85, 247, 0.45)",
-  },
-  planBadgeText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-    color: uiTheme.colors.muted,
-    textTransform: "uppercase",
-  },
-  planTextPlatinum: {
-    color: "#38BDF8",
-  },
-  planTextGold: {
-    color: "#FACC15",
-  },
-  planTextPlus: {
-    color: "#C084FC",
-  },
-  refillPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 5,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 6,
-    backgroundColor: "rgba(234, 88, 12, 0.16)",
-    borderWidth: 1,
-    borderColor: "rgba(234, 88, 12, 0.42)",
-    alignSelf: "flex-start",
-  },
-  refillPillText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-    color: "#FB923C",
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
-  },
-  latency: {
-    alignItems: "flex-end",
-    gap: uiTheme.spacing.xs,
-    flexShrink: 0,
-    marginLeft: 10,
-  },
-  latencyLabel: {
-    fontFamily: "Inter_700Bold",
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: "normal",
-  },
-  latencyValue: {
-    fontFamily: "Inter_700Bold",
-    color: uiTheme.colors.textSecondary,
-    fontSize: 13,
-    fontWeight: "normal",
+  metaNumber: {
+    ...t.footnote,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.textSecondary,
     fontVariant: ["tabular-nums"],
   },
-  agentCard: {
-    backgroundColor: uiTheme.colors.surface,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    borderRadius: 32,
-    padding: 22,
-    overflow: "hidden",
+  statusBlock: {
+    alignItems: "center",
+    marginTop: sp.xl,
+    gap: sp.xs,
   },
-  cardHeading: {
+  statusLine: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: uiTheme.spacing.sm,
-    alignItems: "flex-start",
-    zIndex: 1,
+    alignItems: "center",
+    gap: sp.sm,
   },
-  stateCopy: { flexGrow: 1, minWidth: 170 },
-  eyebrow: {
-    fontFamily: "Inter_700Bold",
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    letterSpacing: 1.2,
-    fontWeight: "normal",
-    marginBottom: 7,
+  statusLabel: {
+    ...t.overline,
   },
   stateTitle: {
-    fontFamily: "Manrope_700Bold",
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.title.fontSize,
-    fontWeight: "normal",
-    letterSpacing: -1,
-  },
-  readyBadge: {
-    flexDirection: "row",
-    gap: uiTheme.spacing.xs,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    borderRadius: uiTheme.radius.card,
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 5,
-    marginTop: 1,
-  },
-  statusDot: { width: 4, height: 4, borderRadius: 2 },
-  readyText: {
-    fontFamily: "Inter_600SemiBold",
-    color: uiTheme.colors.textSecondary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: "normal",
-  },
-  chipArtwork: { position: "absolute", right: 15, top: 38 },
-  launchArea: { alignItems: "center", paddingTop: 42, paddingBottom: 31 },
-  launchGlow: {
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 25,
-    borderRadius: 100,
-  },
-  launchRing: {
-    width: 192,
-    height: 192,
-    borderRadius: 96,
-    borderWidth: 3,
-    borderTopColor: "#805044",
-    borderRightColor: uiTheme.colors.secondary,
-    borderBottomColor: uiTheme.colors.primary,
-    borderLeftColor: "#3B1C32",
-    padding: uiTheme.spacing.sm,
-    transform: [{ rotate: "-18deg" }],
-  },
-  innerRing: {
-    flex: 1,
-    borderRadius: 90,
-    borderWidth: 1,
-    borderColor: "#42243A",
-    alignItems: "center",
-    justifyContent: "center",
-    transform: [{ rotate: "18deg" }],
-  },
-  launchButton: {
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    overflow: "hidden",
-  },
-  launchGradient: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-  },
-  launchLabel: {
-    fontFamily: "Inter_800ExtraBold",
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: "normal",
-    letterSpacing: 1.1,
-    color: "#FFFFFF",
-  },
-  launchHint: {
-    fontFamily: "Inter_400Regular",
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    marginTop: 18,
+    ...t.title,
+    color: c.text,
     textAlign: "center",
   },
-  tiles: { flexDirection: "row", gap: uiTheme.spacing.sm },
+  refillBadge: { alignSelf: "center", marginTop: sp.xs },
+
+  cycle: {
+    marginTop: sp.lg,
+    padding: sp.md,
+    borderRadius: r.lg,
+    backgroundColor: alpha(c.background, 0.5),
+    borderWidth: 1,
+    borderColor: c.hairline,
+    gap: sp.sm,
+  },
+  cycleHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+  },
+  cycleLabel: { ...t.overline, color: c.muted },
+  cycleValue: {
+    ...t.headline,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.text,
+    fontVariant: ["tabular-nums"],
+  },
+  cycleTotal: { color: c.muted, fontFamily: uiTheme.fonts.caption },
+  cycleTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: c.elevatedHigh,
+    overflow: "hidden",
+  },
+  cycleFill: {
+    height: "100%",
+    width: "100%",
+    borderRadius: 3,
+    overflow: "hidden",
+    transformOrigin: "left",
+  },
+
+  // ── Ambient backdrop ──
+  ambient: {
+    position: "absolute",
+    top: -60,
+    left: -60,
+    right: -60,
+    height: 360,
+  },
+  blob: {
+    position: "absolute",
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  blobPink: { width: 300, height: 300, top: -60, right: 0 },
+  blobPeach: { width: 240, height: 240, top: 30, left: 10 },
+
+  // Hidden tiles/metrics (gated with `false &&`); kept token-based for when they return.
+  tiles: { flexDirection: "row", gap: sp.sm },
   tile: {
     flex: 1,
     minWidth: 0,
-    backgroundColor: uiTheme.colors.elevated,
+    backgroundColor: c.elevated,
     borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    borderRadius: 17,
+    borderColor: c.borderSubtle,
+    borderRadius: r.lg,
     alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: uiTheme.spacing.xs,
-    gap: uiTheme.spacing.sm,
+    paddingVertical: sp.md,
+    paddingHorizontal: sp.xs,
+    gap: sp.sm,
   },
   tileHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: uiTheme.spacing.xs,
+    gap: sp.xs,
   },
-  tileLabel: {
-    fontFamily: "Inter_700Bold",
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: "normal",
-  },
-  tileValue: {
-    fontFamily: "Inter_600SemiBold",
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: "normal",
-  },
-  metrics: { flexDirection: "row", gap: 10, marginTop: 6 },
+  tileLabel: { ...t.overline, color: c.muted },
+  tileValue: { ...t.caption, fontFamily: uiTheme.fonts.label, color: c.text },
+  metrics: { flexDirection: "row", gap: sp.sm },
   metric: {
     flex: 1,
     minWidth: 0,
-    backgroundColor: uiTheme.colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    borderRadius: 19,
-    padding: 15,
-    gap: 5,
+    borderColor: c.borderSubtle,
+    borderRadius: r.lg,
+    padding: sp.lg,
+    gap: sp.xs,
   },
-  metricLabel: {
-    fontFamily: "Inter_700Bold",
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: "normal",
-  },
-  metricValueRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: uiTheme.spacing.sm,
-  },
-  metricValue: {
-    fontFamily: "Inter_700Bold",
-    color: uiTheme.colors.text,
-    fontSize: 28,
-    fontWeight: "normal",
-  },
-  activityLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: uiTheme.spacing.md,
-    paddingHorizontal: uiTheme.spacing.xs,
-    paddingBottom: 2,
-  },
-  activityIcon: {
-    height: 39,
-    width: 39,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 13,
-    backgroundColor: "#321526",
-  },
-  activityTitle: {
-    fontFamily: "Inter_600SemiBold",
-    color: uiTheme.colors.text,
-    fontSize: 13,
-    fontWeight: "normal",
-  },
+  metricLabel: { ...t.overline, color: c.muted },
+  metricValueRow: { flexDirection: "row", alignItems: "center", gap: sp.sm },
+  metricValue: { ...t.number, color: c.text, fontVariant: ["tabular-nums"] },
+
+  // ── Bottom dock ──
   navigationWrap: {
     position: "absolute",
-    left: 20,
-    right: 20,
+    left: sp.xl,
+    right: sp.xl,
     bottom: 10,
     zIndex: 10,
-    backgroundColor: "transparent",
+    alignItems: "center",
+  },
+  navigationShadow: {
+    width: "100%",
+    maxWidth: 520,
+    borderRadius: r.sheet,
+    ...uiTheme.shadows.lg,
   },
   navigation: {
     width: "100%",
-    maxWidth: 600,
-    alignSelf: "center",
+    minHeight: uiTheme.layout.navHeight,
     flexDirection: "row",
-    backgroundColor: "transparent",
-    borderRadius: 32,
+    alignItems: "center",
+    borderRadius: r.sheet,
     borderWidth: 1,
-    borderColor: "rgba(255, 170, 128, 0.18)",
-    paddingVertical: 6,
-    paddingHorizontal: uiTheme.spacing.sm,
+    borderColor: alpha(c.white, 0.1),
+    padding: NAV_PAD,
     overflow: "hidden",
+  },
+  navIndicator: {
+    position: "absolute",
+    left: NAV_PAD,
+    top: 0,
+    alignItems: "center",
+  },
+  navIndicatorBar: {
+    width: 28,
+    height: 3,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+  },
+  navIndicatorGlow: {
+    width: 44,
+    height: 26,
+    marginTop: -3,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    backgroundColor: alpha(c.primary, 0.12),
   },
   navSlot: {
     flex: 1,
-    height: 46,
+    minWidth: 0,
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    paddingHorizontal: sp.xxs,
+  },
+  navIcon: {
+    height: 26,
     alignItems: "center",
     justifyContent: "center",
   },
-  navActive: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
+  navLabel: {
+    ...t.caption,
+    fontSize: 11,
+    lineHeight: 14,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
+    textAlign: "center",
+  },
+  navLabelActive: {
+    color: c.text,
+  },
+  fabAnchor: {
+    position: "absolute",
+    top: -(FAB_SIZE / 2) + 4,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  fabRing: {
+    width: FAB_SIZE + 10,
+    height: FAB_SIZE + 10,
+    borderRadius: (FAB_SIZE + 10) / 2,
+    padding: 5,
+    backgroundColor: c.background,
+    ...uiTheme.shadows.glow,
+  },
+  fab: {
+    flex: 1,
+    borderRadius: FAB_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  fabGloss: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "55%",
   },
 });

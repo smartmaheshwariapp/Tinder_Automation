@@ -2,16 +2,27 @@ import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/AiInsightRow.js — Compact AI Engine Insight Pills
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import IconWell from '../ui/IconWell';
 
-function Pill({ iconName, label, value, accentColor }) {
+const TONE_COLOR = {
+  success: uiTheme.colors.success,
+  warning: uiTheme.colors.warning,
+  secondary: uiTheme.colors.secondary,
+  primary: uiTheme.colors.accent,
+};
+
+function Pill({ iconName, label, value, tone }) {
   return (
-    <View style={[styles.pill, { borderColor: accentColor + '30' }]}>
-      <Ionicons name={iconName} size={14} color={accentColor} />
-      <Text style={styles.pillLabel}>{label}</Text>
-      <Text style={[styles.pillValue, { color: accentColor }]} numberOfLines={1}>
-        {value}
-      </Text>
+    <View style={styles.pill} accessible accessibilityLabel={`${label.replace(':', '')} ${value}`}>
+      <IconWell icon={iconName} tone={tone} size={28} iconSize={14} />
+      <View style={styles.pillCopy}>
+        <Text style={styles.pillLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+          {label.replace(':', '')}
+        </Text>
+        <Text style={[styles.pillValue, { color: TONE_COLOR[tone] || uiTheme.colors.text }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+          {value}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -32,13 +43,13 @@ export default function AiInsightRow({ settings, lifetimeStats }) {
           iconName="shield-checkmark-outline"
           label="Safety:"
           value={s.safetyMode !== false ? "50/hr Protected" : "Unlimited"}
-          accentColor={uiTheme.colors.success}
+          tone="success"
         />
         <Pill
           iconName="locate-outline"
           label="Goal:"
           value={optimizingFor}
-          accentColor="#FFB800"
+          tone="warning"
         />
       </View>
       <View style={styles.row}>
@@ -46,13 +57,13 @@ export default function AiInsightRow({ settings, lifetimeStats }) {
           iconName="chatbubble-ellipses-outline"
           label="Tone:"
           value={tone}
-          accentColor="#EC4899"
+          tone="primary"
         />
         <Pill
           iconName="flame-outline"
           label="Chats:"
           value={`${activeChats} Active`}
-          accentColor={uiTheme.colors.success}
+          tone="success"
         />
       </View>
     </View>
@@ -70,23 +81,29 @@ const styles = StyleSheet.create({
   },
   pill: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: uiTheme.colors.surface,
-    borderRadius: 10,
+    borderRadius: uiTheme.radius.md,
     borderWidth: 1,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    gap: 5,
+    borderColor: uiTheme.colors.borderSubtle,
+    paddingVertical: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.sm,
+    gap: uiTheme.spacing.sm,
   },
-  pillLabel: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
+  pillCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pillLabel: {
+    ...uiTheme.type.overline,
+    textTransform: 'uppercase',
     color: uiTheme.colors.muted,
-    fontWeight: 'normal',
   },
-  pillValue: { fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    flexShrink: 1,
+  pillValue: {
+    ...uiTheme.type.subhead,
+    fontFamily: uiTheme.fonts.label,
+    marginTop: 1,
   },
 });

@@ -143,3 +143,12 @@ Copy this template only after the full phase satisfies its requirements. Replace
 - Removed the nested short scroll region and automatic scroll jumps. Kept lifetime telemetry; the large session controller remains available outside the activity tab.
 - Handles numeric and ISO event dates; unknown event types use neutral labels. Removed unsupported verification/compatibility claims and keyword-based milestone inference.
 - Android/iOS export and 83 regression tests passed. Device interaction and visual checks remain pending.
+
+## Design system v2 and app-wide redesign — 2026-09-18
+
+- Design system: `src/theme/index.js` extended (additive, all previous keys kept) with tinted status fills, tier/brand colors, gradients, a full type scale, radius/shadow scales, motion tokens and `alpha()`. Documented in DESIGN_SYSTEM.md.
+- Shared UI kit `src/components/ui/`: AppText, AppButton, IconButton, IconWell, Card, Badge, Chip, ListRow, SectionHeader, ScreenHeader, Screen, BottomSheet, Skeleton, Divider, Loading/Empty/ErrorState. `Motion.js` gained spring press release, input error state, `FadeIn` and `useMotionReduced`. `useResponsive` hook added.
+- Every screen and component restyled on tokens and primitives: Auth, Login, Onboarding (step progress and sticky CTA), home shell and floating tab bar (now labelled), Profile, App Settings, Automation and Settings panels, sliders and dropdown, Activity (skeleton loading, empty states), Browser chrome and login wizard, PlatformConfig, CloudDashboard, and all modals and banners. Looping animations respect reduced motion.
+- Fixed: a successful profile sync showed an error (undefined `setTinderPhotoFailed`); the tooltip modal in AutomationV2Panel had no backdrop (undefined style).
+- Validation: `node scripts/ui-check.js` (new: parse, undefined identifiers, missing style keys) clean on 105 files; 23 suites / 283 tests pass; injected template literals byte-identical to the pre-refactor snapshot; behavior-call comparison reviewed; `expo export --platform all` passed (Android 1,106 / iOS 1,109 modules).
+- Open: no device or emulator was available, so rendering at 320/375/430 widths, VoiceOver/TalkBack and keyboard behavior still need a device pass.

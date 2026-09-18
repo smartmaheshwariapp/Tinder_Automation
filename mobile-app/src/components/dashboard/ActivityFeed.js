@@ -2,22 +2,24 @@ import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/ActivityFeed.js — Live Stream Timeline of AI Engine Actions with Match Moments Hub
 import React, { useRef, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import IconWell from '../ui/IconWell';
+import Badge, { TONES } from '../ui/Badge';
+import { EmptyState } from '../ui';
 
-// ─── Feed metadata with clean vector icons ────────────────────────────────────
+// ─── Feed metadata with clean vector icons (tone → IconWell / Badge tones) ────
 const FEED_META = {
-  opener_sent:      { icon: 'mail-outline',          label: 'Opener Sent',        color: '#EC4899' },
-  message_replied:  { icon: 'chatbubbles-outline',   label: 'Reply Sent',         color: uiTheme.colors.info },
-  profile_liked:    { icon: 'heart',                 label: 'Profile Liked',      color: uiTheme.colors.primary },
-  match_detected:   { icon: 'sparkles',              label: 'New Match',          color: '#FFB800' },
-  handoff_detected: { icon: 'star',                  label: 'Match Moment',       color: uiTheme.colors.success },
-  cycle_complete:   { icon: 'checkmark-done',        label: 'Cycle Completed',    color: uiTheme.colors.success },
-  persona_update:   { icon: 'options-outline',       label: 'AI Tone Calibrated', color: uiTheme.colors.info },
-  swipe_progress:   { icon: 'trending-up-outline',   label: 'Swiping Session',    color: uiTheme.colors.primary },
-  msg_progress:     { icon: 'chatbox-ellipses',      label: 'Messaging Queue',    color: '#EC4899' },
-  rate_limit:       { icon: 'shield-outline',        label: 'Safety Rate Limit',  color: uiTheme.colors.error },
-  trial_ended:      { icon: 'flag-outline',          label: 'Cycle Paused',       color: uiTheme.colors.muted },
-  error:            { icon: 'alert-circle-outline',  label: 'Attention Needed',   color: uiTheme.colors.error },
+  opener_sent:      { icon: 'mail-outline',          label: 'Opener Sent',        tone: 'info' },
+  message_replied:  { icon: 'chatbubbles-outline',   label: 'Reply Sent',         tone: 'info' },
+  profile_liked:    { icon: 'heart',                 label: 'Profile Liked',      tone: 'primary' },
+  match_detected:   { icon: 'sparkles',              label: 'New Match',          tone: 'secondary' },
+  handoff_detected: { icon: 'star',                  label: 'Match Moment',       tone: 'success' },
+  cycle_complete:   { icon: 'checkmark-done',        label: 'Cycle Completed',    tone: 'success' },
+  persona_update:   { icon: 'options-outline',       label: 'AI Tone Calibrated', tone: 'neutral' },
+  swipe_progress:   { icon: 'trending-up-outline',   label: 'Swiping Session',    tone: 'primary' },
+  msg_progress:     { icon: 'chatbox-ellipses',      label: 'Messaging Queue',    tone: 'info' },
+  rate_limit:       { icon: 'shield-outline',        label: 'Safety Rate Limit',  tone: 'error' },
+  trial_ended:      { icon: 'flag-outline',          label: 'Cycle Paused',       tone: 'neutral' },
+  error:            { icon: 'alert-circle-outline',  label: 'Attention Needed',   tone: 'error' },
 };
 
 function formatTimeAgo(timestamp) {
@@ -42,40 +44,40 @@ function FeedItem({ event }) {
   const nameLabel = event.name ? ` → ${event.name}` : '';
   const detailText = event.detail ? truncateText(event.detail) : null;
   const isMoment = event.type === 'handoff_detected' || (event.detail && (event.detail.includes('number') || event.detail.includes('date') || event.detail.includes('WhatsApp')));
+  const tone = isMoment ? 'success' : meta.tone;
+  const toneColor = (TONES[tone] || TONES.neutral).fg;
+  const title = isMoment ? 'Match Moment (Goal Reached)' : meta.label;
+  const timeAgo = formatTimeAgo(event.timestamp);
 
   return (
-    <View style={[styles.feedItem, isMoment && styles.feedItemMoment]}>
-      <View style={[styles.accentBar, { backgroundColor: isMoment ? uiTheme.colors.success : meta.color }]} />
-      <View style={[styles.iconWrap, { backgroundColor: (isMoment ? uiTheme.colors.success : meta.color) + '15' }]}>
-        <Ionicons name={isMoment ? 'star' : meta.icon} size={15} color={isMoment ? uiTheme.colors.success : meta.color} />
-      </View>
+    <View
+      style={[styles.feedItem, isMoment && styles.feedItemMoment]}
+      accessible
+      accessibilityLabel={[title + nameLabel, detailText, timeAgo].filter(Boolean).join(', ')}
+    >
+      <IconWell icon={isMoment ? 'star' : meta.icon} tone={tone} size={32} iconSize={15} />
       <View style={styles.itemContent}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          <Text style={styles.itemTitle} numberOfLines={1}>
-            {isMoment ? 'Match Moment (Goal Reached)' : meta.label}
-            {nameLabel ? <Text style={[styles.itemName, { color: isMoment ? uiTheme.colors.success : meta.color }]}>{nameLabel}</Text> : null}
-          </Text>
-        </View>
+        <Text style={styles.itemTitle} numberOfLines={1}>
+          {title}
+          {nameLabel ? <Text style={[styles.itemName, { color: toneColor }]}>{nameLabel}</Text> : null}
+        </Text>
         {detailText ? (
           <Text style={styles.itemDetail} numberOfLines={1}>{detailText}</Text>
         ) : null}
       </View>
-      <Text style={styles.itemTime}>{formatTimeAgo(event.timestamp)}</Text>
+      <Text style={styles.itemTime} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{timeAgo}</Text>
     </View>
   );
 }
 
 function EmptyFeed() {
   return (
-    <View style={styles.emptyWrap}>
-      <View style={styles.emptyIconWrap}>
-        <Ionicons name="sparkles-outline" size={24} color={uiTheme.colors.muted} />
-      </View>
-      <Text style={styles.emptyTitle}>Live Feed Standby</Text>
-      <Text style={styles.emptyDesc}>
-        Live swipes, goal-oriented conversions, and conversation openers will stream here automatically.
-      </Text>
-    </View>
+    <EmptyState
+      compact
+      icon="sparkles-outline"
+      title="Live Feed Standby"
+      message="Live swipes, goal-oriented conversions, and conversation openers will stream here automatically."
+    />
   );
 }
 
@@ -97,19 +99,14 @@ export default function ActivityFeed({ progressFeed }) {
   return (
     <View style={styles.container}>
       <View style={styles.feedHeader}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={styles.sectionTitle}>Live Activity Timeline</Text>
+        <View style={styles.feedHeaderTitle}>
+          <Text style={styles.sectionTitle} accessibilityRole="header" numberOfLines={1}>Live Activity Timeline</Text>
           {momentsCount > 0 && (
-            <View style={styles.momentBadge}>
-              <Ionicons name="star" size={10} color={uiTheme.colors.success} />
-              <Text style={styles.momentBadgeText}>{momentsCount} Leads</Text>
-            </View>
+            <Badge label={`${momentsCount} Leads`} tone="success" icon="star" size="sm" />
           )}
         </View>
         {events.length > 0 && (
-          <View style={styles.countBadge}>
-            <Text style={styles.countText}>{events.length} events</Text>
-          </View>
+          <Badge label={`${events.length} events`} tone="neutral" size="sm" />
         )}
       </View>
       {events.length === 0 ? (
@@ -133,52 +130,32 @@ export default function ActivityFeed({ progressFeed }) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: uiTheme.colors.surface,
-    borderRadius: 16,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    padding: 14,
+    borderColor: uiTheme.colors.hairline,
+    padding: uiTheme.spacing.lg,
     marginBottom: uiTheme.spacing.md,
   },
   feedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.md,
   },
-  sectionTitle: { fontFamily: 'Manrope_800ExtraBold',
-    fontSize: 14.5,
-    fontWeight: 'normal',
-    color: '#FFF',
-    letterSpacing: -0.2,
-  },
-  momentBadge: {
+  feedHeaderTitle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    gap: uiTheme.spacing.sm,
+    flexShrink: 1,
+    minWidth: 0,
   },
-  momentBadgeText: { fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.success,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  countBadge: {
-    backgroundColor: uiTheme.colors.elevated,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-  },
-  countText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  sectionTitle: {
+    ...uiTheme.type.headline,
+    fontFamily: uiTheme.fonts.heading,
+    color: uiTheme.colors.text,
+    flexShrink: 1,
   },
   scroll: {
     maxHeight: 220,
@@ -186,82 +163,39 @@ const styles = StyleSheet.create({
   feedItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: 10,
+    gap: uiTheme.spacing.md,
+    backgroundColor: uiTheme.colors.elevated,
+    borderRadius: uiTheme.radius.md,
     borderWidth: 1,
-    borderColor: '#221E33',
-    padding: 10,
-    marginBottom: 6,
-    overflow: 'hidden',
+    borderColor: uiTheme.colors.borderSubtle,
+    paddingVertical: uiTheme.spacing.sm,
+    paddingHorizontal: uiTheme.spacing.md,
+    marginBottom: uiTheme.spacing.sm,
   },
   feedItemMoment: {
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-    backgroundColor: 'rgba(16, 185, 129, 0.05)',
-  },
-  accentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-  },
-  iconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-    marginLeft: uiTheme.spacing.xs,
+    borderColor: uiTheme.colors.successBorder,
+    backgroundColor: uiTheme.colors.successSoft,
   },
   itemContent: {
     flex: 1,
+    minWidth: 0,
   },
-  itemTitle: { fontFamily: 'Manrope_700Bold',
-    fontSize: 12.5,
-    fontWeight: 'normal',
-    color: '#FFF',
+  itemTitle: {
+    ...uiTheme.type.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: uiTheme.colors.text,
   },
-  itemName: { fontFamily: 'Inter_800ExtraBold',
-    fontWeight: 'normal',
+  itemName: {
+    fontFamily: uiTheme.fonts.strong,
   },
-  itemDetail: { fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.caption.fontSize,
+  itemDetail: {
+    ...uiTheme.type.footnote,
     color: uiTheme.colors.muted,
     marginTop: 1,
   },
-  itemTime: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
+  itemTime: {
+    ...uiTheme.type.footnote,
+    fontVariant: ['tabular-nums'],
     color: uiTheme.colors.muted,
-    fontWeight: 'normal',
-    marginLeft: 6,
-  },
-  emptyWrap: {
-    paddingVertical: uiTheme.spacing.xxl,
-    alignItems: 'center',
-  },
-  emptyIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: uiTheme.radius.input,
-    backgroundColor: uiTheme.colors.elevated,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: uiTheme.spacing.sm,
-  },
-  emptyTitle: { fontFamily: 'Manrope_700Bold',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-    color: '#FFF',
-    marginBottom: uiTheme.spacing.xs,
-  },
-  emptyDesc: { fontFamily: 'Inter_400Regular',
-    fontSize: uiTheme.type.caption.fontSize,
-    color: uiTheme.colors.muted,
-    textAlign: 'center',
-    lineHeight: 16,
-    paddingHorizontal: uiTheme.spacing.lg,
   },
 });

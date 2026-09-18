@@ -1,5 +1,5 @@
 import DialogContent from './common/DialogContent';
-import { theme as uiTheme } from '../theme';
+import { theme as uiTheme, alpha } from '../theme';
 // mobile-app/src/components/ExternalRedirectModal.js
 // Production-Grade External App Redirect Confirmation Modal with "Remember Preference"
 
@@ -15,10 +15,14 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import AppButton from './ui/AppButton';
 import NotificationService from '../services/notifications';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Third-party brand marks — used only for the destination app's icon tint.
+const BRAND_WHATSAPP = '#25D366';
+const BRAND_INSTAGRAM = '#E1306C';
 
 let Haptics = null;
 try {
@@ -55,20 +59,20 @@ export default function ExternalRedirectModal({
   // Determine primary destination
   let primaryApp = 'Tinder';
   let primaryIcon = 'heart-outline';
-  let primaryColor = uiTheme.colors.primary;
+  let primaryColor = uiTheme.colors.tinder;
   let headline = `Open Tinder?`;
   let description = `You are about to leave FlirtEasy and open ${matchName}'s conversation in the Tinder app.`;
 
   if (phone) {
     primaryApp = 'WhatsApp';
     primaryIcon = 'logo-whatsapp';
-    primaryColor = '#25D366';
+    primaryColor = BRAND_WHATSAPP;
     headline = `Open WhatsApp?`;
     description = `Start a chat with ${matchName} (${phone}) in the WhatsApp app.`;
   } else if (instagram) {
     primaryApp = 'Instagram';
     primaryIcon = 'logo-instagram';
-    primaryColor = '#E1306C';
+    primaryColor = BRAND_INSTAGRAM;
     headline = `Open Instagram?`;
     description = `View @${instagram.replace('@', '')}'s profile in the Instagram app.`;
   }
@@ -122,29 +126,32 @@ export default function ExternalRedirectModal({
     >
       <View style={styles.backdrop}>
         <TouchableOpacity accessibilityRole="button"
+          accessibilityLabel="Stay in app"
           style={styles.dismissArea}
           activeOpacity={1}
           onPress={onClose}
         />
 
         <DialogContent style={styles.modalCard}>
-          {/* Top App Icon Badge */}
+          {/* Top App Icon Badge (brand-tinted for the destination app) */}
           <View
             style={[
               styles.iconBadge,
-              { backgroundColor: primaryColor + '18', borderColor: primaryColor + '35' },
+              { backgroundColor: alpha(primaryColor, 0.14), borderColor: alpha(primaryColor, 0.34) },
             ]}
           >
             <Ionicons name={primaryIcon} size={28} color={primaryColor} />
           </View>
 
           {/* Title & Description */}
-          <Text style={styles.titleText}>{headline}</Text>
+          <Text style={styles.titleText} accessibilityRole="header">{headline}</Text>
           <Text style={styles.descText}>{description}</Text>
 
           {/* "Remember my choice" Toggle Checkbox */}
-          <TouchableOpacity accessibilityRole="button"
-            style={styles.checkboxRow}
+          <TouchableOpacity accessibilityRole="checkbox"
+            accessibilityState={{ checked: rememberChoice }}
+            accessibilityLabel={`Don't ask again for ${primaryApp}`}
+            style={[styles.checkboxRow, rememberChoice && styles.checkboxRowChecked]}
             onPress={() => {
               setRememberChoice(!rememberChoice);
               safeHaptic('light');
@@ -154,63 +161,56 @@ export default function ExternalRedirectModal({
             <View
               style={[
                 styles.checkboxBox,
-                rememberChoice && { backgroundColor: primaryColor, borderColor: primaryColor },
+                rememberChoice && styles.checkboxBoxChecked,
               ]}
             >
-              {rememberChoice && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
+              {rememberChoice && <Ionicons name="checkmark" size={14} color={uiTheme.colors.onPrimary} />}
             </View>
             <Text style={styles.checkboxLabel}>
               Don't ask again for {primaryApp}
             </Text>
           </TouchableOpacity>
 
-          {/* Primary Action Button */}
-          <TouchableOpacity accessibilityRole="button"
-            style={[styles.primaryBtn, { backgroundColor: primaryColor }]}
-            onPress={handleLaunchPrimary}
-            activeOpacity={0.85}
-          >
-            <Ionicons name={primaryIcon} size={17} color="#FFFFFF" />
-            <Text style={styles.primaryBtnText}>Open {primaryApp}</Text>
-          </TouchableOpacity>
+          <View style={styles.actions}>
+            {/* Primary Action Button */}
+            <AppButton
+              title={`Open ${primaryApp}`}
+              icon={primaryIcon}
+              haptic={false}
+              onPress={handleLaunchPrimary}
+            />
 
-          {/* Secondary Action Options */}
-          {phone && primaryApp !== 'Tinder' && (
-            <TouchableOpacity accessibilityRole="button"
-              style={styles.secondaryOptionBtn}
-              onPress={() => handleLaunchSecondary('Tinder')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="flame-outline" size={15} color={uiTheme.colors.primary} />
-              <Text style={styles.secondaryOptionText}>Open in Tinder Instead</Text>
-            </TouchableOpacity>
-          )}
-
-          {phone && (
-            <TouchableOpacity accessibilityRole="button"
-              style={styles.copyOptionBtn}
-              onPress={handleCopy}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name={copied ? 'checkmark-circle-outline' : 'copy-outline'}
-                size={14}
-                color={copied ? uiTheme.colors.success : '#A4A2B8'}
+            {/* Secondary Action Options */}
+            {phone && primaryApp !== 'Tinder' && (
+              <AppButton
+                title="Open in Tinder Instead"
+                icon="flame-outline"
+                variant="outline"
+                haptic={false}
+                onPress={() => handleLaunchSecondary('Tinder')}
               />
-              <Text style={[styles.copyOptionText, copied && { color: uiTheme.colors.success }]}>
-                {copied ? 'Copied to Clipboard' : `Copy ${phone}`}
-              </Text>
-            </TouchableOpacity>
-          )}
+            )}
 
-          {/* Cancel Button */}
-          <TouchableOpacity accessibilityRole="button"
-            style={styles.cancelBtn}
-            onPress={onClose}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.cancelBtnText}>Stay in App</Text>
-          </TouchableOpacity>
+            {/* Cancel Button */}
+            <AppButton
+              title="Stay in App"
+              variant="secondary"
+              onPress={onClose}
+            />
+
+            {phone && (
+              <AppButton
+                title={copied ? 'Copied to Clipboard' : `Copy ${phone}`}
+                icon={copied ? 'checkmark-circle-outline' : 'copy-outline'}
+                variant="ghost"
+                size="sm"
+                haptic={false}
+                accessibilityLabel={copied ? 'Phone number copied to clipboard' : `Copy phone number ${phone}`}
+                textStyle={copied ? styles.copiedText : styles.copyText}
+                onPress={handleCopy}
+              />
+            )}
+          </View>
         </DialogContent>
       </View>
     </Modal>
@@ -220,135 +220,89 @@ export default function ExternalRedirectModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.78)',
+    backgroundColor: uiTheme.colors.scrim,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: uiTheme.spacing.xxl,
+    padding: uiTheme.spacing.xxl,
   },
   dismissArea: {
     ...StyleSheet.absoluteFillObject,
   },
   modalCard: {
     width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#12101D',
+    maxWidth: 400,
+    backgroundColor: uiTheme.colors.surface,
     borderRadius: uiTheme.radius.sheet,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 22,
+    borderColor: uiTheme.colors.hairline,
+    padding: uiTheme.spacing.xxl,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.5,
-    shadowRadius: 30,
-    elevation: 24,
+    ...uiTheme.shadows.lg,
   },
   iconBadge: {
     width: 60,
     height: 60,
-    borderRadius: uiTheme.radius.card,
+    borderRadius: 30,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: uiTheme.spacing.lg,
   },
-  titleText: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 19,
-    fontWeight: 'normal',
-    letterSpacing: -0.3,
+  titleText: {
+    ...uiTheme.type.title2,
+    color: uiTheme.colors.text,
     marginBottom: uiTheme.spacing.sm,
     textAlign: 'center',
   },
-  descText: { fontFamily: 'Inter_400Regular',
+  descText: {
+    ...uiTheme.type.callout,
     color: uiTheme.colors.muted,
-    fontSize: 13,
-    lineHeight: 18.5,
-    fontWeight: 'normal',
     textAlign: 'center',
-    marginBottom: 18,
+    marginBottom: uiTheme.spacing.xl,
   },
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'stretch',
-    backgroundColor: '#181628',
+    minHeight: uiTheme.layout.touchTarget + 4,
+    backgroundColor: uiTheme.colors.elevated,
     borderRadius: uiTheme.radius.input,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: uiTheme.colors.borderSubtle,
     paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: 10,
-    marginBottom: uiTheme.spacing.lg,
-    gap: 10,
+    paddingVertical: uiTheme.spacing.sm,
+    marginBottom: uiTheme.spacing.xl,
+    gap: uiTheme.spacing.md,
+  },
+  checkboxRowChecked: {
+    borderColor: uiTheme.colors.primaryBorder,
   },
   checkboxBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: uiTheme.colors.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxLabel: { fontFamily: 'Inter_600SemiBold',
+  checkboxBoxChecked: {
+    backgroundColor: uiTheme.colors.primary,
+    borderColor: uiTheme.colors.primary,
+  },
+  checkboxLabel: {
+    ...uiTheme.type.label,
     color: uiTheme.colors.text,
-    fontSize: 12.5,
-    fontWeight: 'normal',
     flex: 1,
   },
-  primaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: uiTheme.spacing.sm,
+  actions: {
     alignSelf: 'stretch',
-    borderRadius: 14,
-    paddingVertical: 13,
-    marginBottom: 10,
+    gap: 10,
   },
-  primaryBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontSize: 14.5,
-    fontWeight: 'normal',
+  copyText: {
+    color: uiTheme.colors.textSecondary,
   },
-  secondaryOptionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    alignSelf: 'stretch',
-    backgroundColor: '#1A182B',
-    borderRadius: uiTheme.radius.input,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    paddingVertical: 10,
-    marginBottom: uiTheme.spacing.sm,
-  },
-  secondaryOptionText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.text,
-    fontSize: 12.5,
-    fontWeight: 'normal',
-  },
-  copyOptionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 6,
-    marginBottom: 6,
-  },
-  copyOptionText: { fontFamily: 'Inter_600SemiBold',
-    color: '#A4A2B8',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  cancelBtn: {
-    paddingVertical: uiTheme.spacing.sm,
-    marginTop: uiTheme.spacing.xs,
-  },
-  cancelBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: '#6E6C80',
-    fontSize: 12.5,
-    fontWeight: 'normal',
+  copiedText: {
+    color: uiTheme.colors.success,
   },
 });

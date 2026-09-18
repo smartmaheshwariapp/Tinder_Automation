@@ -1,8 +1,8 @@
-import { theme as uiTheme } from '../theme';
+import { theme as uiTheme, alpha } from '../theme';
 import { createSwipeEventFromDomMessage } from '../utils/tinderCollectionCapture';
 import { activateCollections, ingestCollectionEvent } from '../services/tinderCollections';
 import React, { useRef, useState, useEffect, useCallback, useMemo, useImperativeHandle } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
+import { StyleSheet, Text, View, Dimensions, AppState, TextInput, KeyboardAvoidingView, Platform, PanResponder, Keyboard, Modal, Alert, ScrollView, BackHandler, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ActivityIndicator from '../components/common/SafeActivityIndicator';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,6 +45,9 @@ import { SELECTORS_JSON } from '../utils/selectorsData';
 import { CONTENT_SCRIPT_BUNDLE } from '../utils/contentScriptBundle';
 import { DashboardPanel } from '../components/dashboard';
 import { useExtensionStats } from '../hooks/useExtensionStats';
+import useResponsive from '../hooks/useResponsive';
+import { AppText, AppButton, IconButton, IconWell, Badge, FocusInput, FadeIn, MotionTouchable as TouchableOpacity } from '../components/ui';
+import { useMotionReduced } from '../components/common/Motion';
 import trackingService from '../services/trackingService';
 import NotificationService from '../services/notifications';
 
@@ -268,9 +271,17 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
   const [loadingStage, setLoadingStage] = useState(0);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0.4)).current;
+  const reduceMotion = useMotionReduced();
+  const { isCompact, gutter } = useResponsive();
+  const hdrBtn = isCompact ? 36 : 40;
 
-  // Rhythmic breathing pulse for the loader hero badge
+  // Rhythmic breathing pulse for the loader hero badge (static when reduce motion is on)
   useEffect(() => {
+    if (reduceMotion) {
+      pulseAnim.setValue(1);
+      glowAnim.setValue(0.6);
+      return undefined;
+    }
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.parallel([
@@ -303,7 +314,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
     );
     pulse.start();
     return () => pulse.stop();
-  }, [pulseAnim, glowAnim]);
+  }, [pulseAnim, glowAnim, reduceMotion]);
 
   // ── Smooth reveal transition state (veil) ──
   const [prevIsHeadless, setPrevIsHeadless] = useState(isHeadless);
@@ -2411,24 +2422,24 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
   const isMessagingMode = !swipingActive || currentPhase === 'messaging';
 
   let onDeviceHeaderSubtitle = '';
-  let onDeviceStatusColor = 'rgba(255, 255, 255, 0.35)';
+  let onDeviceStatusColor = uiTheme.colors.textTertiary;
 
   if (sessionStatus !== SESSION_SIGNED_IN) {
     onDeviceHeaderSubtitle = sessionStatus === SESSION_SIGNED_OUT ? 'Not signed in' : 'Checking session…';
-    onDeviceStatusColor = 'rgba(255, 255, 255, 0.35)';
+    onDeviceStatusColor = uiTheme.colors.textTertiary;
   } else if (isLikesExhausted) {
     onDeviceHeaderSubtitle = 'Wingman active · Daily quota reached';
-    onDeviceStatusColor = '#EA580C';
+    onDeviceStatusColor = uiTheme.colors.secondary;
   } else if (isSafetyLocked) {
     onDeviceHeaderSubtitle = `${currentLikes}/${currentTargetLikes} likes · Cooldown (${cooldownMin}m)`;
-    onDeviceStatusColor = '#F59E0B';
+    onDeviceStatusColor = uiTheme.colors.warning;
   } else if (onDeviceSwiping) {
     if (isMessagingMode) {
       onDeviceHeaderSubtitle = `${currentMessages}/${currentTargetMessages} msgs · Chatting…`;
-      onDeviceStatusColor = '#EC4899';
+      onDeviceStatusColor = uiTheme.colors.accent;
     } else {
       onDeviceHeaderSubtitle = `${currentLikes}/${currentTargetLikes} likes · Swiping…`;
-      onDeviceStatusColor = uiTheme.colors.success || '#10B981';
+      onDeviceStatusColor = uiTheme.colors.success;
     }
   } else {
     if (!swipingActive && messagingActive) {
@@ -2436,7 +2447,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
     } else {
       onDeviceHeaderSubtitle = `${currentLikes}/${currentTargetLikes} likes · Standby`;
     }
-    onDeviceStatusColor = '#FE3C72';
+    onDeviceStatusColor = uiTheme.colors.primary;
   }
 
   return (
@@ -2446,10 +2457,13 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
-        {/* ─── Upgraded Modern Glass Header ─── */}
-        <View style={styles.header}>
-          <TouchableOpacity accessibilityRole="button"
-            style={styles.closeBtnCircular}
+        {/* ─── Top bar: close · title + connection badge · trailing actions ─── */}
+        <View style={[styles.header, { paddingHorizontal: isCompact ? uiTheme.spacing.md : uiTheme.spacing.lg }]}>
+          <IconButton
+            icon="close"
+            size={hdrBtn}
+            iconSize={20}
+            accessibilityLabel="Close session"
             onPress={() => {
               if (onClose) {
                 onClose();
@@ -2458,14 +2472,20 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                 navigation?.goBack?.();
               }
             }}
-          >
-            <Ionicons name="close" size={18} color={uiTheme.colors.text} />
-          </TouchableOpacity>
+          />
           <View style={styles.headerLeft}>
             <View style={styles.headerTitleRow}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <Text style={styles.headerTitle} numberOfLines={1} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
                 {isOnDevice ? 'Tinder' : `${platform} Session`}
               </Text>
+              {isOnDevice && !isCompact && sessionStatus !== SESSION_UNKNOWN ? (
+                <Badge
+                  size="sm"
+                  dot
+                  tone={sessionStatus === SESSION_SIGNED_IN ? 'success' : 'neutral'}
+                  label={sessionStatus === SESSION_SIGNED_IN ? 'Live' : 'Offline'}
+                />
+              ) : null}
             </View>
             <View style={styles.subtitleRow}>
               {isOnDevice && sessionStatus === SESSION_SIGNED_IN && (
@@ -2476,7 +2496,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                   ]}
                 />
               )}
-              <Text style={styles.subtitle} numberOfLines={1}>
+              <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
                 {isOnDevice
                   ? onDeviceHeaderSubtitle
                   : (isHyperbeam ? '⚡ Hyperbeam Cloud Stream' : (proxyIp ? `IP: ${maskProxy(proxyIp)}` : 'Direct Connection'))}
@@ -2497,7 +2517,9 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                 onPress={() => setShowDashboard(true)}
                 disabled={sessionStatus !== SESSION_SIGNED_IN}
                 activeOpacity={0.85}
+                hitSlop={{ top: 2, bottom: 2 }}
                 accessibilityRole="button"
+                accessibilityState={{ disabled: sessionStatus !== SESSION_SIGNED_IN }}
                 accessibilityLabel={
                   onDeviceSwiping
                     ? (isMessagingMode
@@ -2513,13 +2535,17 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
               >
                 <Ionicons
                   name={onDeviceSwiping ? "flash" : "options"}
-                  size={13}
-                  color={onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.primary}
+                  size={14}
+                  color={onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.accent}
                 />
                 {/* No swipe count here: it is already on the subtitle line and in
                     the dashboard, and an unbounded number in this label is what
                     pushed the row past the width of a 360dp screen. */}
-                <Text style={[styles.onDeviceDashboardBtnText, { color: onDeviceSwiping ? uiTheme.colors.success : "#FFF" }]}>
+                <Text
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                  style={[styles.onDeviceDashboardBtnText, { color: onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.text }]}
+                >
                   {onDeviceSwiping ? 'AI Active' : 'AI Controls'}
                 </Text>
               </TouchableOpacity>
@@ -2529,82 +2555,94 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                   spacer so resolving the session never reflows the row, and the
                   wording lives on the subtitle line where there is room for it. */}
               {sessionStatus === SESSION_SIGNED_IN ? (
-                <TouchableOpacity
-                  style={[styles.onDeviceLogsBtn, { backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
+                <IconButton
+                  icon="log-out-outline"
+                  size={hdrBtn}
+                  iconSize={18}
+                  color={uiTheme.colors.error}
+                  style={styles.logoutIconBtn}
                   onPress={confirmLogout}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
                   accessibilityLabel="Log out of Tinder"
-                >
-                  <Ionicons name="log-out-outline" size={14} color={uiTheme.colors.error} />
-                </TouchableOpacity>
+                />
               ) : (
                 <View
-                  style={styles.headerActionSlot}
+                  style={{ width: hdrBtn, height: hdrBtn }}
                   accessibilityElementsHidden
                   importantForAccessibility="no-hide-descendants"
                 />
               )}
             </View>
           ) : (loginStep !== 'done' ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity accessibilityRole="button"
-                style={[styles.toggleNekoBtn, { marginRight: 4 }]}
+            <View style={styles.headerActions}>
+              <IconButton
+                icon={isExpanded ? "contract-outline" : "expand-outline"}
+                size={hdrBtn}
+                iconSize={18}
                 onPress={() => setIsExpanded(!isExpanded)}
-              >
-                <Ionicons name={isExpanded ? "contract-outline" : "expand-outline"} size={13} color={uiTheme.colors.text} />
-                <Text style={styles.toggleNekoBtnText}>
-                  {isExpanded ? 'Split' : 'Expand'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button"
-                style={[styles.toggleNekoBtn, { marginRight: 4 }]}
+                accessibilityLabel={isExpanded ? 'Split view' : 'Expand browser'}
+              />
+              <IconButton
+                icon={showNeko ? "eye-off-outline" : "eye-outline"}
+                size={hdrBtn}
+                iconSize={18}
                 onPress={() => setShowNeko(!showNeko)}
-              >
-                <Ionicons name={showNeko ? "eye-off-outline" : "eye-outline"} size={13} color={uiTheme.colors.text} />
-                <Text style={styles.toggleNekoBtnText}>
-                  {showNeko ? 'Hide' : 'View'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button"
-                style={[styles.dashboardBtn, { marginRight: 4 }]}
+                accessibilityLabel={showNeko ? 'Hide live browser' : 'View live browser'}
+              />
+              <IconButton
+                icon="stats-chart-outline"
+                variant="tinted"
+                size={hdrBtn}
+                iconSize={17}
                 onPress={() => setShowDashboard(true)}
-              >
-                <Ionicons name="stats-chart-outline" size={15} color={uiTheme.colors.primary} />
-              </TouchableOpacity>
+                accessibilityLabel="Open dashboard"
+              />
               {sessionStatus === SESSION_SIGNED_IN && (
-                <TouchableOpacity accessibilityRole="button"
-                  style={[styles.dashboardBtn, { marginRight: 4, backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
+                <IconButton
+                  icon="log-out-outline"
+                  size={hdrBtn}
+                  iconSize={18}
+                  color={uiTheme.colors.error}
+                  style={styles.logoutIconBtn}
                   onPress={confirmLogout}
-                >
-                  <Ionicons name="log-out-outline" size={14} color={uiTheme.colors.error} />
-                </TouchableOpacity>
+                  accessibilityLabel="Log out of Tinder"
+                />
               )}
-              <TouchableOpacity accessibilityRole="button" style={styles.skipBtn} onPress={() => setLoginStep('done')}>
-                <Text style={styles.skipBtnText}>Skip</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Skip login wizard"
+                style={styles.skipBtn}
+                hitSlop={{ top: 2, bottom: 2 }}
+                onPress={() => setLoginStep('done')}
+              >
+                <Text style={styles.skipBtnText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Skip</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity accessibilityRole="button"
-                style={[styles.dashboardBtn, { marginRight: 6 }]}
+            <View style={styles.headerActions}>
+              <IconButton
+                icon="stats-chart-outline"
+                variant="tinted"
+                size={hdrBtn}
+                iconSize={17}
                 onPress={() => setShowDashboard(true)}
-              >
-                <Ionicons name="stats-chart-outline" size={15} color={uiTheme.colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button"
-                style={[styles.dashboardBtn, { marginRight: 6, backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}
+                accessibilityLabel="Open dashboard"
+              />
+              <IconButton
+                icon="log-out-outline"
+                size={hdrBtn}
+                iconSize={18}
+                color={uiTheme.colors.error}
+                style={styles.logoutIconBtn}
                 onPress={confirmLogout}
-              >
-                <Ionicons name="log-out-outline" size={14} color={uiTheme.colors.error} />
-              </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button"
-                style={[styles.menuBtn, { marginRight: 8, backgroundColor: '#3A3A4A15', borderColor: '#3A3A4A40' }]}
+                accessibilityLabel="Log out of Tinder"
+              />
+              <IconButton
+                icon="keypad-outline"
+                size={hdrBtn}
+                iconSize={18}
                 onPress={() => inputRef.current.focus()}
-              >
-                <Ionicons name="keypad-outline" size={13} color="#FFF" style={{ marginRight: 4 }} />
-                <Text style={[styles.menuBtnText, { color: '#FFF' }]}>Keyboard</Text>
-              </TouchableOpacity>
+                accessibilityLabel="Open keyboard"
+              />
             </View>
           ))}
         </View>
@@ -2618,27 +2656,29 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
         >
           <SafeAreaView style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="stats-chart" size={16} color={uiTheme.colors.primary} />
-                <Text style={styles.modalTitle}>Flint Dashboard</Text>
+              <View style={styles.modalTitleRow}>
+                <IconWell icon="stats-chart" tone="primary" size={36} />
+                <AppText variant="title2" numberOfLines={1} style={styles.modalTitle}>Flint Dashboard</AppText>
               </View>
               <View style={styles.headerRightActions}>
                 {(isOnDevice ? (sessionStatus === SESSION_SIGNED_IN) : (loginStep === 'done' || sessionStatus === SESSION_SIGNED_IN)) && (
-                  <TouchableOpacity accessibilityRole="button"
-                    style={styles.headerLogoutBtn}
+                  <AppButton
+                    title="Log Out"
+                    icon="log-out-outline"
+                    variant="dangerSoft"
+                    size="sm"
+                    fullWidth={false}
                     onPress={confirmLogout}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="log-out-outline" size={15} color={uiTheme.colors.error} />
-                    <Text style={styles.headerLogoutBtnText}>Log Out</Text>
-                  </TouchableOpacity>
+                    accessibilityLabel="Log out of Tinder"
+                  />
                 )}
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.modalCloseBtn}
+                <IconButton
+                  icon="close"
+                  size={hdrBtn}
+                  iconSize={18}
                   onPress={() => setShowDashboard(false)}
-                >
-                  <Ionicons name="close" size={16} color={uiTheme.colors.text} />
-                </TouchableOpacity>
+                  accessibilityLabel="Close dashboard"
+                />
               </View>
             </View>
             <DashboardPanel
@@ -2662,43 +2702,47 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
               controlsContent={
                 isOnDevice ? (
                   <View style={styles.onDeviceControlsBox}>
-                    <TouchableOpacity accessibilityRole="button"
-                      style={styles.onDeviceQuickChatsBtn}
+                    <AppButton
+                      title="Reply to Unread Matches with AI"
+                      icon="chatbubbles"
+                      variant="secondary"
                       onPress={() => {
                         setShowDashboard(false);
                         triggerProcessChats();
                       }}
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons name="chatbubbles" size={15} color={uiTheme.colors.info} />
-                      <Text style={styles.onDeviceQuickChatsBtnText}>💬 Reply to Unread Matches with AI</Text>
-                    </TouchableOpacity>
+                      style={styles.onDeviceQuickChatsBtn}
+                      textStyle={styles.onDeviceQuickChatsBtnText}
+                    />
                   </View>
                 ) : (
                   <View style={styles.inputPanel}>
-                    <TextInput
+                    <FocusInput
                       style={styles.textInput}
                       placeholder="Paste Phone No. or OTP code here..."
-                      placeholderTextColor="#8E8E9F"
+                      accessibilityLabel="Phone number or OTP code"
                       value={inputText}
                       onChangeText={setInputText}
                       autoCapitalize="none"
                       autoCorrect={false}
                     />
-                    <TouchableOpacity accessibilityRole="button"
-                      style={styles.sendBtn}
+                    <AppButton
+                      title="Send"
+                      size="sm"
+                      fullWidth={false}
+                      loading={sendingText}
                       onPress={handleSendText}
-                      disabled={sendingText}
-                    >
-                      {sendingText ? (
-                        <ActivityIndicator size="small" color="#FFF" />
-                      ) : (
-                        <Text style={styles.sendBtnText}>Send</Text>
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity accessibilityRole="button" style={styles.enterBtn} onPress={handlePressEnter}>
-                      <Text style={styles.enterBtnText}>⏎ Enter</Text>
-                    </TouchableOpacity>
+                      style={styles.inputPanelBtn}
+                    />
+                    <AppButton
+                      title="Enter"
+                      icon="return-down-back-outline"
+                      variant="secondary"
+                      size="sm"
+                      fullWidth={false}
+                      onPress={handlePressEnter}
+                      accessibilityLabel="Press Enter"
+                      style={styles.inputPanelBtn}
+                    />
                   </View>
                 )
               }
@@ -2715,41 +2759,30 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
           statusBarTranslucent
         >
           <View style={styles.logoutModalOverlay}>
-            <View style={styles.logoutModalCard}>
-              <View style={styles.logoutIconBadge}>
-                <Ionicons name="log-out" size={28} color={uiTheme.colors.error} />
-              </View>
+            <View style={styles.logoutModalCard} accessibilityViewIsModal>
+              <IconWell icon="log-out-outline" tone="error" size={60} style={styles.logoutIconBadge} />
 
-              <Text style={styles.logoutModalTitle}>Log Out of Tinder?</Text>
-              <Text style={styles.logoutModalSubtitle}>
+              <AppText variant="title2" align="center" style={styles.logoutModalTitle}>Log Out of Tinder?</AppText>
+              <AppText variant="callout" color="muted" align="center" style={styles.logoutModalSubtitle}>
                 This will terminate the active session, clear browser state, and return you to the login screen.
-              </Text>
+              </AppText>
 
               <View style={styles.logoutModalBtnRow}>
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.logoutModalCancelBtn}
+                <AppButton
+                  title="Cancel"
+                  variant="secondary"
                   onPress={() => setShowLogoutConfirm(false)}
                   disabled={loggingOut}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.logoutModalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.logoutModalConfirmBtn}
+                  style={styles.logoutModalBtn}
+                />
+                <AppButton
+                  title="Log Out"
+                  icon="log-out-outline"
+                  variant="danger"
                   onPress={handleLogout}
-                  disabled={loggingOut}
-                  activeOpacity={0.85}
-                >
-                  {loggingOut ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <>
-                      <Ionicons name="log-out-outline" size={16} color="#FFF" />
-                      <Text style={styles.logoutModalConfirmText}>Log Out</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                  loading={loggingOut}
+                  style={styles.logoutModalBtn}
+                />
               </View>
             </View>
           </View>
@@ -3645,60 +3678,68 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
           )}
           {lastCoord && (
             <View style={styles.coordHudBadge} pointerEvents="box-none">
-              <Ionicons name="locate" size={13} color={uiTheme.colors.success} />
-              <Text style={styles.coordHudText}>
+              <Ionicons name="locate" size={14} color={uiTheme.colors.success} />
+              <Text style={styles.coordHudText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
                 X: {lastCoord.x}  |  Y: {lastCoord.y}
               </Text>
               <TouchableOpacity accessibilityRole="button"
+                accessibilityLabel="Dismiss tap coordinate"
                 onPress={() => setLastCoord(null)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
               >
-                <Ionicons name="close-circle" size={14} color={uiTheme.colors.muted} />
+                <Ionicons name="close-circle" size={16} color={uiTheme.colors.muted} />
               </TouchableOpacity>
             </View>
           )}
           {startingHyperbeam && (
-            <View style={styles.loaderContainer} pointerEvents="none">
-              <ActivityIndicator size="large" color={uiTheme.colors.primary} />
-              <Text style={styles.loaderText}>Starting Cloud Connection...</Text>
+            <View style={styles.loaderContainer} pointerEvents="none" accessibilityLiveRegion="polite">
+              <FadeIn style={styles.stateInner}>
+                <View style={styles.spinnerWell}>
+                  <ActivityIndicator size="large" color={uiTheme.colors.primary} />
+                </View>
+                <AppText variant="section" align="center" style={styles.stateTitle}>Starting Cloud Connection...</AppText>
+                <AppText variant="callout" color="muted" align="center" style={styles.stateMessage}>
+                  Preparing a secure browser for your session.
+                </AppText>
+              </FadeIn>
             </View>
           )}
           {!startingHyperbeam && (!finalUrl || connectionError) && (
-            <View style={styles.errorOverlay}>
-              <Ionicons name="cloud-offline-outline" size={44} color={uiTheme.colors.primary} />
-              <Text style={styles.errorTitle}>Cannot Connect to Tinder</Text>
-              <Text style={styles.errorDetail}>
-                {!finalUrl
-                  ? 'A secure session could not be established. Please check your internet connection or switch mode in Connection Settings.'
-                  : (connectionError?.code === -2 || connectionError?.description?.includes('ERR_NAME_NOT_RESOLVED')
-                    ? 'Connection failed. Please check your internet connection and try again.'
-                    : 'Could not establish connection to Tinder. Check your connection and try again.')}
-              </Text>
-              {Boolean(finalUrl) && <Text style={styles.errorUrl} numberOfLines={2}>Target: {finalUrl}</Text>}
-              <View style={styles.errorActions}>
-                {Boolean(finalUrl) && (
-                  <TouchableOpacity accessibilityRole="button"
-                    style={styles.retryBtn}
+            <View style={styles.errorOverlay} accessibilityLiveRegion="polite">
+              <FadeIn style={styles.stateInner}>
+                <IconWell icon="cloud-offline-outline" tone="error" size={56} />
+                <AppText variant="section" align="center" style={styles.stateTitle}>Cannot Connect to Tinder</AppText>
+                <AppText variant="callout" color="muted" align="center" style={styles.stateMessage}>
+                  {!finalUrl
+                    ? 'A secure session could not be established. Please check your internet connection or switch mode in Connection Settings.'
+                    : (connectionError?.code === -2 || connectionError?.description?.includes('ERR_NAME_NOT_RESOLVED')
+                      ? 'Connection failed. Please check your internet connection and try again.'
+                      : 'Could not establish connection to Tinder. Check your connection and try again.')}
+                </AppText>
+                {Boolean(finalUrl) && <AppText variant="caption" color="textTertiary" align="center" style={styles.errorUrl} numberOfLines={2}>Target: {finalUrl}</AppText>}
+                <View style={styles.errorActions}>
+                  {Boolean(finalUrl) && (
+                    <AppButton
+                      title="Retry"
+                      icon="refresh"
+                      onPress={() => {
+                        setConnectionError(null);
+                        setLoading(true);
+                        if (webViewRef.current) webViewRef.current.reload();
+                      }}
+                    />
+                  )}
+                  <AppButton
+                    title="Connection Settings"
+                    icon="settings-outline"
+                    variant="secondary"
                     onPress={() => {
-                      setConnectionError(null);
-                      setLoading(true);
-                      if (webViewRef.current) webViewRef.current.reload();
+                      cleanupCurrentSession();
+                      navigation.goBack();
                     }}
-                  >
-                    <Ionicons name="refresh" size={15} color="#FFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.retryBtnText}>Retry</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.backToSetupBtn}
-                  onPress={() => {
-                    cleanupCurrentSession();
-                    navigation.goBack();
-                  }}
-                >
-                  <Text style={styles.backToSetupBtnText}>Connection Settings</Text>
-                </TouchableOpacity>
-              </View>
+                  />
+                </View>
+              </FadeIn>
             </View>
           )}
         </View>
@@ -3706,18 +3747,28 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
         {/* ─── Bottom Controls / Wizard Section (Neko / Remote Stream Only) ─── */}
         {!isOnDevice && loginStep !== 'done' && (
           <View style={[styles.wizardPanel, !showNeko && styles.wizardPanelFull]}>
+            <ScrollView
+              style={styles.wizardScroll}
+              contentContainerStyle={[styles.wizardScrollContent, { paddingHorizontal: gutter }]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
             {loginStep === 'options' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardOptionsHeader}>
-                  <Text style={styles.wizardOptionsTitle}>Choose Login Method</Text>
-                  <Text style={styles.wizardOptionsSubtitle}>
+                  <AppText variant="overline" color="secondary" align="center">Sign in</AppText>
+                  <AppText variant="title2" align="center" style={styles.wizardOptionsTitle}>Choose Login Method</AppText>
+                  <AppText variant="callout" color="muted" align="center" style={styles.wizardOptionsSubtitle}>
                     Select how you want to log into your Tinder account
-                  </Text>
+                  </AppText>
                 </View>
 
                 {/* Primary Tinder Pink Gradient Card */}
                 <TouchableOpacity accessibilityRole="button"
-                  style={styles.tinderPrimaryCard}
+                  accessibilityLabel="Log in with Email"
+                  accessibilityState={{ disabled: sendingText }}
+                  style={[styles.tinderPrimaryCard, sendingText && styles.cardDisabled]}
                   disabled={sendingText}
                   activeOpacity={0.88}
                   onPress={async () => {
@@ -3727,18 +3778,26 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     setLoginStep('email');
                   }}
                 >
+                  <LinearGradient
+                    colors={uiTheme.gradients.brandShort}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
                   <View style={styles.cardLeftGroup}>
                     <View style={styles.tinderIconSquare}>
-                      <Ionicons name="mail" size={20} color="#FFF" />
+                      <Ionicons name="mail" size={20} color={uiTheme.colors.onPrimary} />
                     </View>
-                    <Text style={styles.tinderPrimaryCardText}>Log in with Email</Text>
+                    <Text style={styles.tinderPrimaryCardText} numberOfLines={1}>Log in with Email</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.6)" />
+                  <Ionicons name="chevron-forward" size={18} color={alpha(uiTheme.colors.onPrimary, 0.75)} />
                 </TouchableOpacity>
 
                 {/* Secondary Google Glass Card */}
                 <TouchableOpacity accessibilityRole="button"
-                  style={styles.googleGlassCard}
+                  accessibilityLabel="Log in with Google"
+                  accessibilityState={{ disabled: sendingText }}
+                  style={[styles.googleGlassCard, sendingText && styles.cardDisabled]}
                   disabled={sendingText}
                   activeOpacity={0.88}
                   onPress={async () => {
@@ -3750,61 +3809,57 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                 >
                   <View style={styles.cardLeftGroup}>
                     <View style={styles.glassIconSquare}>
-                      <Ionicons name="logo-google" size={18} color="rgba(255, 255, 255, 0.9)" />
+                      <Ionicons name="logo-google" size={18} color={uiTheme.colors.text} />
                     </View>
-                    <Text style={styles.googleCardText}>Log in with Google</Text>
+                    <Text style={styles.googleCardText} numberOfLines={1}>Log in with Google</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.3)" />
+                  <Ionicons name="chevron-forward" size={18} color={uiTheme.colors.muted} />
                 </TouchableOpacity>
 
                 {/* Tertiary Trouble Logging In Link */}
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.troubleLinkBtn}
+                <AppButton
+                  title="Log in with Phone Number"
+                  icon="phone-portrait-outline"
+                  variant="ghost"
                   disabled={sendingText}
-                  activeOpacity={0.7}
                   onPress={async () => {
                     setSendingText(true);
                     await sendBrowserCommand('CLICK_PHONE_LOGIN');
                     setSendingText(false);
                     setLoginStep('phone');
                   }}
-                >
-                  <Text style={styles.wizardBtnSecondaryText}>📱 Log in with Phone Number</Text>
-                </TouchableOpacity>
+                />
               </View>
             )}
 
             {loginStep === 'google_email' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
-                    <Text style={styles.wizardBackBtnText}>Back</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Google Sign-In 🌐</Text>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
-                    <Text style={styles.wizardDoneBtnText}>Logged In</Text>
+                  <IconButton icon="arrow-back" size={40} iconSize={18} onPress={handleGoBack} accessibilityLabel="Back" />
+                  <AppText variant="headline" numberOfLines={2} accessibilityRole="header" style={styles.wizardTitle}>Google Sign-In</AppText>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="I'm logged in" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={14} color={uiTheme.colors.success} />
+                    <Text style={styles.wizardDoneBtnText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.wizardDesc}>
+                <AppText variant="callout" color="muted" style={styles.wizardDesc}>
                   Enter your Google Email Address or Phone Number to log into Tinder.
-                </Text>
+                </AppText>
 
-                <TextInput
+                <FocusInput
                   style={styles.wizardInput}
                   placeholder="Email or Phone..."
-                  placeholderTextColor={uiTheme.colors.muted}
+                  accessibilityLabel="Google email or phone"
                   value={inputText}
                   onChangeText={setInputText}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
 
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.wizardBtn}
-                  disabled={sendingText}
-                  activeOpacity={0.88}
+                <AppButton
+                  title="Next"
+                  iconRight="arrow-forward"
+                  loading={sendingText}
                   onPress={async () => {
                     if (!inputText.trim()) return;
                     setSendingText(true);
@@ -3821,46 +3876,37 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     }
                     setSendingText(false);
                   }}
-                >
-                  {sendingText ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.wizardBtnText}>Next ➔</Text>
-                  )}
-                </TouchableOpacity>
+                />
               </View>
             )}
 
             {loginStep === 'google_password' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
-                    <Text style={styles.wizardBackBtnText}>Back</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Enter Google Password 🔒</Text>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
-                    <Text style={styles.wizardDoneBtnText}>Logged In</Text>
+                  <IconButton icon="arrow-back" size={40} iconSize={18} onPress={handleGoBack} accessibilityLabel="Back" />
+                  <AppText variant="headline" numberOfLines={2} accessibilityRole="header" style={styles.wizardTitle}>Enter Google Password</AppText>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="I'm logged in" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={14} color={uiTheme.colors.success} />
+                    <Text style={styles.wizardDoneBtnText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.wizardDesc}>
+                <AppText variant="callout" color="muted" style={styles.wizardDesc}>
                   Enter your Google Account Password to complete sign-in.
-                </Text>
+                </AppText>
 
-                <TextInput
+                <FocusInput
                   style={styles.wizardInput}
                   placeholder="Google Password..."
-                  placeholderTextColor={uiTheme.colors.muted}
+                  accessibilityLabel="Google password"
                   value={inputText}
                   onChangeText={setInputText}
                   secureTextEntry
                 />
 
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.wizardBtn}
-                  disabled={sendingText}
-                  activeOpacity={0.88}
+                <AppButton
+                  title="Sign In"
+                  iconRight="arrow-forward"
+                  loading={sendingText}
                   onPress={async () => {
                     if (!inputText.trim()) return;
                     setSendingText(true);
@@ -3877,41 +3923,34 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     }
                     setSendingText(false);
                   }}
-                >
-                  {sendingText ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.wizardBtnText}>Sign In ➔</Text>
-                  )}
-                </TouchableOpacity>
+                />
               </View>
             )}
 
             {loginStep === 'email' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
-                    <Text style={styles.wizardBackBtnText}>Back</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Enter Email Address</Text>
+                  <IconButton icon="arrow-back" size={40} iconSize={18} onPress={handleGoBack} accessibilityLabel="Back" />
+                  <AppText variant="headline" numberOfLines={2} accessibilityRole="header" style={styles.wizardTitle}>Enter Email Address</AppText>
                 </View>
-                <Text style={styles.wizardDesc}>
+                <AppText variant="callout" color="muted" style={styles.wizardDesc}>
                   Enter the email address associated with your account to receive your login code.
-                </Text>
+                </AppText>
 
                 {emailErrorText ? (
-                  <View style={styles.wizardErrorBox}>
+                  <View style={styles.wizardErrorBox} accessibilityLiveRegion="polite">
+                    <Ionicons name="alert-circle" size={16} color={uiTheme.colors.error} />
                     <Text style={styles.wizardErrorText}>
                       {emailErrorText}
                     </Text>
                   </View>
                 ) : null}
 
-                <TextInput
+                <FocusInput
                   style={styles.wizardInput}
                   placeholder="email@example.com"
-                  placeholderTextColor={uiTheme.colors.muted}
+                  accessibilityLabel="Email address"
+                  error={Boolean(emailErrorText)}
                   value={inputText}
                   onChangeText={(txt) => {
                     setInputText(txt);
@@ -3923,12 +3962,14 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                 />
 
                 {/* Domain Quick Fill Chips */}
-                <View style={{ marginBottom: 14 }}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                <View style={styles.domainChipsWrap}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.domainChipsRow}>
                     {['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'].map((domain) => (
                       <TouchableOpacity accessibilityRole="button"
+                        accessibilityLabel={'Use ' + domain}
                         key={domain}
                         style={styles.wizardDomainChip}
+                        hitSlop={{ top: 4, bottom: 4 }}
                         onPress={() => {
                           let base = inputText.trim();
                           if (base.includes('@')) base = base.split('@')[0];
@@ -3938,27 +3979,30 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                         }}
                         activeOpacity={0.75}
                       >
-                        <Text style={styles.wizardDomainChipText}>{domain}</Text>
+                        <Text style={styles.wizardDomainChipText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{domain}</Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
                 </View>
 
                 <View style={styles.wizardActionRow}>
-                  <TouchableOpacity accessibilityRole="button"
-                    style={[styles.wizardBtnSecondary, { flex: 1 }]}
+                  <AppButton
+                    title="Clear"
+                    icon="close-circle-outline"
+                    variant="secondary"
+                    style={styles.flexBtn}
                     onPress={() => {
                       setInputText('');
                       setEmailErrorText('');
                     }}
-                  >
-                    <Text style={[styles.wizardBtnSecondaryText, { color: uiTheme.colors.muted }]}>🧹 Clear</Text>
-                  </TouchableOpacity>
+                  />
 
-                  <TouchableOpacity accessibilityRole="button"
-                    style={[styles.wizardBtn, { flex: 1, marginTop: 0 }]}
-                    disabled={sendingText}
-                    activeOpacity={0.88}
+                  <AppButton
+                    title={rateLimitTimer > 0 ? '⏳ Retry in ' + rateLimitTimer + 's' : (emailErrorText ? 'Retry Next' : 'Submit Email')}
+                    icon={!sendingText && emailErrorText && !(rateLimitTimer > 0) ? 'refresh' : undefined}
+                    iconRight={!emailErrorText && !(rateLimitTimer > 0) ? 'arrow-forward' : undefined}
+                    loading={sendingText}
+                    style={styles.flexBtn}
                     onPress={async () => {
                       if (!inputText.trim()) return;
                       setSubmittedEmail(inputText.trim());
@@ -3966,19 +4010,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                       await sendBrowserCommand('SUBMIT_EMAIL', { email: inputText.trim() });
                       setSendingText(false);
                     }}
-                  >
-                    {sendingText ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : rateLimitTimer > 0 ? (
-                      <Text style={styles.wizardBtnText}>
-                        ⏳ Retry in {rateLimitTimer}s
-                      </Text>
-                    ) : (
-                      <Text style={styles.wizardBtnText}>
-                        {emailErrorText ? '🔄 Retry Next' : 'Submit Email ➔'}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                  />
                 </View>
               </View>
             )}
@@ -3986,33 +4018,30 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
             {loginStep === 'phone' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
-                    <Text style={styles.wizardBackBtnText}>Back</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Enter Mobile Number</Text>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
-                    <Text style={styles.wizardDoneBtnText}>Logged In</Text>
+                  <IconButton icon="arrow-back" size={40} iconSize={18} onPress={handleGoBack} accessibilityLabel="Back" />
+                  <AppText variant="headline" numberOfLines={2} accessibilityRole="header" style={styles.wizardTitle}>Enter Mobile Number</AppText>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="I'm logged in" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={14} color={uiTheme.colors.success} />
+                    <Text style={styles.wizardDoneBtnText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.wizardDesc}>
+                <AppText variant="callout" color="muted" style={styles.wizardDesc}>
                   Enter your country code and mobile number to log into your account.
-                </Text>
+                </AppText>
 
                 <View style={styles.phoneInputRow}>
-                  <TextInput
+                  <FocusInput
                     style={styles.countryCodeInput}
                     placeholder="+91"
-                    placeholderTextColor={uiTheme.colors.muted}
+                    accessibilityLabel="Country code"
                     value={countryCode}
                     onChangeText={setCountryCode}
                     keyboardType="phone-pad"
                   />
-                  <TextInput
+                  <FocusInput
                     style={styles.phoneNumberInput}
                     placeholder="Mobile Number"
-                    placeholderTextColor={uiTheme.colors.muted}
+                    accessibilityLabel="Mobile number"
                     value={inputText}
                     onChangeText={setInputText}
                     keyboardType="phone-pad"
@@ -4020,10 +4049,10 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                   />
                 </View>
 
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.wizardBtn}
-                  disabled={sendingText}
-                  activeOpacity={0.88}
+                <AppButton
+                  title="Send & Continue"
+                  iconRight="arrow-forward"
+                  loading={sendingText}
                   onPress={async () => {
                     if (!inputText.trim()) return;
                     setSubmittedPhone(`${countryCode.trim()} ${inputText.trim()}`);
@@ -4036,34 +4065,28 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     setSendingText(false);
                     setLoginStep('waiting_otp');
                   }}
-                >
-                  {sendingText ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.wizardBtnText}>Send & Continue ➔</Text>
-                  )}
-                </TouchableOpacity>
+                />
               </View>
             )}
 
             {loginStep === 'waiting_email' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
-                    <Text style={styles.wizardBackBtnText}>Back</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Check Your Email! 📩</Text>
+                  <IconButton icon="arrow-back" size={40} iconSize={18} onPress={handleGoBack} accessibilityLabel="Back" />
+                  <AppText variant="headline" numberOfLines={2} accessibilityRole="header" style={styles.wizardTitle}>Check Your Email!</AppText>
                 </View>
-                <Text style={styles.wizardDesc}>
+                <AppText variant="callout" color="muted" style={styles.wizardDesc}>
                   If we found an account with your email, an email has been sent. Please check your email inbox to log in.
-                </Text>
+                </AppText>
 
                 <View style={styles.wizardHelpBox}>
-                  <Text style={styles.wizardHelpLabel}>Didn't receive a link?</Text>
+                  <AppText variant="overline" style={styles.wizardHelpLabel}>Didn't receive a link?</AppText>
 
-                  <TouchableOpacity accessibilityRole="button"
-                    style={[styles.wizardBtnSecondary, { marginBottom: 10 }]}
+                  <AppButton
+                    title="Use a different email"
+                    icon="mail-outline"
+                    variant="secondary"
+                    style={styles.wizardHelpBtn}
                     disabled={sendingText}
                     onPress={async () => {
                       setSendingText(true);
@@ -4078,12 +4101,12 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                       setSendingText(false);
                       setLoginStep('email');
                     }}
-                  >
-                    <Text style={styles.wizardBtnSecondaryText}>✉️ Use a different email</Text>
-                  </TouchableOpacity>
+                  />
 
-                  <TouchableOpacity accessibilityRole="button"
-                    style={styles.wizardBtnSecondary}
+                  <AppButton
+                    title="Log in with phone number"
+                    icon="phone-portrait-outline"
+                    variant="secondary"
                     disabled={sendingText}
                     onPress={async () => {
                       setSendingText(true);
@@ -4098,9 +4121,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                       setSendingText(false);
                       setLoginStep('phone');
                     }}
-                  >
-                    <Text style={styles.wizardBtnSecondaryText}>📱 Log in with phone number</Text>
-                  </TouchableOpacity>
+                  />
                 </View>
               </View>
             )}
@@ -4108,41 +4129,37 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
             {loginStep === 'waiting_otp' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
-                    <Text style={styles.wizardBackBtnText}>Back</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Sending OTP...</Text>
+                  <IconButton icon="arrow-back" size={40} iconSize={18} onPress={handleGoBack} accessibilityLabel="Back" />
+                  <AppText variant="headline" numberOfLines={2} accessibilityRole="header" style={styles.wizardTitle}>Sending OTP...</AppText>
                 </View>
-                <ActivityIndicator size="large" color="#FFCB37" style={{ marginVertical: 10 }} />
-                <Text style={styles.wizardDesc}>
+                <View style={styles.waitingWell} accessibilityLiveRegion="polite">
+                  <ActivityIndicator size="large" color={uiTheme.colors.warning} />
+                </View>
+                <AppText variant="callout" color="muted" align="center" style={styles.wizardDesc}>
                   A verification code is being sent to your phone. This may take a few seconds.
-                </Text>
-                <TouchableOpacity accessibilityRole="button"
-                  style={styles.wizardGhostBtn}
+                </AppText>
+                <AppButton
+                  title="I already got the code"
+                  iconRight="arrow-forward"
+                  variant="ghost"
                   onPress={() => setLoginStep('otp')}
-                >
-                  <Text style={styles.wizardGhostBtnText}>I already got the code →</Text>
-                </TouchableOpacity>
+                />
               </View>
             )}
 
             {loginStep === 'otp' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
-                    <Text style={styles.wizardBackBtnText}>Back</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>
-                    {otpSubtype === 'sms' ? 'Device Verification 📱' : 'Email Verification 📧'}
-                  </Text>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
-                    <Ionicons name="checkmark-circle" size={13} color={uiTheme.colors.success} />
-                    <Text style={styles.wizardDoneBtnText}>Logged In</Text>
+                  <IconButton icon="arrow-back" size={40} iconSize={18} onPress={handleGoBack} accessibilityLabel="Back" />
+                  <AppText variant="headline" numberOfLines={2} accessibilityRole="header" style={styles.wizardTitle}>
+                    {otpSubtype === 'sms' ? 'Device Verification' : 'Email Verification'}
+                  </AppText>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="I'm logged in" style={styles.wizardDoneBtn} onPress={() => setLoginStep('done')} activeOpacity={0.8}>
+                    <Ionicons name="checkmark-circle" size={14} color={uiTheme.colors.success} />
+                    <Text style={styles.wizardDoneBtnText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Logged In</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.wizardDesc}>
+                <AppText variant="callout" color="muted" style={styles.wizardDesc}>
                   {otpSubtype === 'sms'
                     ? (submittedPhone
                       ? `We don't recognize your device. Enter the 6-digit passcode sent to ${submittedPhone} (SMS).`
@@ -4150,12 +4167,12 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                     : (submittedEmail
                       ? `Enter the 6-digit passcode sent to ${submittedEmail}.`
                       : "Enter the 6-digit passcode sent to your email address.")}
-                </Text>
+                </AppText>
 
-                <TextInput
-                  style={styles.wizardInput}
+                <FocusInput
+                  style={[styles.wizardInput, styles.otpInput]}
                   placeholder="Enter 6-digit OTP..."
-                  placeholderTextColor={uiTheme.colors.muted}
+                  accessibilityLabel="Verification code"
                   value={inputText}
                   onChangeText={setInputText}
                   keyboardType="number-pad"
@@ -4163,9 +4180,15 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                 />
 
                 <View style={styles.wizardActionRow}>
-                  <TouchableOpacity accessibilityRole="button"
-                    style={styles.resendBtn}
-                    disabled={sendingText || resendingCode}
+                  <AppButton
+                    title={resendingCode ? 'Resending...' : (otpSubtype === 'sms' ? 'Resend via SMS' : 'Resend via Email')}
+                    icon="mail-unread-outline"
+                    variant="secondary"
+                    size="sm"
+                    style={[styles.flexBtn, styles.wizardSmallBtn]}
+                    textStyle={styles.warningText}
+                    loading={resendingCode}
+                    disabled={sendingText}
                     onPress={async () => {
                       setResendingCode(true);
                       setResendStatusText('Requesting new code...');
@@ -4174,15 +4197,16 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                       setResendStatusText(`✅ New ${otpSubtype === 'sms' ? 'SMS' : 'email'} code requested! Check your inbox.`);
                       setTimeout(() => setResendStatusText(''), 6000);
                     }}
-                  >
-                    <Text style={styles.resendBtnText}>
-                      {resendingCode ? '🔄 Resending...' : (otpSubtype === 'sms' ? '📩 Resend via SMS' : '📩 Resend via Email')}
-                    </Text>
-                  </TouchableOpacity>
+                  />
 
                   {otpSubtype === 'sms' && (
-                    <TouchableOpacity accessibilityRole="button"
-                      style={styles.wizardTroubleBtn}
+                    <AppButton
+                      title="Trouble Logging In?"
+                      icon="help-circle-outline"
+                      variant="outline"
+                      size="sm"
+                      style={[styles.flexBtn, styles.wizardSmallBtn]}
+                      textStyle={styles.warningText}
                       disabled={sendingText}
                       onPress={async () => {
                         setSendingText(true);
@@ -4191,36 +4215,30 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                         setSendingText(false);
                         setLoginStep('email');
                       }}
-                    >
-                      <Text style={styles.wizardTroubleBtnText}>❓ Trouble Logging In?</Text>
-                    </TouchableOpacity>
+                    />
                   )}
                 </View>
 
                 {resendStatusText ? (
-                  <Text style={[styles.resendStatusText, { color: resendStatusText.includes('✅') ? uiTheme.colors.success : '#FFCB37' }]}>
+                  <Text accessibilityLiveRegion="polite" style={[styles.resendStatusText, { color: resendStatusText.includes('✅') ? uiTheme.colors.success : uiTheme.colors.warning }]}>
                     {resendStatusText}
                   </Text>
                 ) : null}
 
                 <View style={styles.wizardBtnRow}>
-                  <TouchableOpacity accessibilityRole="button"
-                    style={[styles.wizardBtnPrimary, { flex: 1 }]}
-                    disabled={sendingText || !inputText.trim()}
-                    activeOpacity={0.88}
+                  <AppButton
+                    title="Verify & Log In"
+                    icon="checkmark"
+                    style={styles.flexBtn}
+                    loading={sendingText}
+                    disabled={!inputText.trim()}
                     onPress={async () => {
                       if (!inputText.trim()) return;
                       setSendingText(true);
                       await sendBrowserCommand('SUBMIT_OTP', { otp: inputText.trim() });
                       setSendingText(false);
                     }}
-                  >
-                    {sendingText ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                      <Text style={styles.wizardBtnText}>Verify & Log In ✓</Text>
-                    )}
-                  </TouchableOpacity>
+                  />
                 </View>
               </View>
             )}
@@ -4228,49 +4246,49 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
             {loginStep === 'captcha' && (
               <View style={styles.wizardStep}>
                 <View style={styles.wizardHeaderRow}>
-                  <TouchableOpacity accessibilityRole="button" style={styles.wizardBackBtn} onPress={handleGoBack}>
-                    <Ionicons name="arrow-back" size={15} color="#E0E0E6" />
-                    <Text style={styles.wizardBackBtnText}>Back</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.wizardTitle}>Solve Security Puzzle</Text>
+                  <IconButton icon="arrow-back" size={40} iconSize={18} onPress={handleGoBack} accessibilityLabel="Back" />
+                  <AppText variant="headline" numberOfLines={2} accessibilityRole="header" style={styles.wizardTitle}>Solve Security Puzzle</AppText>
                 </View>
                 <View style={styles.puzzleWarningBox}>
-                  <Text style={styles.puzzleWarningTitle}>🧩 Please Solve Puzzle First</Text>
+                  <View style={styles.puzzleWarningHeader}>
+                    <IconWell icon="extension-puzzle-outline" tone="warning" size={32} />
+                    <Text style={styles.puzzleWarningTitle}>Please Solve Puzzle First</Text>
+                  </View>
                   <Text style={styles.puzzleWarningDesc}>
                     Security verification detected ("Protecting your account" / "Start Puzzle").
                   </Text>
                   <Text style={styles.puzzleInstructionText}>
-                    👉 The live browser screen is visible above. Tap "Start Puzzle" on the browser screen above to solve it manually.
+                    The live browser screen is visible above. Tap "Start Puzzle" on the browser screen above to solve it manually.
                   </Text>
                 </View>
 
-                <View style={{ marginBottom: 8 }}>
-                  <TextInput
-                    style={styles.wizardInput}
-                    placeholder="Enter captcha text (if text-based)..."
-                    placeholderTextColor={uiTheme.colors.muted}
-                    value={captchaText}
-                    onChangeText={setCaptchaText}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
+                <FocusInput
+                  style={styles.wizardInput}
+                  placeholder="Enter captcha text (if text-based)..."
+                  accessibilityLabel="Captcha text"
+                  value={captchaText}
+                  onChangeText={setCaptchaText}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
 
                 <View style={styles.wizardBtnRow}>
-                  <TouchableOpacity accessibilityRole="button"
-                    style={[styles.wizardBtnSecondary, { flex: 1 }]}
+                  <AppButton
+                    title="Skip to OTP"
+                    variant="secondary"
+                    style={styles.flexBtn}
                     disabled={sendingText}
                     onPress={() => {
                       setCaptchaText('');
                       setLoginStep('otp');
                     }}
-                  >
-                    <Text style={styles.wizardBtnSecondaryText}>Skip to OTP ➔</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity accessibilityRole="button"
-                    style={[styles.wizardBtn, { flex: 1 }]}
-                    disabled={sendingText}
-                    activeOpacity={0.88}
+                  />
+                  <AppButton
+                    title="I Solved It"
+                    icon="checkmark"
+                    accessibilityLabel="I solved the puzzle"
+                    style={styles.flexBtn}
+                    loading={sendingText}
                     onPress={async () => {
                       if (captchaText.trim()) {
                         setSendingText(true);
@@ -4291,16 +4309,11 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                       }
                       setLoginStep('otp');
                     }}
-                  >
-                    {sendingText ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                      <Text style={styles.wizardBtnText}>I Solved the Puzzle ✓</Text>
-                    )}
-                  </TouchableOpacity>
+                  />
                 </View>
               </View>
             )}
+            </ScrollView>
           </View>
         )}
 
@@ -4332,15 +4345,18 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
           pointerEvents={revealActive || loading ? 'auto' : 'none'}
         >
           <LinearGradient
-            colors={['#11071B', '#09050D', '#040206']}
+            colors={LOADER_GRADIENT}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
             style={{ flex: 1 }}
           >
             <SafeAreaView style={styles.modalContentContainer}>
               <View style={styles.lazyLoaderHeader}>
-                <TouchableOpacity
-                  style={styles.closeBtnCircular}
+                <IconButton
+                  icon="close"
+                  size={40}
+                  iconSize={20}
+                  accessibilityLabel="Cancel"
                   onPress={() => {
                     if (onClose) {
                       onClose();
@@ -4349,15 +4365,10 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                       navigation?.goBack?.();
                     }
                   }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel"
-                  hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-                >
-                  <Ionicons name="close" size={18} color="#FFFFFF" />
-                </TouchableOpacity>
+                />
               </View>
 
-              <View style={styles.lazyLoaderCenter}>
+              <View style={styles.lazyLoaderCenter} accessibilityLiveRegion="polite">
                 <View style={styles.loaderBadgeContainer}>
                   {/* Ambient glowing aura */}
                   <Animated.View
@@ -4372,26 +4383,26 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
                   {/* Pulsing Tinder flame badge */}
                   <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                     <LinearGradient
-                      colors={['#2B1224', '#170919']}
+                      colors={LOADER_BADGE_GRADIENT}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.loaderIconBadge}
                     >
-                      <Ionicons name="flame" size={48} color="#FE3C72" />
+                      <Ionicons name="flame" size={44} color={uiTheme.colors.tinder} />
                     </LinearGradient>
                   </Animated.View>
                 </View>
 
-                <ActivityIndicator size="large" color="#FE3C72" style={{ marginTop: 28 }} />
-                <Text style={styles.loaderTitle}>{loaderTitle}</Text>
-                <Text style={styles.loaderSubtitle}>{loaderSubtitle}</Text>
+                <ActivityIndicator size="large" color={uiTheme.colors.tinder} style={styles.loaderSpinner} />
+                <AppText variant="title2" align="center" style={styles.loaderTitle}>{loaderTitle}</AppText>
+                <AppText variant="callout" color="textSecondary" align="center" style={styles.loaderSubtitle}>{loaderSubtitle}</AppText>
               </View>
 
               {/* Bottom security and privacy trust indicator */}
               <View style={styles.lazyLoaderFooter}>
                 <View style={styles.trustBadge}>
-                  <Ionicons name="shield-checkmark" size={15} color="#10B981" style={{ marginRight: 7 }} />
-                  <Text style={styles.trustBadgeText}>Private & Secure Connection</Text>
+                  <Ionicons name="shield-checkmark" size={15} color={uiTheme.colors.success} />
+                  <Text style={styles.trustBadgeText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Private & Secure Connection</Text>
                 </View>
               </View>
             </SafeAreaView>
@@ -4404,10 +4415,19 @@ const BrowserScreen = React.forwardRef(function BrowserScreen({
 
 export default BrowserScreen;
 
+// Loader veil: brand plum fading into the app background; the badge is a raised plum well.
+const LOADER_GRADIENT = [uiTheme.colors.surface, uiTheme.colors.background, uiTheme.colors.background];
+const LOADER_BADGE_GRADIENT = [uiTheme.colors.elevatedHigh, uiTheme.colors.surface];
+
+const c = uiTheme.colors;
+const sp = uiTheme.spacing;
+const r = uiTheme.radius;
+const type = uiTheme.type;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: uiTheme.colors.background,
+    backgroundColor: c.background,
   },
   header: {
     // minHeight, not height: with the Android status-bar paddingTop below, a
@@ -4417,9 +4437,12 @@ const styles = StyleSheet.create({
     marginTop: Platform.OS === 'android' ? 6 : 0,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    gap: sp.sm,
     paddingTop: Platform.OS === 'android' ? 38 : 6,
     paddingBottom: 10,
+    backgroundColor: c.background,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.divider,
   },
   // The flexible zone between the fixed close button and the fixed action group.
   // Without flex + minWidth: 0 it sized to its content and shoved the buttons off
@@ -4427,13 +4450,14 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
     minWidth: 0,
-    marginHorizontal: uiTheme.spacing.sm,
+    marginHorizontal: sp.xs,
     flexDirection: 'column',
   },
   headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: sp.sm,
+    minWidth: 0,
   },
   // Keeps its intrinsic width; headerLeft is what gives way.
   headerActions: {
@@ -4442,116 +4466,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  // Same footprint as the icon buttons, so all three session states are identical
-  // in width.
-  headerActionSlot: {
-    width: 36,
-    height: 36,
-  },
-  statusIndicatorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
-  },
-  statusDotPulse: {
-    width: 6.5,
-    height: 6.5,
-    borderRadius: 3.5,
-    backgroundColor: '#22C55E',
-    shadowColor: '#22C55E',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  statusIndicatorText: { fontFamily: 'Inter_800ExtraBold',
-    color: 'rgba(255, 255, 255, 0.45)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  headerTitle: { fontFamily: 'Manrope_800ExtraBold',
+  headerTitle: {
+    ...type.title2,
     flexShrink: 1,
-    color: '#FFFFFF',
-    fontSize: 21,
-    fontWeight: 'normal',
-    letterSpacing: -0.3,
+    color: c.text,
   },
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-  },
-  headerLogoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.32)',
-    borderRadius: 19,
-    paddingHorizontal: uiTheme.spacing.md,
-    height: 44,
-    justifyContent: 'center',
-  },
-  headerLogoutBtnText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.error,
-    fontSize: 12.5,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
-  },
-  closeBtnCircular: {
+    gap: sp.sm,
     flexShrink: 0,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  actionBarGrid: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: uiTheme.spacing.xl,
-    marginBottom: 10,
-    gap: uiTheme.spacing.sm,
-  },
-  actionBtn: {
-    height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  actionBtnExpand: {
-    flex: 2,
-  },
-  actionBtnIconOnly: {
-    flex: 1,
-  },
-  actionBtnActive: {
-    backgroundColor: 'rgba(253, 41, 123, 0.12)',
-    borderColor: 'rgba(253, 41, 123, 0.3)',
-  },
-  actionBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 13,
-    fontWeight: 'normal',
+  logoutIconBtn: {
+    backgroundColor: c.errorSoft,
+    borderColor: c.errorBorder,
   },
   webviewContainer: {
-    marginHorizontal: uiTheme.spacing.lg,
+    marginHorizontal: sp.lg,
     position: 'relative',
   },
   webviewContainerSplit: {
     flex: 0.62,
+    // Rounded frame only: no margin/border so the stream keeps its exact size.
+    borderRadius: r.lg,
+    overflow: 'hidden',
+    backgroundColor: c.black,
   },
   webviewContainerFull: {
     // No explicit height here on purpose. Yoga defaults flexShrink to 0, so a
@@ -4581,53 +4520,81 @@ const styles = StyleSheet.create({
     flex: 0,
     opacity: 0,
   },
-  browserFrame: {
-    flex: 1,
-    borderRadius: 22,
-    overflow: 'hidden',
-    backgroundColor: '#000000',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 6,
-  },
-  webviewInnerContainer: {
-    borderRadius: 21,
-    overflow: 'hidden',
-    backgroundColor: '#000000',
-  },
   webview: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: c.black,
   },
+
+  // ── Loading / error states inside the browser frame ──
   loaderContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#08050B',
+    backgroundColor: c.background,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
-    paddingHorizontal: 24,
+    paddingHorizontal: sp.xxl,
   },
+  errorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: alpha(c.background, 0.97),
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: sp.xxl,
+    zIndex: 100,
+  },
+  stateInner: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+  },
+  spinnerWell: {
+    width: 64,
+    height: 64,
+    borderRadius: r.lg,
+    backgroundColor: c.elevated,
+    borderWidth: 1,
+    borderColor: c.hairline,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stateTitle: {
+    marginTop: sp.lg,
+  },
+  stateMessage: {
+    marginTop: sp.sm,
+  },
+  errorUrl: {
+    marginTop: sp.md,
+    paddingHorizontal: sp.lg,
+  },
+  errorActions: {
+    width: '100%',
+    maxWidth: 300,
+    gap: sp.sm,
+    marginTop: sp.xxl,
+  },
+
+  // ── Full-screen loader veil ──
   modalRootContainer: {
     flex: 1,
-    backgroundColor: '#08050B',
+    backgroundColor: c.background,
   },
   modalContentContainer: {
     flex: 1,
     justifyContent: 'space-between',
   },
   lazyLoaderHeader: {
-    paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingHorizontal: sp.lg,
+    paddingTop: sp.sm,
     flexDirection: 'row',
   },
   lazyLoaderCenter: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal: sp.section,
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
   },
   loaderBadgeContainer: {
     alignItems: 'center',
@@ -4640,7 +4607,7 @@ const styles = StyleSheet.create({
     width: 116,
     height: 116,
     borderRadius: 58,
-    backgroundColor: 'rgba(254, 60, 114, 0.22)',
+    backgroundColor: alpha(c.tinder, 0.2),
   },
   loaderIconBadge: {
     width: 86,
@@ -4648,541 +4615,388 @@ const styles = StyleSheet.create({
     borderRadius: 43,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(254, 60, 114, 0.42)',
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
+    borderWidth: 1,
+    borderColor: alpha(c.tinder, 0.4),
+    ...uiTheme.shadows.glow,
+    shadowColor: c.tinder,
+  },
+  loaderSpinner: {
+    marginTop: sp.xxl,
   },
   loaderTitle: {
-    fontFamily: 'Manrope_700Bold',
-    color: '#FFFFFF',
-    fontSize: 20,
-    marginTop: 20,
-    textAlign: 'center',
-    letterSpacing: -0.3,
+    marginTop: sp.xl,
   },
   loaderSubtitle: {
-    fontFamily: 'Inter_400Regular',
-    color: 'rgba(255, 255, 255, 0.68)',
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
-    lineHeight: 21,
-    paddingHorizontal: 20,
+    marginTop: sp.sm,
+    paddingHorizontal: sp.lg,
   },
   lazyLoaderFooter: {
     alignItems: 'center',
-    paddingBottom: 24,
+    paddingBottom: sp.xxl,
   },
   trustBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    gap: sp.sm,
+    backgroundColor: c.neutralSoft,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
-    borderRadius: 22,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    borderColor: c.hairline,
+    borderRadius: r.pill,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.lg,
   },
   trustBadgeText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.62)',
-    fontSize: 12.5,
-    letterSpacing: 0.1,
+    ...type.subhead,
+    color: c.textSecondary,
   },
-  loaderText: {
-    fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    marginTop: 15,
-    fontSize: 13.5,
-    fontWeight: 'normal',
-  },
+
+  // ── Login wizard (remote sessions) ──
   wizardPanel: {
     flex: 0.38,
     backgroundColor: 'transparent',
-    paddingHorizontal: uiTheme.spacing.xl,
-    paddingTop: uiTheme.spacing.lg,
-    paddingBottom: uiTheme.spacing.xl,
-    justifyContent: 'center',
   },
   wizardPanelFull: {
     flex: 1,
   },
+  wizardScroll: {
+    flex: 1,
+  },
+  wizardScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingTop: sp.lg,
+    paddingBottom: sp.xl,
+  },
   wizardStep: {
     width: '100%',
+    maxWidth: uiTheme.layout.formMax,
+    alignSelf: 'center',
   },
   wizardOptionsHeader: {
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: sp.lg,
   },
-  wizardOptionsTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 21,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
+  wizardOptionsTitle: {
+    marginTop: sp.xs,
   },
-  wizardOptionsSubtitle: { fontFamily: 'Inter_400Regular',
-    color: 'rgba(255, 255, 255, 0.45)',
-    fontSize: 12.5,
-    marginTop: 3,
-    textAlign: 'center',
+  wizardOptionsSubtitle: {
+    marginTop: sp.xs,
   },
   tinderPrimaryCard: {
     width: '100%',
-    height: 60,
-    borderRadius: uiTheme.radius.card,
-    backgroundColor: uiTheme.colors.primary,
+    minHeight: 60,
+    borderRadius: r.card,
+    overflow: 'hidden',
+    backgroundColor: c.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    marginBottom: 10,
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 7,
+    paddingHorizontal: sp.lg,
+    marginBottom: sp.md,
+    ...uiTheme.shadows.glow,
+  },
+  cardDisabled: {
+    opacity: 0.55,
   },
   cardLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.md,
+    gap: sp.md,
+    flex: 1,
+    minWidth: 0,
   },
   tinderIconSquare: {
     width: 36,
     height: 36,
-    borderRadius: uiTheme.radius.input,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    borderRadius: r.md,
+    backgroundColor: alpha(c.white, 0.22),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tinderPrimaryCardText: { fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontSize: 15.5,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+  tinderPrimaryCardText: {
+    ...type.headline,
+    color: c.onPrimary,
+    flexShrink: 1,
   },
   googleGlassCard: {
     width: '100%',
-    height: 60,
-    borderRadius: uiTheme.radius.card,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    minHeight: 60,
+    borderRadius: r.card,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: c.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    marginBottom: 6,
+    paddingHorizontal: sp.lg,
+    marginBottom: sp.sm,
   },
   glassIconSquare: {
     width: 36,
     height: 36,
-    borderRadius: uiTheme.radius.input,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: r.md,
+    backgroundColor: c.elevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  googleCardText: { fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.92)',
-    fontSize: 15.5,
-    fontWeight: 'normal',
-    letterSpacing: 0.1,
-  },
-  troubleLinkBtn: {
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  troubleLinkText: { fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.45)',
-    fontSize: 13,
-    fontWeight: 'normal',
-    letterSpacing: 0.1,
+  googleCardText: {
+    ...type.headline,
+    color: c.text,
+    flexShrink: 1,
   },
   wizardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: uiTheme.spacing.sm,
+    gap: sp.md,
+    marginBottom: sp.md,
+  },
+  wizardTitle: {
+    flex: 1,
+    minWidth: 0,
   },
   wizardDoneBtn: {
-    marginLeft: 'auto',
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(16, 185, 129, 0.10)',
+    gap: sp.xs,
+    minHeight: 36,
+    paddingHorizontal: sp.md,
+    borderRadius: r.pill,
+    backgroundColor: c.successSoft,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
+    borderColor: c.successBorder,
   },
-  wizardDoneBtnText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.success,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  wizardDoneBtnText: {
+    ...type.buttonSmall,
+    color: c.success,
   },
-  wizardBackBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 9,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginRight: uiTheme.spacing.sm,
+  wizardDesc: {
+    marginBottom: sp.md,
+  },
+  wizardInput: {
+    ...type.body,
+    height: uiTheme.layout.inputHeight,
+    backgroundColor: c.elevated,
+    borderRadius: r.input,
+    paddingHorizontal: sp.lg,
+    color: c.text,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: c.border,
+    marginBottom: sp.md,
   },
-  wizardBackBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#E0E0E6',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  otpInput: {
+    ...type.headline,
+    letterSpacing: 4,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
   },
-  wizardTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 15.5,
-    fontWeight: 'normal',
-    letterSpacing: 0.15,
-    flexShrink: 1,
+  domainChipsWrap: {
+    marginBottom: sp.lg,
   },
-  wizardDesc: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    marginBottom: 10,
-    lineHeight: 16.5,
-  },
-  wizardInput: { fontFamily: 'Inter_400Regular',
-    height: 46,
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    color: '#FFF',
-    fontSize: uiTheme.type.label.fontSize,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 10,
+  domainChipsRow: {
+    gap: sp.sm,
   },
   wizardDomainChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    minHeight: 36,
+    justifyContent: 'center',
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: uiTheme.radius.small,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    borderColor: c.border,
+    borderRadius: r.pill,
+    paddingHorizontal: 14,
   },
-  wizardDomainChipText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  wizardDomainChipText: {
+    ...type.subhead,
+    color: c.textSecondary,
   },
   phoneInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    gap: uiTheme.spacing.sm,
+    marginBottom: sp.md,
+    gap: sp.sm,
   },
-  countryCodeInput: { fontFamily: 'Inter_600SemiBold',
-    width: 72,
-    height: 46,
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    color: '#FFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
+  countryCodeInput: {
+    ...type.bodyStrong,
+    width: 76,
+    height: uiTheme.layout.inputHeight,
+    backgroundColor: c.elevated,
+    borderRadius: r.input,
+    paddingHorizontal: sp.sm,
+    color: c.text,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: c.border,
     textAlign: 'center',
   },
-  phoneNumberInput: { fontFamily: 'Inter_400Regular',
+  phoneNumberInput: {
+    ...type.body,
     flex: 1,
-    height: 46,
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    color: '#FFF',
-    fontSize: uiTheme.type.label.fontSize,
+    minWidth: 0,
+    height: uiTheme.layout.inputHeight,
+    backgroundColor: c.elevated,
+    borderRadius: r.input,
+    paddingHorizontal: sp.lg,
+    color: c.text,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: c.border,
   },
-  wizardBtn: {
-    height: 48,
-    backgroundColor: uiTheme.colors.primary,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
+  flexBtn: {
+    flex: 1,
+    minWidth: 0,
   },
-  wizardBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: 13.5,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+  wizardSmallBtn: {
+    minHeight: uiTheme.layout.touchTarget,
+  },
+  warningText: {
+    color: c.warning,
   },
   wizardBtnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-  },
-  wizardBtnSecondary: {
-    height: 48,
-    paddingHorizontal: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  wizardBtnSecondaryText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: 13.5,
-    fontWeight: 'normal',
-  },
-  wizardBtnPrimary: {
-    height: 48,
-    backgroundColor: uiTheme.colors.primary,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
+    gap: sp.sm,
   },
   wizardActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-    marginTop: uiTheme.spacing.xs,
+    gap: sp.sm,
+    marginTop: sp.xs,
+    marginBottom: sp.md,
   },
   wizardErrorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.10)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.sm,
+    backgroundColor: c.errorSoft,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.30)',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 10,
+    borderColor: c.errorBorder,
+    padding: sp.md,
+    borderRadius: r.md,
+    marginBottom: sp.md,
   },
-  wizardErrorText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.error,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    textAlign: 'center',
+  wizardErrorText: {
+    ...type.footnote,
+    color: c.error,
+    flex: 1,
+    minWidth: 0,
   },
   wizardHelpBox: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.input,
-    padding: uiTheme.spacing.md,
-    marginBottom: 10,
+    backgroundColor: c.surface,
+    borderRadius: r.card,
+    padding: sp.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: c.borderSubtle,
   },
-  wizardHelpLabel: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginBottom: uiTheme.spacing.sm,
+  wizardHelpLabel: {
+    marginBottom: sp.md,
   },
-  wizardGhostBtn: {
-    height: 46,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 14,
-    justifyContent: 'center',
+  wizardHelpBtn: {
+    marginBottom: sp.sm,
+  },
+  waitingWell: {
+    alignSelf: 'center',
+    width: 64,
+    height: 64,
+    borderRadius: r.lg,
+    backgroundColor: c.warningSoft,
+    borderWidth: 1,
+    borderColor: c.warningBorder,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: sp.md,
+  },
+  resendStatusText: {
+    ...type.footnote,
+    marginBottom: sp.md,
+  },
+  puzzleWarningBox: {
+    backgroundColor: c.warningSoft,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: c.warningBorder,
+    borderRadius: r.lg,
+    padding: sp.lg,
+    marginBottom: sp.md,
   },
-  wizardGhostBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: 13,
-    fontWeight: 'normal',
+  puzzleWarningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    marginBottom: sp.sm,
   },
-  wizardTroubleBtn: {
+  puzzleWarningTitle: {
+    ...type.headline,
+    color: c.warning,
     flex: 1,
-    height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 203, 55, 0.20)',
+    minWidth: 0,
   },
-  wizardTroubleBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFCB37',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  puzzleWarningDesc: {
+    ...type.footnote,
+    color: c.textSecondary,
+    marginBottom: sp.sm,
   },
+  puzzleInstructionText: {
+    ...type.label,
+    color: c.text,
+  },
+
   // ── Dashboard Modal ──
   modalContainer: {
     flex: 1,
-    backgroundColor: uiTheme.colors.background,
+    backgroundColor: c.background,
   },
   modalHeader: {
-    height: 52,
+    minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: uiTheme.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E1E2E',
-    backgroundColor: '#16161E',
+    gap: sp.md,
+    paddingHorizontal: sp.lg,
+    paddingVertical: sp.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.divider,
+    backgroundColor: c.surface,
   },
-  modalTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#F1F1F5',
-    fontSize: 16,
-    fontWeight: 'normal',
-  },
-  modalCloseBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: uiTheme.spacing.md,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(253, 41, 123, 0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(253, 41, 123, 0.25)',
-  },
-  puzzleWarningBox: {
-    backgroundColor: 'rgba(255, 203, 55, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 203, 55, 0.25)',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: uiTheme.spacing.md,
-  },
-  puzzleWarningTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFCB37',
-    fontSize: 16,
-    fontWeight: 'normal',
-    marginBottom: uiTheme.spacing.xs,
-  },
-  puzzleWarningDesc: { fontFamily: 'Inter_400Regular',
-    color: '#C8C8D0',
-    fontSize: 12.5,
-    lineHeight: 18,
-    marginBottom: 6,
-  },
-  puzzleInstructionText: { fontFamily: 'Inter_600SemiBold',
-    color: '#FFF',
-    fontSize: 12.5,
-    fontWeight: 'normal',
-    lineHeight: 18,
-  },
-  resendBtn: {
+  modalTitleRow: {
     flex: 1,
-    height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  resendBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFCB37',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  resendStatusText: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  errorOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0F0F13F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    zIndex: 100,
-  },
-  errorTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#FFF',
-    fontSize: uiTheme.type.section.fontSize,
-    fontWeight: 'normal',
-    marginTop: uiTheme.spacing.lg,
-    marginBottom: uiTheme.spacing.sm,
-    textAlign: 'center',
-  },
-  errorDetail: { fontFamily: 'Inter_400Regular',
-    color: '#9E9EB0',
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-    marginBottom: uiTheme.spacing.md,
-  },
-  errorUrl: { fontFamily: 'Inter_400Regular',
-    color: '#65657A',
-    fontSize: uiTheme.type.caption.fontSize,
-    textAlign: 'center',
-    marginBottom: uiTheme.spacing.xxl,
-    paddingHorizontal: uiTheme.spacing.lg,
-  },
-  errorActions: {
-    width: '100%',
-    maxWidth: 280,
-    gap: 10,
-  },
-  retryBtn: {
-    backgroundColor: uiTheme.colors.primary,
-    height: 44,
-    borderRadius: 10,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: sp.md,
   },
-  retryBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
+  modalTitle: {
+    flexShrink: 1,
   },
-  backToSetupBtn: {
-    backgroundColor: '#222230',
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#343448',
+  onDeviceControlsBox: {
+    paddingVertical: sp.xs,
   },
-  backToSetupBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: '#C4C4D6',
-    fontSize: 13,
-    fontWeight: 'normal',
+  onDeviceQuickChatsBtn: {
+    backgroundColor: c.infoSoft,
+    borderColor: c.infoBorder,
+  },
+  onDeviceQuickChatsBtnText: {
+    color: c.info,
   },
 
-
+  // ── Tap-coordinate HUD (remote sessions) ──
   coordHudBadge: {
     position: 'absolute',
-    top: 12,
+    top: sp.md,
     alignSelf: 'center',
     zIndex: 9999,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    backgroundColor: 'rgba(18, 16, 28, 0.95)',
+    gap: sp.sm,
+    backgroundColor: alpha(c.surface, 0.95),
     borderWidth: 1,
-    borderColor: uiTheme.colors.success,
+    borderColor: c.successBorder,
     paddingVertical: 6,
-    paddingHorizontal: uiTheme.spacing.md,
-    borderRadius: uiTheme.radius.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 8,
+    paddingHorizontal: sp.md,
+    borderRadius: r.pill,
+    ...uiTheme.shadows.md,
   },
-  coordHudText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  coordHudText: {
+    ...type.caption,
+    fontFamily: uiTheme.fonts.strong,
+    fontVariant: ['tabular-nums'],
+    color: c.text,
     letterSpacing: 0.4,
   },
 
@@ -5190,60 +5004,22 @@ const styles = StyleSheet.create({
   onDeviceDashboardBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: uiTheme.radius.small,
+    gap: 6,
+    minHeight: 40,
+    paddingHorizontal: sp.md,
+    borderRadius: r.pill,
+    borderWidth: 1,
   },
   onDeviceDashboardBtnIdle: {
-    backgroundColor: 'rgba(254, 60, 114, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.4)',
+    backgroundColor: c.primarySoft,
+    borderColor: c.primaryBorder,
   },
   onDeviceDashboardBtnActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.4)',
-    shadowColor: uiTheme.colors.success,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: c.successSoft,
+    borderColor: c.successBorder,
   },
-  onDeviceDashboardBtnText: { fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
-  },
-  onDeviceLogsBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  onDeviceControlsBox: {
-    paddingVertical: uiTheme.spacing.xs,
-  },
-  onDeviceQuickChatsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: uiTheme.spacing.sm,
-    backgroundColor: 'rgba(99, 102, 241, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.4)',
-    borderRadius: uiTheme.radius.input,
-    paddingVertical: uiTheme.spacing.md,
-    paddingHorizontal: uiTheme.spacing.lg,
-  },
-  onDeviceQuickChatsBtnText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.info,
-    fontSize: 13,
-    fontWeight: 'normal',
+  onDeviceDashboardBtnText: {
+    ...type.buttonSmall,
   },
 
   // ── Header ──
@@ -5264,218 +5040,86 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   subtitle: {
-    fontFamily: 'Inter_600SemiBold',
-    color: 'rgba(255, 255, 255, 0.45)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+    ...type.caption,
+    lineHeight: 16,
+    color: c.muted,
     flexShrink: 1,
   },
-  // Square icon button used for the header action row (dashboard, logs, logout).
-  // Callers layer their own backgroundColor / borderColor on top, so the base
-  // only owns geometry plus a neutral glass fallback.
-  dashboardBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // ── Header chips (remote / Neko session controls) ──
-  toggleNekoBtn: {
-    height: 44,
-    paddingHorizontal: 10,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleNekoBtnText: { fontFamily: 'Inter_700Bold',
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  menuBtn: {
-    height: 44,
-    paddingHorizontal: 10,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuBtnText: { fontFamily: 'Inter_700Bold',
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
   skipBtn: {
-    height: 44,
-    paddingHorizontal: uiTheme.spacing.md,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(253, 41, 123, 0.12)',
+    minHeight: 40,
+    paddingHorizontal: sp.md,
+    borderRadius: r.pill,
+    backgroundColor: c.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(253, 41, 123, 0.30)',
+    borderColor: c.primaryBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  skipBtnText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-  },
-  modalCloseBtnText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  skipBtnText: {
+    ...type.buttonSmall,
+    color: c.accent,
   },
 
   // ── Manual text input panel (remote / Neko session) ──
   inputPanel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-    paddingHorizontal: uiTheme.spacing.lg,
+    gap: sp.sm,
+    paddingHorizontal: sp.lg,
     paddingVertical: 10,
   },
-  textInput: { fontFamily: 'Inter_400Regular',
+  textInput: {
+    ...type.callout,
     flex: 1,
-    height: 42,
-    borderRadius: uiTheme.radius.input,
+    minWidth: 0,
+    height: uiTheme.layout.touchTarget,
+    borderRadius: r.input,
     paddingHorizontal: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: c.elevated,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.label.fontSize,
+    borderColor: c.border,
+    color: c.text,
   },
-  sendBtn: {
-    height: 44,
-    paddingHorizontal: 18,
-    borderRadius: uiTheme.radius.input,
-    backgroundColor: uiTheme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendBtnText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: 'normal',
-  },
-  enterBtn: {
-    height: 44,
-    paddingHorizontal: 14,
-    borderRadius: uiTheme.radius.input,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  enterBtnText: { fontFamily: 'Inter_700Bold',
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 13,
-    fontWeight: 'normal',
+  inputPanelBtn: {
+    minHeight: uiTheme.layout.touchTarget,
   },
 
   // ── Logout Confirmation Modal ──
-  // These were referenced by the modal but never defined in this file, so every
-  // style resolved to undefined: the dialog collapsed to unstyled content in the
-  // top-left corner while its transparent full-screen Modal kept swallowing
-  // every touch. Values mirror the identical dialog in PlatformSelectScreen.
   logoutModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(5, 4, 10, 0.80)',
+    backgroundColor: c.scrim,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: uiTheme.spacing.xxl,
+    paddingHorizontal: sp.xxl,
   },
   logoutModalCard: {
     width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#141220',
-    borderRadius: uiTheme.radius.sheet,
+    maxWidth: 360,
+    backgroundColor: c.surface,
+    borderRadius: r.sheet,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.28)',
-    padding: uiTheme.spacing.xxl,
+    borderColor: c.hairline,
+    padding: sp.xxl,
     alignItems: 'center',
-    shadowColor: uiTheme.colors.error,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 8,
+    ...uiTheme.shadows.lg,
   },
   logoutIconBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.32)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: uiTheme.spacing.lg,
+    marginBottom: sp.lg,
   },
-  logoutModalTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.section.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.3,
-    marginBottom: uiTheme.spacing.sm,
-    textAlign: 'center',
+  logoutModalTitle: {
+    marginBottom: sp.sm,
   },
-  logoutModalSubtitle: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: 12.5,
-    lineHeight: 18,
-    textAlign: 'center',
-    marginBottom: 22,
+  logoutModalSubtitle: {
+    marginBottom: sp.xxl,
   },
   logoutModalBtnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: sp.sm,
     width: '100%',
   },
-  logoutModalCancelBtn: {
+  logoutModalBtn: {
     flex: 1,
-    height: 44,
-    borderRadius: uiTheme.radius.input,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoutModalCancelText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.text,
-    fontSize: 13,
-    fontWeight: 'normal',
-  },
-  logoutModalConfirmBtn: {
-    flex: 1,
-    height: 44,
-    borderRadius: uiTheme.radius.input,
-    backgroundColor: uiTheme.colors.error,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    shadowColor: uiTheme.colors.error,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  logoutModalConfirmText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: 'normal',
+    minWidth: 0,
   },
 });

@@ -10,8 +10,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../theme';
-import SafeActivityIndicator from '../common/SafeActivityIndicator';
+import { theme, alpha } from '../../theme';
+import { MotionTouchable } from '../common/Motion';
+import AppButton from '../ui/AppButton';
+import Badge from '../ui/Badge';
+import IconWell from '../ui/IconWell';
 
 const VITALS_CONFIG = [
   { key: 'lookingFor', label: 'Looking for', icon: 'heart-outline' },
@@ -125,11 +128,53 @@ export default function TinderProfileCard({
     setCollapsed(!collapsed);
   };
 
+  // Pure-UI helpers: initials fallback when a photo is missing or fails to load.
+  const initials = (name || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('');
+  const tierTone = tinderPlan === 'platinum' || tinderPlan === 'gold' || tinderPlan === 'plus' ? tinderPlan : 'neutral';
+  const likesLeftLabel = typeof flintLikesRemaining === 'number' ? `${flintLikesRemaining} left` : flintLikesRemaining;
+  const msgsLeftLabel = typeof flintMsgsRemaining === 'number' ? `${flintMsgsRemaining} left` : flintMsgsRemaining;
+
+  const renderPlaceholder = (size, style) => (
+    <View style={[styles.photoPlaceholder, style]} accessibilityLabel="Profile photo unavailable">
+      {initials ? (
+        <Text style={[styles.placeholderInitials, size === 'lg' && styles.placeholderInitialsLg]} maxFontSizeMultiplier={1}>
+          {initials}
+        </Text>
+      ) : (
+        <Ionicons name="flame" size={size === 'lg' ? 30 : 20} color={theme.colors.tinder} />
+      )}
+    </View>
+  );
+
+  const renderTelemetry = (likesLabel, msgsLabel) => (
+    <>
+      <View style={styles.telemetryPill}>
+        <Ionicons name="heart" size={13} color={theme.colors.accent} />
+        <Text style={styles.telemetryText} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
+          {likesLabel}{' '}
+          <Text style={styles.telemetryValue}>{likesLeftLabel}</Text>
+        </Text>
+      </View>
+      <View style={styles.telemetryPill}>
+        <Ionicons name="chatbubbles" size={13} color={theme.colors.info} />
+        <Text style={styles.telemetryText} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
+          {msgsLabel}{' '}
+          <Text style={styles.telemetryValue}>{msgsLeftLabel}</Text>
+        </Text>
+      </View>
+    </>
+  );
+
   if (!isLoggedIn) {
     return (
       <View style={styles.cardContainer}>
         <LinearGradient
-          colors={['#251220', '#180B15']}
+          colors={theme.gradients.hero}
           start={{ x: 0, y: 0 }}
           end={{ x: 0.8, y: 1 }}
           style={styles.emptyCard}
@@ -137,21 +182,18 @@ export default function TinderProfileCard({
           {/* Header Row: Flame Icon + Title + Real Status */}
           <View style={styles.emptyHeaderRow}>
             <LinearGradient
-              colors={['#FE3C72', '#FF655B']}
+              colors={theme.gradients.brandShort}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.emptyIconBadge}
             >
-              <Ionicons name="flame" size={22} color="#FFFFFF" />
+              <Ionicons name="flame" size={22} color={theme.colors.onPrimary} />
             </LinearGradient>
 
             <View style={styles.emptyHeaderTextWrap}>
               <View style={styles.emptyTitleRow}>
-                <Text style={styles.emptyTitle}>Tinder Account</Text>
-                <View style={styles.emptyStatusBadge}>
-                  <Ionicons name="sparkles" size={10} color="#FE3C72" />
-                  <Text style={styles.emptyStatusBadgeText}>CONNECT TO ACTIVATE</Text>
-                </View>
+                <Text style={styles.emptyTitle} accessibilityRole="header" numberOfLines={1}>Tinder Account</Text>
+                <Badge label="CONNECT TO ACTIVATE" tone="primary" icon="sparkles" size="sm" />
               </View>
               <Text style={styles.emptySubtitle}>
                 Connect your account to enable AI swiping, icebreakers, and live profile preview.
@@ -165,9 +207,7 @@ export default function TinderProfileCard({
           {/* Feature Highlights — Full-width, clean, and 100% accurate */}
           <View style={styles.benefitList}>
             <View style={styles.benefitItem}>
-              <View style={[styles.benefitIconWrap, { backgroundColor: 'rgba(254, 60, 114, 0.12)' }]}>
-                <Ionicons name="person" size={14} color="#FE3C72" />
-              </View>
+              <IconWell icon="person" tone="primary" size={32} iconSize={15} />
               <View style={styles.benefitTextWrap}>
                 <Text style={styles.benefitTitle}>Profile Sync & Preview</Text>
                 <Text style={styles.benefitDesc}>
@@ -177,9 +217,7 @@ export default function TinderProfileCard({
             </View>
 
             <View style={styles.benefitItem}>
-              <View style={[styles.benefitIconWrap, { backgroundColor: 'rgba(255, 101, 91, 0.12)' }]}>
-                <Ionicons name="heart" size={14} color="#FF655B" />
-              </View>
+              <IconWell icon="heart" tone="secondary" size={32} iconSize={15} />
               <View style={styles.benefitTextWrap}>
                 <Text style={styles.benefitTitle}>AI-Powered Swiping</Text>
                 <Text style={styles.benefitDesc}>
@@ -189,9 +227,7 @@ export default function TinderProfileCard({
             </View>
 
             <View style={styles.benefitItem}>
-              <View style={[styles.benefitIconWrap, { backgroundColor: 'rgba(0, 208, 255, 0.12)' }]}>
-                <Ionicons name="chatbubbles" size={14} color="#00D0FF" />
-              </View>
+              <IconWell icon="chatbubbles" tone="info" size={32} iconSize={15} />
               <View style={styles.benefitTextWrap}>
                 <Text style={styles.benefitTitle}>Smart Openers & Replies</Text>
                 <Text style={styles.benefitDesc}>
@@ -201,9 +237,7 @@ export default function TinderProfileCard({
             </View>
 
             <View style={styles.benefitItem}>
-              <View style={[styles.benefitIconWrap, { backgroundColor: 'rgba(97, 214, 163, 0.12)' }]}>
-                <Ionicons name="stats-chart" size={14} color="#61D6A3" />
-              </View>
+              <IconWell icon="stats-chart" tone="success" size={32} iconSize={15} />
               <View style={styles.benefitTextWrap}>
                 <Text style={styles.benefitTitle}>Live Match & Activity Stats</Text>
                 <Text style={styles.benefitDesc}>
@@ -215,24 +249,13 @@ export default function TinderProfileCard({
 
           {/* CTA Button */}
           {onOpenTinder && (
-            <TouchableOpacity
-              style={styles.connectButton}
+            <AppButton
+              title="Connect Tinder Account"
+              icon="flame"
+              iconRight="chevron-forward"
               onPress={onOpenTinder}
-              activeOpacity={0.85}
-              accessibilityRole="button"
               accessibilityLabel="Connect Tinder Account"
-            >
-              <LinearGradient
-                colors={['#FE3C72', '#FF655B']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.connectButtonGradient}
-              >
-                <Ionicons name="flame" size={18} color="#FFFFFF" />
-                <Text style={styles.connectButtonText}>Connect Tinder Account</Text>
-                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
-              </LinearGradient>
-            </TouchableOpacity>
+            />
           )}
 
           {/* Honest, Clear Trust Note */}
@@ -251,14 +274,16 @@ export default function TinderProfileCard({
   if (collapsed) {
     return (
       <View style={styles.cardContainer}>
-        <TouchableOpacity
-          activeOpacity={0.8}
+        <MotionTouchable
+          activeOpacity={0.85}
+          pressScale={0.985}
           onPress={toggleCollapse}
           accessibilityRole="button"
+          accessibilityState={{ expanded: false }}
           accessibilityLabel={`Tinder connected as ${name || 'user'}. Tap to preview full profile.`}
         >
           <LinearGradient
-            colors={['#241221', '#170C16']}
+            colors={theme.gradients.hero}
             start={{ x: 0, y: 0 }}
             end={{ x: 0.8, y: 1 }}
             style={styles.collapsedCard}
@@ -273,9 +298,7 @@ export default function TinderProfileCard({
                     onError={() => setPhotoError(true)}
                   />
                 ) : (
-                  <View style={styles.collapsedPlaceholder}>
-                    <Ionicons name="flame" size={20} color="#FE3C72" />
-                  </View>
+                  renderPlaceholder('sm', styles.collapsedAvatar)
                 )}
                 <View style={styles.collapsedLiveDot} />
               </View>
@@ -287,29 +310,16 @@ export default function TinderProfileCard({
                     {name || 'Tinder Account'}
                   </Text>
                   {age ? <Text style={styles.collapsedAge}>, {age}</Text> : null}
-                  <Ionicons name="checkmark-circle" size={14} color="#00D0FF" style={{ marginLeft: 4 }} />
+                  <Ionicons name="checkmark-circle" size={14} color={theme.colors.info} style={styles.verifiedIconSm} />
                 </View>
-                <Text style={styles.collapsedSubtitle}>
+                <Text style={styles.collapsedSubtitle} numberOfLines={2}>
                   Connected Tinder account · Tap to view details
                 </Text>
               </View>
 
               {/* Right Side: Plan Badge + Chevron */}
               <View style={styles.collapsedRightAction}>
-                <View
-                  style={[
-                    styles.tierPill,
-                    tinderPlan === 'platinum'
-                      ? styles.tierPlatinum
-                      : tinderPlan === 'gold'
-                        ? styles.tierGold
-                        : tinderPlan === 'plus'
-                          ? styles.tierPlus
-                          : styles.tierFree,
-                  ]}
-                >
-                  <Text style={styles.tierText}>{activePlanBadge}</Text>
-                </View>
+                <Badge label={activePlanBadge} tone={tierTone} size="sm" />
                 <Ionicons name="chevron-down" size={18} color={theme.colors.muted} />
               </View>
             </View>
@@ -317,39 +327,14 @@ export default function TinderProfileCard({
             {/* Telemetry Strip: Flint Automation Likes & Messages Remaining */}
             <View style={styles.telemetryDivider} />
             <View style={styles.telemetryStrip}>
-              <View style={styles.telemetryPill}>
-                <Ionicons name="heart" size={13} color="#FE3C72" />
-                <Text style={styles.telemetryText}>
-                  Likes:{' '}
-                  <Text style={styles.telemetryValue}>
-                    {typeof flintLikesRemaining === 'number'
-                      ? `${flintLikesRemaining} left`
-                      : flintLikesRemaining}
-                  </Text>
-                </Text>
-              </View>
-
-              <View style={styles.telemetryPill}>
-                <Ionicons name="chatbubbles" size={13} color="#00D0FF" />
-                <Text style={styles.telemetryText}>
-                  Messages:{' '}
-                  <Text style={styles.telemetryValue}>
-                    {typeof flintMsgsRemaining === 'number'
-                      ? `${flintMsgsRemaining} left`
-                      : flintMsgsRemaining}
-                  </Text>
-                </Text>
-              </View>
+              {renderTelemetry('Likes:', 'Messages:')}
 
               {isAgentRunning && (
-                <View style={styles.sessionPill}>
-                  <View style={styles.liveDot} />
-                  <Text style={styles.sessionText}>Automating</Text>
-                </View>
+                <Badge label="Automating" tone="success" dot size="sm" style={styles.sessionBadge} />
               )}
             </View>
           </LinearGradient>
-        </TouchableOpacity>
+        </MotionTouchable>
       </View>
     );
   }
@@ -358,7 +343,7 @@ export default function TinderProfileCard({
   return (
     <View style={styles.cardContainer}>
       <LinearGradient
-        colors={['#241221', '#170C16']}
+        colors={theme.gradients.hero}
         start={{ x: 0, y: 0 }}
         end={{ x: 0.8, y: 1 }}
         style={styles.heroCard}
@@ -368,38 +353,25 @@ export default function TinderProfileCard({
           style={styles.cardHeader}
           activeOpacity={0.7}
           onPress={toggleCollapse}
+          accessibilityRole="button"
+          accessibilityLabel={compact ? 'Tinder profile' : 'Collapse Tinder profile'}
+          accessibilityState={{ expanded: true }}
         >
           <View style={styles.headerBrand}>
             <View style={styles.flameIconBadge}>
-              <Ionicons name="flame" size={14} color="#FE3C72" />
+              <Ionicons name="flame" size={14} color={theme.colors.tinder} />
             </View>
-            <Text style={styles.headerBrandText}>TINDER PROFILE</Text>
+            <Text style={styles.headerBrandText} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>TINDER PROFILE</Text>
           </View>
 
           <View style={styles.headerBadges}>
             {/* Live Session Pill — only when agent is active */}
             {isAgentRunning && (
-              <View style={styles.sessionPill}>
-                <View style={styles.liveDot} />
-                <Text style={styles.sessionText}>Automating</Text>
-              </View>
+              <Badge label="Automating" tone="success" dot size="sm" />
             )}
 
             {/* Active Plan Pill */}
-            <View
-              style={[
-                styles.tierPill,
-                tinderPlan === 'platinum'
-                  ? styles.tierPlatinum
-                  : tinderPlan === 'gold'
-                    ? styles.tierGold
-                    : tinderPlan === 'plus'
-                      ? styles.tierPlus
-                      : styles.tierFree,
-              ]}
-            >
-              <Text style={styles.tierText}>{activePlanBadge}</Text>
-            </View>
+            <Badge label={activePlanBadge} tone={tierTone} size="sm" />
 
             {!compact && (
               <Ionicons name="chevron-up" size={18} color={theme.colors.muted} />
@@ -409,29 +381,7 @@ export default function TinderProfileCard({
 
         {/* Telemetry Strip: Flint Automation Likes & Messages Remaining */}
         <View style={styles.telemetryStrip}>
-          <View style={styles.telemetryPill}>
-            <Ionicons name="heart" size={13} color="#FE3C72" />
-            <Text style={styles.telemetryText}>
-              AI Likes:{' '}
-              <Text style={styles.telemetryValue}>
-                {typeof flintLikesRemaining === 'number'
-                  ? `${flintLikesRemaining} left`
-                  : flintLikesRemaining}
-              </Text>
-            </Text>
-          </View>
-
-          <View style={styles.telemetryPill}>
-            <Ionicons name="chatbubbles" size={13} color="#00D0FF" />
-            <Text style={styles.telemetryText}>
-              AI Messages:{' '}
-              <Text style={styles.telemetryValue}>
-                {typeof flintMsgsRemaining === 'number'
-                  ? `${flintMsgsRemaining} left`
-                  : flintMsgsRemaining}
-              </Text>
-            </Text>
-          </View>
+          {renderTelemetry('AI Likes:', 'AI Messages:')}
         </View>
 
         {/* Hero Identity: Avatar + Name + Age + Taglines */}
@@ -442,34 +392,33 @@ export default function TinderProfileCard({
                 source={{ uri: typeof heroPhoto === 'string' ? heroPhoto : heroPhoto?.url }}
                 style={styles.avatarImage}
                 onError={() => setPhotoError(true)}
+                accessibilityLabel={name ? `${name}'s profile photo` : 'Profile photo'}
               />
             ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Ionicons name="flame" size={32} color="#FE3C72" />
-              </View>
+              renderPlaceholder('lg', styles.avatarImage)
             )}
             <View style={styles.avatarFlameIcon}>
-              <Ionicons name="flame" size={12} color="#FFFFFF" />
+              <Ionicons name="flame" size={12} color={theme.colors.onPrimary} />
             </View>
           </View>
 
           <View style={styles.identityContent}>
             <View style={styles.nameRow}>
-              <Text style={styles.profileName} numberOfLines={1}>
+              <Text style={styles.profileName} numberOfLines={1} accessibilityRole="header">
                 {name || 'Tinder Profile'}
               </Text>
               {age ? <Text style={styles.profileAge}>, {age}</Text> : null}
               <Ionicons
                 name="checkmark-circle"
                 size={18}
-                color="#00D0FF"
+                color={theme.colors.info}
                 style={styles.verifiedIcon}
               />
             </View>
 
             {city ? (
               <View style={styles.metaRow}>
-                <Ionicons name="location-sharp" size={13} color="#FF655B" />
+                <Ionicons name="location-sharp" size={13} color={theme.colors.secondary} />
                 <Text style={styles.metaText} numberOfLines={1}>
                   {city}
                 </Text>
@@ -500,7 +449,7 @@ export default function TinderProfileCard({
         {photos.length > 1 && (
           <View style={styles.photosSection}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionMiniTitle}>PHOTOS</Text>
+              <Text style={styles.sectionMiniTitle} accessibilityRole="header">PHOTOS</Text>
               <Text style={styles.sectionCounter}>{photos.length} synced</Text>
             </View>
             <ScrollView
@@ -516,11 +465,17 @@ export default function TinderProfileCard({
                     key={`${photoUrl}-${idx}`}
                     onPress={() => setSelectedPhotoIdx(idx)}
                     activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Photo ${idx + 1} of ${photos.length}`}
+                    accessibilityState={{ selected: isSelected }}
                     style={[
                       styles.photoThumbWrapper,
                       isSelected && styles.photoThumbSelected,
                     ]}
                   >
+                    <View style={styles.photoThumbFallback}>
+                      <Ionicons name="image-outline" size={18} color={theme.colors.textTertiary} />
+                    </View>
                     <Image source={{ uri: photoUrl }} style={styles.photoThumbImage} />
                   </TouchableOpacity>
                 );
@@ -535,7 +490,7 @@ export default function TinderProfileCard({
             <Ionicons
               name="chatbox-ellipses-outline"
               size={16}
-              color="#FE3C72"
+              color={theme.colors.accent}
               style={styles.bioIcon}
             />
             <Text style={styles.bioText}>"{bio}"</Text>
@@ -545,14 +500,14 @@ export default function TinderProfileCard({
         {/* Passions & Interests Chips Cloud */}
         {interests.length > 0 && (
           <View style={styles.interestsSection}>
-            <Text style={styles.sectionMiniTitle}>PASSIONS & INTERESTS</Text>
+            <Text style={styles.sectionMiniTitle} accessibilityRole="header">PASSIONS & INTERESTS</Text>
             <View style={styles.chipsCloud}>
               {interests.map((interest, idx) => {
                 const label = typeof interest === 'string' ? interest : interest?.name || '';
                 if (!label) return null;
                 return (
                   <View key={`${label}-${idx}`} style={styles.interestChip}>
-                    <Text style={styles.interestChipText}>{label}</Text>
+                    <Text style={styles.interestChipText} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{label}</Text>
                   </View>
                 );
               })}
@@ -563,17 +518,15 @@ export default function TinderProfileCard({
         {/* Vitals & Lifestyle 2-Column Grid */}
         {activeVitals.length > 0 && (
           <View style={styles.vitalsSection}>
-            <Text style={styles.sectionMiniTitle}>LIFESTYLE & DETAILS</Text>
+            <Text style={styles.sectionMiniTitle} accessibilityRole="header">LIFESTYLE & DETAILS</Text>
             <View style={styles.vitalsGrid}>
               {activeVitals.map((item) => {
                 const value = formatValue(tinderProfile[item.key]);
                 return (
-                  <View key={item.key} style={styles.vitalCell}>
-                    <View style={styles.vitalIconWrap}>
-                      <Ionicons name={item.icon} size={15} color="#FE3C72" />
-                    </View>
+                  <View key={item.key} style={styles.vitalCell} accessible accessibilityLabel={`${item.label}: ${value}`}>
+                    <IconWell icon={item.icon} tone="primary" size={28} iconSize={14} />
                     <View style={styles.vitalTextWrap}>
-                      <Text style={styles.vitalLabel}>{item.label}</Text>
+                      <Text style={styles.vitalLabel} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{item.label}</Text>
                       <Text style={styles.vitalValue} numberOfLines={2}>
                         {value}
                       </Text>
@@ -588,34 +541,25 @@ export default function TinderProfileCard({
         {/* Actions Dock */}
         <View style={styles.actionsDock}>
           {onSync && (
-            <TouchableOpacity
-              style={styles.syncButton}
+            <AppButton
+              title={syncing ? 'Syncing...' : 'Sync latest details'}
+              icon="refresh-outline"
+              size="sm"
               onPress={onSync}
-              disabled={syncing}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-            >
-              {syncing ? (
-                <SafeActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
-              )}
-              <Text style={styles.syncButtonText}>
-                {syncing ? 'Syncing...' : 'Sync latest details'}
-              </Text>
-            </TouchableOpacity>
+              loading={syncing}
+              style={styles.dockButton}
+            />
           )}
 
           {onOpenTinder && (
-            <TouchableOpacity
-              style={styles.openTinderBtn}
+            <AppButton
+              title="Open Tinder"
+              icon="flame"
+              size="sm"
+              variant="secondary"
               onPress={onOpenTinder}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-            >
-              <Ionicons name="flame" size={16} color="#FE3C72" />
-              <Text style={styles.openTinderText}>Open Tinder</Text>
-            </TouchableOpacity>
+              style={styles.dockButton}
+            />
           )}
         </View>
       </LinearGradient>
@@ -623,376 +567,277 @@ export default function TinderProfileCard({
   );
 }
 
+const c = theme.colors;
 const styles = StyleSheet.create({
   cardContainer: {
     width: '100%',
-    marginVertical: 4,
+    marginVertical: theme.spacing.xs,
   },
   heroCard: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: theme.radius.card,
+    padding: theme.spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.22)',
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 4,
-    gap: 14,
+    borderColor: c.primaryBorder,
+    ...theme.shadows.md,
+    gap: theme.spacing.lg,
   },
   collapsedCard: {
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: theme.radius.card,
+    padding: theme.spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.22)',
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 3,
-    gap: 10,
+    borderColor: c.primaryBorder,
+    ...theme.shadows.sm,
+    gap: theme.spacing.md,
   },
   collapsedHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: theme.spacing.md,
   },
   collapsedAvatarWrap: {
     position: 'relative',
   },
   collapsedAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.surface,
+    width: 48,
+    height: 48,
+    borderRadius: theme.radius.md,
+    backgroundColor: c.elevated,
     borderWidth: 1.5,
-    borderColor: '#FE3C72',
-  },
-  collapsedPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#2D1425',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FE3C72',
+    borderColor: c.primaryBorder,
   },
   collapsedLiveDot: {
     position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#61D6A3',
-    borderWidth: 1.5,
-    borderColor: '#170C16',
+    bottom: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: c.success,
+    borderWidth: 2,
+    borderColor: c.surface,
   },
   collapsedIdentity: {
     flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   collapsedName: {
+    ...theme.type.headline,
     fontFamily: theme.fonts.heading,
-    fontSize: 16,
-    color: theme.colors.text,
-    fontWeight: '700',
+    color: c.text,
+    flexShrink: 1,
   },
   collapsedAge: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-    fontWeight: '400',
+    ...theme.type.headline,
+    fontFamily: theme.fonts.body,
+    color: c.textSecondary,
   },
   collapsedSubtitle: {
-    ...theme.type.caption,
-    color: theme.colors.muted,
-    fontSize: 11,
+    ...theme.type.footnote,
+    color: c.muted,
   },
   collapsedRightAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: theme.spacing.sm,
+    flexShrink: 0,
   },
   telemetryDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: c.divider,
   },
   telemetryStrip: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: theme.spacing.sm,
   },
   telemetryPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    maxWidth: '100%',
+    backgroundColor: c.neutralSoft,
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: c.neutralBorder,
   },
   telemetryText: {
-    fontSize: 11,
-    color: theme.colors.muted,
+    ...theme.type.footnote,
+    color: c.muted,
+    flexShrink: 1,
   },
   telemetryValue: {
-    color: theme.colors.text,
-    fontWeight: '600',
+    fontFamily: theme.fonts.label,
+    color: c.text,
+  },
+  sessionBadge: {
+    alignSelf: 'center',
   },
   emptyCard: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: theme.radius.card,
+    padding: theme.spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.22)',
-    shadowColor: '#FE3C72',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    elevation: 3,
-    gap: 12,
+    borderColor: c.primaryBorder,
+    ...theme.shadows.sm,
+    gap: theme.spacing.lg,
   },
   emptyHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: theme.spacing.md,
   },
   emptyIconBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyHeaderTextWrap: {
     flex: 1,
-    gap: 3,
+    minWidth: 0,
+    gap: theme.spacing.xs,
   },
   emptyTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: 6,
   },
   emptyTitle: {
+    ...theme.type.headline,
     fontFamily: theme.fonts.heading,
-    color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  emptyStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.28)',
-  },
-  emptyStatusBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: '#FE3C72',
-    letterSpacing: 0.5,
+    color: c.text,
+    flexShrink: 1,
   },
   emptySubtitle: {
-    ...theme.type.caption,
-    color: theme.colors.muted,
-    fontSize: 11.5,
-    lineHeight: 16,
+    ...theme.type.footnote,
+    color: c.muted,
   },
   cardDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: c.divider,
   },
   benefitList: {
-    gap: 8,
+    gap: theme.spacing.md,
   },
   benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 2,
-  },
-  benefitIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: theme.spacing.md,
   },
   benefitTextWrap: {
     flex: 1,
-    gap: 1,
+    minWidth: 0,
+    gap: 2,
   },
   benefitTitle: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: theme.colors.text,
+    ...theme.type.subhead,
+    fontFamily: theme.fonts.label,
+    color: c.text,
   },
   benefitDesc: {
-    fontSize: 11,
-    color: theme.colors.muted,
-    lineHeight: 15,
-  },
-  connectButton: {
-    width: '100%',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  connectButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  connectButtonText: {
-    ...theme.type.label,
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13.5,
+    ...theme.type.footnote,
+    color: c.muted,
   },
   trustRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    marginTop: -theme.spacing.xs,
   },
   trustText: {
-    fontSize: 11,
-    color: theme.colors.muted,
-    opacity: 0.8,
+    ...theme.type.footnote,
+    color: c.muted,
+    flexShrink: 1,
+    textAlign: 'center',
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 2,
+    gap: theme.spacing.sm,
+    minHeight: theme.layout.touchTarget - 8,
   },
   headerBrand: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: theme.spacing.sm,
+    flexShrink: 1,
+    minWidth: 0,
   },
   flameIconBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(254, 60, 114, 0.18)',
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    backgroundColor: alpha(c.tinder, 0.16),
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerBrandText: {
-    ...theme.type.caption,
-    color: '#FF655B',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    ...theme.type.overline,
+    color: c.secondary,
+    flexShrink: 1,
   },
   headerBadges: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     gap: 6,
-  },
-  sessionPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(97, 214, 163, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(97, 214, 163, 0.3)',
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#61D6A3',
-  },
-  sessionText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#61D6A3',
-  },
-  tierPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  tierPlatinum: {
-    backgroundColor: 'rgba(229, 228, 226, 0.15)',
-    borderColor: 'rgba(229, 228, 226, 0.4)',
-  },
-  tierGold: {
-    backgroundColor: 'rgba(255, 215, 0, 0.15)',
-    borderColor: 'rgba(255, 215, 0, 0.4)',
-  },
-  tierPlus: {
-    backgroundColor: 'rgba(254, 60, 114, 0.15)',
-    borderColor: 'rgba(254, 60, 114, 0.4)',
-  },
-  tierFree: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  tierText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: theme.colors.text,
+    flexShrink: 1,
   },
   identityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: theme.spacing.lg,
   },
   avatarWrapper: {
     position: 'relative',
   },
   avatarImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: theme.colors.surface,
+    width: 80,
+    height: 80,
+    borderRadius: theme.radius.xl,
+    backgroundColor: c.elevated,
     borderWidth: 2,
-    borderColor: '#FE3C72',
+    borderColor: c.primaryBorder,
   },
-  avatarPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#2D1425',
+  photoPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FE3C72',
+    backgroundColor: c.elevatedHigh,
+  },
+  placeholderInitials: {
+    ...theme.type.headline,
+    fontFamily: theme.fonts.heading,
+    color: c.textSecondary,
+  },
+  placeholderInitialsLg: {
+    ...theme.type.title,
   },
   avatarFlameIcon: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#FE3C72',
+    bottom: -4,
+    right: -4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: c.tinder,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#170C16',
+    borderColor: c.surface,
   },
   identityContent: {
     flex: 1,
-    gap: 3,
+    minWidth: 0,
+    gap: theme.spacing.xs,
   },
   nameRow: {
     flexDirection: 'row',
@@ -1000,33 +845,33 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   profileName: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 19,
-    color: theme.colors.text,
-    fontWeight: '700',
+    ...theme.type.title2,
+    color: c.text,
+    flexShrink: 1,
   },
   profileAge: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 19,
-    color: theme.colors.textSecondary,
-    fontWeight: '400',
+    ...theme.type.title2,
+    fontFamily: theme.fonts.body,
+    color: c.textSecondary,
   },
   verifiedIcon: {
     marginLeft: 6,
   },
+  verifiedIconSm: {
+    marginLeft: theme.spacing.xs,
+  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   metaText: {
-    ...theme.type.caption,
-    color: theme.colors.muted,
-    fontSize: 12,
+    ...theme.type.footnote,
+    color: c.muted,
     flex: 1,
   },
   photosSection: {
-    gap: 8,
+    gap: theme.spacing.sm,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1034,59 +879,61 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionMiniTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.muted,
-    letterSpacing: 0.8,
+    ...theme.type.overline,
+    color: c.muted,
   },
   sectionCounter: {
-    fontSize: 11,
-    color: theme.colors.muted,
+    ...theme.type.footnote,
+    color: c.muted,
   },
   photoStripContainer: {
     flexDirection: 'row',
-    gap: 8,
+    gap: theme.spacing.sm,
     paddingVertical: 2,
   },
   photoThumbWrapper: {
     width: 60,
     height: 80,
-    borderRadius: 10,
+    borderRadius: theme.radius.sm,
     overflow: 'hidden',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: 'transparent',
+    backgroundColor: c.elevated,
   },
   photoThumbSelected: {
-    borderColor: '#FE3C72',
+    borderColor: c.primary,
+  },
+  photoThumbFallback: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   photoThumbImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: theme.radius.sm - 2,
   },
   bioCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    padding: 12,
-    borderRadius: 12,
+    gap: theme.spacing.sm,
+    backgroundColor: alpha(c.black, 0.25),
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.15)',
+    borderColor: c.hairline,
   },
   bioIcon: {
     marginTop: 2,
   },
   bioText: {
-    ...theme.type.body,
-    fontSize: 13,
-    lineHeight: 19,
-    color: theme.colors.text,
+    ...theme.type.callout,
+    color: c.text,
     flex: 1,
     fontStyle: 'italic',
   },
   interestsSection: {
-    gap: 8,
+    gap: theme.spacing.sm,
   },
   chipsCloud: {
     flexDirection: 'row',
@@ -1094,99 +941,65 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   interestChip: {
-    backgroundColor: 'rgba(254, 60, 114, 0.1)',
+    maxWidth: '100%',
+    backgroundColor: c.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    borderColor: c.primaryBorder,
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 6,
   },
   interestChipText: {
-    fontSize: 12,
-    color: theme.colors.text,
-    fontWeight: '500',
+    ...theme.type.subhead,
+    color: c.text,
   },
   vitalsSection: {
-    gap: 8,
+    gap: theme.spacing.sm,
   },
   vitalsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: theme.spacing.sm,
   },
   vitalCell: {
-    width: '48%',
+    flexBasis: '46%',
+    flexGrow: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    padding: 8,
-    borderRadius: 10,
+    gap: theme.spacing.sm,
+    backgroundColor: c.neutralSoft,
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  vitalIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: c.borderSubtle,
   },
   vitalTextWrap: {
     flex: 1,
+    minWidth: 0,
   },
   vitalLabel: {
+    ...theme.type.overline,
     fontSize: 10,
-    color: theme.colors.muted,
+    lineHeight: 13,
+    letterSpacing: 0.6,
+    color: c.muted,
     textTransform: 'uppercase',
-    fontWeight: '600',
   },
   vitalValue: {
-    fontSize: 12,
-    color: theme.colors.text,
-    fontWeight: '500',
+    ...theme.type.footnote,
+    fontFamily: theme.fonts.caption,
+    color: c.text,
   },
   actionsDock: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
   },
-  syncButton: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 12,
-    backgroundColor: '#FE3C72',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-  },
-  syncButtonText: {
-    ...theme.type.label,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  openTinderBtn: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.4)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-  },
-  openTinderText: {
-    ...theme.type.label,
-    color: '#FE3C72',
-    fontWeight: '600',
-    fontSize: 13,
+  dockButton: {
+    flexGrow: 1,
+    flexBasis: 150,
   },
 });

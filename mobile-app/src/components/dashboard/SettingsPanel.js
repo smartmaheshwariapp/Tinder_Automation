@@ -1,4 +1,3 @@
-import { theme as uiTheme } from '../../theme';
 // src/components/dashboard/SettingsPanel.js — Exact 1:1 FlirtEasy V2 Settings Architecture
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
@@ -25,6 +24,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../../utils/network';
 import TinderProfileCard from './TinderProfileCard';
+import { theme as uiTheme } from '../../theme';
+import { FocusInput } from '../common/Motion';
+import IconButton from '../ui/IconButton';
+import IconWell from '../ui/IconWell';
+import SectionHeader from '../ui/SectionHeader';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -670,8 +674,8 @@ export default function SettingsPanel({
   if (loading || !form) {
     return (
       <View style={styles.centerWrap}>
-        <ActivityIndicator size="small" color={uiTheme.colors.primary} />
-        <Text style={styles.loadingText}>Syncing Linksy Settings...</Text>
+        <ActivityIndicator size="small" color={uiTheme.colors.accent} />
+        <Text style={styles.loadingText} accessibilityRole="progressbar" accessibilityLabel="Syncing Linksy Settings">Syncing Linksy Settings...</Text>
       </View>
     );
   }
@@ -689,12 +693,14 @@ export default function SettingsPanel({
       >
 
         {/* ════════════════════ CATEGORY 1: SAFETY ════════════════════ */}
-        <Text style={styles.categoryLabel}>SAFETY</Text>
+        <SectionHeader title="SAFETY" description="Hourly limits that keep your account looking natural." style={[styles.sectionHeader, styles.sectionHeaderFirst]} />
 
         <View style={styles.card}>
           {/* Section Header with Independent Safety Toggle & Chevron */}
           <View style={styles.cardHeaderRow}>
             <TouchableOpacity accessibilityRole="button"
+              accessibilityLabel="Safety Mode details"
+              accessibilityState={{ expanded: !safetyCollapsed }}
               style={styles.headerLeftTouchable}
               onPress={() => {
                 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -702,32 +708,35 @@ export default function SettingsPanel({
               }}
               activeOpacity={0.7}
             >
-              <Text style={styles.cardTitle}>Safety Mode</Text>
+              <IconWell icon="shield-checkmark-outline" tone={isSafetyOn ? 'success' : 'warning'} size={36} />
+              <Text style={styles.cardTitle} numberOfLines={1}>Safety Mode</Text>
               <Ionicons
                 name={safetyCollapsed ? 'chevron-down' : 'chevron-up'}
-                size={16}
+                size={18}
                 color={uiTheme.colors.muted}
-                style={{ marginLeft: 4 }}
+                style={styles.headerChevron}
               />
             </TouchableOpacity>
 
             <Switch
+              accessibilityLabel="Safety Mode"
               value={isSafetyOn}
               onValueChange={v => {
                 updateField('safetyMode', v);
               }}
-              trackColor={{ false: uiTheme.colors.elevated, true: uiTheme.colors.primary }}
-              thumbColor={isSafetyOn ? '#FFF' : uiTheme.colors.muted}
+              trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+              thumbColor={uiTheme.colors.white}
+              ios_backgroundColor={uiTheme.colors.elevatedHigh}
             />
           </View>
 
           {/* Collapsible Inner Content (Hidden when collapsed) */}
           {!safetyCollapsed && (
-            <View style={{ marginTop: 8 }}>
+            <View style={styles.cardBody}>
               {/* 2 Independent Meter Boxes (Likes/hr: used/limit, Msgs/hr: used/limit) */}
               <View style={styles.metersRow}>
                 <View style={styles.meterBox}>
-                  <Text style={styles.meterLabel}>Likes/hr</Text>
+                  <Text style={styles.meterLabel} numberOfLines={1}>Likes/hr</Text>
                   <Text
                     style={[
                       styles.meterValue,
@@ -739,7 +748,7 @@ export default function SettingsPanel({
                 </View>
 
                 <View style={styles.meterBox}>
-                  <Text style={styles.meterLabel}>Msgs/hr</Text>
+                  <Text style={styles.meterLabel} numberOfLines={1}>Msgs/hr</Text>
                   <Text
                     style={[
                       styles.meterValue,
@@ -753,32 +762,32 @@ export default function SettingsPanel({
 
               {/* Badges Row (Auto-managed · Shadowban secure) */}
               <View style={styles.safetyFeaturesRow}>
-                <View style={styles.safetyFeatureChip}>
+                <View style={[styles.safetyFeatureChip, isSafetyOn ? styles.safetyFeatureChipOn : styles.safetyFeatureChipOff]}>
                   <Ionicons
                     name={isSafetyOn ? "checkmark" : "close"}
                     size={13}
-                    color={isSafetyOn ? "#16a34a" : uiTheme.colors.error}
+                    color={isSafetyOn ? uiTheme.colors.success : uiTheme.colors.error}
                   />
                   <Text
                     style={[
                       styles.safetyFeatureText,
-                      { color: isSafetyOn ? "#16a34a" : uiTheme.colors.error },
+                      { color: isSafetyOn ? uiTheme.colors.success : uiTheme.colors.error },
                     ]}
                   >
                     {isSafetyOn ? "Auto-managed" : "Manual overrides"}
                   </Text>
                 </View>
 
-                <View style={styles.safetyFeatureChip}>
+                <View style={[styles.safetyFeatureChip, isSafetyOn ? styles.safetyFeatureChipOn : styles.safetyFeatureChipOff]}>
                   <Ionicons
                     name={isSafetyOn ? "checkmark" : "warning"}
                     size={13}
-                    color={isSafetyOn ? "#16a34a" : uiTheme.colors.error}
+                    color={isSafetyOn ? uiTheme.colors.success : uiTheme.colors.error}
                   />
                   <Text
                     style={[
                       styles.safetyFeatureText,
-                      { color: isSafetyOn ? "#16a34a" : uiTheme.colors.error },
+                      { color: isSafetyOn ? uiTheme.colors.success : uiTheme.colors.error },
                     ]}
                   >
                     {isSafetyOn ? "Shadowban secure" : "Shadowban risk"}
@@ -788,24 +797,27 @@ export default function SettingsPanel({
 
               {/* Safety Lock Active Banner with manual reset override */}
               {Boolean(rateLimitStatus?.isSafetyLocked) && (
-                <View style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(234, 88, 12, 0.12)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(234, 88, 12, 0.3)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <View style={{ flex: 1, marginRight: 10 }}>
-                    <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, color: '#EA580C' }}>
+                <View style={styles.lockBanner} accessibilityRole="alert">
+                  <Ionicons name="time-outline" size={20} color={uiTheme.colors.warning} style={styles.lockBannerIcon} />
+                  <View style={styles.lockBannerCopy}>
+                    <Text style={styles.lockBannerTitle}>
                       Safety Lock Active ({rateLimitStatus.resetIn || 59}m remaining)
                     </Text>
-                    <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 11, color: uiTheme.colors.muted, marginTop: 2 }}>
+                    <Text style={styles.lockBannerText}>
                       Hourly limit reached. Tap Reset to resume swiping now.
                     </Text>
                   </View>
                   <TouchableOpacity accessibilityRole="button"
-                    style={{ backgroundColor: '#EA580C', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 6 }}
+                    accessibilityLabel="Reset safety limits"
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    style={styles.lockResetBtn}
                     onPress={async () => {
                       await resetRateLimits();
                       await saveOnDeviceSessionState({ waitingReason: null, nextRunTimestamp: null });
                       Alert.alert('Safety Limits Reset', 'Hourly safety rate limits have been cleared. You can resume swiping.');
                     }}
                   >
-                    <Text style={{ color: '#FFF', fontFamily: 'Inter_600SemiBold', fontSize: 12 }}>Reset</Text>
+                    <Text style={styles.lockResetText}>Reset</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -820,10 +832,12 @@ export default function SettingsPanel({
                 {/* Swipes Preset Row */}
                 <View style={styles.presetRow}>
                   <Text style={styles.presetLabel}>Swipes per cycle</Text>
-                  <View style={styles.presetButtonGroup}>
+                  <View style={styles.presetButtonGroup} accessibilityRole="radiogroup" accessibilityLabel="Swipes per cycle">
                     {SWIPE_PRESETS.map(val => (
                       <TouchableOpacity accessibilityRole="button"
                         key={val}
+                        accessibilityLabel={`${val} swipes per cycle`}
+                        accessibilityState={{ selected: activeSwipes === val, disabled: isSafetyOn }}
                         disabled={isSafetyOn}
                         style={[
                           styles.presetBtn,
@@ -848,10 +862,12 @@ export default function SettingsPanel({
                 {/* Messages Preset Row */}
                 <View style={styles.presetRow}>
                   <Text style={styles.presetLabel}>Messages per cycle</Text>
-                  <View style={styles.presetButtonGroup}>
+                  <View style={styles.presetButtonGroup} accessibilityRole="radiogroup" accessibilityLabel="Messages per cycle">
                     {MSG_PRESETS.map(val => (
                       <TouchableOpacity accessibilityRole="button"
                         key={val}
+                        accessibilityLabel={`${val} messages per cycle`}
+                        accessibilityState={{ selected: activeMsgs === val, disabled: isSafetyOn }}
                         disabled={isSafetyOn}
                         style={[
                           styles.presetBtn,
@@ -875,7 +891,7 @@ export default function SettingsPanel({
 
                 {isSafetyOn && (
                   <View style={styles.lockedNoteRow}>
-                    <Ionicons name="lock-closed" size={12} color={uiTheme.colors.muted} style={{ marginRight: 6 }} />
+                    <Ionicons name="lock-closed" size={14} color={uiTheme.colors.info} style={styles.lockedNoteIcon} />
                     <Text style={styles.lockedNoteText}>
                       Presets locked to safe defaults. Toggle Safety Mode OFF above to customize.
                     </Text>
@@ -948,7 +964,7 @@ export default function SettingsPanel({
                         <Text
                           style={[
                             styles.segBtnText,
-                            form?.useDeviceLocation && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' },
+                            form?.useDeviceLocation && { fontFamily: uiTheme.fonts.strong, color: uiTheme.colors.onPrimary, fontWeight: 'normal' },
                           ]}
                         >
                           Live Near Me
@@ -978,7 +994,7 @@ export default function SettingsPanel({
                         <Text
                           style={[
                             styles.segBtnText,
-                            !form?.useDeviceLocation && { fontFamily: 'Inter_700Bold', color: '#FFF', fontWeight: 'normal' },
+                            !form?.useDeviceLocation && { fontFamily: uiTheme.fonts.strong, color: uiTheme.colors.onPrimary, fontWeight: 'normal' },
                           ]}
                         >
                           Pick a City
@@ -1031,7 +1047,7 @@ export default function SettingsPanel({
                       <View style={styles.selectedCityBanner}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                           {CITY_PRESETS.find(p => (form?.locationCity || '').includes(p.short))?.flag ? (
-                            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 22 }}>
+                            <Text style={{ fontFamily: uiTheme.fonts.body, fontSize: 22 }}>
                               {CITY_PRESETS.find(p => (form?.locationCity || '').includes(p.short)).flag}
                             </Text>
                           ) : (
@@ -1089,7 +1105,7 @@ export default function SettingsPanel({
                         <TextInput
                           style={styles.hubSearchInput}
                           placeholder="Search city or country (e.g. London, Tokyo, Miami)..."
-                          placeholderTextColor="#555268"
+                          placeholderTextColor={uiTheme.colors.muted}
                           value={citySearchQuery}
                           onChangeText={setCitySearchQuery}
                           autoCapitalize="none"
@@ -1167,7 +1183,7 @@ export default function SettingsPanel({
 
                       {filteredPresets.length === 0 && (
                         <View style={styles.noHubsFoundWrap}>
-                          <Ionicons name="search-outline" size={22} color="#555268" />
+                          <Ionicons name="search-outline" size={22} color={uiTheme.colors.muted} />
                           <Text style={styles.noHubsFoundText}>No cities matching "{citySearchQuery}"</Text>
                           <TouchableOpacity accessibilityRole="button" onPress={() => setCitySearchQuery('')} style={{ marginTop: 4 }}>
                             <Text style={styles.resetFilterText}>Clear search</Text>
@@ -1209,7 +1225,7 @@ export default function SettingsPanel({
                                 updateField('useDeviceLocation', false);
                               }}
                               placeholder="e.g. Austin, TX or Berlin, Germany"
-                              placeholderTextColor="#555268"
+                              placeholderTextColor={uiTheme.colors.muted}
                             />
                           </View>
 
@@ -1222,7 +1238,7 @@ export default function SettingsPanel({
                                 onChangeText={(v) => updateField('locationLatitude', parseFloat(v) || 0)}
                                 keyboardType="numeric"
                                 placeholder="40.7128"
-                                placeholderTextColor="#555268"
+                                placeholderTextColor={uiTheme.colors.muted}
                               />
                             </View>
                             <View style={styles.customInputHalf}>
@@ -1233,7 +1249,7 @@ export default function SettingsPanel({
                                 onChangeText={(v) => updateField('locationLongitude', parseFloat(v) || 0)}
                                 keyboardType="numeric"
                                 placeholder="-74.0060"
-                                placeholderTextColor="#555268"
+                                placeholderTextColor={uiTheme.colors.muted}
                               />
                             </View>
                           </View>
@@ -1256,11 +1272,13 @@ export default function SettingsPanel({
         )}
 
         {/* ════════════════════ CATEGORY 2: AI PROFILE ════════════════════ */}
-        <Text style={styles.categoryLabel}>AI PROFILE</Text>
+        <SectionHeader title="AI PROFILE" description="What the AI knows about you when it writes." style={styles.sectionHeader} />
 
         <View style={styles.card}>
           {/* Card Title Row with Chevron */}
           <TouchableOpacity accessibilityRole="button"
+            accessibilityLabel="Your Bio (Improve it with AI)"
+            accessibilityState={{ expanded: !bioCollapsed }}
             style={styles.cardHeaderRow}
             onPress={() => {
               LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1268,7 +1286,10 @@ export default function SettingsPanel({
             }}
             activeOpacity={0.85}
           >
-            <Text style={styles.cardTitle}>Your Bio (Improve it with AI)</Text>
+            <View style={styles.cardHeaderLeft}>
+              <IconWell icon="document-text-outline" tone="primary" size={36} />
+              <Text style={styles.cardTitle} numberOfLines={2}>Your Bio (Improve it with AI)</Text>
+            </View>
             <Ionicons
               name={bioCollapsed ? 'chevron-down' : 'chevron-up'}
               size={18}
@@ -1277,10 +1298,12 @@ export default function SettingsPanel({
           </TouchableOpacity>
 
           {/* Segmented Mode Selector: Sync | Custom | Generate */}
-          <View style={styles.segmentedSelector}>
+          <View style={styles.segmentedSelector} accessibilityRole="tablist">
             {BIO_MODES.map(bm => (
-              <TouchableOpacity accessibilityRole="button"
+              <TouchableOpacity accessibilityRole="tab"
                 key={bm.id}
+                accessibilityLabel={bm.label}
+                accessibilityState={{ selected: bioMode === bm.id }}
                 style={[
                   styles.segBtn,
                   bioMode === bm.id && styles.segBtnActive,
@@ -1297,6 +1320,7 @@ export default function SettingsPanel({
                     styles.segBtnText,
                     bioMode === bm.id && styles.segBtnTextActive,
                   ]}
+                  numberOfLines={1}
                 >
                   {bm.label}
                 </Text>
@@ -1306,7 +1330,7 @@ export default function SettingsPanel({
 
           {/* Collapsible Details Drawer */}
           {!bioCollapsed && (
-            <View style={{ marginTop: 8 }}>
+            <View style={styles.bioDrawer}>
 
               {/* ── Panel 1: Sync with Live Dating Profile ── */}
               {bioMode === 'tinder' && (
@@ -1317,15 +1341,17 @@ export default function SettingsPanel({
 
                   <View style={styles.syncRow}>
                     <TouchableOpacity accessibilityRole="button"
+                      accessibilityLabel={syncSuccess ? 'Synced' : 'Sync Now'}
+                      accessibilityState={{ disabled: !!syncing, busy: !!syncing }}
                       style={styles.syncBtn}
                       onPress={handleSyncNow}
                       disabled={syncing}
                       activeOpacity={0.85}
                     >
                       {syncing ? (
-                        <ActivityIndicator size="small" color="#FFF" />
+                        <ActivityIndicator size="small" color={uiTheme.colors.onPrimary} />
                       ) : (
-                        <Text style={styles.syncBtnText}>
+                        <Text style={styles.syncBtnText} numberOfLines={1}>
                           {syncSuccess ? '✓ Synced' : 'Sync Now'}
                         </Text>
                       )}
@@ -1336,14 +1362,14 @@ export default function SettingsPanel({
                       onPress={() => setPreviewVisible(true)}
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="eye-outline" size={15} color={uiTheme.colors.primary} />
-                      <Text style={styles.previewEyeBtnText}>How AI Sees You</Text>
+                      <Ionicons name="eye-outline" size={16} color={uiTheme.colors.accent} />
+                      <Text style={styles.previewEyeBtnText} numberOfLines={1}>How AI Sees You</Text>
                     </TouchableOpacity>
                   </View>
 
                   {syncError ? (
                     <View style={styles.syncErrorCard}>
-                      <Ionicons name="alert-circle" size={14} color={uiTheme.colors.error} />
+                      <Ionicons name="alert-circle" size={16} color={uiTheme.colors.error} />
                       <Text style={styles.syncErrorText}>{syncError}</Text>
                     </View>
                   ) : (
@@ -1360,11 +1386,11 @@ export default function SettingsPanel({
               {/* ── Panel 2: Custom Bio ── */}
               {bioMode === 'manual' && (
                 <View style={styles.bioSubPanel}>
-                  <TextInput
+                  <FocusInput
                     style={styles.bioTextArea}
                     multiline={true}
                     placeholder="Enter your text here"
-                    placeholderTextColor="#55526B"
+                    accessibilityLabel="Custom bio"
                     value={form.manualBio || ''}
                     onChangeText={v => updateField('manualBio', v)}
                   />
@@ -1384,9 +1410,7 @@ export default function SettingsPanel({
                 <View style={styles.bioSubPanel}>
                   {genStep === 0 && (
                     <View style={styles.genStepWrap}>
-                      <View style={styles.magicIconWrap}>
-                        <Ionicons name="sparkles" size={24} color={uiTheme.colors.primary} />
-                      </View>
+                      <IconWell icon="sparkles" tone="primary" size={52} style={styles.magicIconWrap} />
                       <Text style={styles.magicTitle}>Generate a Magic Bio</Text>
                       <Text style={styles.magicDesc}>
                         Let AI analyze your profile and craft the perfect bio to maximize your matches.
@@ -1396,7 +1420,7 @@ export default function SettingsPanel({
                         onPress={handleRunGenerate}
                         activeOpacity={0.85}
                       >
-                        <Ionicons name="sparkles" size={14} color="#FFF" />
+                        <Ionicons name="sparkles" size={16} color={uiTheme.colors.onPrimary} />
                         <Text style={styles.magicCtaBtnText}>Generate Bio Now</Text>
                       </TouchableOpacity>
                     </View>
@@ -1404,7 +1428,7 @@ export default function SettingsPanel({
 
                   {genStep === 1 && (
                     <View style={styles.genLoadingWrap}>
-                      <ActivityIndicator size="small" color={uiTheme.colors.primary} />
+                      <ActivityIndicator size="small" color={uiTheme.colors.accent} />
                       <Text style={styles.genLoadingText}>
                         ✨ AI is crafting your personalized bio...
                       </Text>
@@ -1420,8 +1444,8 @@ export default function SettingsPanel({
                             {generatedBioData.score}
                           </Text>
                         </View>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={styles.scoreCopy}>
+                          <View style={styles.scoreTitleRow}>
                             <Text style={styles.scoreLabel}>Quality Score</Text>
                             <View style={styles.activeScoreTag}>
                               <Text style={styles.activeScoreTagText}>Active</Text>
@@ -1442,7 +1466,7 @@ export default function SettingsPanel({
 
                       {pushError && (
                         <View style={styles.syncErrorCard}>
-                          <Ionicons name="alert-circle" size={14} color={uiTheme.colors.error} />
+                          <Ionicons name="alert-circle" size={16} color={uiTheme.colors.error} />
                           <Text style={styles.syncErrorText}>{pushError}</Text>
                         </View>
                       )}
@@ -1464,14 +1488,15 @@ export default function SettingsPanel({
                           ]}
                           onPress={handlePushBio}
                           disabled={pushing}
+                          accessibilityState={{ disabled: !!pushing, busy: !!pushing }}
                           activeOpacity={0.85}
                         >
                           {pushing ? (
-                            <ActivityIndicator size="small" color="#FFF" />
+                            <ActivityIndicator size="small" color={uiTheme.colors.onPrimary} />
                           ) : (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <View style={styles.genActionPushInner}>
                               {pushSuccess && (
-                                <Ionicons name="checkmark-circle" size={14} color="#FFF" />
+                                <Ionicons name="checkmark-circle" size={16} color={uiTheme.colors.onPrimary} />
                               )}
                               <Text style={styles.genActionPushText}>
                                 {pushSuccess ? '✓ Pushed to Tinder' : '↓ Push Bio to Tinder'}
@@ -1504,7 +1529,7 @@ export default function SettingsPanel({
         </View>
 
         {/* ════════════════════ CATEGORY 3: ACCOUNT ════════════════════ */}
-        <Text style={styles.categoryLabel}>ACCOUNT & SESSION</Text>
+        <SectionHeader title="ACCOUNT & SESSION" description="Your connected Tinder account." style={styles.sectionHeader} />
 
         <View style={styles.card}>
           <View style={styles.accountProfileRow}>
@@ -1519,7 +1544,7 @@ export default function SettingsPanel({
             </View>
             <View style={styles.accountInfoWrap}>
               <View style={styles.accountTitleRow}>
-                <Text style={styles.accountTitle}>
+                <Text style={styles.accountTitle} numberOfLines={1}>
                   {isTinderLoggedIn
                     ? (form?.userProfile?.name
                       ? `${form.userProfile.name} (Tinder)`
@@ -1537,6 +1562,7 @@ export default function SettingsPanel({
                       styles.accountPlanText,
                       !isTinderLoggedIn && styles.accountInactiveBadgeText,
                     ]}
+                    numberOfLines={1}
                   >
                     {isTinderLoggedIn ? 'PRO PLAN ✦' : 'NOT CONNECTED'}
                   </Text>
@@ -1558,13 +1584,15 @@ export default function SettingsPanel({
               style={styles.accountLogoutBtn}
               onPress={handleLogoutPress}
               disabled={loggingOut}
+              accessibilityLabel="Log Out of Tinder"
+              accessibilityState={{ disabled: !!loggingOut, busy: !!loggingOut }}
               activeOpacity={0.85}
             >
               {loggingOut ? (
                 <ActivityIndicator size="small" color={uiTheme.colors.error} />
               ) : (
                 <View style={styles.accountLogoutBtnInner}>
-                  <Ionicons name="log-out-outline" size={16} color={uiTheme.colors.error} />
+                  <Ionicons name="log-out-outline" size={18} color={uiTheme.colors.error} />
                   <Text style={styles.accountLogoutBtnText}>Log Out of Tinder</Text>
                 </View>
               )}
@@ -1576,9 +1604,9 @@ export default function SettingsPanel({
               activeOpacity={0.85}
             >
               <View style={styles.accountConnectBtnInner}>
-                <Ionicons name="flame" size={16} color="#FFFFFF" />
+                <Ionicons name="flame" size={18} color={uiTheme.colors.onPrimary} />
                 <Text style={styles.accountConnectBtnText}>Log In to Tinder</Text>
-                <Ionicons name="arrow-forward" size={14} color="#FFFFFF" style={{ marginLeft: 2 }} />
+                <Ionicons name="arrow-forward" size={16} color={uiTheme.colors.onPrimary} />
               </View>
             </TouchableOpacity>
           )}
@@ -1587,9 +1615,11 @@ export default function SettingsPanel({
         {/* ════════════════════ CATEGORY 4: DIRECT KEYPAD ════════════════════ */}
         {rawControlsContent && (
           <>
-            <Text style={styles.categoryLabel}>VIRTUAL CONTAINER CONTROLS</Text>
+            <SectionHeader title="VIRTUAL CONTAINER CONTROLS" description="Manual OTP and keypad input." style={styles.sectionHeader} />
             <View style={styles.card}>
               <TouchableOpacity accessibilityRole="button"
+                accessibilityLabel="Direct OTP & Keypad"
+                accessibilityState={{ expanded: !!showRawControls }}
                 style={styles.cardHeaderRow}
                 onPress={() => {
                   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1597,9 +1627,9 @@ export default function SettingsPanel({
                 }}
                 activeOpacity={0.85}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="keypad-outline" size={16} color={uiTheme.colors.info} />
-                  <Text style={styles.cardTitle}>Direct OTP & Keypad</Text>
+                <View style={styles.cardHeaderLeft}>
+                  <IconWell icon="keypad-outline" tone="info" size={36} />
+                  <Text style={styles.cardTitle} numberOfLines={1}>Direct OTP & Keypad</Text>
                 </View>
                 <Ionicons
                   name={showRawControls ? 'chevron-up' : 'chevron-down'}
@@ -1627,18 +1657,21 @@ export default function SettingsPanel({
         onRequestClose={() => setPreviewVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
+          <View style={styles.modalSheet} accessibilityViewIsModal>
+            <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>How AI Sees You</Text>
-                <Text style={styles.modalSubtitle}>YOUR SYNCED PROFILE CONTEXT</Text>
+              <View style={styles.modalHeaderCopy}>
+                <Text style={styles.modalTitle} accessibilityRole="header" numberOfLines={1}>How AI Sees You</Text>
+                <Text style={styles.modalSubtitle} numberOfLines={1}>YOUR SYNCED PROFILE CONTEXT</Text>
               </View>
-              <TouchableOpacity accessibilityRole="button"
+              <IconButton
+                icon="close"
+                size={40}
+                iconSize={20}
                 style={styles.modalCloseBtn}
                 onPress={() => setPreviewVisible(false)}
-              >
-                <Ionicons name="close" size={20} color={uiTheme.colors.text} />
-              </TouchableOpacity>
+                accessibilityLabel="Close"
+              />
             </View>
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
@@ -1665,12 +1698,12 @@ export default function SettingsPanel({
         statusBarTranslucent
       >
         <View style={styles.logoutModalOverlay}>
-          <View style={styles.logoutModalCard}>
+          <View style={styles.logoutModalCard} accessibilityViewIsModal>
             <View style={styles.logoutIconBadge}>
               <Ionicons name="log-out" size={28} color={uiTheme.colors.error} />
             </View>
 
-            <Text style={styles.logoutModalTitle}>Log Out of Tinder?</Text>
+            <Text style={styles.logoutModalTitle} accessibilityRole="header">Log Out of Tinder?</Text>
             <Text style={styles.logoutModalSubtitle}>
               This will end the active Tinder session and pause your AI automation assistant until you sign back in.
             </Text>
@@ -1689,13 +1722,15 @@ export default function SettingsPanel({
                 style={styles.logoutModalConfirmBtn}
                 onPress={executeLogout}
                 disabled={loggingOut}
+                accessibilityLabel="Log Out"
+                accessibilityState={{ disabled: !!loggingOut, busy: !!loggingOut }}
                 activeOpacity={0.85}
               >
                 {loggingOut ? (
-                  <ActivityIndicator size="small" color="#FFF" />
+                  <ActivityIndicator size="small" color={uiTheme.colors.onPrimary} />
                 ) : (
                   <>
-                    <Ionicons name="log-out-outline" size={16} color="#FFF" />
+                    <Ionicons name="log-out-outline" size={18} color={uiTheme.colors.onPrimary} />
                     <Text style={styles.logoutModalConfirmText}>Log Out</Text>
                   </>
                 )}
@@ -1722,593 +1757,722 @@ export default function SettingsPanel({
   );
 }
 
+const c = uiTheme.colors;
+const sp = uiTheme.spacing;
+const r = uiTheme.radius;
+const ty = uiTheme.type;
+const L = uiTheme.layout;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: uiTheme.colors.background,
+    backgroundColor: c.background,
   },
   centerWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: uiTheme.spacing.xl,
-    backgroundColor: uiTheme.colors.background,
+    padding: sp.xl,
+    backgroundColor: c.background,
   },
-  loadingText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    marginTop: 10,
-    fontSize: 13,
+  loadingText: {
+    ...ty.footnote,
+    color: c.muted,
+    marginTop: sp.md,
+    textAlign: 'center',
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    padding: 14,
-    paddingBottom: 90,
-    gap: 6,
+    paddingHorizontal: sp.xxs,
+    paddingTop: 0,
+    paddingBottom: sp.section,
   },
-
-  categoryLabel: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    color: '#94a3b8',
-    letterSpacing: 0.8,
-    marginTop: 10,
-    marginBottom: uiTheme.spacing.xs,
-    marginLeft: uiTheme.spacing.xs,
+  categoryLabel: {
+    ...ty.overline,
+    color: c.muted,
+    marginTop: sp.xxl,
+    marginBottom: sp.sm,
+    marginLeft: sp.xs,
     textTransform: 'uppercase',
   },
-
+  sectionHeader: {
+    marginTop: sp.xxl,
+  },
+  sectionHeaderFirst: {
+    marginTop: sp.xs,
+  },
   card: {
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.input,
+    backgroundColor: c.surface,
+    borderRadius: r.card,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    padding: 14,
-    marginBottom: 6,
+    borderColor: c.borderSubtle,
+    padding: sp.lg,
   },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 36,
+    gap: sp.md,
+    minHeight: 48,
+  },
+  cardHeaderLeft: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
   },
   headerLeftTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: sp.md,
     flex: 1,
-    paddingVertical: uiTheme.spacing.xs,
+    minWidth: 0,
+    minHeight: L.touchTarget,
+    paddingVertical: sp.xs,
   },
-  cardTitle: { fontFamily: 'Inter_600SemiBold',
-    color: '#FFF',
-    fontSize: uiTheme.type.body.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.1,
+  headerChevron: {
+    marginLeft: -sp.xs,
+  },
+  cardTitle: {
+    ...ty.headline,
+    color: c.text,
+    flexShrink: 1,
+  },
+  cardBody: {
+    marginTop: sp.md,
   },
 
   // ── 2 Independent Side-by-Side Meter Boxes ──
   metersRow: {
     flexDirection: 'row',
-    gap: uiTheme.spacing.sm,
-    marginTop: 10,
+    gap: sp.sm,
+    marginTop: sp.xs,
   },
   meterBox: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: 10,
+    gap: sp.xs,
+    minHeight: 48,
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: c.hairline,
   },
-  meterLabel: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  meterLabel: {
+    ...ty.footnote,
+    color: c.muted,
+    flexShrink: 1,
   },
-  meterValue: { fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-    fontWeight: 'normal',
-    color: '#FFF',
+  meterValue: {
+    ...ty.headline,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.text,
+    fontVariant: ['tabular-nums'],
   },
   meterValueDanger: {
-    color: uiTheme.colors.error,
+    color: c.error,
   },
 
   // ── Badges Row ──
   safetyFeaturesRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: 2,
-    marginTop: uiTheme.spacing.xs,
+    gap: sp.sm,
+    marginTop: sp.md,
   },
   safetyFeatureChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.xs,
+    gap: sp.xs,
+    paddingHorizontal: sp.md - 2,
+    paddingVertical: sp.xs,
+    borderRadius: r.pill,
+    borderWidth: 1,
+    borderColor: c.neutralBorder,
+    backgroundColor: c.neutralSoft,
   },
-  safetyFeatureText: { fontFamily: 'Inter_500Medium',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  safetyFeatureChipOn: {
+    backgroundColor: c.successSoft,
+    borderColor: c.successBorder,
+  },
+  safetyFeatureChipOff: {
+    backgroundColor: c.errorSoft,
+    borderColor: c.errorBorder,
+  },
+  safetyFeatureText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.label,
+  },
+
+  // ── Safety lock warning ──
+  lockBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    marginTop: sp.md,
+    padding: sp.md,
+    backgroundColor: c.warningSoft,
+    borderRadius: r.lg,
+    borderWidth: 1,
+    borderColor: c.warningBorder,
+  },
+  lockBannerIcon: {
+    alignSelf: 'flex-start',
+    marginTop: 1,
+  },
+  lockBannerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  lockBannerTitle: {
+    ...ty.label,
+    color: c.warning,
+  },
+  lockBannerText: {
+    ...ty.footnote,
+    color: c.textSecondary,
+    marginTop: sp.xxs,
+  },
+  lockResetBtn: {
+    minHeight: 36,
+    justifyContent: 'center',
+    backgroundColor: c.warning,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs + 2,
+    borderRadius: r.sm,
+  },
+  lockResetText: {
+    ...ty.buttonSmall,
+    color: c.background,
   },
 
   // ── Presets ──
   presetSection: {
-    marginTop: 10,
-    gap: uiTheme.spacing.md,
+    marginTop: sp.lg,
+    paddingTop: sp.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.divider,
+    gap: sp.lg,
   },
   presetSectionLocked: {
     opacity: 0.55,
   },
   presetRow: {
-    gap: 6,
+    gap: sp.sm,
   },
-  presetLabel: { fontFamily: 'Inter_500Medium',
-    color: '#9ca3af',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  presetLabel: {
+    ...ty.label,
+    color: c.textSecondary,
   },
   presetButtonGroup: {
     flexDirection: 'row',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
+    backgroundColor: c.background,
+    borderRadius: r.md,
     padding: 3,
     gap: 3,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: c.border,
   },
   presetBtn: {
     flex: 1,
-    paddingVertical: 7,
+    minWidth: 0,
+    minHeight: 40,
+    paddingVertical: sp.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 6,
+    borderRadius: r.sm,
   },
   presetBtnActive: {
-    backgroundColor: uiTheme.colors.primary,
+    backgroundColor: c.primary,
+    ...uiTheme.shadows.sm,
   },
-  presetBtnText: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  presetBtnText: {
+    ...ty.subhead,
+    color: c.muted,
+    fontVariant: ['tabular-nums'],
   },
-  presetBtnTextActive: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontWeight: 'normal',
+  presetBtnTextActive: {
+    fontFamily: uiTheme.fonts.strong,
+    color: c.onPrimary,
   },
   lockedNoteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: uiTheme.spacing.xs,
+    gap: sp.sm,
+    padding: sp.md,
+    backgroundColor: c.infoSoft,
+    borderRadius: r.md,
+    borderWidth: 1,
+    borderColor: c.infoBorder,
   },
-  lockedNoteText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontStyle: 'italic',
+  lockedNoteIcon: {
+    alignSelf: 'flex-start',
+    marginTop: 1,
+  },
+  lockedNoteText: {
+    ...ty.footnote,
+    color: c.textSecondary,
     flex: 1,
+    minWidth: 0,
   },
 
   // ── Segmented Mode Selector ──
   segmentedSelector: {
     flexDirection: 'row',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
+    backgroundColor: c.background,
+    borderRadius: r.md,
     padding: 3,
     gap: 3,
     borderWidth: 1,
-    borderColor: '#221E33',
-    marginTop: 10,
+    borderColor: c.border,
+    marginTop: sp.md,
   },
   segBtn: {
     flex: 1,
-    paddingVertical: 7,
+    minWidth: 0,
+    minHeight: 40,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.xs,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 6,
+    borderRadius: r.sm,
   },
   segBtnActive: {
-    backgroundColor: uiTheme.colors.elevated,
+    backgroundColor: c.primary,
+    ...uiTheme.shadows.sm,
   },
-  segBtnText: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  segBtnText: {
+    ...ty.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
   },
-  segBtnTextActive: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontWeight: 'normal',
+  segBtnTextActive: {
+    fontFamily: uiTheme.fonts.label,
+    color: c.onPrimary,
   },
-
+  bioDrawer: {
+    marginTop: sp.xs,
+  },
   bioSubPanel: {
-    marginTop: 10,
+    marginTop: sp.md,
   },
-  bioPanelHint: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    lineHeight: 16,
+  bioPanelHint: {
+    ...ty.footnote,
+    color: c.muted,
+    flexShrink: 1,
   },
   syncRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
-    marginTop: uiTheme.spacing.sm,
-    marginBottom: uiTheme.spacing.sm,
+    gap: sp.sm,
+    marginTop: sp.md,
+    marginBottom: sp.md,
   },
   syncBtn: {
     flex: 1,
-    backgroundColor: uiTheme.colors.primary,
-    borderRadius: uiTheme.radius.small,
-    paddingVertical: 9,
+    minWidth: 0,
+    minHeight: L.touchTarget,
+    backgroundColor: c.primary,
+    borderRadius: r.button,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  syncBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: 12.5,
-    fontWeight: 'normal',
+  syncBtnText: {
+    ...ty.buttonSmall,
+    color: c.onPrimary,
   },
   previewEyeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: uiTheme.colors.elevated,
+    justifyContent: 'center',
+    gap: sp.xs + 2,
+    flexShrink: 1,
+    minHeight: L.touchTarget,
+    backgroundColor: c.elevated,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
-    borderRadius: uiTheme.radius.small,
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: 9,
+    borderColor: c.primaryBorder,
+    borderRadius: r.button,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm,
   },
-  previewEyeBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  previewEyeBtnText: {
+    ...ty.buttonSmall,
+    color: c.accent,
+    flexShrink: 1,
   },
   syncStatusCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
-    padding: uiTheme.spacing.sm,
+    gap: sp.sm,
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm + 2,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: c.hairline,
   },
   syncErrorCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-    borderRadius: uiTheme.radius.small,
-    padding: uiTheme.spacing.sm,
+    gap: sp.sm,
+    backgroundColor: c.errorSoft,
+    borderRadius: r.md,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm + 2,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.25)',
+    borderColor: c.errorBorder,
   },
-  syncErrorText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.error,
-    fontSize: uiTheme.type.caption.fontSize,
+  syncErrorText: {
+    ...ty.footnote,
+    color: c.error,
     flex: 1,
+    minWidth: 0,
   },
   syncStatusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: uiTheme.colors.success,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: c.success,
   },
-  syncStatusText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  syncStatusText: {
+    ...ty.footnote,
+    color: c.muted,
+    flexShrink: 1,
   },
-
-  bioTextArea: { fontFamily: 'Inter_400Regular',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
+  bioTextArea: {
+    ...ty.callout,
+    backgroundColor: c.elevated,
+    borderRadius: r.input,
     borderWidth: 1,
-    borderColor: '#221E33',
-    color: '#FFF',
-    fontSize: 12.5,
-    padding: 10,
-    minHeight: 70,
+    borderColor: c.border,
+    color: c.text,
+    padding: sp.md,
+    minHeight: 104,
     textAlignVertical: 'top',
   },
   customBioFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 6,
+    gap: sp.md,
+    marginTop: sp.sm,
   },
-  charCountText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  charCountText: {
+    ...ty.footnote,
+    color: c.muted,
+    fontVariant: ['tabular-nums'],
   },
 
   // ── Magic Bio Studio ──
   genStepWrap: {
     alignItems: 'center',
-    paddingVertical: uiTheme.spacing.md,
+    paddingVertical: sp.md,
   },
   magicIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: uiTheme.radius.input,
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: uiTheme.spacing.sm,
+    marginBottom: sp.md,
   },
-  magicTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#FFF',
-    fontSize: 14.5,
-    fontWeight: 'normal',
-    marginBottom: uiTheme.spacing.xs,
-  },
-  magicDesc: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  magicTitle: {
+    ...ty.section,
+    color: c.text,
     textAlign: 'center',
-    lineHeight: 16,
-    paddingHorizontal: uiTheme.spacing.md,
-    marginBottom: uiTheme.spacing.md,
+    marginBottom: sp.xs,
+  },
+  magicDesc: {
+    ...ty.callout,
+    color: c.muted,
+    textAlign: 'center',
+    paddingHorizontal: sp.md,
+    marginBottom: sp.lg,
   },
   magicCtaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: uiTheme.colors.primary,
-    borderRadius: uiTheme.radius.small,
-    paddingVertical: 10,
-    paddingHorizontal: uiTheme.spacing.xl,
+    justifyContent: 'center',
+    gap: sp.sm,
+    minHeight: 48,
+    backgroundColor: c.primary,
+    borderRadius: r.button,
+    paddingVertical: sp.md,
+    paddingHorizontal: sp.xxl,
+    ...uiTheme.shadows.glow,
   },
-  magicCtaBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: 12.5,
-    fontWeight: 'normal',
+  magicCtaBtnText: {
+    ...ty.button,
+    color: c.onPrimary,
   },
-
   genLoadingWrap: {
-    paddingVertical: uiTheme.spacing.xxl,
+    paddingVertical: sp.xxl,
     alignItems: 'center',
-    gap: 10,
+    gap: sp.md,
   },
-  genLoadingText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  genLoadingText: {
+    ...ty.footnote,
+    color: c.muted,
+    textAlign: 'center',
   },
-
   genResultWrap: {
-    gap: 10,
+    gap: sp.md,
   },
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
-    padding: 10,
+    backgroundColor: c.elevated,
+    borderRadius: r.lg,
+    padding: sp.md,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: c.hairline,
   },
   scoreRing: {
-    width: 40,
-    height: 40,
-    borderRadius: uiTheme.radius.card,
-    borderWidth: 2.5,
-    borderColor: uiTheme.colors.primary,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 3,
+    borderColor: c.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scoreNumber: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
+  scoreNumber: {
+    ...ty.headline,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.text,
+    fontVariant: ['tabular-nums'],
   },
-  scoreLabel: { fontFamily: 'Inter_600SemiBold',
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: 'normal',
+  scoreCopy: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: sp.md,
+  },
+  scoreTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: sp.sm,
+  },
+  scoreLabel: {
+    ...ty.label,
+    color: c.text,
   },
   activeScoreTag: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    backgroundColor: c.successSoft,
+    borderWidth: 1,
+    borderColor: c.successBorder,
+    paddingHorizontal: sp.sm,
+    paddingVertical: sp.xxs,
+    borderRadius: r.pill,
   },
-  activeScoreTagText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.success,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  activeScoreTagText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.success,
   },
-  scoreSub: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    marginTop: 2,
+  scoreSub: {
+    ...ty.footnote,
+    color: c.muted,
+    marginTop: sp.xxs,
   },
   bioBoxResult: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
-    padding: uiTheme.spacing.md,
+    backgroundColor: c.elevated,
+    borderRadius: r.lg,
+    padding: sp.lg,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: c.hairline,
   },
-  bioResultText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.text,
-    fontSize: 12.5,
-    lineHeight: 18,
+  bioResultText: {
+    ...ty.body,
+    color: c.text,
   },
   genActionsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    alignItems: 'stretch',
+    gap: sp.sm,
   },
   genActionSecBtn: {
-    backgroundColor: uiTheme.colors.elevated,
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: uiTheme.spacing.md,
-    borderRadius: 7,
+    minHeight: L.touchTarget,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: c.elevated,
+    borderWidth: 1,
+    borderColor: c.border,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.md,
+    borderRadius: r.button,
   },
-  genActionSecText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  genActionSecText: {
+    ...ty.buttonSmall,
+    color: c.text,
   },
   genActionPushBtn: {
     flex: 1,
-    backgroundColor: uiTheme.colors.primary,
-    paddingVertical: uiTheme.spacing.sm,
+    minWidth: 0,
+    minHeight: L.touchTarget,
+    backgroundColor: c.primary,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.sm,
     alignItems: 'center',
-    borderRadius: 7,
+    justifyContent: 'center',
+    borderRadius: r.button,
   },
   genActionPushBtnSuccess: {
-    backgroundColor: '#059669',
+    backgroundColor: c.success,
   },
-  genActionPushText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  genActionPushInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: sp.xs,
+  },
+  genActionPushText: {
+    ...ty.buttonSmall,
+    color: c.onPrimary,
+    textAlign: 'center',
+    flexShrink: 1,
   },
 
   // ── Account & Platforms ──
   accountProfileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.md,
+    gap: sp.md,
   },
   accountIconWrap: {
     position: 'relative',
   },
   accountLogo: {
-    width: 44,
-    height: 44,
-    borderRadius: uiTheme.radius.input,
+    width: 48,
+    height: 48,
+    borderRadius: r.md,
   },
   accountActiveDot: {
     position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: uiTheme.colors.success,
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: c.success,
     borderWidth: 2,
-    borderColor: '#151322',
+    borderColor: c.surface,
   },
   accountInactiveDot: {
-    backgroundColor: '#64748B',
-    borderColor: '#151322',
+    backgroundColor: c.textTertiary,
+    borderColor: c.surface,
   },
   accountInfoWrap: {
     flex: 1,
+    minWidth: 0,
   },
   accountTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 3,
+    flexWrap: 'wrap',
+    columnGap: sp.sm,
+    rowGap: sp.xs,
+    marginBottom: sp.xxs,
   },
-  accountTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 14.5,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
+  accountTitle: {
+    ...ty.headline,
+    color: c.text,
+    flexShrink: 1,
   },
   accountPlanBadge: {
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
+    backgroundColor: c.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderColor: c.primaryBorder,
+    borderRadius: r.pill,
+    paddingHorizontal: sp.sm,
+    paddingVertical: sp.xxs,
   },
   accountInactiveBadge: {
-    backgroundColor: 'rgba(148, 163, 184, 0.12)',
-    borderColor: 'rgba(148, 163, 184, 0.25)',
+    backgroundColor: c.neutralSoft,
+    borderColor: c.neutralBorder,
   },
-  accountPlanText: { fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.5,
+  accountPlanText: {
+    ...ty.overline,
+    fontSize: 10,
+    lineHeight: 13,
+    letterSpacing: 0.6,
+    color: c.accent,
   },
   accountInactiveBadgeText: {
-    color: '#94A3B8',
+    color: c.textSecondary,
   },
-  accountSubText: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  accountSubText: {
+    ...ty.footnote,
+    color: c.muted,
   },
   accountLogoutBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    minHeight: 48,
+    backgroundColor: c.errorSoft,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.28)',
-    borderRadius: uiTheme.radius.input,
-    paddingVertical: uiTheme.spacing.md,
+    borderColor: c.errorBorder,
+    borderRadius: r.button,
+    paddingVertical: sp.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   accountLogoutBtnInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: sp.sm,
   },
-  accountLogoutBtnText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.error,
-    fontSize: 13,
-    fontWeight: 'normal',
+  accountLogoutBtnText: {
+    ...ty.button,
+    color: c.error,
   },
   accountConnectBtn: {
-    backgroundColor: uiTheme.colors.primary,
-    borderRadius: uiTheme.radius.input,
-    paddingVertical: uiTheme.spacing.md,
+    minHeight: L.buttonHeight,
+    backgroundColor: c.primary,
+    borderRadius: r.button,
+    paddingVertical: sp.md,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
+    ...uiTheme.shadows.glow,
   },
   accountConnectBtnInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: sp.sm,
   },
-  accountConnectBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+  accountConnectBtnText: {
+    ...ty.button,
+    color: c.onPrimary,
   },
   cardDivider: {
-    height: 1,
-    backgroundColor: '#221E33',
-    marginVertical: uiTheme.spacing.md,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: c.divider,
+    marginVertical: sp.lg,
   },
   subStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: sp.md,
   },
-  subStatusLabel: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  subStatusLabel: {
+    ...ty.footnote,
+    color: c.muted,
   },
-  subStatusValue: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: 'normal',
+  subStatusValue: {
+    ...ty.label,
+    color: c.text,
   },
-
   rawControlsBody: {
-    marginTop: 14,
-    borderTopWidth: 1,
-    borderColor: '#221E33',
-    paddingTop: uiTheme.spacing.md,
+    marginTop: sp.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: c.divider,
+    paddingTop: sp.md,
   },
 
   // ─── Desktop V2 Toast Banner ───
@@ -2316,21 +2480,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: uiTheme.spacing.sm,
-    backgroundColor: '#064E3B',
-    borderColor: uiTheme.colors.success,
+    gap: sp.sm,
+    backgroundColor: c.successSoft,
+    borderColor: c.successBorder,
     borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: uiTheme.spacing.lg,
-    marginHorizontal: 14,
-    marginTop: 10,
-    borderRadius: uiTheme.radius.input,
+    paddingVertical: sp.md,
+    paddingHorizontal: sp.lg,
+    marginHorizontal: sp.md,
+    marginTop: sp.md,
+    borderRadius: r.input,
     zIndex: 99,
   },
-  toastBannerText: { fontFamily: 'Inter_700Bold',
-    color: '#ECFDF5',
-    fontSize: 13,
-    fontWeight: 'normal',
+  toastBannerText: {
+    ...ty.label,
+    color: c.success,
+    flexShrink: 1,
   },
 
   // ─── Desktop V2 Sticky Save Bar ───
@@ -2339,25 +2503,21 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: uiTheme.colors.surface,
+    backgroundColor: c.elevated,
     borderTopWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    paddingHorizontal: 14,
-    paddingVertical: uiTheme.spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 10,
+    borderColor: c.hairline,
+    paddingHorizontal: sp.lg,
+    paddingVertical: sp.md,
+    ...uiTheme.shadows.lg,
   },
   saveBarProgress: {
     position: 'absolute',
     top: 0,
     left: 0,
     height: 3,
-    backgroundColor: uiTheme.colors.primary,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    backgroundColor: c.primary,
+    borderTopLeftRadius: r.md,
+    borderTopRightRadius: r.md,
   },
   saveBarContent: {
     flexDirection: 'row',
@@ -2367,9 +2527,10 @@ const styles = StyleSheet.create({
   saveBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    gap: sp.sm,
     flex: 1,
-    marginRight: 10,
+    minWidth: 0,
+    marginRight: sp.md,
   },
   statusDot: {
     width: 8,
@@ -2377,371 +2538,368 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   unsavedDot: {
-    backgroundColor: uiTheme.colors.warning,
+    backgroundColor: c.warning,
   },
   savedDot: {
-    backgroundColor: uiTheme.colors.success,
+    backgroundColor: c.success,
   },
-  saveBarText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  saveBarText: {
+    ...ty.footnote,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
   },
-  saveBarTextUnsaved: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontWeight: 'normal',
+  saveBarTextUnsaved: {
+    fontFamily: uiTheme.fonts.strong,
+    color: c.accent,
   },
   saveBarActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    gap: sp.sm,
   },
   discardBtn: {
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: 13,
-    borderRadius: uiTheme.radius.small,
+    minHeight: L.touchTarget,
+    justifyContent: 'center',
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.md,
+    borderRadius: r.sm,
     borderWidth: 1,
-    borderColor: uiTheme.colors.border,
+    borderColor: c.border,
     backgroundColor: 'transparent',
   },
-  discardBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.textSecondary,
-    fontSize: 12.5,
-    fontWeight: 'normal',
+  discardBtnText: {
+    ...ty.buttonSmall,
+    color: c.textSecondary,
   },
   saveChangesBtn: {
-    backgroundColor: uiTheme.colors.primary,
-    paddingVertical: uiTheme.spacing.sm,
-    paddingHorizontal: uiTheme.spacing.lg,
-    borderRadius: uiTheme.radius.small,
+    minHeight: L.touchTarget,
+    backgroundColor: c.primary,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.lg,
+    borderRadius: r.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: uiTheme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 3,
+    ...uiTheme.shadows.glow,
   },
   saveChangesBtnIdle: {
-    backgroundColor: '#E11D48',
+    backgroundColor: c.primary,
     opacity: 0.95,
   },
   saveChangesBtnSuccess: {
-    backgroundColor: uiTheme.colors.success,
-    shadowColor: uiTheme.colors.success,
+    backgroundColor: c.success,
+    shadowColor: c.success,
   },
-  saveChangesBtnText: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: 12.5,
-    fontWeight: 'normal',
+  saveChangesBtnText: {
+    ...ty.buttonSmall,
+    color: c.onPrimary,
   },
   btnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: sp.xs,
   },
-  errorText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.error,
-    fontSize: uiTheme.type.caption.fontSize,
+  errorText: {
+    ...ty.footnote,
+    color: c.error,
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: sp.xs,
   },
 
   // ── Modal Styles ──
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: c.scrim,
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: uiTheme.colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
+    backgroundColor: c.surface,
+    borderTopLeftRadius: r.sheet,
+    borderTopRightRadius: r.sheet,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    padding: uiTheme.spacing.lg,
-    maxHeight: '80%',
+    borderBottomWidth: 0,
+    borderColor: c.hairline,
+    paddingHorizontal: sp.xl,
+    paddingTop: sp.xs,
+    paddingBottom: sp.xl,
+    maxHeight: '85%',
+    ...uiTheme.shadows.lg,
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: c.borderStrong,
+    marginTop: sp.xs + 2,
+    marginBottom: sp.md,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderColor: '#221E33',
-    paddingBottom: uiTheme.spacing.md,
-    marginBottom: uiTheme.spacing.md,
+    gap: sp.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: c.divider,
+    paddingBottom: sp.md,
+    marginBottom: sp.md,
   },
-  modalTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'normal',
+  modalHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
   },
-  modalSubtitle: { fontFamily: 'Manrope_700Bold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.5,
-    marginTop: 1,
+  modalTitle: {
+    ...ty.title2,
+    color: c.text,
+  },
+  modalSubtitle: {
+    ...ty.overline,
+    color: c.muted,
+    marginTop: sp.xxs,
   },
   modalCloseBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    backgroundColor: uiTheme.colors.elevated,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: c.elevated,
+    borderColor: c.hairline,
   },
   modalBody: {
-    gap: uiTheme.spacing.sm,
+    gap: sp.sm,
   },
   previewField: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
-    padding: 10,
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
+    padding: sp.md,
     borderWidth: 1,
-    borderColor: '#221E33',
-    marginBottom: 6,
+    borderColor: c.hairline,
+    marginBottom: sp.sm,
   },
   previewFieldHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginBottom: 3,
+    gap: sp.xs,
+    marginBottom: sp.xs,
   },
-  previewLabel: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  previewLabel: {
+    ...ty.overline,
+    color: c.muted,
     textTransform: 'uppercase',
   },
-  previewValue: { fontFamily: 'Inter_400Regular',
-    color: '#FFF',
-    fontSize: 12.5,
-    lineHeight: 17,
+  previewValue: {
+    ...ty.callout,
+    color: c.text,
   },
   previewValueEmpty: {
-    color: '#605D78',
+    color: c.textTertiary,
     fontStyle: 'italic',
   },
   modalProfileStatusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#161426',
-    borderRadius: uiTheme.radius.small,
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: uiTheme.spacing.sm,
-    marginBottom: 10,
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm,
+    marginBottom: sp.md,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    gap: uiTheme.spacing.sm,
+    borderColor: c.hairline,
+    gap: sp.sm,
   },
-  modalProfileStatusText: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  modalProfileStatusText: {
+    ...ty.footnote,
+    color: c.text,
     flex: 1,
+    minWidth: 0,
   },
   modalQuickSyncBtn: {
-    backgroundColor: uiTheme.colors.elevated,
-    paddingHorizontal: 10,
-    paddingVertical: uiTheme.spacing.xs,
-    borderRadius: 6,
+    minHeight: 32,
+    justifyContent: 'center',
+    backgroundColor: c.elevatedHigh,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs,
+    borderRadius: r.sm,
     borderWidth: 1,
-    borderColor: '#3D385A',
+    borderColor: c.border,
   },
-  modalQuickSyncBtnText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  modalQuickSyncBtnText: {
+    ...ty.buttonSmall,
+    color: c.accent,
   },
 
   // ── Custom Logout Confirmation Modal ──
   logoutModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(5, 4, 10, 0.80)',
+    backgroundColor: c.scrim,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: uiTheme.spacing.xxl,
+    paddingHorizontal: sp.xl,
   },
   logoutModalCard: {
     width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#141220',
-    borderRadius: uiTheme.radius.sheet,
+    maxWidth: 380,
+    backgroundColor: c.surface,
+    borderRadius: r.sheet,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.28)',
-    padding: uiTheme.spacing.xxl,
+    borderColor: c.hairline,
+    padding: sp.xxl,
     alignItems: 'center',
-    shadowColor: uiTheme.colors.error,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 8,
+    ...uiTheme.shadows.lg,
   },
   logoutIconBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    backgroundColor: c.errorSoft,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.32)',
+    borderColor: c.errorBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: uiTheme.spacing.lg,
+    marginBottom: sp.lg,
   },
-  logoutModalTitle: { fontFamily: 'Manrope_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: uiTheme.type.section.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.3,
-    marginBottom: uiTheme.spacing.sm,
+  logoutModalTitle: {
+    ...ty.title2,
+    color: c.text,
+    marginBottom: sp.sm,
     textAlign: 'center',
   },
-  logoutModalSubtitle: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: 12.5,
-    lineHeight: 18,
+  logoutModalSubtitle: {
+    ...ty.callout,
+    color: c.muted,
     textAlign: 'center',
-    marginBottom: 22,
+    marginBottom: sp.xxl,
   },
   logoutModalBtnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: sp.md,
     width: '100%',
   },
   logoutModalCancelBtn: {
     flex: 1,
-    height: 44,
-    borderRadius: uiTheme.radius.input,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    minWidth: 0,
+    height: 48,
+    borderRadius: r.button,
+    backgroundColor: c.elevated,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: c.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoutModalCancelText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.text,
-    fontSize: 13,
-    fontWeight: 'normal',
+  logoutModalCancelText: {
+    ...ty.button,
+    color: c.text,
   },
   logoutModalConfirmBtn: {
     flex: 1,
-    height: 44,
-    borderRadius: uiTheme.radius.input,
-    backgroundColor: uiTheme.colors.error,
+    minWidth: 0,
+    height: 48,
+    borderRadius: r.button,
+    backgroundColor: c.danger,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
-    shadowColor: uiTheme.colors.error,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
+    gap: sp.sm,
   },
-  logoutModalConfirmText: { fontFamily: 'Inter_800ExtraBold',
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: 'normal',
+  logoutModalConfirmText: {
+    ...ty.button,
+    color: c.onPrimary,
   },
 
   // ── Target Location & Passport Styles ──
   locationHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiTheme.spacing.sm,
+    gap: sp.sm,
     flex: 1,
+    minWidth: 0,
   },
   locationIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
+    width: 32,
+    height: 32,
+    borderRadius: r.sm,
+    backgroundColor: c.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
   locationActiveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(254, 60, 114, 0.10)',
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 6,
+    gap: sp.xs,
+    backgroundColor: c.primarySoft,
+    paddingHorizontal: sp.sm,
+    paddingVertical: sp.xxs + 1,
+    borderRadius: r.pill,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.25)',
+    borderColor: c.primaryBorder,
     maxWidth: 140,
   },
   locationActiveBadgeLive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderColor: 'rgba(16, 185, 129, 0.25)',
+    backgroundColor: c.successSoft,
+    borderColor: c.successBorder,
   },
   locationActiveDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: uiTheme.colors.primary,
+    backgroundColor: c.primary,
   },
   locationActiveDotLive: {
-    backgroundColor: uiTheme.colors.success,
+    backgroundColor: c.success,
   },
-  locationActiveText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  locationActiveText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.accent,
   },
   locationActiveTextLive: {
-    color: uiTheme.colors.success,
+    color: c.success,
   },
 
   // ── Live GPS Card ──
   liveGpsCard: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: 10,
-    padding: uiTheme.spacing.md,
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
+    padding: sp.md,
     borderWidth: 1,
-    borderColor: '#221E33',
-    marginTop: uiTheme.spacing.sm,
+    borderColor: c.hairline,
+    marginTop: sp.sm,
   },
   liveGpsTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: sp.sm,
   },
   liveGpsDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: uiTheme.colors.success,
+    backgroundColor: c.success,
   },
-  liveGpsCity: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontSize: 14.5,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
+  liveGpsCity: {
+    ...ty.headline,
+    color: c.text,
   },
-  liveGpsSub: { fontFamily: 'Inter_500Medium',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    marginTop: 2,
+  liveGpsSub: {
+    ...ty.footnote,
+    color: c.muted,
+    marginTop: sp.xxs,
   },
   refreshGpsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: uiTheme.radius.small,
+    gap: sp.xs,
+    minHeight: 36,
+    backgroundColor: c.successSoft,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs + 2,
+    borderRadius: r.pill,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
+    borderColor: c.successBorder,
   },
-  refreshGpsBtnText: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.success,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  refreshGpsBtnText: {
+    ...ty.buttonSmall,
+    color: c.success,
   },
 
   // ── Selected City Banner ──
@@ -2749,281 +2907,287 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: 10,
-    padding: uiTheme.spacing.md,
+    gap: sp.sm,
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
+    padding: sp.md,
     borderWidth: 1,
-    borderColor: '#221E33',
-    marginTop: uiTheme.spacing.sm,
+    borderColor: c.hairline,
+    marginTop: sp.sm,
   },
   selectedCityIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
+    width: 36,
+    height: 36,
+    borderRadius: r.sm,
+    backgroundColor: c.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  selectedCityTitle: { fontFamily: 'Manrope_700Bold',
-    color: '#FFF',
-    fontSize: uiTheme.type.label.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: -0.2,
+  selectedCityTitle: {
+    ...ty.bodyStrong,
+    color: c.text,
   },
-  selectedCitySub: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    marginTop: 2,
+  selectedCitySub: {
+    ...ty.footnote,
+    color: c.muted,
+    marginTop: sp.xxs,
   },
   passportActivePill: {
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    paddingHorizontal: uiTheme.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 6,
+    backgroundColor: c.primarySoft,
+    paddingHorizontal: sp.sm,
+    paddingVertical: sp.xxs + 1,
+    borderRadius: r.pill,
     borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
+    borderColor: c.primaryBorder,
   },
-  passportActiveText: { fontFamily: 'Inter_800ExtraBold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.5,
+  passportActiveText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.accent,
+    letterSpacing: 0.4,
   },
 
   // ── Popular Destination Chips ──
-  quickLabel: { fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    color: uiTheme.colors.muted,
-    letterSpacing: 0.5,
-    marginBottom: 6,
+  quickLabel: {
+    ...ty.overline,
+    color: c.muted,
+    marginBottom: sp.sm,
     textTransform: 'uppercase',
   },
   quickChipsScroll: {
     flexDirection: 'row',
-    gap: 6,
-    paddingVertical: 2,
+    gap: sp.sm,
+    paddingVertical: sp.xxs,
   },
   quickChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: uiTheme.radius.small,
-    backgroundColor: uiTheme.colors.background,
+    gap: sp.xs + 2,
+    minHeight: 36,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs + 2,
+    borderRadius: r.pill,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: c.border,
   },
   quickChipActive: {
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    borderColor: uiTheme.colors.primary,
+    backgroundColor: c.primarySoft,
+    borderColor: c.primaryBorder,
   },
-  quickChipFlag: { fontFamily: 'Inter_400Regular',
-    fontSize: 13,
+  quickChipFlag: {
+    ...ty.subhead,
+    fontFamily: uiTheme.fonts.body,
   },
-  quickChipText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.text,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  quickChipText: {
+    ...ty.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: c.textSecondary,
   },
-  quickChipTextActive: { fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-    fontWeight: 'normal',
+  quickChipTextActive: {
+    fontFamily: uiTheme.fonts.label,
+    color: c.text,
   },
 
   // ── Hub Search & Filter ──
   hubSearchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    gap: sp.sm,
+    minHeight: L.touchTarget,
+    backgroundColor: c.elevated,
+    borderRadius: r.input,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs,
     borderWidth: 1,
-    borderColor: '#221E33',
-    marginTop: 10,
+    borderColor: c.border,
+    marginTop: sp.md,
   },
-  hubSearchInput: { fontFamily: 'Inter_400Regular',
+  hubSearchInput: {
+    ...ty.callout,
     flex: 1,
-    color: '#FFF',
-    fontSize: uiTheme.type.caption.fontSize,
-    paddingVertical: 2,
+    minWidth: 0,
+    color: c.text,
+    paddingVertical: sp.xs,
   },
   regionFilterScroll: {
-    marginTop: uiTheme.spacing.sm,
-    marginBottom: uiTheme.spacing.xs,
+    marginTop: sp.sm,
+    marginBottom: sp.xs,
   },
   regionFilterContainer: {
     flexDirection: 'row',
-    gap: 6,
-    paddingVertical: 2,
+    gap: sp.sm,
+    paddingVertical: sp.xxs,
   },
   regionTab: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    backgroundColor: uiTheme.colors.background,
+    minHeight: 32,
+    justifyContent: 'center',
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs,
+    borderRadius: r.pill,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: c.border,
   },
   regionTabActive: {
-    backgroundColor: 'rgba(254, 60, 114, 0.12)',
-    borderColor: uiTheme.colors.primary,
+    backgroundColor: c.primarySoft,
+    borderColor: c.primaryBorder,
   },
-  regionTabText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  regionTabText: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: c.muted,
   },
-  regionTabTextActive: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.primary,
-    fontWeight: 'normal',
+  regionTabTextActive: {
+    fontFamily: uiTheme.fonts.strong,
+    color: c.accent,
   },
   cityListScroll: {
     maxHeight: 220,
-    marginTop: uiTheme.spacing.sm,
-    borderRadius: uiTheme.radius.small,
+    marginTop: sp.sm,
+    borderRadius: r.md,
   },
   hubGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    paddingBottom: uiTheme.spacing.xs,
+    gap: sp.sm,
+    paddingBottom: sp.xs,
   },
   hubCard: {
-    width: '48.8%',
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
-    padding: uiTheme.spacing.sm,
+    width: '48%',
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
+    padding: sp.sm + 2,
     borderWidth: 1,
-    borderColor: '#221E33',
+    borderColor: c.hairline,
   },
   hubCardActive: {
-    backgroundColor: 'rgba(254, 60, 114, 0.15)',
-    borderColor: uiTheme.colors.primary,
+    backgroundColor: c.primarySoft,
+    borderColor: c.primaryBorder,
   },
   hubCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: uiTheme.spacing.xs,
+    marginBottom: sp.xs,
   },
-  hubCardFlag: { fontFamily: 'Inter_400Regular',
-    fontSize: 16,
+  hubCardFlag: {
+    ...ty.headline,
+    fontFamily: uiTheme.fonts.body,
   },
-  hubCountryCode: { fontFamily: 'Inter_700Bold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: uiTheme.spacing.xs,
+  hubCountryCode: {
+    ...ty.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.muted,
+    backgroundColor: c.neutralSoft,
+    paddingHorizontal: sp.xs,
     paddingVertical: 1,
-    borderRadius: 3,
+    borderRadius: r.xs,
+    overflow: 'hidden',
   },
-  hubCardCity: { fontFamily: 'Inter_700Bold',
-    color: '#E2E1EC',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  hubCardCity: {
+    ...ty.footnote,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.textSecondary,
   },
   hubCardCityActive: {
-    color: '#FFF',
+    color: c.text,
   },
-  hubCardCountry: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  hubCardCountry: {
+    ...ty.caption,
+    color: c.muted,
     marginTop: 1,
   },
   noHubsFoundWrap: {
     alignItems: 'center',
-    paddingVertical: 14,
-    gap: uiTheme.spacing.xs,
+    paddingVertical: sp.lg,
+    gap: sp.xs,
   },
-  noHubsFoundText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  noHubsFoundText: {
+    ...ty.footnote,
+    color: c.muted,
   },
-  resetFilterText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.primary,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  resetFilterText: {
+    ...ty.buttonSmall,
+    color: c.accent,
   },
 
   // ── Custom Location Accordion ──
   customAccordionToggle: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    marginTop: 6,
+    minHeight: L.touchTarget,
+    paddingVertical: sp.sm,
+    marginTop: sp.xs,
   },
-  customAccordionText: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  customAccordionText: {
+    ...ty.buttonSmall,
+    color: c.muted,
   },
   customCoordsCard: {
-    backgroundColor: uiTheme.colors.background,
-    borderRadius: uiTheme.radius.small,
-    padding: 10,
-    marginTop: uiTheme.spacing.xs,
+    backgroundColor: c.elevated,
+    borderRadius: r.md,
+    padding: sp.md,
+    marginTop: sp.xs,
     borderWidth: 1,
-    borderColor: '#221E33',
-    gap: uiTheme.spacing.sm,
+    borderColor: c.hairline,
+    gap: sp.sm,
   },
   customInputRow: {
     flexDirection: 'row',
-    gap: uiTheme.spacing.sm,
+    gap: sp.sm,
   },
   customInputHalf: {
     flex: 1,
+    minWidth: 0,
   },
-  customInputLabel: { fontFamily: 'Inter_600SemiBold',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  customInputLabel: {
+    ...ty.overline,
+    color: c.muted,
     textTransform: 'uppercase',
-    marginBottom: uiTheme.spacing.xs,
-    letterSpacing: 0.5,
+    marginBottom: sp.xs,
   },
-  customTextInput: { fontFamily: 'Inter_400Regular',
-    backgroundColor: uiTheme.colors.surface,
+  customTextInput: {
+    ...ty.callout,
+    minHeight: L.touchTarget,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    color: '#FFF',
-    fontSize: uiTheme.type.caption.fontSize,
+    borderColor: c.border,
+    borderRadius: r.sm,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.xs + 2,
+    color: c.text,
   },
   locationNoteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-    paddingHorizontal: uiTheme.spacing.xs,
+    gap: sp.sm,
+    marginTop: sp.md,
+    paddingHorizontal: sp.xs,
   },
-  locationNoteText: { fontFamily: 'Inter_400Regular',
-    color: uiTheme.colors.muted,
-    fontSize: uiTheme.type.caption.fontSize,
+  locationNoteText: {
+    ...ty.footnote,
+    color: c.muted,
     flex: 1,
-    lineHeight: 15,
+    minWidth: 0,
   },
   physicalGpsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: uiTheme.colors.surface,
-    borderRadius: uiTheme.radius.input,
+    gap: sp.md,
+    minHeight: 56,
+    backgroundColor: c.elevated,
+    borderRadius: r.lg,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    paddingHorizontal: uiTheme.spacing.md,
-    paddingVertical: 10,
-    marginBottom: 6,
+    borderColor: c.hairline,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm + 2,
+    marginBottom: sp.sm,
   },
   physicalGpsLeft: {
     flex: 1,
-    paddingRight: 10,
+    minWidth: 0,
+    paddingRight: sp.sm,
   },
-
 });
-

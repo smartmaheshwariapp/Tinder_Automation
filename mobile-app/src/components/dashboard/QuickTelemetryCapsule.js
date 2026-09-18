@@ -3,6 +3,8 @@ import { theme as uiTheme } from '../../theme';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Badge, { TONES } from '../ui/Badge';
+import CountUp from '../ui/CountUp';
 
 function formatNumber(n) {
   if (typeof n !== 'number' || isNaN(n)) return '0';
@@ -24,50 +26,60 @@ export default function QuickTelemetryCapsule({ lifetimeStats }) {
   return (
     <View style={styles.container}>
       {/* ── 1. Swipes Telemetry Column ── */}
-      <View style={styles.col}>
-        <View style={styles.colHeader}>
-          <Ionicons name="heart" size={13} color={uiTheme.colors.primary} />
-          <Text style={styles.colLabel}>Swipes</Text>
-        </View>
-        <Text style={styles.colValue}>{formatNumber(totalSwipes)}</Text>
-        <View style={[styles.badge, { backgroundColor: 'rgba(254, 60, 114, 0.12)' }]}>
-          <Text style={[styles.badgeText, { color: uiTheme.colors.primary }]}>
-            {todaySwipes > 0 ? `+${todaySwipes} today` : 'Ready'}
-          </Text>
-        </View>
-      </View>
+      <Metric
+        icon="heart"
+        tone="primary"
+        label="Swipes"
+        value={formatNumber(totalSwipes)}
+        raw={totalSwipes}
+        badge={todaySwipes > 0 ? `+${todaySwipes} today` : 'Ready'}
+      />
 
       <View style={styles.divider} />
 
       {/* ── 2. Messages Telemetry Column ── */}
-      <View style={styles.col}>
-        <View style={styles.colHeader}>
-          <Ionicons name="chatbubbles" size={13} color="#EC4899" />
-          <Text style={styles.colLabel}>Messages</Text>
-        </View>
-        <Text style={styles.colValue}>{formatNumber(totalMessages)}</Text>
-        <View style={[styles.badge, { backgroundColor: 'rgba(236, 72, 153, 0.12)' }]}>
-          <Text style={[styles.badgeText, { color: '#EC4899' }]}>
-            {todayMessages > 0 ? `+${todayMessages} sent` : `${activeChats} chats`}
-          </Text>
-        </View>
-      </View>
+      <Metric
+        icon="chatbubbles"
+        tone="secondary"
+        label="Messages"
+        value={formatNumber(totalMessages)}
+        raw={totalMessages}
+        badge={todayMessages > 0 ? `+${todayMessages} sent` : `${activeChats} chats`}
+      />
 
       <View style={styles.divider} />
 
       {/* ── 3. Matches & Leads Telemetry Column ── */}
-      <View style={styles.col}>
-        <View style={styles.colHeader}>
-          <Ionicons name="sparkles" size={13} color={uiTheme.colors.info} />
-          <Text style={styles.colLabel}>Matches</Text>
-        </View>
-        <Text style={styles.colValue}>{formatNumber(totalMatches)}</Text>
-        <View style={[styles.badge, { backgroundColor: 'rgba(129, 140, 248, 0.12)' }]}>
-          <Text style={[styles.badgeText, { color: uiTheme.colors.info }]}>
-            {totalMatches > 0 ? `${totalMatches} matches` : 'Standby'}
-          </Text>
-        </View>
+      <Metric
+        icon="sparkles"
+        tone="info"
+        label="Matches"
+        value={formatNumber(totalMatches)}
+        raw={totalMatches}
+        badge={totalMatches > 0 ? `${totalMatches} matches` : 'Standby'}
+      />
+    </View>
+  );
+}
+
+function Metric({ icon, tone, label, value, raw, badge }) {
+  return (
+    <View style={styles.col} accessible accessibilityLabel={`${label}: ${value}, ${badge}`}>
+      <View style={styles.colHeader}>
+        <Ionicons name={icon} size={12} color={(TONES[tone] || TONES.neutral).fg} />
+        <Text style={styles.colLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{label}</Text>
       </View>
+      <CountUp
+        value={typeof raw === 'number' && !isNaN(raw) ? raw : value}
+        format={v => formatNumber(Math.round(v))}
+        style={styles.colValue}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+        importantForAccessibility="no"
+      />
+      <Badge label={badge} tone={tone} size="sm" style={styles.badge} />
     </View>
   );
 }
@@ -77,50 +89,51 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: uiTheme.colors.surface,
-    borderRadius: 18,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    paddingVertical: 14,
-    paddingHorizontal: uiTheme.spacing.sm,
+    borderColor: uiTheme.colors.hairline,
+    paddingVertical: uiTheme.spacing.md,
+    paddingHorizontal: uiTheme.spacing.xs,
     marginBottom: uiTheme.spacing.md,
   },
   col: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: uiTheme.spacing.xs,
   },
   colHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiTheme.spacing.xs,
+    maxWidth: '100%',
     marginBottom: uiTheme.spacing.xs,
   },
-  colLabel: { fontFamily: 'Inter_600SemiBold',
-    fontSize: uiTheme.type.caption.fontSize,
+  colLabel: {
+    ...uiTheme.type.overline,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
     color: uiTheme.colors.muted,
-    fontWeight: 'normal',
+    flexShrink: 1,
   },
-  colValue: { fontFamily: 'Inter_800ExtraBold',
-    fontSize: 20,
-    fontWeight: 'normal',
-    color: '#FFF',
-    letterSpacing: -0.5,
-    marginVertical: 2,
+  colValue: {
+    ...uiTheme.type.title2,
+    fontFamily: uiTheme.fonts.strong,
+    fontVariant: ['tabular-nums'],
+    color: uiTheme.colors.text,
+    alignSelf: 'stretch',
+    textAlign: 'center',
   },
   badge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 5,
-    marginTop: 2,
-  },
-  badgeText: { fontFamily: 'Inter_700Bold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.2,
+    marginTop: uiTheme.spacing.xs,
+    alignSelf: 'center',
+    maxWidth: '100%',
   },
   divider: {
-    width: 1,
-    height: 36,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+    marginVertical: uiTheme.spacing.xs,
+    backgroundColor: uiTheme.colors.divider,
   },
 });

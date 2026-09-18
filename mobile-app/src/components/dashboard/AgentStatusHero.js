@@ -1,23 +1,24 @@
-import { theme as uiTheme } from '../../theme';
+import { theme as uiTheme, alpha } from '../../theme';
 // src/components/dashboard/AgentStatusHero.js — Sleek Live Status Hero with Native Vector Icons
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   Animated,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { MotionTouchable, useMotionReduced } from '../common/Motion';
+import Badge from '../ui/Badge';
 
 // ─── Phase metadata with clean vector icons ─────────────────────────────────
 const PHASE_META = {
   liking:        { label: 'SWIPING',       color: uiTheme.colors.primary, icon: 'heart' },
-  messaging:     { label: 'MESSAGING',     color: '#EC4899', icon: 'chatbubbles' },
-  lead_scan:     { label: 'SCANNING',      color: '#C026D3', icon: 'scan' },
+  messaging:     { label: 'MESSAGING',     color: uiTheme.colors.accent, icon: 'chatbubbles' },
+  lead_scan:     { label: 'SCANNING',      color: uiTheme.colors.info, icon: 'scan' },
   waiting:       { label: 'WAITING',       color: uiTheme.colors.warning, icon: 'time-outline' },
   polling:       { label: 'SYNCING',       color: uiTheme.colors.info, icon: 'sync' },
-  transitioning: { label: 'COOLDOWN',      color: '#8B5CF6', icon: 'hourglass-outline' },
+  transitioning: { label: 'COOLDOWN',      color: uiTheme.colors.secondary, icon: 'hourglass-outline' },
   initializing:  { label: 'INITIALIZING',  color: uiTheme.colors.primary, icon: 'sparkles' },
   starting:      { label: 'STARTING',      color: uiTheme.colors.primary, icon: 'flash' },
   checking:      { label: 'CHECKING',      color: uiTheme.colors.info, icon: 'search' },
@@ -69,21 +70,22 @@ export default function AgentStatusHero({ agentState, onToggleAgent }) {
   }, [agentState?.nextRunTimestamp]);
 
   // Pulse animation
+  const reducedMotion = useMotionReduced();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    if (!isRunning) {
+    if (!isRunning || reducedMotion) {
       pulseAnim.setValue(1);
       return;
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.25, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.25, duration: 900, useNativeDriver: true, isInteraction: false }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 900, useNativeDriver: true, isInteraction: false }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [isRunning, pulseAnim]);
+  }, [isRunning, reducedMotion, pulseAnim]);
 
   // Progress label
   const progressLabel = useMemo(() => {
@@ -114,6 +116,7 @@ export default function AgentStatusHero({ agentState, onToggleAgent }) {
       {/* Left: Glowing Orb with Native Vector Icon */}
       <View style={styles.orbWrap}>
         <Animated.View
+          importantForAccessibility="no"
           style={[
             styles.orbRing,
             {
@@ -123,7 +126,7 @@ export default function AgentStatusHero({ agentState, onToggleAgent }) {
             },
           ]}
         />
-        <View style={[styles.orb, { backgroundColor: meta.color + '18', borderColor: meta.color + '60' }]}>
+        <View style={[styles.orb, { backgroundColor: alpha(meta.color, 0.14), borderColor: alpha(meta.color, 0.38) }]}>
           <Ionicons name={meta.icon} size={18} color={meta.color} />
         </View>
       </View>
@@ -131,27 +134,31 @@ export default function AgentStatusHero({ agentState, onToggleAgent }) {
       {/* Center: Labels */}
       <View style={styles.labels}>
         <View style={styles.phaseRow}>
-          <Text style={[styles.phaseLabel, { color: meta.color }]}>{meta.label}</Text>
-          <View style={[styles.runningBadge, { backgroundColor: isRunning ? 'rgba(16, 185, 129, 0.12)' : 'rgba(113, 110, 137, 0.15)', borderColor: isRunning ? 'rgba(16, 185, 129, 0.3)' : 'rgba(113, 110, 137, 0.3)' }]}>
-            <View style={[styles.runningDot, { backgroundColor: isRunning ? uiTheme.colors.success : uiTheme.colors.muted }]} />
-            <Text style={[styles.runningText, { color: isRunning ? uiTheme.colors.success : uiTheme.colors.muted }]}>
-              {isRunning ? 'ACTIVE' : 'IDLE'}
-            </Text>
-          </View>
+          <Text
+            style={[styles.phaseLabel, { color: meta.color }]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+            accessibilityRole="header"
+          >
+            {meta.label}
+          </Text>
+          <Badge label={isRunning ? 'ACTIVE' : 'IDLE'} tone={isRunning ? 'success' : 'neutral'} dot size="sm" />
         </View>
         {progressLabel ? (
-          <Text style={styles.progressLabel} numberOfLines={1}>{progressLabel}</Text>
+          <Text style={styles.progressLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.body}>{progressLabel}</Text>
         ) : null}
       </View>
 
       {/* Right: Remote Start/Stop Trigger Button */}
       {onToggleAgent ? (
-        <TouchableOpacity accessibilityRole="button"
+        <MotionTouchable accessibilityRole="button"
+          accessibilityLabel={isRunning ? 'Stop agent' : 'Start agent'}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
           style={[
             styles.toggleBtn,
             {
-              backgroundColor: isRunning ? 'rgba(239, 68, 68, 0.12)' : 'rgba(254, 60, 114, 0.12)',
-              borderColor: isRunning ? 'rgba(239, 68, 68, 0.35)' : 'rgba(254, 60, 114, 0.35)',
+              backgroundColor: isRunning ? uiTheme.colors.errorSoft : uiTheme.colors.primarySoft,
+              borderColor: isRunning ? uiTheme.colors.errorBorder : uiTheme.colors.primaryBorder,
             },
           ]}
           onPress={onToggleAgent}
@@ -160,12 +167,15 @@ export default function AgentStatusHero({ agentState, onToggleAgent }) {
           <Ionicons
             name={isRunning ? 'square' : 'play'}
             size={12}
-            color={isRunning ? uiTheme.colors.error : uiTheme.colors.primary}
+            color={isRunning ? uiTheme.colors.error : uiTheme.colors.accent}
           />
-          <Text style={[styles.toggleBtnText, { color: isRunning ? uiTheme.colors.error : uiTheme.colors.primary }]}>
+          <Text
+            style={[styles.toggleBtnText, { color: isRunning ? uiTheme.colors.error : uiTheme.colors.accent }]}
+            maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+          >
             {isRunning ? 'Stop' : 'Start'}
           </Text>
-        </TouchableOpacity>
+        </MotionTouchable>
       ) : null}
     </View>
   );
@@ -176,10 +186,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: uiTheme.colors.surface,
-    borderRadius: 16,
+    borderRadius: uiTheme.radius.card,
     borderWidth: 1,
-    borderColor: uiTheme.colors.elevated,
-    padding: 14,
+    borderColor: uiTheme.colors.hairline,
+    padding: uiTheme.spacing.md,
     marginBottom: uiTheme.spacing.md,
   },
   orbWrap: {
@@ -193,7 +203,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 48,
     height: 48,
-    borderRadius: uiTheme.radius.sheet,
+    borderRadius: 24,
     borderWidth: 1.5,
   },
   orb: {
@@ -206,54 +216,37 @@ const styles = StyleSheet.create({
   },
   labels: {
     flex: 1,
+    minWidth: 0,
   },
   phaseRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: uiTheme.spacing.sm,
   },
-  phaseLabel: { fontFamily: 'Inter_800ExtraBold',
-    fontSize: 14.5,
-    fontWeight: 'normal',
+  phaseLabel: {
+    ...uiTheme.type.label,
+    fontFamily: uiTheme.fonts.heavy,
     letterSpacing: 0.5,
+    flexShrink: 1,
   },
-  runningBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiTheme.spacing.xs,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  runningDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  runningText: { fontFamily: 'Inter_800ExtraBold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
-    letterSpacing: 0.8,
-  },
-  progressLabel: { fontFamily: 'Inter_500Medium',
+  progressLabel: {
+    ...uiTheme.type.footnote,
     marginTop: uiTheme.spacing.xs,
-    fontSize: uiTheme.type.caption.fontSize,
     color: uiTheme.colors.muted,
-    fontWeight: 'normal',
   },
   toggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 7,
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: uiTheme.layout.buttonHeightSmall,
     paddingHorizontal: uiTheme.spacing.md,
-    borderRadius: uiTheme.radius.small,
+    borderRadius: uiTheme.radius.sm,
     borderWidth: 1,
     marginLeft: uiTheme.spacing.sm,
   },
-  toggleBtnText: { fontFamily: 'Inter_800ExtraBold',
-    fontSize: uiTheme.type.caption.fontSize,
-    fontWeight: 'normal',
+  toggleBtnText: {
+    ...uiTheme.type.buttonSmall,
   },
 });

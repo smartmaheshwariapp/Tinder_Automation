@@ -1,24 +1,26 @@
 import React, { useState } from 'react';
 import {
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../theme';
-import SafeActivityIndicator from '../common/SafeActivityIndicator';
 import AppConfirmModal from '../common/AppConfirmModal';
+import { FadeIn, FocusInput } from '../common/Motion';
+import { AppButton, AppText, Badge, Card, CountUp, IconButton, ListRow, ScreenHeader, SectionHeader } from '../ui';
+import useResponsive from '../../hooks/useResponsive';
 import TinderProfileCard from './TinderProfileCard';
 import appConfig from '../../../app.json';
+
+const c = theme.colors;
+const sp = theme.spacing;
 
 const tinderFields = [
   ['bio', 'About me on Tinder'],
@@ -48,31 +50,23 @@ const display = value =>
       ? String(value)
       : '';
 
-function Action({ title, icon, onPress, busy, secondary }) {
-  return (
-    <TouchableOpacity
-      style={[styles.button, secondary && styles.secondary]}
-      onPress={onPress}
-      disabled={busy}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!busy, busy: !!busy }}
-    >
-      {busy ? (
-        <SafeActivityIndicator size="small" color={theme.colors.text} />
-      ) : (
-        <Ionicons name={icon} size={18} color={theme.colors.text} />
-      )}
-      <Text style={styles.buttonText}>{title}</Text>
-    </TouchableOpacity>
-  );
-}
-
 function StatCard({ icon, label, value, color }) {
+  const formatted = Number.isFinite(Number(value)) ? Number(value).toLocaleString() : String(value);
   return (
-    <View style={styles.statCard}>
+    <View style={styles.statCard} accessible accessibilityLabel={`${formatted} ${label.toLowerCase()}`}>
       <Ionicons name={icon} size={20} color={color} />
-      <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <CountUp
+        value={Number.isFinite(Number(value)) ? Number(value) : formatted}
+        style={[styles.statValue, { color }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        maxFontSizeMultiplier={theme.fontScale.chrome}
+        importantForAccessibility="no"
+      />
+      <Text style={styles.statLabel} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -90,6 +84,7 @@ export default function ProfileDetails({
   onDeleteData,
 }) {
   const insets = useSafeAreaInsets();
+  const { gutter } = useResponsive();
 
   // ── 1. Isolated Flint App User Profile ──
   const flintName = (
@@ -151,9 +146,9 @@ export default function ProfileDetails({
   const [confirmModal, setConfirmModal] = useState({
     visible: false,
     icon: 'log-out-outline',
-    iconColor: '#F59E0B',
-    iconBg: 'rgba(245, 158, 11, 0.12)',
-    iconBorder: 'rgba(245, 158, 11, 0.3)',
+    iconColor: c.warning,
+    iconBg: c.warningSoft,
+    iconBorder: c.warningBorder,
     title: '',
     message: '',
     confirmText: 'Confirm',
@@ -178,9 +173,9 @@ export default function ProfileDetails({
       setConfirmModal({
         visible: true,
         icon: 'alert-circle-outline',
-        iconColor: theme.colors.accent,
-        iconBg: 'rgba(254, 60, 114, 0.12)',
-        iconBorder: 'rgba(254, 60, 114, 0.3)',
+        iconColor: c.accent,
+        iconBg: c.primarySoft,
+        iconBorder: c.primaryBorder,
         title: 'Discard changes?',
         message: 'Your unsaved name change will be lost.',
         confirmText: 'Discard',
@@ -231,7 +226,6 @@ export default function ProfileDetails({
           ? 'Tinder profile updated.'
           : 'Could not update Tinder details. Open Tinder and check your connection.'
       );
-      setTinderPhotoFailed(false);
     } catch {
       setFeedback('Could not update Tinder details. Please try again.');
     } finally {
@@ -243,9 +237,9 @@ export default function ProfileDetails({
     setConfirmModal({
       visible: true,
       icon: 'log-out-outline',
-      iconColor: '#F59E0B',
-      iconBg: 'rgba(245, 158, 11, 0.12)',
-      iconBorder: 'rgba(245, 158, 11, 0.3)',
+      iconColor: c.warning,
+      iconBg: c.warningSoft,
+      iconBorder: c.warningBorder,
       title: 'Log out of Flint?',
       message: 'This will disconnect your Tinder session and return you to the login screen.',
       confirmText: 'Log out',
@@ -262,9 +256,9 @@ export default function ProfileDetails({
     setConfirmModal({
       visible: true,
       icon: 'trash-outline',
-      iconColor: '#EF4444',
-      iconBg: 'rgba(239, 68, 68, 0.12)',
-      iconBorder: 'rgba(239, 68, 68, 0.3)',
+      iconColor: c.error,
+      iconBg: c.errorSoft,
+      iconBorder: c.errorBorder,
       title: 'Delete your account?',
       message: 'This will permanently delete your Flint account, history, and preferences. This action cannot be undone.',
       confirmText: 'Delete Account',
@@ -277,101 +271,104 @@ export default function ProfileDetails({
     });
   };
 
+  const feedbackIsError = /could not/i.test(feedback);
+
   return (
     <>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingHorizontal: gutter, paddingBottom: insets.bottom + theme.layout.navHeight + sp.hero + sp.sm },
+        ]}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.back}
-            onPress={onBack}
-            accessibilityRole="button"
-            accessibilityLabel="Back to home"
-          >
-            <Ionicons name="arrow-back" size={21} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.pageTitle} accessibilityRole="header">
-            Profile
-          </Text>
-          <View style={styles.backSpacer} />
-        </View>
+        <ScreenHeader title="Profile" onBack={onBack} backLabel="Back to home" />
 
         {/* ── 1. Flint Account Hero Card ── */}
-        <LinearGradient
-          colors={['#382036', '#211426', theme.colors.surface]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.identity}
-        >
-          <View style={styles.identityTop}>
-            <View style={styles.avatarRing}>
-              <View style={[styles.avatar, styles.placeholder]}>
-                <Text style={styles.initial}>{flintInitial}</Text>
+        <FadeIn>
+          <LinearGradient
+            colors={theme.gradients.hero}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.identity}
+          >
+            <View style={styles.identityTop}>
+              <LinearGradient
+                colors={theme.gradients.brand}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarRing}
+              >
+                <View style={styles.avatar} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  <Text style={styles.initial} maxFontSizeMultiplier={theme.fontScale.chrome}>{flintInitial}</Text>
+                </View>
+              </LinearGradient>
+              <View style={styles.identityCopy}>
+                <AppText variant="overline" color="secondary">ACCOUNT</AppText>
+                <AppText variant="title2" numberOfLines={1}>
+                  {flintName}
+                </AppText>
+                <AppText variant="footnote" numberOfLines={1}>
+                  {flintEmail}
+                </AppText>
+                <Badge
+                  label={isLoggedIn ? 'Tinder connected' : 'Tinder not connected'}
+                  tone={isLoggedIn ? 'success' : 'neutral'}
+                  dot
+                  size="sm"
+                  style={styles.connectionBadge}
+                />
               </View>
             </View>
-            <View style={styles.identityCopy}>
-              <Text style={styles.eyebrow}>ACCOUNT</Text>
-              <Text style={styles.name} numberOfLines={1}>
-                {flintName}
-              </Text>
-              <Text style={styles.description} numberOfLines={1}>
-                {flintEmail}
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={openEditor}
-            accessibilityRole="button"
-            activeOpacity={0.75}
-          >
-            <Ionicons name="create-outline" size={18} color={theme.colors.text} />
-            <Text style={styles.buttonText}>Edit profile</Text>
-            <Ionicons name="arrow-forward" size={18} color={theme.colors.text} />
-          </TouchableOpacity>
-        </LinearGradient>
+            <AppButton
+              variant="secondary"
+              title="Edit profile"
+              icon="create-outline"
+              iconRight="arrow-forward"
+              onPress={openEditor}
+            />
+          </LinearGradient>
+        </FadeIn>
 
         {/* ── 2. Flint Lifetime Stats ── */}
-        <View style={styles.statsRow}>
+        <FadeIn delay={60} style={styles.statsRow}>
           <StatCard
             icon="heart-outline"
             label="SWIPES"
             value={totalSwipes}
-            color={theme.colors.primary}
+            color={c.primary}
           />
           <StatCard
             icon="people-outline"
             label="MATCHES"
             value={totalMatches}
-            color={theme.colors.secondary}
+            color={c.secondary}
           />
           <StatCard
             icon="chatbubble-outline"
             label="MESSAGES"
             value={totalMessages}
-            color="#6ED2B1"
+            color={c.success}
           />
-        </View>
+        </FadeIn>
 
         {!!feedback && (
-          <View style={styles.feedback}>
+          <View style={[styles.feedback, feedbackIsError && styles.feedbackError]}>
             <Ionicons
-              name="information-circle-outline"
+              name={feedbackIsError ? 'alert-circle-outline' : 'information-circle-outline'}
               size={19}
-              color={theme.colors.accent}
+              color={feedbackIsError ? c.error : c.accent}
             />
-            <Text style={[styles.description, styles.flex]} accessibilityLiveRegion="polite">
+            <AppText variant="footnote" color="textSecondary" style={styles.flex} accessibilityLiveRegion="polite">
               {feedback}
-            </Text>
+            </AppText>
           </View>
         )}
 
         {/* ── 3. Connected Dating Platform (Isolated Tinder Session) ── */}
-        <View style={styles.group}>
-          <Text style={styles.eyebrow}>CONNECTED ACCOUNTS</Text>
+        <FadeIn delay={120} style={styles.group}>
+          <SectionHeader title="Connected accounts" style={styles.sectionHeader} />
           <TinderProfileCard
             profile={tinderProfile}
             settings={settings}
@@ -382,64 +379,36 @@ export default function ProfileDetails({
             onSync={sync}
             onOpenTinder={onOpenTinder}
           />
-        </View>
+        </FadeIn>
 
         {/* ── 4. Account Actions ── */}
-        <View style={styles.group}>
-          <Text style={styles.eyebrow}>ACCOUNT & PRIVACY</Text>
-          <View style={styles.list}>
-            <TouchableOpacity
-              style={styles.settingRow}
+        <FadeIn delay={180} style={styles.group}>
+          <SectionHeader title="Account & privacy" style={styles.sectionHeader} />
+          <Card padding="none" style={styles.list}>
+            <ListRow
+              icon="log-out-outline"
+              iconTone="neutral"
+              title="Log out"
+              subtitle="Sign out of your Flint account"
               onPress={confirmLogout}
-              activeOpacity={0.7}
-              accessibilityRole="button"
+              divider
               accessibilityLabel="Log out of Flint"
-            >
-              <View style={styles.rowIcon}>
-                <Ionicons
-                  name="log-out-outline"
-                  size={20}
-                  color={theme.colors.textSecondary}
-                />
-              </View>
-              <View style={styles.flex}>
-                <Text style={styles.label}>Log out</Text>
-                <Text style={styles.description}>
-                  Sign out of your Flint account
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.settingRow}
+            />
+            <ListRow
+              icon="trash-outline"
+              title="Delete account"
+              subtitle="Permanently erase your account and data"
               onPress={confirmDeleteData}
-              activeOpacity={0.7}
-              accessibilityRole="button"
+              destructive
               accessibilityLabel="Delete account"
-            >
-              <View style={[styles.rowIcon, styles.destructiveIcon]}>
-                <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
-              </View>
-              <View style={styles.flex}>
-                <Text style={[styles.label, { color: theme.colors.error }]}>
-                  Delete account
-                </Text>
-                <Text style={styles.description}>
-                  Permanently erase your account and data
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
-            </TouchableOpacity>
-          </View>
-        </View>
+            />
+          </Card>
+        </FadeIn>
 
         {/* ── 5. App Version Footer ── */}
-        <Text style={styles.versionFooter}>
+        <AppText variant="caption" align="center" style={styles.versionFooter}>
           Flint · Version {appConfig.expo.version}
-        </Text>
+        </AppText>
       </ScrollView>
 
       {/* ── Edit Flint Profile Modal ── */}
@@ -453,51 +422,64 @@ export default function ProfileDetails({
             keyboardDismissMode="on-drag"
             contentContainerStyle={[
               styles.content,
-              { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
+              styles.modalContent,
+              { paddingHorizontal: gutter, paddingTop: insets.top + sp.lg, paddingBottom: insets.bottom + sp.xxl },
             ]}
           >
-            <Text style={styles.title} accessibilityRole="header">
-              Edit Profile
-            </Text>
-            <Text style={styles.description}>
+            <View style={styles.modalHeader}>
+              <AppText variant="title" style={styles.flex} numberOfLines={1}>
+                Edit Profile
+              </AppText>
+              <IconButton
+                icon="close"
+                onPress={closeEditor}
+                disabled={saving}
+                accessibilityLabel="Close editor"
+              />
+            </View>
+            <AppText variant="callout" color="muted">
               Update how your name appears in Flint. Your email and
               connected Tinder account stay unchanged.
-            </Text>
+            </AppText>
 
-            <View style={styles.detail}>
-              <Text style={styles.label}>Full name</Text>
-              <TextInput
-                style={[styles.input, { minHeight: 52 }]}
+            <View style={styles.field}>
+              <AppText variant="label" nativeID="profile-full-name-label">Full name</AppText>
+              <FocusInput
+                style={styles.input}
                 value={personalName}
                 onChangeText={setPersonalName}
                 editable={!saving}
                 accessibilityLabel="Full name"
+                accessibilityLabelledBy="profile-full-name-label"
                 maxLength={80}
                 autoCapitalize="words"
+                autoComplete="name"
+                textContentType="name"
                 placeholder="Your full name"
-                placeholderTextColor={theme.colors.muted}
+                error={!!error}
               />
+              {!!error && (
+                <AppText variant="footnote" color="error" accessibilityRole="alert" style={styles.errorText}>
+                  {error}
+                </AppText>
+              )}
             </View>
 
-            {!!error && (
-              <Text style={styles.error} accessibilityRole="alert">
-                {error}
-              </Text>
-            )}
-
-            <Action
-              title={saving ? 'Saving…' : 'Save changes'}
-              icon="checkmark-outline"
-              busy={saving}
-              onPress={save}
-            />
-            <Action
-              title="Cancel"
-              icon="close-outline"
-              busy={saving}
-              secondary
-              onPress={closeEditor}
-            />
+            <View style={styles.modalActions}>
+              <AppButton
+                title={saving ? 'Saving…' : 'Save changes'}
+                icon="checkmark-outline"
+                loading={saving}
+                onPress={save}
+              />
+              <AppButton
+                title="Cancel"
+                icon="close-outline"
+                variant="secondary"
+                disabled={saving}
+                onPress={closeEditor}
+              />
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -522,336 +504,137 @@ export default function ProfileDetails({
 }
 
 const styles = StyleSheet.create({
+  content: {
+    width: '100%',
+    maxWidth: theme.layout.readableMax,
+    alignSelf: 'center',
+    paddingTop: sp.sm,
+    gap: sp.xl,
+  },
   identity: {
-    padding: 24,
-    gap: 20,
-    borderRadius: 24,
+    padding: sp.xl,
+    gap: sp.xl,
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: c.borderSubtle,
   },
   identityTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: sp.lg,
   },
   identityCopy: {
     flex: 1,
     minWidth: 0,
-    gap: 4,
+    gap: sp.xxs,
   },
   avatarRing: {
     padding: 3,
-    borderRadius: 40,
-    borderWidth: 1.5,
-    borderColor: theme.colors.accent,
+    borderRadius: 38,
+    flexShrink: 0,
+  },
+  avatar: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: c.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   initial: {
-    ...theme.type.display,
-    fontSize: 26,
-    color: theme.colors.text,
-    fontWeight: '700',
-  },
-  name: {
     ...theme.type.title,
-    fontSize: 20,
-    color: theme.colors.text,
+    color: c.text,
   },
-  eyebrow: {
-    ...theme.type.caption,
-    color: theme.colors.muted,
-    letterSpacing: 1.5,
-    fontSize: 10,
-    fontWeight: '700',
+  connectionBadge: {
+    marginTop: sp.xs,
   },
-  pageTitle: {
-    ...theme.type.section,
-    color: theme.colors.text,
-    flex: 1,
-    textAlign: 'center',
-  },
-  backSpacer: {
-    width: 44,
-  },
-  editButton: {
-    minHeight: 46,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: theme.colors.elevated,
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    gap: sp.sm,
   },
-  group: {
-    gap: 12,
-  },
-  list: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    minHeight: 76,
-  },
-  rowIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.elevated,
-  },
-  tinderIcon: {
-    backgroundColor: '#321526',
-  },
-  destructiveIcon: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  },
-  divider: {
-    marginLeft: 68,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: theme.colors.divider,
-  },
-  flex: {
+  statCard: {
     flex: 1,
     minWidth: 0,
-    gap: 4,
-  },
-  connectionStatus: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  expanded: {
-    padding: 18,
-    paddingTop: 8,
-    gap: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-  },
-  tinderPreviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.divider,
-  },
-  tinderAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
-  tinderPreviewName: {
-    ...theme.type.body,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  tinderNoticeBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    gap: sp.xs,
+    paddingVertical: sp.lg,
+    paddingHorizontal: sp.sm,
+    backgroundColor: c.surface,
+    borderRadius: theme.radius.card,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: c.borderSubtle,
   },
-  tinderActionsRow: {
-    gap: 10,
+  statValue: {
+    ...theme.type.title2,
+    fontFamily: theme.fonts.strong,
+    fontVariant: ['tabular-nums'],
+    maxWidth: '100%',
   },
-  galleryStrip: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingVertical: 4,
-  },
-  galleryThumb: {
-    width: 52,
-    height: 70,
-    borderRadius: 8,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  openTinderBtn: {
-    minHeight: 44,
-    borderRadius: theme.radius.button,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#281423',
-    borderWidth: 1,
-    borderColor: 'rgba(254, 60, 114, 0.3)',
+  statLabel: {
+    ...theme.type.overline,
+    color: c.muted,
   },
   feedback: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 4,
+    gap: sp.sm,
+    padding: sp.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: c.primarySoft,
+    borderWidth: 1,
+    borderColor: c.primaryBorder,
+  },
+  feedbackError: {
+    backgroundColor: c.errorSoft,
+    borderColor: c.errorBorder,
+  },
+  flex: {
+    flex: 1,
+    minWidth: 0,
+  },
+  group: {
+    gap: 0,
+  },
+  sectionHeader: {
+    marginBottom: sp.sm,
+  },
+  list: {
+    overflow: 'hidden',
   },
   versionFooter: {
-    ...theme.type.caption,
-    color: theme.colors.muted,
-    textAlign: 'center',
-    paddingVertical: 8,
-  },
-  content: {
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
-    padding: 20,
-    gap: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  back: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    ...theme.type.title,
-    color: theme.colors.text,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-  },
-  placeholder: {
-    backgroundColor: theme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  description: {
-    ...theme.type.caption,
-    color: theme.colors.muted,
-  },
-  label: {
-    ...theme.type.label,
-    color: theme.colors.textSecondary,
-  },
-  fieldLabel: {
-    ...theme.type.caption,
-    color: theme.colors.muted,
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  body: {
-    ...theme.type.body,
-    color: theme.colors.text,
-  },
-  detail: {
-    gap: 4,
-  },
-  button: {
-    minHeight: 48,
-    padding: 12,
-    borderRadius: theme.radius.button,
-    backgroundColor: theme.colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  secondary: {
-    backgroundColor: theme.colors.elevated,
-  },
-  buttonText: {
-    ...theme.type.label,
-    color: theme.colors.text,
+    paddingVertical: sp.sm,
   },
   modal: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: c.background,
+  },
+  modalContent: {
+    maxWidth: theme.layout.formMax,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+  },
+  field: {
+    gap: sp.sm,
   },
   input: {
     ...theme.type.body,
-    color: theme.colors.text,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: theme.colors.surface,
+    color: c.text,
+    minHeight: theme.layout.inputHeight,
+    paddingHorizontal: sp.lg,
+    paddingVertical: sp.md,
+    borderRadius: theme.radius.input,
+    backgroundColor: c.elevated,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: c.border,
   },
-  error: {
-    ...theme.type.body,
-    color: theme.colors.error,
+  errorText: {
+    marginTop: sp.xxs,
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 18,
-    paddingHorizontal: 8,
-    backgroundColor: theme.colors.surface,
-    borderRadius: 20,
-  },
-  statValue: {
-    ...theme.type.title,
-    fontSize: 22,
-  },
-  statLabel: {
-    ...theme.type.caption,
-    color: theme.colors.muted,
-    fontSize: 10,
-    letterSpacing: 1.2,
-  },
-  tierBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  tierPlatinum: {
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-    borderColor: 'rgba(56, 189, 248, 0.45)',
-  },
-  tierGold: {
-    backgroundColor: 'rgba(234, 179, 8, 0.15)',
-    borderColor: 'rgba(234, 179, 8, 0.45)',
-  },
-  tierPlus: {
-    backgroundColor: 'rgba(168, 85, 247, 0.15)',
-    borderColor: 'rgba(168, 85, 247, 0.45)',
-  },
-  tierText: {
-    ...theme.type.caption,
-    fontSize: 10,
-    fontWeight: '700',
-    color: theme.colors.muted,
-    textTransform: 'uppercase',
-  },
-  tierTextPlatinum: {
-    color: '#38BDF8',
-  },
-  tierTextGold: {
-    color: '#FACC15',
-  },
-  tierTextPlus: {
-    color: '#C084FC',
+  modalActions: {
+    gap: sp.md,
+    marginTop: sp.sm,
   },
 });

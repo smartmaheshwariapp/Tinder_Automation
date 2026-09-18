@@ -10,7 +10,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme as uiTheme } from '../../theme';
+import { theme as uiTheme, alpha } from '../../theme';
+import * as Haptics from 'expo-haptics';
+import { useMotionReduced, ContentTransition } from '../common/Motion';
+
+const c = uiTheme.colors;
+const t = uiTheme.type;
+// Orb palette helpers: every state colour comes from a theme token.
+const ring = color => alpha(color, 0.22);
+const pulse = color => alpha(color, 0.34);
 
 function formatCountdown(ms, includeSeconds = false) {
   if (!ms || ms <= 0) return null;
@@ -33,7 +41,10 @@ export default function MasterControlOrb({
   busy = false,
   onToggleAgent,
   onOpenBrowser,
+  wellColor = c.surface, // colour of the recessed dial behind the orb; match the parent surface
+  showHint = true,
 }) {
+  const reduced = useMotionReduced();
   const agentState = stats?.agentState || stats || {};
   const isRunning = Boolean(
     (isLoggedIn || agentState?.isRunning === true) &&
@@ -134,7 +145,7 @@ export default function MasterControlOrb({
   const pulse3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (isRunning || isStarting) {
+    if ((isRunning || isStarting) && !reduced) {
       const createPulse = (anim, delay) => {
         return Animated.loop(
           Animated.sequence([
@@ -163,27 +174,27 @@ export default function MasterControlOrb({
       pulse2.setValue(0);
       pulse3.setValue(0);
     }
-  }, [isRunning, isStarting]);
+  }, [isRunning, isStarting, reduced]);
 
   const getPulseStyle = (anim) => ({
     transform: [
       {
         scale: anim.interpolate({
           inputRange: [0, 1],
-          outputRange: [1.0, 1.42],
+          outputRange: [1.0, 1.55],
         }),
       },
     ],
     opacity: anim.interpolate({
       inputRange: [0, 0.4, 1],
-      outputRange: [0.55, 0.35, 0],
+      outputRange: [0.7, 0.35, 0],
     }),
   });
 
   // ── 4. Continuous Spin Animation (Initializing & Transitioning) ──
   const spinAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (orbState === 'initializing' || orbState === 'transitioning') {
+    if ((orbState === 'initializing' || orbState === 'transitioning') && !reduced) {
       const loop = Animated.loop(
         Animated.timing(spinAnim, {
           toValue: 1,
@@ -197,7 +208,7 @@ export default function MasterControlOrb({
     } else {
       spinAnim.setValue(0);
     }
-  }, [orbState]);
+  }, [orbState, reduced]);
   const spinInterpolate = spinAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
@@ -206,7 +217,7 @@ export default function MasterControlOrb({
   // ── 5. Heartbeat Pulse Animation (Swiping State) ──
   const heartAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    if (orbState === 'swiping') {
+    if (orbState === 'swiping' && !reduced) {
       const loop = Animated.loop(
         Animated.sequence([
           Animated.timing(heartAnim, { toValue: 1.2, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
@@ -220,14 +231,14 @@ export default function MasterControlOrb({
     } else {
       heartAnim.setValue(1);
     }
-  }, [orbState]);
+  }, [orbState, reduced]);
 
   // ── 6. Bouncing 3-Dot Typing Animation (Messaging State) ──
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (orbState === 'messaging') {
+    if (orbState === 'messaging' && !reduced) {
       const createDot = (anim, delay) => {
         return Animated.loop(
           Animated.sequence([
@@ -244,11 +255,13 @@ export default function MasterControlOrb({
       d1.start(); d2.start(); d3.start();
       return () => { d1.stop(); d2.stop(); d3.stop(); };
     }
-  }, [orbState]);
+    dot1.setValue(0); dot2.setValue(0); dot3.setValue(0);
+  }, [orbState, reduced]);
 
   // ── 7. Tactile Spring Press In/Out ──
   const pressScale = useRef(new Animated.Value(1)).current;
   const handlePressIn = () => {
+    if (reduced) return;
     Animated.spring(pressScale, {
       toValue: 0.94,
       speed: 45,
@@ -257,12 +270,34 @@ export default function MasterControlOrb({
     }).start();
   };
   const handlePressOut = () => {
+    if (reduced) { pressScale.setValue(1); return; }
     Animated.spring(pressScale, {
       toValue: 1,
       speed: 35,
       bounciness: 6,
       useNativeDriver: true,
     }).start();
+  };
+
+  // ── 7b. Ambient Glow + Rotating Sweep Ring (Siri-orb breathing / Instagram story ring) ──
+  const breathe = useRef(new Animated.Value(0)).current;
+  const sweep = useRef(new Animated.Value(0)).current;
+  const sweepSpeed = isRunning || isStarting ? 3200 : 9000;
+  useEffect(() => {
+    if (reduced) { breathe.setValue(0.5); sweep.setValue(0); return; }
+    const breatheLoop = Animated.loop(Animated.sequence([
+      Animated.timing(breathe, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true, isInteraction: false }),
+      Animated.timing(breathe, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true, isInteraction: false }),
+    ]));
+    sweep.setValue(0);
+    const sweepLoop = Animated.loop(Animated.timing(sweep, { toValue: 1, duration: sweepSpeed, easing: Easing.linear, useNativeDriver: true, isInteraction: false }));
+    breatheLoop.start(); sweepLoop.start();
+    return () => { breatheLoop.stop(); sweepLoop.stop(); };
+  }, [reduced, sweepSpeed]);
+  const sweepRotate = sweep.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const glowStyle = {
+    opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
+    transform: [{ scale: breathe.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.06] }) }],
   };
 
   // ── 8. Visual State Configurations (1:1 with desktop activity-tab-bridge.js) ──
@@ -276,7 +311,7 @@ export default function MasterControlOrb({
   const stopPulseAnim = useRef(new Animated.Value(1)).current;
   const stopGlowAnim = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
-    if (isRunning && !isSafetyLocked) {
+    if (isRunning && !isSafetyLocked && !reduced) {
       const pulseLoop = Animated.loop(
         Animated.sequence([
           Animated.parallel([
@@ -315,16 +350,16 @@ export default function MasterControlOrb({
       stopPulseAnim.setValue(1);
       stopGlowAnim.setValue(0.5);
     }
-  }, [isRunning, isSafetyLocked]);
+  }, [isRunning, isSafetyLocked, reduced]);
 
   const config = useMemo(() => {
     switch (orbState) {
       case 'disconnected':
         return {
-          gradient: ['#FE3C72', '#FF655B', '#FF8E53'],
-          ringColor: 'rgba(254, 60, 114, 0.2)',
-          pulseColor: 'rgba(254, 60, 114, 0.3)',
-          icon: <Ionicons name="flame" size={38} color="#FFFFFF" />,
+          gradient: uiTheme.gradients.brand,
+          ringColor: ring(c.primary),
+          pulseColor: pulse(c.primary),
+          icon: <Ionicons name="flame" size={38} color={c.onPrimary} />,
           label: 'CONNECT',
           sublabel: 'Tap to start',
           hint: 'Connect Tinder to get started',
@@ -332,12 +367,12 @@ export default function MasterControlOrb({
 
       case 'initializing':
         return {
-          gradient: ['#4F46E5', '#7C3AED', '#9333EA'],
-          ringColor: 'rgba(129, 140, 248, 0.25)',
-          pulseColor: 'rgba(129, 140, 248, 0.35)',
+          gradient: [c.info, c.plus],
+          ringColor: ring(c.info),
+          pulseColor: pulse(c.info),
           icon: (
             <Animated.View style={{ transform: [{ rotate: spinInterpolate }] }}>
-              <Ionicons name="sync" size={36} color="#FFFFFF" />
+              <Ionicons name="sync" size={36} color={c.onPrimary} />
             </Animated.View>
           ),
           label: 'Starting...',
@@ -347,12 +382,12 @@ export default function MasterControlOrb({
 
       case 'swiping':
         return {
-          gradient: ['#E11D48', '#BE185D', '#9D174D'],
-          ringColor: 'rgba(244, 63, 94, 0.28)',
-          pulseColor: 'rgba(244, 63, 94, 0.38)',
+          gradient: uiTheme.gradients.brandShort,
+          ringColor: ring(c.primary),
+          pulseColor: pulse(c.primary),
           icon: (
             <Animated.View style={{ transform: [{ scale: heartAnim }] }}>
-              <Ionicons name="heart" size={38} color="#FFFFFF" />
+              <Ionicons name="heart" size={38} color={c.onPrimary} />
             </Animated.View>
           ),
           label: 'Swiping',
@@ -363,12 +398,12 @@ export default function MasterControlOrb({
       case 'messaging': {
         const targetMsgs = typeof settings?.messagesPerCycle === 'number' && settings.messagesPerCycle > 0 ? settings.messagesPerCycle : 50;
         return {
-          gradient: ['#7C3AED', '#9333EA', '#A855F7'],
-          ringColor: 'rgba(168, 85, 247, 0.28)',
-          pulseColor: 'rgba(168, 85, 247, 0.38)',
+          gradient: [c.info, c.plus],
+          ringColor: ring(c.info),
+          pulseColor: pulse(c.info),
           icon: (
             <View style={styles.chatIconWrapper}>
-              <Ionicons name="chatbubble" size={34} color="#FFFFFF" />
+              <Ionicons name="chatbubble" size={34} color={c.onPrimary} />
               <View style={styles.typingDotsRow}>
                 <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot1 }] }]} />
                 <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot2 }] }]} />
@@ -388,10 +423,10 @@ export default function MasterControlOrb({
 
       case 'lead_scan':
         return {
-          gradient: ['#DB2777', '#BE185D', '#9D174D'],
-          ringColor: 'rgba(236, 72, 153, 0.25)',
-          pulseColor: 'rgba(236, 72, 153, 0.35)',
-          icon: <Ionicons name="sparkles" size={34} color="#FFFFFF" />,
+          gradient: [c.accent, c.primary],
+          ringColor: ring(c.accent),
+          pulseColor: pulse(c.accent),
+          icon: <Ionicons name="sparkles" size={34} color={c.onPrimary} />,
           label: 'Scanning',
           sublabel: 'Finding Dates',
           hint: 'Analyzing bios and conversation signals · Tap to stop',
@@ -399,12 +434,12 @@ export default function MasterControlOrb({
 
       case 'transitioning':
         return {
-          gradient: ['#059669', '#10B981', '#34D399'],
-          ringColor: 'rgba(16, 185, 129, 0.25)',
-          pulseColor: 'rgba(16, 185, 129, 0.35)',
+          gradient: [c.success, c.platinum],
+          ringColor: ring(c.success),
+          pulseColor: pulse(c.success),
           icon: (
             <Animated.View style={{ transform: [{ rotate: spinInterpolate }] }}>
-              <Ionicons name="refresh" size={34} color="#FFFFFF" />
+              <Ionicons name="refresh" size={34} color={c.onPrimary} />
             </Animated.View>
           ),
           label: 'Cooldown',
@@ -415,10 +450,10 @@ export default function MasterControlOrb({
       case 'polling':
       case 'waiting':
         return {
-          gradient: ['#0891B2', '#06B6D4', '#22D3EE'],
-          ringColor: 'rgba(6, 182, 212, 0.25)',
-          pulseColor: 'rgba(6, 182, 212, 0.35)',
-          icon: <Ionicons name="radio" size={34} color="#FFFFFF" />,
+          gradient: [c.platinum, c.info],
+          ringColor: ring(c.platinum),
+          pulseColor: pulse(c.platinum),
+          icon: <Ionicons name="radio" size={34} color={c.onPrimary} />,
           label: 'Awaiting Replies',
           sublabel: countdown ? countdown : 'Rechecking soon',
           hint: 'Monitoring active conversations · Tap to stop',
@@ -426,10 +461,10 @@ export default function MasterControlOrb({
 
       case 'locked':
         return {
-          gradient: ['#D97706', '#B45309', '#92400E'],
-          ringColor: 'rgba(245, 158, 11, 0.25)',
-          pulseColor: 'rgba(245, 158, 11, 0.35)',
-          icon: <Ionicons name="shield-checkmark" size={34} color="#FFFFFF" />,
+          gradient: [c.warning, c.secondary],
+          ringColor: ring(c.warning),
+          pulseColor: pulse(c.warning),
+          icon: <Ionicons name="shield-checkmark" size={34} color={c.onPrimary} />,
           label: 'Safety Pause',
           sublabel: countdown ? `Resumes in ${countdown}` : 'Safety break',
           hint: 'Hourly swipe safety limit · Taking a short break to protect your profile',
@@ -438,13 +473,13 @@ export default function MasterControlOrb({
       case 'exhausted':
         return {
           gradient: isRunning
-            ? ['#F97316', '#EA580C', '#8B5CF6']
-            : ['#4F46E5', '#6366F1', '#4338CA'],
-          ringColor: isRunning ? 'rgba(249, 115, 22, 0.28)' : 'rgba(99, 102, 241, 0.28)',
-          pulseColor: isRunning ? 'rgba(249, 115, 22, 0.38)' : 'rgba(99, 102, 241, 0.38)',
+            ? [c.warning, c.info]
+            : [c.info, c.plus],
+          ringColor: isRunning ? ring(c.warning) : ring(c.info),
+          pulseColor: isRunning ? pulse(c.warning) : pulse(c.info),
           icon: isRunning
-            ? <Ionicons name="chatbubbles" size={36} color="#FFFFFF" />
-            : <Ionicons name="hourglass-outline" size={36} color="#FFFFFF" />,
+            ? <Ionicons name="chatbubbles" size={36} color={c.onPrimary} />
+            : <Ionicons name="hourglass-outline" size={36} color={c.onPrimary} />,
           label: isRunning ? 'WINGMAN' : 'LIKES REFILL',
           sublabel: countdown ? `Refills in ${countdown}` : (isRunning ? 'Chatting' : '12h Refill'),
           hint: isRunning
@@ -464,10 +499,10 @@ export default function MasterControlOrb({
 
         if (!swipingEnabled && !messagingEnabled) {
           return {
-            gradient: ['#4B5563', '#6B7280', '#9CA3AF'],
-            ringColor: 'rgba(107, 114, 128, 0.25)',
-            pulseColor: 'rgba(107, 114, 128, 0.35)',
-            icon: <Ionicons name="pause" size={38} color="#FFFFFF" />,
+            gradient: [c.textTertiary, c.muted],
+            ringColor: ring(c.muted),
+            pulseColor: pulse(c.muted),
+            icon: <Ionicons name="pause" size={38} color={c.onPrimary} />,
             label: 'OFF',
             sublabel: 'Turn on in Settings',
             hint: 'Swiping & Messaging are both disabled · Turn one on in Automation tab',
@@ -476,10 +511,10 @@ export default function MasterControlOrb({
 
         if (!swipingEnabled && messagingEnabled) {
           return {
-            gradient: ['#7C3AED', '#8B5CF6', '#A855F7'],
-            ringColor: 'rgba(139, 92, 246, 0.25)',
-            pulseColor: 'rgba(139, 92, 246, 0.35)',
-            icon: <Ionicons name="chatbubbles" size={38} color="#FFFFFF" />,
+            gradient: uiTheme.gradients.brand,
+            ringColor: ring(c.primary),
+            pulseColor: pulse(c.primary),
+            icon: <Ionicons name="chatbubbles" size={38} color={c.onPrimary} />,
             label: 'START',
             sublabel: 'Messaging Only',
             hint: 'Swiping disabled · Tap to chat with existing matches',
@@ -488,10 +523,10 @@ export default function MasterControlOrb({
 
         if (swipingEnabled && !messagingEnabled) {
           return {
-            gradient: ['#FE3C72', '#FF655B', '#FF8E53'],
-            ringColor: 'rgba(254, 60, 114, 0.2)',
-            pulseColor: 'rgba(254, 60, 114, 0.3)',
-            icon: <Ionicons name="heart" size={38} color="#FFFFFF" />,
+            gradient: uiTheme.gradients.brand,
+            ringColor: ring(c.primary),
+            pulseColor: pulse(c.primary),
+            icon: <Ionicons name="heart" size={38} color={c.onPrimary} />,
             label: hasPausedLikesProgress ? 'RESUME' : 'START',
             sublabel: hasPausedLikesProgress ? `${currentLikes} / ${targetLikes}` : 'Swiping Only',
             hint: hasPausedLikesProgress
@@ -501,10 +536,10 @@ export default function MasterControlOrb({
         }
 
         return {
-          gradient: ['#10B981', '#059669', '#047857'],
-          ringColor: 'rgba(16, 185, 129, 0.2)',
-          pulseColor: 'rgba(16, 185, 129, 0.3)',
-          icon: <Ionicons name="play" size={38} color="#FFFFFF" style={{ marginLeft: 4 }} />,
+          gradient: uiTheme.gradients.brand,
+          ringColor: ring(c.primary),
+          pulseColor: pulse(c.primary),
+          icon: <Ionicons name="play" size={38} color={c.onPrimary} style={{ marginLeft: 4 }} />,
           label: hasPausedLikesProgress ? 'RESUME' : 'START',
           sublabel: hasPausedLikesProgress ? `${currentLikes} / ${targetLikes}` : 'Full Auto',
           hint: hasPausedLikesProgress
@@ -528,20 +563,34 @@ export default function MasterControlOrb({
     }
   };
 
+  const tintStart = config.gradient[0];
+  const tintEnd = config.gradient[config.gradient.length - 1];
+  const tapHaptic = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); };
+
   return (
     <View style={styles.container}>
       <View style={styles.orbCenterWrapper}>
         {/* Concentric Decorative Rings */}
         <View style={[styles.ringOuter, { borderColor: config.ringColor }]} pointerEvents="none" />
         <View style={[styles.ringMid, { borderColor: config.ringColor }]} pointerEvents="none" />
-        <View style={[styles.ringInner, { borderColor: config.ringColor }]} pointerEvents="none" />
+        <Animated.View style={[styles.glowOuter, { backgroundColor: alpha(tintStart, 0.08) }, glowStyle]} pointerEvents="none" />
+        <Animated.View style={[styles.glowInner, { backgroundColor: alpha(tintStart, 0.14) }, glowStyle]} pointerEvents="none" />
+        <Animated.View style={[styles.sweepRing, { transform: [{ rotate: sweepRotate }] }]} pointerEvents="none">
+          <LinearGradient
+            colors={[tintStart, alpha(tintEnd, 0), tintEnd, alpha(tintStart, 0)]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+        <View style={[styles.sweepMask, { backgroundColor: wellColor }]} pointerEvents="none" />
 
         {/* Triple Staggered Pulse Rings (Active when running) */}
         {(isRunning || isStarting) && (
           <>
-            <Animated.View style={[styles.pulseRing, { borderColor: config.pulseColor }, getPulseStyle(pulse1)]} pointerEvents="none" />
-            <Animated.View style={[styles.pulseRing, { borderColor: config.pulseColor }, getPulseStyle(pulse2)]} pointerEvents="none" />
-            <Animated.View style={[styles.pulseRing, { borderColor: config.pulseColor }, getPulseStyle(pulse3)]} pointerEvents="none" />
+            <Animated.View style={[styles.pulseRing, { borderColor: config.pulseColor, backgroundColor: alpha(tintStart, 0.1) }, getPulseStyle(pulse1)]} pointerEvents="none" />
+            <Animated.View style={[styles.pulseRing, { borderColor: config.pulseColor, backgroundColor: alpha(tintStart, 0.1) }, getPulseStyle(pulse2)]} pointerEvents="none" />
+            <Animated.View style={[styles.pulseRing, { borderColor: config.pulseColor, backgroundColor: alpha(tintStart, 0.1) }, getPulseStyle(pulse3)]} pointerEvents="none" />
           </>
         )}
 
@@ -550,8 +599,10 @@ export default function MasterControlOrb({
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={`${config.label}: ${config.sublabel}`}
+            accessibilityHint={config.hint}
+            accessibilityState={{ disabled: Boolean(busy || isSafetyLocked), busy: Boolean(isStarting) }}
             disabled={busy || isSafetyLocked}
-            onPress={handlePress}
+            onPress={() => { tapHaptic(); handlePress(); }}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
             activeOpacity={0.88}
@@ -563,6 +614,23 @@ export default function MasterControlOrb({
               end={{ x: 0.1, y: 0.95 }}
               style={styles.orbGradient}
             >
+              {/* Tonal shade keeps white labels legible on the lighter token colours. */}
+              <LinearGradient
+                pointerEvents="none"
+                colors={[alpha(c.black, 0.12), alpha(c.black, 0.46)]}
+                start={{ x: 0.9, y: 0.1 }}
+                end={{ x: 0.1, y: 0.95 }}
+                style={StyleSheet.absoluteFill}
+              />
+              {/* Glass highlight across the top of the orb */}
+              <LinearGradient
+                pointerEvents="none"
+                colors={[alpha(c.white, 0.32), alpha(c.white, 0)]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 0.55 }}
+                style={styles.orbGloss}
+              />
+              <ContentTransition transitionKey={orbState} style={styles.orbContent}>
               <View style={styles.iconContainer}>
                 {config.icon}
               </View>
@@ -573,6 +641,7 @@ export default function MasterControlOrb({
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.75}
+                  maxFontSizeMultiplier={uiTheme.fontScale.chrome}
                 >
                   {config.label}
                 </Text>
@@ -581,10 +650,12 @@ export default function MasterControlOrb({
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.75}
+                  maxFontSizeMultiplier={uiTheme.fontScale.chrome}
                 >
                   {config.sublabel}
                 </Text>
               </View>
+              </ContentTransition>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -606,18 +677,19 @@ export default function MasterControlOrb({
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Stop Automation"
-              onPress={handlePress}
+              onPress={() => { tapHaptic(); handlePress(); }}
               activeOpacity={0.82}
+              hitSlop={PILL_HIT_SLOP}
               style={styles.stopPill}
             >
               <LinearGradient
-                colors={['#EF4444', '#DC2626', '#991B1B']}
+                colors={[c.danger, c.primary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.stopPillGradient}
               >
                 <View style={styles.stopIconSquare} />
-                <Text style={styles.stopPillText}>TAP TO STOP</Text>
+                <Text style={styles.stopPillText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>TAP TO STOP</Text>
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
@@ -631,16 +703,17 @@ export default function MasterControlOrb({
               accessibilityLabel="Start Wingman"
               onPress={handlePress}
               activeOpacity={0.82}
+              hitSlop={PILL_HIT_SLOP}
               style={styles.stopPill}
             >
               <LinearGradient
-                colors={['#EA580C', '#C2410C', '#9A3412']}
+                colors={[c.warning, c.secondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.stopPillGradient}
               >
-                <Ionicons name="play" size={13} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.stopPillText}>START WINGMAN</Text>
+                <Ionicons name="play" size={13} color={c.background} />
+                <Text style={[styles.stopPillText, styles.startPillText]} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>START WINGMAN</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -648,18 +721,23 @@ export default function MasterControlOrb({
       </View>
 
       {/* Dynamic Status Hint Subtitle */}
-      <Text style={styles.statusHint}>
-        {config.hint}
-      </Text>
+      {showHint ? (
+        <Text style={styles.statusHint} accessibilityLiveRegion="polite" maxFontSizeMultiplier={uiTheme.fontScale.body}>
+          {config.hint}
+        </Text>
+      ) : null}
     </View>
   );
 }
+
+// Extends the compact floating pills to a 44pt touch target.
+const PILL_HIT_SLOP = { top: 10, bottom: 10, left: 8, right: 8 };
 
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: uiTheme.spacing.md,
   },
   orbCenterWrapper: {
     width: 220,
@@ -690,6 +768,45 @@ const styles = StyleSheet.create({
     borderRadius: 86,
     borderWidth: 1.5,
   },
+  glowOuter: {
+    position: 'absolute',
+    width: 214,
+    height: 214,
+    borderRadius: 107,
+  },
+  glowInner: {
+    position: 'absolute',
+    width: 188,
+    height: 188,
+    borderRadius: 94,
+  },
+  // Rotating gradient ring: a gradient disc masked by a surface-coloured disc.
+  sweepRing: {
+    position: 'absolute',
+    width: 172,
+    height: 172,
+    borderRadius: 86,
+    overflow: 'hidden',
+  },
+  sweepMask: {
+    position: 'absolute',
+    width: 166,
+    height: 166,
+    borderRadius: 83,
+    backgroundColor: c.surface,
+  },
+  orbGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '60%',
+  },
+  orbContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
   // Triple pulse rings (mirrors .orb-pulse-ring)
   pulseRing: {
     position: 'absolute',
@@ -705,53 +822,52 @@ const styles = StyleSheet.create({
     borderRadius: 76,
     overflow: 'hidden',
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.45,
-        shadowRadius: 16,
-      },
-      android: {
-        elevation: 12,
-      },
+      ios: uiTheme.shadows.lg,
+      android: { elevation: 12 },
     }),
   },
   orbGradient: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: uiTheme.spacing.md,
   },
   iconContainer: {
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: uiTheme.spacing.xs,
   },
   labelGroup: {
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    paddingHorizontal: 8,
+    paddingHorizontal: uiTheme.spacing.sm,
   },
   orbLabel: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 16,
-    color: '#FFFFFF',
+    ...t.headline,
+    fontFamily: uiTheme.fonts.heavy,
+    color: c.onPrimary,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     textAlign: 'center',
     maxWidth: '100%',
+    textShadowColor: alpha(c.black, 0.35),
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   orbSublabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.88)',
-    marginTop: 2,
-    letterSpacing: 0.2,
+    ...t.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: alpha(c.white, 0.92),
+    marginTop: uiTheme.spacing.xxs,
     textAlign: 'center',
     maxWidth: '100%',
+    fontVariant: ['tabular-nums'],
+    textShadowColor: alpha(c.black, 0.35),
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   chatIconWrapper: {
     position: 'relative',
@@ -770,16 +886,14 @@ const styles = StyleSheet.create({
     width: 3.5,
     height: 3.5,
     borderRadius: 2,
-    backgroundColor: '#7C3AED',
+    backgroundColor: c.primary,
   },
   statusHint: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: uiTheme.colors.muted,
+    ...t.subhead,
+    color: c.muted,
     textAlign: 'center',
-    marginTop: 14,
-    letterSpacing: 0.1,
-    paddingHorizontal: 20,
+    marginTop: uiTheme.spacing.md,
+    paddingHorizontal: uiTheme.spacing.xl,
   },
   stopPillWrapper: {
     position: 'absolute',
@@ -787,9 +901,9 @@ const styles = StyleSheet.create({
     zIndex: 20,
     ...Platform.select({
       ios: {
-        shadowColor: '#EF4444',
+        shadowColor: c.danger,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.65,
+        shadowOpacity: 0.5,
         shadowRadius: 10,
       },
       android: {
@@ -798,29 +912,32 @@ const styles = StyleSheet.create({
     }),
   },
   stopPill: {
-    borderRadius: 20,
+    borderRadius: uiTheme.radius.pill,
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.45)',
+    borderColor: alpha(c.white, 0.4),
   },
   stopPillGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    gap: 6,
+    minHeight: 30,
+    paddingVertical: uiTheme.spacing.xs,
+    paddingHorizontal: uiTheme.spacing.md + 2,
+    gap: uiTheme.spacing.sm - 2,
   },
   stopIconSquare: {
     width: 8,
     height: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.onPrimary,
     borderRadius: 2,
   },
   stopPillText: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 11,
-    color: '#FFFFFF',
+    ...t.overline,
     letterSpacing: 0.8,
+    color: c.onPrimary,
+  },
+  startPillText: {
+    color: c.background,
   },
 });
