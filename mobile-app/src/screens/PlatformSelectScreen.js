@@ -1284,14 +1284,17 @@ export default function PlatformSelectScreen({ navigation, route }) {
               badge={unreadNotifCount > 0}
               style={homeStyles.headerButton}
             />
-            {homeTab !== "profile" && (
-              <IconButton
-                icon="person-outline"
-                onPress={() => setHomeTab("profile")}
-                accessibilityLabel="Profile details and settings"
-                style={homeStyles.headerButton}
-              />
-            )}
+            <IconButton
+              icon="menu-outline"
+              onPress={() => setShowQuickMenu(true)}
+              accessibilityLabel="Quick actions menu"
+              color={isAutomationRunning ? "#FBBF24" : undefined}
+              badge={isAutomationRunning}
+              style={[
+                homeStyles.headerButton,
+                isAutomationRunning && homeStyles.headerButtonActive,
+              ]}
+            />
           </View>
         </View>
       )}
@@ -1853,6 +1856,122 @@ export default function PlatformSelectScreen({ navigation, route }) {
         onConfirm={handleLogout}
         onCancel={() => !loggingOut && setShowLogoutConfirm(false)}
       />
+      {/* ═══════════════════ ANCHORED TOP-RIGHT HEADER DROPDOWN MENU ═══════════════════ */}
+      <Modal
+        visible={showQuickMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowQuickMenu(false)}
+        statusBarTranslucent
+      >
+        <Pressable
+          style={styles.dropdownOverlay}
+          onPress={() => setShowQuickMenu(false)}
+        >
+          <SafeAreaView edges={["top"]} style={styles.dropdownSafeArea} pointerEvents="box-none">
+            <Pressable
+              style={styles.dropdownMenu}
+              onPress={(e) => e.stopPropagation()}
+            >
+              {/* Pocket Mode */}
+              <TouchableOpacity
+                style={[
+                  styles.dropdownItem,
+                  isAutomationRunning && styles.dropdownItemActive,
+                ]}
+                onPress={() => {
+                  setShowQuickMenu(false);
+                  togglePocketMode(true);
+                }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Pocket Mode"
+              >
+                <View
+                  style={[
+                    styles.dropdownIconWrap,
+                    {
+                      backgroundColor: isAutomationRunning
+                        ? "rgba(251, 191, 36, 0.16)"
+                        : "rgba(251, 191, 36, 0.10)",
+                    },
+                  ]}
+                >
+                  <Ionicons name="moon" size={16} color="#FBBF24" />
+                </View>
+                <View style={styles.dropdownTextWrap}>
+                  <Text style={styles.dropdownItemTitle}>Pocket Mode</Text>
+                  <Text style={styles.dropdownItemDesc}>Stealth touch-lock</Text>
+                </View>
+                {isAutomationRunning ? (
+                  <View style={styles.dropdownActiveBadge}>
+                    <Text style={styles.dropdownActiveBadgeText}>RUNNING</Text>
+                  </View>
+                ) : (
+                  <Ionicons name="chevron-forward" size={14} color="#6B5E75" />
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.dropdownDivider} />
+
+              {/* Tinder Profile */}
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setShowQuickMenu(false);
+                  setHomeTab("profile");
+                }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Tinder Profile"
+              >
+                <View
+                  style={[
+                    styles.dropdownIconWrap,
+                    { backgroundColor: "rgba(110, 210, 177, 0.10)" },
+                  ]}
+                >
+                  <Ionicons name="person-outline" size={16} color="#6ED2B1" />
+                </View>
+                <View style={styles.dropdownTextWrap}>
+                  <Text style={styles.dropdownItemTitle}>Tinder Profile</Text>
+                  <Text style={styles.dropdownItemDesc}>Photos & account</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color="#6B5E75" />
+              </TouchableOpacity>
+
+              <View style={styles.dropdownDivider} />
+
+              {/* Preferences */}
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setShowQuickMenu(false);
+                  openModal();
+                }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Preferences"
+              >
+                <View
+                  style={[
+                    styles.dropdownIconWrap,
+                    { backgroundColor: "rgba(96, 165, 250, 0.10)" },
+                  ]}
+                >
+                  <Ionicons name="options-outline" size={16} color="#60A5FA" />
+                </View>
+                <View style={styles.dropdownTextWrap}>
+                  <Text style={styles.dropdownItemTitle}>Preferences</Text>
+                  <Text style={styles.dropdownItemDesc}>Pacing & safety</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color="#6B5E75" />
+              </TouchableOpacity>
+            </Pressable>
+          </SafeAreaView>
+        </Pressable>
+      </Modal>
+
       {/* ═══════════════════ NOTIFICATION CENTER MODAL ═══════════════════ */}
       <NotificationCenterModal
         visible={showNotifModal}
@@ -2493,6 +2612,10 @@ const homeStyles = StyleSheet.create({
   },
   headerButton: {
     borderRadius: r.pill,
+  },
+  headerButtonActive: {
+    borderColor: "rgba(251, 191, 36, 0.35)",
+    backgroundColor: "rgba(251, 191, 36, 0.08)",
   },
   dashboard: {
     flex: 1,
