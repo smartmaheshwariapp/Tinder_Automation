@@ -616,11 +616,10 @@ function isLoggedIn() {
     return false;
   }
 
-  // 3. If login form inputs, login modal, or 3-button login sheet are visible, user is NOT logged in
+  // 3. If login form inputs or login modal are visible, user is NOT logged in
   if (
     document.querySelector('input[type="tel"], input[name="phone_number"], input[autocomplete="one-time-code"], input[name="code"]') ||
-    (typeof isLoginSheetOpen === 'function' && isLoginSheetOpen()) ||
-    document.querySelector('div[role="dialog"] button[aria-label*="Log in" i], [data-testid*="login" i]')
+    document.querySelector('div[role="dialog"] button[aria-label*="Log in" i]')
   ) {
     return false;
   }
@@ -633,7 +632,11 @@ function isLoggedIn() {
     return true;
   }
 
-  // 5. Without a valid token, residual DOM elements must NOT deceive the state
+  // 5. On any authenticated /app/* route without login inputs or error banners, user is logged in
+  if (path.includes('/app') && !path.includes('/app/login')) {
+    return true;
+  }
+
   return false;
 }
 
@@ -1104,12 +1107,26 @@ function _initTinderDeadStatePassiveDetector() {
     const origPushState = history.pushState.bind(history);
     const origReplaceState = history.replaceState.bind(history);
 
+    function _notifyPathChange(newPath) {
+        try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'FE_URL_CHANGE',
+                    url: window.location.href,
+                    pathname: newPath,
+                    isLoggedIn: typeof isLoggedIn === 'function' ? isLoggedIn() : newPath.includes('/app')
+                }));
+            }
+        } catch (_) {}
+    }
+
     history.pushState = function (...args) {
         origPushState(...args);
         if (window.location.pathname !== _lastPathname) {
             _lastPathname = window.location.pathname;
             _tinderDeadStatePendingConfirm = false;
             _checkTinderDeadStatePassive();
+            _notifyPathChange(_lastPathname);
         }
     };
     history.replaceState = function (...args) {
@@ -1118,6 +1135,7 @@ function _initTinderDeadStatePassiveDetector() {
             _lastPathname = window.location.pathname;
             _tinderDeadStatePendingConfirm = false;
             _checkTinderDeadStatePassive();
+            _notifyPathChange(_lastPathname);
         }
     };
     window.addEventListener('popstate', () => {
@@ -1125,6 +1143,7 @@ function _initTinderDeadStatePassiveDetector() {
             _lastPathname = window.location.pathname;
             _tinderDeadStatePendingConfirm = false;
             _checkTinderDeadStatePassive();
+            _notifyPathChange(_lastPathname);
         }
     });
 
@@ -1134,6 +1153,7 @@ function _initTinderDeadStatePassiveDetector() {
             _lastPathname = window.location.pathname;
             _tinderDeadStatePendingConfirm = false;
             _checkTinderDeadStatePassive();
+            _notifyPathChange(_lastPathname);
             return;
         }
         // Only act on new conversation nodes

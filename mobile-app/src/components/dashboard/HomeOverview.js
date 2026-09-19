@@ -117,6 +117,7 @@ export default function HomeOverview({
   onActivity,
   onNotifications,
   onProfile,
+  onEnterPocketMode,
 }) {
   const { gutter, isCompact } = useResponsive();
   const effectiveStats = stats || agentState || {};
@@ -479,7 +480,80 @@ export default function HomeOverview({
         </View>
       </FadeIn>
 
+      
+        <MasterControlOrb
+          stats={effectiveStats}
+          settings={settings}
+          isLoggedIn={isLoggedIn}
+          busy={busy}
+          onToggleAgent={onToggleAgent}
+          onOpenBrowser={onOpenBrowser}
+        />
+
+        {running && (
+          <TouchableOpacity
+            style={styles.contextualPocketBtn}
+            onPress={onEnterPocketMode}
+            activeOpacity={0.82}
+            accessibilityRole="button"
+            accessibilityLabel="Enter Pocket Mode"
+          >
+            <View style={styles.contextualPocketIconWrap}>
+              <Ionicons name="moon" size={13} color="#FBBF24" />
+            </View>
+            <Text style={styles.contextualPocketText}>
+              Enter Pocket Mode
+            </Text>
+            <View style={styles.contextualPocketDot} />
+          </TouchableOpacity>
+        )}
+
+        <View style={styles.tiles}>
+          {[
+            {
+              label: "GOAL",
+              value: GOALS[goal] || titleCase(goal),
+              icon: "flag-outline",
+              action: onAutomation,
+            },
+            {
+              label: "TONE",
+              value: titleCase(tone),
+              icon: "mic-outline",
+              action: onAutomation,
+            },
+            {
+              label: "SPEED",
+              value: safe ? "Human" : "Fast",
+              icon: "timer-outline",
+              action: onSettings,
+            },
+          ].map((tile) => (
+            <TouchableOpacity
+              key={tile.label}
+              style={styles.tile}
+              onPress={tile.action}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${tile.label.toLowerCase()}: ${tile.value}`}
+            >
+              <View style={styles.tileHeader}>
+                <Ionicons
+                  name={tile.icon}
+                  size={18}
+                  color={uiTheme.colors.textSecondary}
+                />
+                <Text style={styles.tileLabel}>{tile.label}</Text>
+              </View>
+              <Text style={styles.tileValue} numberOfLines={1}>
+                {tile.value}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      {/* </View> */}
       {false && <View style={styles.metrics}>
+      <View style={styles.metrics}>
         {metrics.map((metric) => (
           <TouchableOpacity
             key={metric.label}
@@ -495,6 +569,7 @@ export default function HomeOverview({
             </View>
           </TouchableOpacity>
         ))}
+      </View>
       </View>}
 
       <FadeIn delay={STAGGER * 2}>
@@ -1115,5 +1190,39 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: "55%",
+  },
+  contextualPocketBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(251, 191, 36, 0.12)',
+    borderColor: 'rgba(251, 191, 36, 0.35)',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    marginTop: -2,
+    marginBottom: 10,
+    gap: 7,
+  },
+  contextualPocketIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(251, 191, 36, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contextualPocketText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FBBF24',
+    letterSpacing: 0.2,
+  },
+  contextualPocketDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#48CB8D',
   },
 });

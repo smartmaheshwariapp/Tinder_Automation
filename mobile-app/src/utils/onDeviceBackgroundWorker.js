@@ -1259,15 +1259,52 @@ export class OnDeviceBackgroundWorker {
     const styleParams = STYLE_AI_PARAMS[settings.chattingStyle] || { temperature: 0.88, max_tokens: 90 };
 
     const startTime = Date.now();
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 15000) : null;
 
-    // Mode A: Direct OpenAI API Key
-    if (apiKey && apiKey.startsWith('sk-')) {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    try {
+      // Mode A: Direct OpenAI API Key
+      if (apiKey && apiKey.startsWith('sk-')) {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          signal: controller ? controller.signal : undefined,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: settings.aiModel || 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            temperature: styleParams.temperature,
+            max_tokens: styleParams.max_tokens
+          })
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`OpenAI API error (${res.status}): ${errText}`);
+        }
+
+        const data = await res.json();
+        const latency_ms = Date.now() - startTime;
+        trackingService.trackAiCall({ model: settings.aiModel || 'gpt-4o-mini', latency_ms });
+        return data.choices?.[0]?.message?.content?.trim() || '';
+      }
+
+      // Mode B: Linksy / FlirtEasy Mobile Cloudflare Worker Proxy
+      const endpoints = API_CONFIG.getEndpoints();
+      const proxyUrl = endpoints.AI_CHAT;
+      const authToken = settings.userToken || API_CONFIG.appSecret;
+
+      const res = await fetch(proxyUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
+        signal: controller ? controller.signal : undefined,
+        headers: API_CONFIG.getHeaders({
+          'Authorization': `Bearer ${authToken}`
+        }),
         body: JSON.stringify({
           model: settings.aiModel || 'gpt-4o-mini',
           messages: [
@@ -1281,48 +1318,19 @@ export class OnDeviceBackgroundWorker {
 
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`OpenAI API error (${res.status}): ${errText}`);
+        throw new Error(`Worker Proxy error (${res.status}): ${errText}`);
       }
 
       const data = await res.json();
       const latency_ms = Date.now() - startTime;
       trackingService.trackAiCall({ model: settings.aiModel || 'gpt-4o-mini', latency_ms });
-      return data.choices?.[0]?.message?.content?.trim() || '';
+
+      const content = data.choices?.[0]?.message?.content || data.message || data.result;
+      if (!content) throw new Error('Empty response from AI proxy');
+      return content.trim();
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
-
-    // Mode B: Linksy / FlirtEasy Mobile Cloudflare Worker Proxy
-    const endpoints = API_CONFIG.getEndpoints();
-    const proxyUrl = endpoints.AI_CHAT;
-    const authToken = settings.userToken || API_CONFIG.appSecret;
-
-    const res = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: API_CONFIG.getHeaders({
-        'Authorization': `Bearer ${authToken}`
-      }),
-      body: JSON.stringify({
-        model: settings.aiModel || 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: styleParams.temperature,
-        max_tokens: styleParams.max_tokens
-      })
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Worker Proxy error (${res.status}): ${errText}`);
-    }
-
-    const data = await res.json();
-    const latency_ms = Date.now() - startTime;
-    trackingService.trackAiCall({ model: settings.aiModel || 'gpt-4o-mini', latency_ms });
-
-    const content = data.choices?.[0]?.message?.content || data.message || data.result;
-    if (!content) throw new Error('Empty response from AI proxy');
-    return content.trim();
   }
 
   /**

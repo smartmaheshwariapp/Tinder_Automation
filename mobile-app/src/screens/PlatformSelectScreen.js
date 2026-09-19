@@ -16,6 +16,7 @@ import {
   Platform,
   ScrollView,
   Alert,
+  BackHandler,
 } from "react-native";
 import ActivityIndicator from "../components/common/SafeActivityIndicator";
 
@@ -64,16 +65,39 @@ import HomeOverview, {
 import AppSettings from "../components/dashboard/AppSettings";
 import ProfileDetails from "../components/dashboard/ProfileDetails";
 import { LinearGradient } from "expo-linear-gradient";
-import { AppButton, AppText, Badge, IconButton, IconWell, MotionTouchable, ScreenHeader, ContentTransition } from "../components/ui";
+import {
+  AppButton,
+  AppText,
+  Badge,
+  IconButton,
+  IconWell,
+  MotionTouchable,
+  ScreenHeader,
+  ContentTransition,
+} from "../components/ui";
 import SupabaseService from "../services/supabase";
 import NotificationService from "../services/notifications";
 import NotificationCenterModal from "../components/NotificationCenterModal";
 import AppConfirmModal from "../components/common/AppConfirmModal";
 import PermissionPrePromptModal from "../components/common/PermissionPrePromptModal";
 import LocationNoticeModal from "../components/common/LocationNoticeModal";
+import PocketModeModal from "../components/common/PocketModeModal";
 import LocationService from "../services/locationService";
 import trackingService from "../services/trackingService";
 import BrowserScreen from "./BrowserScreen";
+
+let KeepAwake;
+try {
+  KeepAwake = require("expo-keep-awake");
+} catch (_) {
+  KeepAwake = null;
+}
+let Haptics;
+try {
+  Haptics = require("expo-haptics");
+} catch (_) {
+  Haptics = null;
+}
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -83,10 +107,38 @@ const SHOW_ASSISTANT_STATUS_CARD = false;
 
 // Server environments shown in App Preferences (ids match `environment`).
 const ENVIRONMENT_OPTIONS = [
-  { id: "on_device", label: "On-Device", icon: "phone-portrait-outline", tone: "success", short: "Runs on this phone", description: "Tinder runs right here on your phone." },
-  { id: "hyperbeam", label: "Cloud", icon: "flash-outline", tone: "primary", short: "Secure cloud browser", description: "Streams Tinder from a secure cloud browser." },
-  { id: "vps", label: "VPS", icon: "cloud-done-outline", tone: "info", short: "Your private server", description: "Runs on your private server." },
-  { id: "local", label: "Local", icon: "laptop-outline", tone: "neutral", short: "Computer on your network", description: "Connects to a computer on your network." },
+  {
+    id: "on_device",
+    label: "On-Device",
+    icon: "phone-portrait-outline",
+    tone: "success",
+    short: "Runs on this phone",
+    description: "Tinder runs right here on your phone.",
+  },
+  {
+    id: "hyperbeam",
+    label: "Cloud",
+    icon: "flash-outline",
+    tone: "primary",
+    short: "Secure cloud browser",
+    description: "Streams Tinder from a secure cloud browser.",
+  },
+  {
+    id: "vps",
+    label: "VPS",
+    icon: "cloud-done-outline",
+    tone: "info",
+    short: "Your private server",
+    description: "Runs on your private server.",
+  },
+  {
+    id: "local",
+    label: "Local",
+    icon: "laptop-outline",
+    tone: "neutral",
+    short: "Computer on your network",
+    description: "Connects to a computer on your network.",
+  },
 ];
 
 export default function PlatformSelectScreen({ navigation, route }) {
@@ -104,6 +156,79 @@ export default function PlatformSelectScreen({ navigation, route }) {
   const [userRegion, setUserRegion] = useState("israel"); // 'israel' | 'direct'
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
+
+  const [pocketModeActive, setPocketModeActive] = useState(false);
+  const pocketModeActiveRef = useRef(false);
+  useEffect(() => {
+    pocketModeActiveRef.current = pocketModeActive;
+  }, [pocketModeActive]);
+  const lastPocketTapRef = useRef(0);
+  const [tapHintVisible, setTapHintVisible] = useState(false);
+  const tapHintTimeoutRef = useRef(null);
+
+  const togglePocketMode = useCallback(async (enable) => {
+    if (enable) {
+      pocketModeActiveRef.current = true;
+      setPocketModeActive(true);
+      setTapHintVisible(false);
+      try {
+        if (KeepAwake?.activateKeepAwakeAsync) {
+          await KeepAwake.activateKeepAwakeAsync("flirteasy_pocket_mode_home");
+        }
+      } catch (_) {}
+      try {
+        if (Haptics?.impactAsync) {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+      } catch (_) {}
+    } else {
+      pocketModeActiveRef.current = false;
+      setPocketModeActive(false);
+      setTapHintVisible(false);
+      if (tapHintTimeoutRef.current) clearTimeout(tapHintTimeoutRef.current);
+      try {
+        if (KeepAwake?.deactivateKeepAwake) {
+          KeepAwake.deactivateKeepAwake("flirteasy_pocket_mode_home");
+        }
+      } catch (_) {}
+      try {
+        if (Haptics?.impactAsync) {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      } catch (_) {}
+    }
+  }, []);
+
+  const handlePocketTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastPocketTapRef.current < 500) {
+      togglePocketMode(false);
+    } else {
+      lastPocketTapRef.current = now;
+      setTapHintVisible(true);
+      if (tapHintTimeoutRef.current) clearTimeout(tapHintTimeoutRef.current);
+      tapHintTimeoutRef.current = setTimeout(() => {
+        setTapHintVisible(false);
+      }, 1800);
+      try {
+        if (Haptics?.impactAsync) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      } catch (_) {}
+    }
+  }, [togglePocketMode]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (pocketModeActiveRef.current) {
+        togglePocketMode(false);
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [togglePocketMode]);
 
   // Connection endpoints
   const [vpsUrl, setVpsUrl] = useState(
@@ -207,7 +332,9 @@ export default function PlatformSelectScreen({ navigation, route }) {
   );
 
   // ── Authenticated Flint User (Hydrated from route params or persistent local account) ──
-  const [currentUser, setCurrentUser] = useState(() => route?.params?.user || null);
+  const [currentUser, setCurrentUser] = useState(
+    () => route?.params?.user || null,
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -243,9 +370,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
   // ── Initialize Telemetry & Scoped Session with Resolved User ID ──
   useEffect(() => {
-    const resolvedId = route?.params?.userId || route?.params?.user?.id || currentUser?.id;
+    const resolvedId =
+      route?.params?.userId || route?.params?.user?.id || currentUser?.id;
     if (resolvedId) {
-      trackingService.init(resolvedId, 'tinder');
+      trackingService.init(resolvedId, "tinder");
       if (getActiveUserId() !== resolvedId) {
         switchUserSession(resolvedId);
       }
@@ -278,20 +406,20 @@ export default function PlatformSelectScreen({ navigation, route }) {
               : {}),
             ...(goals
               ? {
-                intentions: goals.includes("never_stop")
-                  ? "continuous"
-                  : goals.includes("relationship")
-                    ? "long_term"
-                    : "short_term",
-                stopConditions: goals,
-              }
+                  intentions: goals.includes("never_stop")
+                    ? "continuous"
+                    : goals.includes("relationship")
+                      ? "long_term"
+                      : "short_term",
+                  stopConditions: goals,
+                }
               : {}),
             ...(fullPhone
               ? { contactDetails: { phone: fullPhone, whatsapp: fullPhone } }
               : {}),
           });
         }
-      } catch (_) { }
+      } catch (_) {}
 
       const current = getSharedExtensionSettings();
       const merged = {
@@ -321,7 +449,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
       if (updatedSettings?.accountProfile?.name) {
         const newName = updatedSettings.accountProfile.name.trim();
         try {
-          const updated = await SupabaseService.updateCurrentUser({ fullName: newName, name: newName });
+          const updated = await SupabaseService.updateCurrentUser({
+            fullName: newName,
+            name: newName,
+          });
           if (updated) {
             setCurrentUser(updated);
           }
@@ -332,7 +463,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
         SupabaseService.saveUserSnapshot(userId, {
           platform: "tinder",
           settings: merged,
-        }).catch(() => { });
+        }).catch(() => {});
       }
       return true;
     },
@@ -356,12 +487,14 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
     const res = await probeTinderSession(auth.token);
     if (res?.ok && (res.profile || res.user)) {
-      const profile = res.profile || parseTinderUserProfile(res.user, {
-        plan: res.plan,
-        isPro: res.isPro,
-        likesRemaining: res.likesRemaining,
-        rateLimitedUntil: res.rateLimitedUntil,
-      });
+      const profile =
+        res.profile ||
+        parseTinderUserProfile(res.user, {
+          plan: res.plan,
+          isPro: res.isPro,
+          likesRemaining: res.likesRemaining,
+          rateLimitedUntil: res.rateLimitedUntil,
+        });
       await handleSaveSettings({ userProfile: profile });
       return { success: true, profile };
     }
@@ -369,7 +502,8 @@ export default function PlatformSelectScreen({ navigation, route }) {
     if (res?.expired) {
       return {
         success: false,
-        error: "Your Tinder session has expired. Please open Tinder to reconnect.",
+        error:
+          "Your Tinder session has expired. Please open Tinder to reconnect.",
       };
     }
 
@@ -382,6 +516,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
   // ── Notification Center State ──
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [showQuickMenu, setShowQuickMenu] = useState(false);
 
   // ── App Permissions Pre-Prompt Modal ──
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -399,7 +534,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
             setHasPromptedPermissions(true);
           }
         })
-        .catch(() => { });
+        .catch(() => {});
     }
   }, []);
 
@@ -473,164 +608,173 @@ export default function PlatformSelectScreen({ navigation, route }) {
   const lastAuthProbeTimeRef = useRef(0);
 
   // Auth detection & login status refresh
-  const checkAuthStatus = useCallback(async (force = false) => {
-    // 1. If an explicit logout was performed or purge is pending, force logged-out state
-    if (getPendingWebViewPurge()) {
-      setIsLoggedIn(false);
-      setCheckingAuth(false);
-      return;
-    }
-
-    let auth = getTinderAuthState();
-    if (environment === "on_device" && !auth?.token) {
-      try {
-        auth = await ensureTinderAuthHydrated();
-      } catch (_) {}
-    }
-
-    // 2. For On-Device mode: strictly validate using real Tinder API token
-    if (environment === "on_device") {
-      setDeviceLatencyMs(null);
-      if (auth?.token) {
-        setIsLoggedIn(Boolean(auth?.isLoggedIn));
-        const now = Date.now();
-        // Throttle probe to once every 60 seconds unless forced, preventing render thrashing
-        if (!force && now - lastAuthProbeTimeRef.current < 60000) {
-          setCheckingAuth(false);
-          return;
-        }
-        lastAuthProbeTimeRef.current = now;
-
-        const requestStarted = Date.now();
-        try {
-          const res = await probeTinderSession(auth.token);
-          if (res?.ok) {
-            setDeviceLatencyMs(Math.max(0, Date.now() - requestStarted));
-            setIsLoggedIn(true);
-            if (res.rateLimitedUntil && res.rateLimitedUntil > Date.now()) {
-              saveOnDeviceSessionState({
-                likesReplenishTimestamp: res.rateLimitedUntil,
-                waitingReason: 'likes_exhausted',
-              }).catch(() => {});
-            }
-            if (res.profile || res.user || res.plan) {
-              const profile = res.profile || parseTinderUserProfile(res.user, {
-                plan: res.plan,
-                isPro: res.isPro,
-                likesRemaining: res.likesRemaining,
-                rateLimitedUntil: res.rateLimitedUntil,
-              });
-              if (profile) {
-                const current = getSharedExtensionSettings();
-                const prevProfile = current?.userProfile || {};
-                // Only dispatch state updates if meaningful fields actually changed
-                const hasChanged =
-                  !prevProfile.lastSyncedAt ||
-                  prevProfile.name !== profile.name ||
-                  prevProfile.bio !== profile.bio ||
-                  prevProfile.age !== profile.age ||
-                  prevProfile.tinderPlan !== profile.tinderPlan ||
-                  (profile.photos && profile.photos.length !== (prevProfile.photos || []).length);
-
-                if (hasChanged) {
-                  const updated = {
-                    ...(current || {}),
-                    userProfile: {
-                      ...prevProfile,
-                      ...profile,
-                    },
-                  };
-                  setSharedExtensionSettings(updated);
-                  setLocalSettings(updated);
-                }
-              }
-            }
-          } else if (res?.expired) {
-            setIsLoggedIn(false);
-          }
-        } catch (_) {
-        } finally {
-          setCheckingAuth(false);
-        }
-        return;
-      } else {
-        // Unauthenticated or closed without logging in — no valid token exists.
-        // Cleanse any dirty/corrupted auth state.
-        if (auth?.isLoggedIn) {
-          setTinderAuthState({
-            isLoggedIn: false,
-            accountName: null,
-            token: null,
-          });
-        }
+  const checkAuthStatus = useCallback(
+    async (force = false) => {
+      // 1. If an explicit logout was performed or purge is pending, force logged-out state
+      if (getPendingWebViewPurge()) {
         setIsLoggedIn(false);
         setCheckingAuth(false);
         return;
       }
-    }
 
-    // 3. For Remote/VPS mode: Check in-memory shared & persisted auth state
-    if (auth && typeof auth.isLoggedIn === "boolean") {
-      setIsLoggedIn(auth.isLoggedIn);
-      setCheckingAuth(false);
-      if (auth.isLoggedIn) return;
-    }
+      let auth = getTinderAuthState();
+      if (environment === "on_device" && !auth?.token) {
+        try {
+          auth = await ensureTinderAuthHydrated();
+        } catch (_) {}
+      }
 
-    const cachedProfile = getSharedExtensionSettings()?.userProfile;
+      // 2. For On-Device mode: strictly validate using real Tinder API token
+      if (environment === "on_device") {
+        setDeviceLatencyMs(null);
+        if (auth?.token) {
+          setIsLoggedIn(Boolean(auth?.isLoggedIn));
+          const now = Date.now();
+          // Throttle probe to once every 60 seconds unless forced, preventing render thrashing
+          if (!force && now - lastAuthProbeTimeRef.current < 60000) {
+            setCheckingAuth(false);
+            return;
+          }
+          lastAuthProbeTimeRef.current = now;
 
-    // 4. Remote/VPS mode: Check live status from orchestrator if explicitly logged in
-    if (stats && stats.tinderAccount?.isLoggedIn) {
-      setTinderAuthState({
-        isLoggedIn: true,
-        accountName:
-          stats.tinderAccount?.name || cachedProfile?.name || "Tinder Account",
-        accountEmail: stats.tinderAccount?.email || null,
-      });
-      setIsLoggedIn(true);
-      setCheckingAuth(false);
-      return;
-    }
+          const requestStarted = Date.now();
+          try {
+            const res = await probeTinderSession(auth.token);
+            if (res?.ok) {
+              setDeviceLatencyMs(Math.max(0, Date.now() - requestStarted));
+              setIsLoggedIn(true);
+              if (res.rateLimitedUntil && res.rateLimitedUntil > Date.now()) {
+                saveOnDeviceSessionState({
+                  likesReplenishTimestamp: res.rateLimitedUntil,
+                  waitingReason: "likes_exhausted",
+                }).catch(() => {});
+              }
+              if (res.profile || res.user || res.plan) {
+                const profile =
+                  res.profile ||
+                  parseTinderUserProfile(res.user, {
+                    plan: res.plan,
+                    isPro: res.isPro,
+                    likesRemaining: res.likesRemaining,
+                    rateLimitedUntil: res.rateLimitedUntil,
+                  });
+                if (profile) {
+                  const current = getSharedExtensionSettings();
+                  const prevProfile = current?.userProfile || {};
+                  // Only dispatch state updates if meaningful fields actually changed
+                  const hasChanged =
+                    !prevProfile.lastSyncedAt ||
+                    prevProfile.name !== profile.name ||
+                    prevProfile.bio !== profile.bio ||
+                    prevProfile.age !== profile.age ||
+                    prevProfile.tinderPlan !== profile.tinderPlan ||
+                    (profile.photos &&
+                      profile.photos.length !==
+                        (prevProfile.photos || []).length);
 
-    // 5. Query backend orchestrator for active page and auth state (Neko mode)
-    const backendUrl =
-      orchestratorUrl ||
-      (environment === "vps"
-        ? "https://api.smartmaheshwari.com"
-        : resolveLocalUrl("http://localhost:3001"));
-    if (backendUrl) {
-      try {
-        const pageStateRes = await fetch(`${backendUrl}/check-page-state`)
-          .then((r) => r.json())
-          .catch(() => null);
-        if (pageStateRes?.state === "logged_in") {
-          setTinderAuthState({
-            isLoggedIn: true,
-            accountName: cachedProfile?.name || "Tinder Account",
-          });
-          setIsLoggedIn(true);
+                  if (hasChanged) {
+                    const updated = {
+                      ...(current || {}),
+                      userProfile: {
+                        ...prevProfile,
+                        ...profile,
+                      },
+                    };
+                    setSharedExtensionSettings(updated);
+                    setLocalSettings(updated);
+                  }
+                }
+              }
+            } else if (res?.expired) {
+              setIsLoggedIn(false);
+            }
+          } catch (_) {
+          } finally {
+            setCheckingAuth(false);
+          }
+          return;
+        } else {
+          // Unauthenticated or closed without logging in — no valid token exists.
+          // Cleanse any dirty/corrupted auth state.
+          if (auth?.isLoggedIn) {
+            setTinderAuthState({
+              isLoggedIn: false,
+              accountName: null,
+              token: null,
+            });
+          }
+          setIsLoggedIn(false);
           setCheckingAuth(false);
           return;
         }
+      }
 
-        const authStatusRes = await fetch(`${backendUrl}/auth-status`)
-          .then((r) => r.json())
-          .catch(() => null);
-        if (authStatusRes?.success && authStatusRes.isLoggedIn) {
-          setTinderAuthState({
-            isLoggedIn: true,
-            accountName: cachedProfile?.name || "Tinder Account",
-          });
-          setIsLoggedIn(true);
-          setCheckingAuth(false);
-          return;
-        }
-      } catch (_) { }
-    }
+      // 3. For Remote/VPS mode: Check in-memory shared & persisted auth state
+      if (auth && typeof auth.isLoggedIn === "boolean") {
+        setIsLoggedIn(auth.isLoggedIn);
+        setCheckingAuth(false);
+        if (auth.isLoggedIn) return;
+      }
 
-    // Default to false if no live verification confirms logged in
-    setIsLoggedIn(false);
-    setCheckingAuth(false);
-  }, [orchestratorUrl, environment, stats]);
+      const cachedProfile = getSharedExtensionSettings()?.userProfile;
+
+      // 4. Remote/VPS mode: Check live status from orchestrator if explicitly logged in
+      if (stats && stats.tinderAccount?.isLoggedIn) {
+        setTinderAuthState({
+          isLoggedIn: true,
+          accountName:
+            stats.tinderAccount?.name ||
+            cachedProfile?.name ||
+            "Tinder Account",
+          accountEmail: stats.tinderAccount?.email || null,
+        });
+        setIsLoggedIn(true);
+        setCheckingAuth(false);
+        return;
+      }
+
+      // 5. Query backend orchestrator for active page and auth state (Neko mode)
+      const backendUrl =
+        orchestratorUrl ||
+        (environment === "vps"
+          ? "https://api.smartmaheshwari.com"
+          : resolveLocalUrl("http://localhost:3001"));
+      if (backendUrl) {
+        try {
+          const pageStateRes = await fetch(`${backendUrl}/check-page-state`)
+            .then((r) => r.json())
+            .catch(() => null);
+          if (pageStateRes?.state === "logged_in") {
+            setTinderAuthState({
+              isLoggedIn: true,
+              accountName: cachedProfile?.name || "Tinder Account",
+            });
+            setIsLoggedIn(true);
+            setCheckingAuth(false);
+            return;
+          }
+
+          const authStatusRes = await fetch(`${backendUrl}/auth-status`)
+            .then((r) => r.json())
+            .catch(() => null);
+          if (authStatusRes?.success && authStatusRes.isLoggedIn) {
+            setTinderAuthState({
+              isLoggedIn: true,
+              accountName: cachedProfile?.name || "Tinder Account",
+            });
+            setIsLoggedIn(true);
+            setCheckingAuth(false);
+            return;
+          }
+        } catch (_) {}
+      }
+
+      // Default to false if no live verification confirms logged in
+      setIsLoggedIn(false);
+      setCheckingAuth(false);
+    },
+    [orchestratorUrl, environment, stats],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -666,7 +810,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
               // FE_AUTH_STEP messages from the browser WebView.
             }
           })
-          .catch(() => { });
+          .catch(() => {});
       }
     }, [checkAuthStatus, orchestratorUrl, environment]),
   );
@@ -774,7 +918,9 @@ export default function PlatformSelectScreen({ navigation, route }) {
         currentState?.agentState?.isRunning === true ||
         (currentState?.agentState?.isRunning !== false &&
           currentState?.agentState?.currentPhase &&
-          !['stopped', 'idle', 'waiting', 'paused'].includes(currentState.agentState.currentPhase))
+          !["stopped", "idle", "waiting", "paused"].includes(
+            currentState.agentState.currentPhase,
+          )),
       );
       const nextRunning = !isCurrentlyRunning;
 
@@ -794,7 +940,8 @@ export default function PlatformSelectScreen({ navigation, route }) {
           return;
         }
 
-        const isExhausted = currentState?.agentState?.waitingReason === 'likes_exhausted';
+        const isExhausted =
+          currentState?.agentState?.waitingReason === "likes_exhausted";
 
         // Authenticated! Stay on Home Screen and start automation silently in background
         updateSharedAgentState({
@@ -846,7 +993,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
         body: JSON.stringify({ platform: "Tinder" }),
       });
       setTimeout(refreshStats, 400);
-    } catch (_) { }
+    } catch (_) {}
   }, [environment, orchestratorUrl, stats, refreshStats, handleOpenLiveFeed]);
 
   // Logout handler
@@ -928,7 +1075,13 @@ export default function PlatformSelectScreen({ navigation, route }) {
     loggingOutRef.current = false;
     setLoggingOut(false);
     setShowLogoutConfirm(false);
-  }, [orchestratorUrl, environment, refreshStats, route?.params?.userId, route?.params?.user?.id]);
+  }, [
+    orchestratorUrl,
+    environment,
+    refreshStats,
+    route?.params?.userId,
+    route?.params?.user?.id,
+  ]);
 
   const handleFlintLogout = useCallback(async () => {
     try {
@@ -995,11 +1148,60 @@ export default function PlatformSelectScreen({ navigation, route }) {
     selectedPlatform,
   ]);
 
+  const isAutomationRunning = Boolean(
+    agentState?.agentState?.isRunning ||
+    agentState?.isRunning ||
+    (agentState?.agentState?.currentPhase &&
+      !["stopped", "idle", "waiting", "paused"].includes(
+        agentState.agentState.currentPhase,
+      )) ||
+    (agentState?.currentPhase &&
+      !["stopped", "idle", "waiting", "paused"].includes(
+        agentState.currentPhase,
+      )),
+  );
+
+  const effectiveAgentState = agentState?.agentState || agentState || {};
+  const effectiveAgentStats = effectiveAgentState?.stats || stats || {};
+  const pocketModeTotalSwipes = Math.max(
+    effectiveAgentStats?.swipes ?? 0,
+    effectiveAgentStats?.totalSwipes ?? 0,
+    effectiveAgentStats?.totalLikes ?? 0,
+  );
+  const pocketModeCycleSwipes =
+    effectiveAgentState?.currentCycle?.likesCompleted ?? 0;
+  const pocketModeCycleTarget =
+    effectiveAgentState?.currentCycle?.targetLikes ||
+    localSettings?.likesPerCycle ||
+    50;
+
+  const pocketModeTotalMessages = Math.max(
+    effectiveAgentStats?.messages ?? 0,
+    effectiveAgentStats?.totalMessages ?? 0,
+    effectiveAgentStats?.messagesSent ?? 0,
+  );
+  const pocketModeCycleMessages =
+    effectiveAgentState?.currentCycle?.messagesProcessed ?? 0;
+  const pocketModeCycleMessagesTarget =
+    effectiveAgentState?.currentCycle?.targetMessages ||
+    localSettings?.messagesPerCycle ||
+    50;
+
+  const pocketModeMatches =
+    effectiveAgentStats?.matches ??
+    effectiveAgentStats?.totalMatches ??
+    effectiveAgentStats?.matchesCreated ??
+    0;
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
         pointerEvents="none"
-        colors={[uiTheme.gradients.hero[1], uiTheme.colors.surface, uiTheme.colors.background]}
+        colors={[
+          uiTheme.gradients.hero[1],
+          uiTheme.colors.surface,
+          uiTheme.colors.background,
+        ]}
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFillObject}
       />
@@ -1028,223 +1230,276 @@ export default function PlatformSelectScreen({ navigation, route }) {
       )}
 
       {/* The Home tab renders its own personal header (greeting, avatar, notifications). */}
-      {!["home", "automation", "activity", "settings", "profile", "appSettings"].includes(homeTab) && (
-      <View style={homeStyles.header}>
-        <View
-          style={homeStyles.brand}
-          accessible
-          accessibilityRole="header"
-          accessibilityLabel="Flint, your AI dating assistant"
-        >
-          <LinearGradient
-            colors={uiTheme.gradients.brand}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={homeStyles.brandIcon}
+      {![
+        "home",
+        "automation",
+        "activity",
+        "settings",
+        "profile",
+        "appSettings",
+      ].includes(homeTab) && (
+        <View style={homeStyles.header}>
+          <View
+            style={homeStyles.brand}
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel="Flint, your AI dating assistant"
           >
-            <Ionicons name="flame" size={22} color={uiTheme.colors.onPrimary} />
-          </LinearGradient>
-          <View style={homeStyles.brandCopy}>
-            <Text
-              style={homeStyles.brandName}
-              numberOfLines={1}
-              maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+            <LinearGradient
+              colors={uiTheme.gradients.brand}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={homeStyles.brandIcon}
             >
-              Flint
-            </Text>
-            <Text
-              style={homeStyles.brandCaption}
-              numberOfLines={1}
-              maxFontSizeMultiplier={uiTheme.fontScale.chrome}
-            >
-              YOUR AI DATING ASSISTANT
-            </Text>
+              <Ionicons
+                name="flame"
+                size={22}
+                color={uiTheme.colors.onPrimary}
+              />
+            </LinearGradient>
+            <View style={homeStyles.brandCopy}>
+              <Text
+                style={homeStyles.brandName}
+                numberOfLines={1}
+                maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+              >
+                Flint
+              </Text>
+              <Text
+                style={homeStyles.brandCaption}
+                numberOfLines={1}
+                maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+              >
+                YOUR AI DATING ASSISTANT
+              </Text>
+            </View>
           </View>
-        </View>
-        <View style={homeStyles.headerActions}>
-          <IconButton
-            icon="notifications-outline"
-            onPress={() => setShowNotifModal(true)}
-            accessibilityLabel={`Notifications, ${unreadNotifCount} unread`}
-            badge={unreadNotifCount > 0}
-            style={homeStyles.headerButton}
-          />
-          {homeTab !== "profile" && (
+
+          {/* ── Spacious 2-Action Controls (44x44 Touch Target Ergonomics) ── */}
+          <View style={homeStyles.headerActions}>
             <IconButton
-              icon="person-outline"
-              onPress={() => setHomeTab("profile")}
-              accessibilityLabel="Profile details and settings"
+              icon="notifications-outline"
+              onPress={() => setShowNotifModal(true)}
+              accessibilityLabel={`Notifications, ${unreadNotifCount} unread`}
+              badge={unreadNotifCount > 0}
               style={homeStyles.headerButton}
             />
-          )}
+            {homeTab !== "profile" && (
+              <IconButton
+                icon="person-outline"
+                onPress={() => setHomeTab("profile")}
+                accessibilityLabel="Profile details and settings"
+                style={homeStyles.headerButton}
+              />
+            )}
+          </View>
         </View>
-      </View>
       )}
 
       <ContentTransition transitionKey={homeTab} style={homeStyles.tabContent}>
-      {homeTab === "home" ? (
-        <HomeOverview
-          stats={environment === "on_device" ? agentState : (stats || agentState)}
-          agentState={agentState}
-          settings={localSettings}
-          isLoggedIn={isLoggedIn}
-          starting={startingSession}
-          checking={checkingAuth}
-          checkingAuth={checkingAuth}
-          latencyMs={environment === "on_device" ? deviceLatencyMs : remoteLatencyMs}
-          environment={environment}
-          unreadCount={unreadNotifCount}
-          user={currentUser || route?.params?.user}
-          onNotifications={() => setShowNotifModal(true)}
-          onProfile={() => setHomeTab("profile")}
-          onOpenBrowser={() => handleOpenLiveFeed("Tinder")}
-          onToggleAgent={handleToggleAgent}
-          onAutomation={() => setHomeTab("automation")}
-          onSettings={() => setHomeTab("settings")}
-          onActivity={() => setHomeTab("activity")}
-        />
-      ) : homeTab === "profile" ? (
-        <ProfileDetails
-          settings={localSettings}
-          user={currentUser || route?.params?.user}
-          isLoggedIn={isLoggedIn}
-          stats={environment === "on_device" ? agentState : stats}
-          onBack={() => setHomeTab("home")}
-          onOpenTinder={() => handleOpenLiveFeed("Tinder")}
-          onSync={handleSyncProfileFromHome}
-          onSave={handleSaveSettings}
-          onLogout={handleFlintLogout}
-          onDeleteData={async () => {
-            await handleLogout();
-            await SupabaseService.logoutUser();
-            try {
-              const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-              await AsyncStorage.clear();
-            } catch (_) {}
-            navigation.replace("Auth", { logout: true });
-          }}
-        />
-      ) : homeTab === "appSettings" ? (
-        <AppSettings
-          settings={localSettings}
-          isLoggedIn={isLoggedIn}
-          environment={environment}
-          unreadCount={unreadNotifCount}
-          updatingLocation={updatingGpsLocation}
-          onRefreshLocation={handleRefreshDeviceLocation}
-          onNotifications={() => setShowNotifModal(true)}
-          onPreferences={openModal}
-          onSession={() => handleLaunch("Tinder")}
-          onAutomation={() => setHomeTab("automation")}
-          onConnect={() => handleOpenLiveFeed("Tinder")}
-          onBack={() => setHomeTab("home")}
-        />
-      ) : (
-        <View style={homeStyles.dashboard}>
-          <ScreenHeader
-            style={homeStyles.sectionHeader}
-            title={
-              homeTab === "settings"
-                ? "Controls"
-                : homeTab === "automation"
-                  ? "Automation"
-                  : "Activity"
-            }
-            large
-            subtitle={
-              homeTab === "settings"
-                ? "Swiping, messaging and safety controls."
-                : homeTab === "automation"
-                  ? "Shape how your wingman swipes and chats."
-                  : "Every match, reply and update in one place."
-            }
-            right={
-              <>
-                <IconButton
-                  icon="notifications-outline"
-                  onPress={() => setShowNotifModal(true)}
-                  accessibilityLabel={`Notifications, ${unreadNotifCount} unread`}
-                  badge={unreadNotifCount > 0}
-                  style={homeStyles.headerButton}
-                />
-                <IconButton
-                  icon="options-outline"
-                  onPress={openModal}
-                  accessibilityLabel="App preferences"
-                  color={uiTheme.colors.textSecondary}
-                  style={homeStyles.headerButton}
-                />
-              </>
-            }
-          />
-          <DashboardPanel
-            selectedTab={homeTab}
-            onTabChange={setHomeTab}
+        {homeTab === "home" ? (
+          <HomeOverview
             stats={
-              environment === "on_device"
-                ? agentState
-                : stats || (isLoggedIn ? agentState : null)
+              environment === "on_device" ? agentState : stats || agentState
             }
-            loading={
-              environment === "on_device" ? false : isLoggedIn ? false : loading
-            }
-            error={
-              environment === "on_device" ? null : isLoggedIn ? null : error
-            }
-            orchestratorUrl={
-              orchestratorUrl ||
-              (environment === "vps"
-                ? "https://api.smartmaheshwari.com"
-                : resolveLocalUrl("http://localhost:3001"))
-            }
-            onToggleAgent={handleToggleAgent}
-            onLogout={handleLogout}
-            onConnect={() => handleOpenLiveFeed("Tinder")}
-            isLoggedIn={isLoggedIn}
-            onSaveSettings={handleSaveSettings}
+            agentState={agentState}
             settings={localSettings}
-            onSyncProfile={
-              environment === "on_device"
-                ? handleSyncProfileFromHome
-                : undefined
+            isLoggedIn={isLoggedIn}
+            starting={startingSession}
+            checking={checkingAuth}
+            checkingAuth={checkingAuth}
+            latencyMs={
+              environment === "on_device" ? deviceLatencyMs : remoteLatencyMs
             }
-            controlsContent={
-              <View style={homeStyles.extraActions}>
-                <TouchableOpacity
-                  style={homeStyles.secondaryAction}
-                  onPress={() => handleLaunch("Tinder")}
-                  accessibilityRole="button"
-                  accessibilityLabel="Session preferences"
-                >
-                  <Ionicons
-                    name="options-outline"
-                    size={17}
-                    color={uiTheme.colors.accent}
-                  />
-                  <Text style={homeStyles.secondaryLabel}>
-                    Session preferences
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={homeStyles.secondaryAction}
-                  onPress={() => navigation.replace("Auth")}
-                  accessibilityRole="button"
-                  accessibilityLabel="Back to Flint login"
-                >
-                  <Ionicons
-                    name="log-out-outline"
-                    size={17}
-                    color={uiTheme.colors.accent}
-                  />
-                  <Text style={homeStyles.secondaryLabel}>
-                    Back to Flint login
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            }
+            environment={environment}
+            unreadCount={unreadNotifCount}
+            user={currentUser || route?.params?.user}
+            onNotifications={() => setShowNotifModal(true)}
+            onProfile={() => setHomeTab("profile")}
+            onOpenBrowser={() => handleOpenLiveFeed("Tinder")}
+            onToggleAgent={handleToggleAgent}
+            onAutomation={() => setHomeTab("automation")}
+            onSettings={() => setHomeTab("settings")}
+            onActivity={() => setHomeTab("activity")}
+            onEnterPocketMode={() => {
+              togglePocketMode(true);
+            }}
           />
-        </View>
-      )}
+        ) : homeTab === "profile" ? (
+          <ProfileDetails
+            settings={localSettings}
+            user={currentUser || route?.params?.user}
+            isLoggedIn={isLoggedIn}
+            stats={environment === "on_device" ? agentState : stats}
+            onBack={() => setHomeTab("home")}
+            onOpenTinder={() => handleOpenLiveFeed("Tinder")}
+            onSync={handleSyncProfileFromHome}
+            onSave={handleSaveSettings}
+            onLogout={handleFlintLogout}
+            onDeleteData={async () => {
+              await handleLogout();
+              await SupabaseService.logoutUser();
+              try {
+                const AsyncStorage = (
+                  await import("@react-native-async-storage/async-storage")
+                ).default;
+                await AsyncStorage.clear();
+              } catch (_) {}
+              navigation.replace("Auth", { logout: true });
+            }}
+          />
+        ) : homeTab === "appSettings" ? (
+          <AppSettings
+            settings={localSettings}
+            isLoggedIn={isLoggedIn}
+            environment={environment}
+            unreadCount={unreadNotifCount}
+            updatingLocation={updatingGpsLocation}
+            onRefreshLocation={handleRefreshDeviceLocation}
+            onNotifications={() => setShowNotifModal(true)}
+            onPreferences={openModal}
+            onSession={() => handleLaunch("Tinder")}
+            onAutomation={() => setHomeTab("automation")}
+            onConnect={() => handleOpenLiveFeed("Tinder")}
+            onBack={() => setHomeTab("home")}
+          />
+        ) : (
+          <View style={homeStyles.dashboard}>
+            <ScreenHeader
+              style={homeStyles.sectionHeader}
+              title={
+                homeTab === "settings"
+                  ? "Controls"
+                  : homeTab === "automation"
+                    ? "Automation"
+                    : "Activity"
+              }
+              large
+              subtitle={
+                homeTab === "settings"
+                  ? "Swiping, messaging and safety controls."
+                  : homeTab === "automation"
+                    ? "Shape how your wingman swipes and chats."
+                    : "Every match, reply and update in one place."
+              }
+              right={
+                <>
+                  <IconButton
+                    icon="notifications-outline"
+                    onPress={() => setShowNotifModal(true)}
+                    accessibilityLabel={`Notifications, ${unreadNotifCount} unread`}
+                    badge={unreadNotifCount > 0}
+                    style={homeStyles.headerButton}
+                  />
+                  <IconButton
+                    icon="options-outline"
+                    onPress={openModal}
+                    accessibilityLabel="App preferences"
+                    color={uiTheme.colors.textSecondary}
+                    style={homeStyles.headerButton}
+                  />
+                </>
+              }
+            />
+            <DashboardPanel
+              selectedTab={homeTab}
+              onTabChange={setHomeTab}
+              stats={
+                environment === "on_device"
+                  ? agentState
+                  : stats || (isLoggedIn ? agentState : null)
+              }
+              loading={
+                environment === "on_device"
+                  ? false
+                  : isLoggedIn
+                    ? false
+                    : loading
+              }
+              error={
+                environment === "on_device" ? null : isLoggedIn ? null : error
+              }
+              orchestratorUrl={
+                orchestratorUrl ||
+                (environment === "vps"
+                  ? "https://api.smartmaheshwari.com"
+                  : resolveLocalUrl("http://localhost:3001"))
+              }
+              onToggleAgent={handleToggleAgent}
+              onLogout={handleLogout}
+              onConnect={() => handleOpenLiveFeed("Tinder")}
+              isLoggedIn={isLoggedIn}
+              onSaveSettings={handleSaveSettings}
+              settings={localSettings}
+              onSyncProfile={
+                environment === "on_device"
+                  ? handleSyncProfileFromHome
+                  : undefined
+              }
+              controlsContent={
+                <View style={homeStyles.extraActions}>
+                  {environment === "on_device" && (
+                    <TouchableOpacity
+                      style={[
+                        homeStyles.secondaryAction,
+                        {
+                          borderColor: "rgba(251, 191, 36, 0.4)",
+                          backgroundColor: "rgba(251, 191, 36, 0.08)",
+                        },
+                      ]}
+                      onPress={() => {
+                        togglePocketMode(true);
+                      }}
+                      accessibilityRole="button"
+                    >
+                      <Ionicons name="moon" size={17} color="#FBBF24" />
+                      <Text
+                        style={[
+                          homeStyles.secondaryLabel,
+                          { color: "#FBBF24", fontWeight: "600" },
+                        ]}
+                      >
+                        {agentState?.isRunning
+                          ? "Enter Pocket Mode"
+                          : "Pocket Mode"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={homeStyles.secondaryAction}
+                    onPress={() => handleLaunch("Tinder")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Session preferences"
+                  >
+                    <Ionicons
+                      name="options-outline"
+                      size={17}
+                      color={uiTheme.colors.accent}
+                    />
+                    <Text style={homeStyles.secondaryLabel}>
+                      Session preferences
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={homeStyles.secondaryAction}
+                    onPress={() => navigation.replace("Auth")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Back to Flint login"
+                  >
+                    <Ionicons
+                      name="log-out-outline"
+                      size={17}
+                      color={uiTheme.colors.accent}
+                    />
+                    <Text style={homeStyles.secondaryLabel}>
+                      Back to Flint login
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              }
+            />
+          </View>
+        )}
       </ContentTransition>
       <HomeBottomNavigation
         activeTab={homeTab}
@@ -1277,7 +1532,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                 },
               ]}
             >
-              <Pressable onPress={() => { }} /* prevent overlay dismiss */>
+              <Pressable onPress={() => {}} /* prevent overlay dismiss */>
                 <View style={styles.modalHandle} />
 
                 <View style={styles.modalHeader}>
@@ -1287,7 +1542,11 @@ export default function PlatformSelectScreen({ navigation, route }) {
                     end={{ x: 1, y: 1 }}
                     style={styles.prefsHeaderIcon}
                   >
-                    <Ionicons name="options" size={20} color={uiTheme.colors.onPrimary} />
+                    <Ionicons
+                      name="options"
+                      size={20}
+                      color={uiTheme.colors.onPrimary}
+                    />
                   </LinearGradient>
                   <View style={styles.modalHeaderCopy}>
                     <AppText variant="title2" numberOfLines={1}>
@@ -1408,15 +1667,27 @@ export default function PlatformSelectScreen({ navigation, route }) {
 
                   {/* ─── 3. Connection: current environment + developer picker ─── */}
                   {(() => {
-                    const current = ENVIRONMENT_OPTIONS.find((option) => option.id === environment) || ENVIRONMENT_OPTIONS[0];
+                    const current =
+                      ENVIRONMENT_OPTIONS.find(
+                        (option) => option.id === environment,
+                      ) || ENVIRONMENT_OPTIONS[0];
                     return (
                       <View style={styles.prefsCard}>
                         <View style={styles.prefsCurrent}>
-                          <IconWell icon={current.icon} tone={current.tone} size={44} iconSize={20} />
+                          <IconWell
+                            icon={current.icon}
+                            tone={current.tone}
+                            size={44}
+                            iconSize={20}
+                          />
                           <View style={styles.prefsCurrentCopy}>
                             <AppText variant="overline">CONNECTION</AppText>
-                            <AppText variant="headline" numberOfLines={1}>{current.label}</AppText>
-                            <AppText variant="footnote" numberOfLines={2}>{current.description}</AppText>
+                            <AppText variant="headline" numberOfLines={1}>
+                              {current.label}
+                            </AppText>
+                            <AppText variant="footnote" numberOfLines={2}>
+                              {current.description}
+                            </AppText>
                           </View>
                           <Badge label="Selected" tone="primary" size="sm" />
                         </View>
@@ -1424,13 +1695,26 @@ export default function PlatformSelectScreen({ navigation, route }) {
                         <TouchableOpacity
                           accessibilityRole="button"
                           accessibilityState={{ expanded: showAdvanced }}
-                          accessibilityLabel={showAdvanced ? "Hide developer settings" : "Show developer settings"}
+                          accessibilityLabel={
+                            showAdvanced
+                              ? "Hide developer settings"
+                              : "Show developer settings"
+                          }
                           style={styles.prefsDisclosure}
                           onPress={() => setShowAdvanced(!showAdvanced)}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="construct-outline" size={16} color={uiTheme.colors.muted} />
-                          <AppText variant="subhead" color="textSecondary" style={styles.prefsDisclosureText} numberOfLines={1}>
+                          <Ionicons
+                            name="construct-outline"
+                            size={16}
+                            color={uiTheme.colors.muted}
+                          />
+                          <AppText
+                            variant="subhead"
+                            color="textSecondary"
+                            style={styles.prefsDisclosureText}
+                            numberOfLines={1}
+                          >
                             Developer · Server environment
                           </AppText>
                           <Ionicons
@@ -1441,7 +1725,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
                         </TouchableOpacity>
 
                         {showAdvanced && (
-                          <View style={styles.envGrid} accessibilityRole="radiogroup">
+                          <View
+                            style={styles.envGrid}
+                            accessibilityRole="radiogroup"
+                          >
                             {ENVIRONMENT_OPTIONS.map((option) => {
                               const active = environment === option.id;
                               return (
@@ -1449,19 +1736,45 @@ export default function PlatformSelectScreen({ navigation, route }) {
                                   key={option.id}
                                   accessibilityRole="radio"
                                   accessibilityLabel={`${option.label} environment. ${option.description}`}
-                                  accessibilityState={{ selected: active, checked: active }}
-                                  style={[styles.envCard, active && styles.envCardActive]}
+                                  accessibilityState={{
+                                    selected: active,
+                                    checked: active,
+                                  }}
+                                  style={[
+                                    styles.envCard,
+                                    active && styles.envCardActive,
+                                  ]}
                                   onPress={() => setEnvironment(option.id)}
                                   activeOpacity={0.85}
                                   pressScale={0.96}
                                 >
                                   <View style={styles.envCardTop}>
-                                    <IconWell icon={option.icon} tone={active ? option.tone : "neutral"} size={34} iconSize={16} />
-                                    <View style={[styles.envRadio, active && styles.envRadioActive]}>
-                                      {active ? <Ionicons name="checkmark" size={12} color={uiTheme.colors.onPrimary} /> : null}
+                                    <IconWell
+                                      icon={option.icon}
+                                      tone={active ? option.tone : "neutral"}
+                                      size={34}
+                                      iconSize={16}
+                                    />
+                                    <View
+                                      style={[
+                                        styles.envRadio,
+                                        active && styles.envRadioActive,
+                                      ]}
+                                    >
+                                      {active ? (
+                                        <Ionicons
+                                          name="checkmark"
+                                          size={12}
+                                          color={uiTheme.colors.onPrimary}
+                                        />
+                                      ) : null}
                                     </View>
                                   </View>
-                                  <AppText variant="bodyStrong" color={active ? "text" : "textSecondary"} numberOfLines={1}>
+                                  <AppText
+                                    variant="bodyStrong"
+                                    color={active ? "text" : "textSecondary"}
+                                    numberOfLines={1}
+                                  >
                                     {option.label}
                                   </AppText>
                                   <AppText variant="footnote" numberOfLines={2}>
@@ -1528,7 +1841,11 @@ export default function PlatformSelectScreen({ navigation, route }) {
         iconBorder={uiTheme.colors.primaryBorder}
         title="Log out of Tinder?"
         message="This ends the active Tinder session and pauses your AI assistant until you sign back in."
-        detail={{ title: localSettings?.userProfile?.name || "Your Tinder account", subtitle: "Tinder session on this device", icon: "flame" }}
+        detail={{
+          title: localSettings?.userProfile?.name || "Your Tinder account",
+          subtitle: "Tinder session on this device",
+          icon: "flame",
+        }}
         confirmText="Log out"
         cancelText="Cancel"
         confirmVariant="primary"
@@ -1562,7 +1879,9 @@ export default function PlatformSelectScreen({ navigation, route }) {
           if (environment === "on_device") {
             setBrowserVisible(true);
           } else {
-            navigation.navigate("Browser", { targetSettingsSection: "location" });
+            navigation.navigate("Browser", {
+              targetSettingsSection: "location",
+            });
           }
         }}
         onLocationAcquired={handleLocationAcquired}
@@ -1581,10 +1900,12 @@ export default function PlatformSelectScreen({ navigation, route }) {
           <BrowserScreen
             ref={browserScreenRef}
             logoutTrigger={onDeviceLogoutTrigger}
+            isLoggedIn={isLoggedIn}
             route={{
               params: {
                 platform: "Tinder",
                 isOnDevice: true,
+                isLoggedIn: isLoggedIn,
                 vpsUrl: "https://tinder.com",
                 proxyIp: activeProxy,
                 orchestratorUrl,
@@ -1619,14 +1940,35 @@ export default function PlatformSelectScreen({ navigation, route }) {
               }
             }}
             onRequestIntervention={({ reason, message }) => {
-              if (reason === 'login_required') return;
-              console.log(`[PlatformSelectScreen] Intervention required: ${reason} - ${message}`);
-              pushProgressFeedEvent("action_required", message || "Verification required", null, 15);
+              if (reason === "login_required") return;
+              console.log(
+                `[PlatformSelectScreen] Intervention required: ${reason} - ${message}`,
+              );
+              pushProgressFeedEvent(
+                "action_required",
+                message || "Verification required",
+                null,
+                15,
+              );
               setBrowserVisible(true);
             }}
           />
         </View>
       )}
+
+      {/* ── Pocket Mode Stealth Touch-Lock Screen (Luxury Industry-Standard) ── */}
+      <PocketModeModal
+        visible={pocketModeActive}
+        onDismiss={() => togglePocketMode(false)}
+        swipes={pocketModeTotalSwipes}
+        cycleSwipes={pocketModeCycleSwipes}
+        cycleTarget={pocketModeCycleTarget}
+        messages={pocketModeTotalMessages}
+        cycleMessages={pocketModeCycleMessages}
+        cycleMessagesTarget={pocketModeCycleMessagesTarget}
+        matches={pocketModeMatches}
+        isRunning={isAutomationRunning}
+      />
     </SafeAreaView>
   );
 }
@@ -2025,6 +2367,82 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
+  /* Anchored Top-Right Header Dropdown Menu */
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+  },
+  dropdownSafeArea: {
+    alignItems: "flex-end",
+    paddingTop: 66,
+    paddingRight: 20,
+  },
+  dropdownMenu: {
+    width: 232,
+    backgroundColor: "#191222",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.55,
+    shadowRadius: 20,
+    elevation: 14,
+    overflow: "hidden",
+    paddingVertical: 5,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 11,
+  },
+  dropdownItemActive: {
+    backgroundColor: "rgba(251, 191, 36, 0.05)",
+  },
+  dropdownIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dropdownTextWrap: {
+    flex: 1,
+  },
+  dropdownItemTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13.5,
+    color: "#FFFFFF",
+    letterSpacing: -0.2,
+  },
+  dropdownItemDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "#8E8294",
+    marginTop: 1,
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    marginHorizontal: 12,
+  },
+  dropdownActiveBadge: {
+    backgroundColor: "rgba(251, 191, 36, 0.15)",
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(251, 191, 36, 0.3)",
+  },
+  dropdownActiveBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 8,
+    color: "#FBBF24",
+    letterSpacing: 0.5,
+  },
 });
 
 const homeStyles = StyleSheet.create({
@@ -2067,7 +2485,12 @@ const homeStyles = StyleSheet.create({
     color: c.muted,
     marginTop: sp.xxs,
   },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: sp.sm, flexShrink: 0 },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: sp.sm,
+    flexShrink: 0,
+  },
   headerButton: {
     borderRadius: r.pill,
   },
