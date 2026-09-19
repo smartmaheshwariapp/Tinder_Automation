@@ -12,7 +12,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { theme } from "../../theme";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { theme, alpha } from "../../theme";
+import { useMotionReduced } from "./Motion";
 import {
   getSharedAgentState,
   subscribeSharedAgentState,
@@ -78,6 +81,30 @@ export default function PocketModeModal({
     }, 30000);
     return () => clearInterval(timer);
   }, [visible]);
+
+  // Lock-screen clock (refreshes every 15s while visible)
+  const [clockNow, setClockNow] = useState(() => new Date());
+  useEffect(() => {
+    if (!visible) return;
+    setClockNow(new Date());
+    const timer = setInterval(() => setClockNow(new Date()), 15000);
+    return () => clearInterval(timer);
+  }, [visible]);
+
+  // OLED burn-in protection: the whole HUD drifts a few pixels over a slow cycle.
+  const reduced = useMotionReduced();
+  const driftAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!visible || reduced) { driftAnim.setValue(0); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(driftAnim, { toValue: 1, duration: 45000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(driftAnim, { toValue: 0, duration: 45000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [visible, reduced, driftAnim]);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(0.35)).current; // Ambient breathing
@@ -151,6 +178,7 @@ export default function PocketModeModal({
   // Ambient breathing pulse (2.4s calm resting rhythm)
   useEffect(() => {
     if (!visible) return;
+    if (reduced) { pulseAnim.setValue(0.6); return; }
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -172,7 +200,7 @@ export default function PocketModeModal({
     return () => {
       pulseLoop.stop();
     };
-  }, [visible, pulseAnim]);
+  }, [visible, reduced, pulseAnim]);
 
   // Safe dismiss that guarantees glance timer cleanup
   const handleDismiss = useCallback(() => {
@@ -315,58 +343,60 @@ export default function PocketModeModal({
 
   // Dynamic Live Heartbeat Ticker
   const latestEvent = liveState.progressFeed?.[0];
-  const liveTickerText = useMemo(() => {
+  // Live activity line: icon + text per event/state (same conditions as before, no emoji).
+  const liveTicker = useMemo(() => {
     if (latestEvent) {
       if (latestEvent.type === "match_detected") {
-        return `✨ Match connected: ${latestEvent.name || "Someone New"}!`;
+        return { icon: "sparkles", tone: "gold", text: `Match connected: ${latestEvent.name || "Someone New"}` };
       }
       if (latestEvent.type === "message_replied") {
-        return `💬 Sent reply to ${latestEvent.name || "Match"}`;
+        return { icon: "chatbubble-ellipses", tone: "info", text: `Sent a reply to ${latestEvent.name || "a match"}` };
       }
       if (latestEvent.type === "profile_liked") {
-        return `⚡ Liked ${latestEvent.name || "Profile"} · ${latestEvent.detail || "Safe Paced"}`;
+        return { icon: "heart", tone: "accent", text: `Liked ${latestEvent.name || "a profile"} · ${latestEvent.detail || "Safe paced"}` };
       }
       if (latestEvent.type === "rate_limit") {
-        return "⚡ Likes limit reached · Chatting with matches";
+        return { icon: "flash", tone: "warning", text: "Likes limit reached · Chatting with matches" };
       }
     }
-
-    // Hourly Safety Mode Lock
     if (waitingReason === "safety_lock" || waitingReason === "hourly_limit") {
-      return minutesLeft
-        ? `🛡️ Hourly safe limit reached · Resumes in ~${minutesLeft}m`
-        : "🛡️ Hourly safe limit · Natural cooldown active";
+      return {
+        icon: "shield-checkmark",
+        tone: "warning",
+        text: minutesLeft ? `Hourly safe limit reached · Resumes in ~${minutesLeft}m` : "Hourly safe limit · Natural cooldown",
+      };
     }
-
-    // Tinder Free Tier Daily Quota Exhausted
     if (waitingReason === "likes_exhausted") {
       if (effectiveAgentState.currentPhase === "messaging") {
-        return hoursLeft
-          ? `⚡ Daily likes refilling (~${hoursLeft}h) · Wingman messaging active`
-          : "⚡ Daily likes refilling · Wingman messaging active";
+        return {
+          icon: "chatbubbles",
+          tone: "info",
+          text: hoursLeft ? `Daily likes refilling (~${hoursLeft}h) · Wingman messaging` : "Daily likes refilling · Wingman messaging",
+        };
       }
-      return hoursLeft
-        ? `⚡ Daily likes refilling · Resumes in ~${hoursLeft}h`
-        : "⚡ Daily likes refilling · Resumes automatically";
+      return {
+        icon: "hourglass",
+        tone: "warning",
+        text: hoursLeft ? `Daily likes refilling · Resumes in ~${hoursLeft}h` : "Daily likes refilling · Resumes automatically",
+      };
     }
-
-    // Natural Pacing Cooldown
     if (waitingReason === "cooldown") {
-      return minutesLeft
-        ? `🛡️ Safe pacing break · Resumes in ~${minutesLeft}m`
-        : "🛡️ Safe pacing break · Resumes shortly";
+      return {
+        icon: "shield-checkmark",
+        tone: "warning",
+        text: minutesLeft ? `Safe pacing break · Resumes in ~${minutesLeft}m` : "Safe pacing break · Resumes shortly",
+      };
     }
-
     if (effectiveAgentState.currentPhase === "messaging") {
-      return "💬 AI Wingman chatting with active matches";
+      return { icon: "chatbubbles", tone: "info", text: "Wingman chatting with your matches" };
     }
     if (effectiveAgentState.currentPhase === "transitioning") {
-      return "🛡️ Natural human pause between profiles";
+      return { icon: "pause-circle", tone: "muted", text: "Natural pause between profiles" };
     }
     if (isRunning) {
-      return "⚡ AI Wingman active & swiping (Safe Paced)";
+      return { icon: "flash", tone: "accent", text: "Wingman active and swiping · Safe paced" };
     }
-    return "Stealth Touch-Lock Standby";
+    return { icon: "moon", tone: "muted", text: "Standing by" };
   }, [
     latestEvent,
     waitingReason,
@@ -399,6 +429,30 @@ export default function PocketModeModal({
 
   if (!visible) return null;
 
+  const accent = theme.colors.accent;
+  const toneColor = {
+    accent,
+    gold: theme.colors.gold,
+    info: theme.colors.info,
+    warning: theme.colors.warning,
+    muted: DIM.label,
+  }[liveTicker.tone] || accent;
+  const statusDot = isRunning ? theme.colors.success : theme.colors.warning;
+  const timeText = clockNow.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M$/i, "");
+  const meridiem = (clockNow.toLocaleTimeString([], { hour: "numeric" }).match(/[AP]M/i) || [""])[0];
+  const dateText = clockNow.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  const driftStyle = {
+    transform: [
+      { translateX: driftAnim.interpolate({ inputRange: [0, 1], outputRange: [-6, 6] }) },
+      { translateY: driftAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 8] }) },
+    ],
+  };
+  const stats = [
+    { icon: "flame", color: accent, label: "Swipes", value: effectiveTotalSwipes },
+    { icon: "chatbubble-ellipses", color: theme.colors.info, label: "Messages", value: effectiveTotalMessages },
+    { icon: "sparkles", color: theme.colors.gold, label: "Matches", value: effectiveMatches },
+  ];
+
   return (
     <Modal
       visible={visible}
@@ -415,289 +469,188 @@ export default function PocketModeModal({
           style={styles.touchSurface}
           onPress={handleSurfaceTap}
           accessibilityRole="button"
-          accessibilityLabel="Touch-locked stealth screen. Double tap to unlock."
+          accessibilityLabel={`Pocket mode. ${displayStatus}. ${effectiveTotalSwipes} swipes, ${effectiveTotalMessages} messages. Double tap to unlock.`}
         >
-          <Animated.View style={[styles.hudContainer, { opacity: glanceAnim }]}>
-            {/* Living Cyber Aperture with Breathing Halo & Action Bloom */}
-            <View style={styles.beaconWrap}>
-              <Animated.View
-                style={[
-                  styles.haloRing,
-                  {
-                    opacity: pulseAnim,
-                    transform: [{ scale: actionPulseAnim }],
-                  },
-                ]}
-              />
-              <View style={styles.aperture}>
-                <Ionicons name="moon" size={28} color="#FBBF24" />
-              </View>
-            </View>
-
-            {/* Architectural Tracked Eyebrow */}
-            <Text style={styles.eyebrow}>TOUCH LOCKED</Text>
-
-            {/* Symmetrical Dual-Pillar Metrics: SWIPES & MESSAGES */}
-            <View style={styles.dualPillarCard}>
-              <View style={styles.pillar}>
-                <View style={styles.pillarHeader}>
-                  <Ionicons name="flame" size={14} color="#FE3C72" />
-                  <Text style={styles.pillarLabel}>SWIPES</Text>
+          <SafeAreaView edges={["top", "bottom", "left", "right"]} style={styles.safe}>
+            <Animated.View style={[styles.hud, driftStyle, { opacity: glanceAnim }]}>
+              {/* Lock-screen clock */}
+              <View style={styles.clockBlock}>
+                <View style={styles.lockRow}>
+                  <Ionicons name="lock-closed" size={11} color={DIM.faint} />
+                  <Text style={styles.lockText}>TOUCH LOCKED</Text>
                 </View>
-                <Text style={styles.pillarValue}>{effectiveTotalSwipes}</Text>
-              </View>
-
-              <View style={styles.pillarDivider} />
-
-              <View style={styles.pillar}>
-                <View style={styles.pillarHeader}>
-                  <Ionicons name="chatbubble-ellipses" size={13} color="#6ED2B1" />
-                  <Text style={styles.pillarLabel}>MESSAGES</Text>
+                <View style={styles.clockRow}>
+                  <Text style={styles.clock} maxFontSizeMultiplier={1.2}>{timeText}</Text>
+                  {meridiem ? <Text style={styles.meridiem}>{meridiem}</Text> : null}
                 </View>
-                <Text style={styles.pillarValue}>{effectiveTotalMessages}</Text>
+                <Text style={styles.date} maxFontSizeMultiplier={1.3}>{dateText}</Text>
               </View>
-            </View>
 
-            {/* Subtle Match Reward Badge (Acknowledges outcome without competing with active work) */}
-            {effectiveMatches > 0 && (
-              <View style={styles.matchRewardBadge}>
-                <Ionicons name="sparkles" size={11} color="#FFD166" />
-                <Text style={styles.matchRewardText}>
-                  {effectiveMatches} {effectiveMatches === 1 ? "Match" : "Matches"} Connected
+              {/* Status ring: breathing halo + bloom on each action */}
+              <View style={styles.center}>
+                <View style={styles.ringWrap}>
+                  <Animated.View
+                    style={[
+                      styles.halo,
+                      { backgroundColor: alpha(accent, 0.07), borderColor: alpha(accent, 0.22), opacity: pulseAnim, transform: [{ scale: actionPulseAnim }] },
+                    ]}
+                  />
+                  <LinearGradient
+                    colors={[alpha(theme.gradients.brand[0], 0.55), alpha(theme.gradients.brand[theme.gradients.brand.length - 1], 0.35)]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.ring}
+                  >
+                    <View style={styles.ringInner}>
+                      <Ionicons name={isRunning ? "flame" : "moon"} size={30} color={alpha(accent, 0.9)} />
+                    </View>
+                  </LinearGradient>
+                </View>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: statusDot }]} />
+                  <Text style={styles.statusText} numberOfLines={1}>{displayStatus}</Text>
+                </View>
+
+                {/* Stats strip */}
+                <View style={styles.stats}>
+                  {stats.map((stat, index) => (
+                    <React.Fragment key={stat.label}>
+                      {index > 0 ? <View style={styles.statDivider} /> : null}
+                      <View style={styles.stat} accessible accessibilityLabel={`${stat.value} ${stat.label}`}>
+                        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.2}>
+                          {Number(stat.value || 0).toLocaleString()}
+                        </Text>
+                        <View style={styles.statLabelRow}>
+                          <Ionicons name={stat.icon} size={11} color={alpha(stat.color, 0.8)} />
+                          <Text style={styles.statLabel}>{stat.label}</Text>
+                        </View>
+                      </View>
+                    </React.Fragment>
+                  ))}
+                </View>
+
+                {/* Live activity */}
+                <Animated.View style={[styles.ticker, { opacity: tickerAnim }]}>
+                  <Ionicons name={liveTicker.icon} size={13} color={alpha(toneColor, 0.85)} />
+                  <Text style={styles.tickerText} numberOfLines={1}>{liveTicker.text}</Text>
+                </Animated.View>
+              </View>
+
+              {/* Unlock */}
+              <View style={styles.bottom}>
+                <Text style={[styles.hint, glanceActive && { color: alpha(accent, 0.9) }]}>
+                  {glanceActive ? "Tap once more to unlock" : "Double-tap anywhere to unlock"}
                 </Text>
+                <TouchableOpacity
+                  style={styles.unlock}
+                  onPress={handleDismiss}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Unlock screen"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="lock-open-outline" size={14} color={DIM.label} />
+                  <Text style={styles.unlockText}>Unlock</Text>
+                </TouchableOpacity>
               </View>
-            )}
-
-            {/* Live Heartbeat Whisper Ticker (Real-Time Assurance) */}
-            <Animated.View style={[styles.tickerRow, { opacity: tickerAnim }]}>
-              <View
-                style={[
-                  styles.livePulseDot,
-                  { backgroundColor: isRunning ? "#10B981" : "#FBBF24" },
-                ]}
-              />
-              <Text style={styles.tickerText} numberOfLines={1}>
-                {liveTickerText}
-              </Text>
             </Animated.View>
-
-            {/* Minimalist Status Beacon (No heavy outer pill border) */}
-            <View style={styles.beaconStatusLine}>
-              <Text style={styles.beaconStatusText}>{displayStatus}</Text>
-            </View>
-
-            {/* Contextual Gesture Hint */}
-            <Text
-              style={[
-                styles.interactionHint,
-                glanceActive && styles.interactionHintActive,
-              ]}
-            >
-              {glanceActive ? "Tap once more to wake" : "Double-tap anywhere to unlock"}
-            </Text>
-
-            {/* Sleek Frosted Glass Unlock Button */}
-            <TouchableOpacity
-              style={styles.unlockPill}
-              onPress={handleDismiss}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Unlock screen"
-            >
-              <Ionicons name="lock-open-outline" size={13} color="#9CA3AF" />
-              <Text style={styles.unlockPillText}>Unlock Screen</Text>
-            </TouchableOpacity>
-          </Animated.View>
+          </SafeAreaView>
         </TouchableOpacity>
       </View>
     </Modal>
   );
 }
 
+// Dim whites on pure black: readable at a glance, easy on OLED and in the dark.
+const DIM = {
+  clock: "rgba(255, 255, 255, 0.86)",
+  text: "rgba(255, 255, 255, 0.72)",
+  label: "rgba(255, 255, 255, 0.46)",
+  faint: "rgba(255, 255, 255, 0.3)",
+  line: "rgba(255, 255, 255, 0.08)",
+  fill: "rgba(255, 255, 255, 0.035)",
+};
+
 const styles = StyleSheet.create({
-  fullscreen: {
+  fullscreen: { flex: 1, backgroundColor: "#000000" },
+  touchSurface: { flex: 1, backgroundColor: "#000000" },
+  safe: { flex: 1, paddingHorizontal: 24 },
+  hud: {
     flex: 1,
-    backgroundColor: "#000000",
     width: "100%",
-    height: "100%",
-  },
-  touchSurface: {
-    flex: 1,
-    backgroundColor: "#000000",
-    justifyContent: "center",
-    alignItems: "center",
-    width: "100%",
-    height: "100%",
-    paddingHorizontal: 24,
-  },
-  hudContainer: {
-    alignItems: "center",
-    width: "100%",
-    maxWidth: 320,
-  },
-  beaconWrap: {
-    width: 76,
-    height: 76,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-    position: "relative",
-  },
-  haloRing: {
-    position: "absolute",
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: "rgba(251, 191, 36, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(251, 191, 36, 0.22)",
-  },
-  aperture: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#0D0B10",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  eyebrow: {
-    fontFamily: theme.fonts.label,
-    fontSize: 10.5,
-    color: "#5C5262",
-    letterSpacing: 2.2,
-    marginBottom: 16,
-    textTransform: "uppercase",
+    maxWidth: 380,
+    alignSelf: "center",
+    justifyContent: "space-between",
+    paddingTop: 36,
+    paddingBottom: 20,
   },
 
-  /* Symmetrical Dual-Pillar Segment (Swipes & Messages) */
-  dualPillarCard: {
+  clockBlock: { alignItems: "center" },
+  lockRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
+  lockText: { fontFamily: theme.fonts.strong, fontSize: 10, letterSpacing: 2, color: DIM.faint },
+  clockRow: { flexDirection: "row", alignItems: "flex-start" },
+  clock: {
+    fontFamily: theme.fonts.display,
+    fontSize: 76,
+    lineHeight: 84,
+    letterSpacing: -3,
+    color: DIM.clock,
+    fontVariant: ["tabular-nums"],
+  },
+  meridiem: { fontFamily: theme.fonts.label, fontSize: 15, color: DIM.label, marginTop: 14, marginLeft: 6 },
+  date: { fontFamily: theme.fonts.caption, fontSize: 15, color: DIM.label, marginTop: 2 },
+
+  center: { alignItems: "center", gap: 18 },
+  ringWrap: { width: 120, height: 120, alignItems: "center", justifyContent: "center" },
+  halo: { position: "absolute", width: 120, height: 120, borderRadius: 60, borderWidth: 1 },
+  ring: { width: 84, height: 84, borderRadius: 42, padding: 1.5 },
+  ringInner: { flex: 1, borderRadius: 41, backgroundColor: "#050505", alignItems: "center", justifyContent: "center" },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 8, maxWidth: "100%" },
+  statusDot: { width: 7, height: 7, borderRadius: 4, opacity: 0.85 },
+  statusText: { fontFamily: theme.fonts.label, fontSize: 15, color: DIM.text, letterSpacing: 0.2, flexShrink: 1 },
+
+  stats: {
     flexDirection: "row",
     alignItems: "center",
-    width: "100%",
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
-    borderColor: "rgba(255, 255, 255, 0.07)",
-    borderWidth: 1,
-    borderRadius: 18,
+    alignSelf: "stretch",
     paddingVertical: 14,
-    paddingHorizontal: 8,
-    marginBottom: 12,
-  },
-  pillar: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pillarHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginBottom: 4,
-  },
-  pillarLabel: {
-    fontFamily: theme.fonts.label,
-    fontSize: 10,
-    color: "#83768B",
-    letterSpacing: 1.2,
-  },
-  pillarValue: {
-    fontFamily: theme.fonts.heading,
-    fontSize: 22,
-    color: "#F3EBF7",
-    letterSpacing: -0.4,
-  },
-  pillarDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: "rgba(255, 255, 255, 0.07)",
-  },
-
-  /* Match Reward Micro-Badge */
-  matchRewardBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(255, 209, 102, 0.08)",
-    borderColor: "rgba(255, 209, 102, 0.22)",
+    borderRadius: 20,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 3.5,
-    borderRadius: 12,
-    marginBottom: 14,
+    borderColor: DIM.line,
+    backgroundColor: DIM.fill,
   },
-  matchRewardText: {
-    fontFamily: theme.fonts.caption,
-    fontSize: 11,
-    color: "#FFD166",
-    fontWeight: "600",
-    letterSpacing: 0.2,
-  },
+  stat: { flex: 1, minWidth: 0, alignItems: "center", gap: 3, paddingHorizontal: 4 },
+  statDivider: { width: 1, height: 30, backgroundColor: DIM.line },
+  statValue: { fontFamily: theme.fonts.heading, fontSize: 24, lineHeight: 30, color: DIM.clock, fontVariant: ["tabular-nums"] },
+  statLabelRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  statLabel: { fontFamily: theme.fonts.caption, fontSize: 11, letterSpacing: 0.4, color: DIM.label },
 
-  /* Live Heartbeat Whisper Ticker */
-  tickerRow: {
+  ticker: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 8,
-    marginBottom: 10,
-    maxWidth: 290,
-  },
-  livePulseDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  tickerText: {
-    fontFamily: theme.fonts.caption,
-    fontSize: 11.5,
-    color: "#9C8EA6",
-    letterSpacing: 0.2,
-  },
-
-  /* Clean Status Line */
-  beaconStatusLine: {
-    marginBottom: 20,
-  },
-  beaconStatusText: {
-    fontFamily: theme.fonts.caption,
-    fontSize: 11,
-    color: "#5C5262",
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
-
-  /* Interaction Hint */
-  interactionHint: {
-    fontFamily: theme.fonts.caption,
-    fontSize: 12,
-    color: "#6B6071",
-    letterSpacing: 0.2,
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  interactionHintActive: {
-    color: "#FBBF24",
-    fontFamily: theme.fonts.label,
-  },
-
-  /* Unlock Affordance Button */
-  unlockPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderColor: "rgba(255, 255, 255, 0.09)",
+    gap: 8,
+    maxWidth: "100%",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: DIM.fill,
     borderWidth: 1,
-    borderRadius: 22,
-    paddingVertical: 9,
-    paddingHorizontal: 18,
+    borderColor: DIM.line,
   },
-  unlockPillText: {
-    fontFamily: theme.fonts.label,
-    fontSize: 12,
-    color: "#9CA3AF",
-    letterSpacing: 0.2,
+  tickerText: { fontFamily: theme.fonts.caption, fontSize: 12.5, color: DIM.label, flexShrink: 1 },
+
+  bottom: { alignItems: "center", gap: 14 },
+  hint: { fontFamily: theme.fonts.caption, fontSize: 12.5, color: DIM.faint, letterSpacing: 0.2, textAlign: "center" },
+  unlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: DIM.line,
+    backgroundColor: DIM.fill,
   },
+  unlockText: { fontFamily: theme.fonts.label, fontSize: 13, color: DIM.label, letterSpacing: 0.3 },
 });

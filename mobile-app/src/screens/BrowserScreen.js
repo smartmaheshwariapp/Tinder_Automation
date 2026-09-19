@@ -3191,21 +3191,15 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
 
               {/* Pocket Mode Quick Toggle */}
               {isOnDevice && (
-                <TouchableOpacity
-                  style={[
-                    styles.onDeviceLogsBtn,
-                    {
-                      backgroundColor: "rgba(251, 191, 36, 0.16)",
-                      borderColor: "rgba(251, 191, 36, 0.45)",
-                    },
-                  ]}
+                <IconButton
+                  icon="moon"
+                  variant="tinted"
+                  size={hdrBtn}
+                  iconSize={17}
                   onPress={() => togglePocketMode(true)}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
                   accessibilityLabel="Enter Pocket Mode"
-                >
-                  <Ionicons name="moon" size={14} color="#FBBF24" />
-                </TouchableOpacity>
+                  accessibilityHint="Locks the screen while the assistant keeps running"
+                />
               )}
 
               {/* Tri-state: a logout control only exists when there is a session to

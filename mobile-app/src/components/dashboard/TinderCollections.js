@@ -312,7 +312,9 @@ function ConnectHero({ loading, error, onConnect }) {
         style={styles.connectButton}
       />
       {!!error && <AppText variant="footnote" color="error" align="center" style={styles.error} accessibilityRole="alert">{error}</AppText>}
+      {/* "Private and saved on this device" line removed.
       <View style={styles.connectPrivacy}><Ionicons name="lock-closed-outline" size={12} color={c.muted} /><AppText variant="caption">Private and saved on this device</AppText></View>
+      */}
     </LinearGradient>
   );
 }
@@ -440,7 +442,9 @@ export default function TinderCollections({ settings, onConnect }) {
         {!entries.length && <Empty tab={tab} loading={state.loading} />}
       </ContentTransition>
       {tab === 'chatting' && <AppButton variant="secondary" size="sm" icon="refresh" loading={state.loading} onPress={refreshConversations} title={state.loading ? 'Refreshing conversations…' : 'Refresh conversations'} />}
+      {/* "Private and saved on this device" line removed.
       <View style={styles.sync}><Ionicons name="shield-checkmark-outline" size={14} color={c.success} /><Text style={styles.syncText} maxFontSizeMultiplier={theme.fontScale.body}>Private and saved on this device</Text></View>
+      */}
     </>}
     <Modal visible={open} animationType={reduced ? 'fade' : 'slide'} presentationStyle="fullScreen" statusBarTranslucent onRequestClose={close}>
       <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.modal}>

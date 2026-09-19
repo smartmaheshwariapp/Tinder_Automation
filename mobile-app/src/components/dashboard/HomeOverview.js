@@ -119,6 +119,7 @@ export default function HomeOverview({
   onProfile,
   onEnterPocketMode,
   onMenu,
+  onAppSettings,
 }) {
   const { gutter, isCompact } = useResponsive();
   const effectiveStats = stats || agentState || {};
@@ -294,6 +295,14 @@ export default function HomeOverview({
               style={styles.roundButton}
             />
           ) : null}
+          {onAppSettings ? (
+            <IconButton
+              icon="settings-outline"
+              onPress={onAppSettings}
+              accessibilityLabel="App settings"
+              style={styles.roundButton}
+            />
+          ) : null}
           {onMenu ? (
             <IconButton
               icon="menu-outline"
@@ -461,18 +470,25 @@ export default function HomeOverview({
               accessibilityLabel="Enter Pocket Mode"
             >
               <View style={styles.contextualPocketIconWrap}>
-                <Ionicons name="moon" size={13} color="#FBBF24" />
+                <Ionicons name="moon" size={14} color={c.accent} />
               </View>
-              <Text style={styles.contextualPocketText}>
-                Enter Pocket Mode
-              </Text>
-              <View style={styles.contextualPocketDot} />
+              <View style={styles.contextualPocketCopy}>
+                <Text style={styles.contextualPocketText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  Pocket mode
+                </Text>
+                <Text style={styles.contextualPocketHint} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  Lock the screen while it runs
+                </Text>
+              </View>
+              <LiveDot size={7} color={c.success} />
             </TouchableOpacity>
           )}
 
+          {/* "Likes this cycle" progress bar removed from the home page.
           {showCycle ? (
             <CycleProgress value={cycleLikes} total={cycleTarget} />
           ) : null}
+          */}
         </View>
       </FadeIn>
 
@@ -564,7 +580,9 @@ const NAV_TABS = [
   { id: "home", icon: "home-outline", activeIcon: "home", label: "Home", short: "Home" },
   { id: "automation", icon: "compass-outline", activeIcon: "compass", label: "Automation", short: "Automate" },
   { id: "activity", icon: "analytics-outline", activeIcon: "analytics", label: "Activity", short: "Activity" },
-  { id: "appSettings", icon: "settings-outline", activeIcon: "settings", label: "App settings", short: "Settings" },
+  // App settings moved to the top bar (gear next to notifications); Controls takes its dock slot.
+  // { id: "appSettings", icon: "settings-outline", activeIcon: "settings", label: "App settings", short: "Settings" },
+  { id: "settings", icon: "options-outline", activeIcon: "options", label: "Controls", short: "Controls" },
 ];
 // Slot layout: two tabs, centre action, two tabs.
 const NAV_SLOTS = [0, 1, null, 2, 3];
@@ -1105,37 +1123,39 @@ const styles = StyleSheet.create({
     height: "55%",
   },
   contextualPocketBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(251, 191, 36, 0.12)',
-    borderColor: 'rgba(251, 191, 36, 0.35)',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    gap: sp.md,
+    minHeight: 48,
+    paddingVertical: sp.sm,
+    paddingLeft: sp.sm,
+    paddingRight: sp.lg,
+    marginTop: sp.xs,
+    marginBottom: sp.sm,
+    borderRadius: r.pill,
+    backgroundColor: alpha(c.background, 0.6),
     borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    marginTop: -2,
-    marginBottom: 10,
-    gap: 7,
+    borderColor: c.primaryBorder,
   },
   contextualPocketIconWrap: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(251, 191, 36, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: c.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  contextualPocketCopy: { minWidth: 0 },
   contextualPocketText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FBBF24',
-    letterSpacing: 0.2,
+    ...t.subhead,
+    fontFamily: uiTheme.fonts.label,
+    color: c.text,
   },
-  contextualPocketDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#48CB8D',
+  contextualPocketHint: {
+    ...t.footnote,
+    fontSize: 11,
+    lineHeight: 14,
+    color: c.muted,
   },
 });

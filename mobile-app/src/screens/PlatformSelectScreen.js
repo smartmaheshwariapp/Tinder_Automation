@@ -1319,6 +1319,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
             user={currentUser || route?.params?.user}
             onNotifications={() => setShowNotifModal(true)}
             onMenu={() => setShowQuickMenu(true)}
+            onAppSettings={() => setHomeTab("appSettings")}
             onProfile={() => setHomeTab("profile")}
             onOpenBrowser={() => handleOpenLiveFeed("Tinder")}
             onToggleAgent={handleToggleAgent}
@@ -1393,6 +1394,12 @@ export default function PlatformSelectScreen({ navigation, route }) {
                     onPress={() => setShowNotifModal(true)}
                     accessibilityLabel={`Notifications, ${unreadNotifCount} unread`}
                     badge={unreadNotifCount > 0}
+                    style={homeStyles.headerButton}
+                  />
+                  <IconButton
+                    icon="settings-outline"
+                    onPress={() => setHomeTab("appSettings")}
+                    accessibilityLabel="App settings"
                     style={homeStyles.headerButton}
                   />
                   <IconButton

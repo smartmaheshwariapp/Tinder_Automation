@@ -190,10 +190,12 @@ export default function DashboardPanel({
 
         {/* ── 2. Pill Segmented Navigation (Activity | Automation | Controls) — always first so the
                Controls page stays reachable ── */}
+        {/* Removed: Activity, Automation and Controls are all in the bottom dock now.
         <SegmentedTabControl
           activeTab={activeTab}
           onSelectTab={handleTabSelect}
         />
+        */}
 
         {/* ── 3. Lifetime stat strip (Swipes, Messages, Matches) — shown on Activity & Automation;
                hidden on Controls where it competes with the form content ── */}
