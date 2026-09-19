@@ -571,8 +571,10 @@ export default function MasterControlOrb({
     <View style={styles.container}>
       <View style={styles.orbCenterWrapper}>
         {/* Concentric Decorative Rings */}
+        {/* Static outer rings removed to declutter (glow, sweep ring and ripples remain).
         <View style={[styles.ringOuter, { borderColor: config.ringColor }]} pointerEvents="none" />
         <View style={[styles.ringMid, { borderColor: config.ringColor }]} pointerEvents="none" />
+        */}
         <Animated.View style={[styles.glowOuter, { backgroundColor: alpha(tintStart, 0.08) }, glowStyle]} pointerEvents="none" />
         <Animated.View style={[styles.glowInner, { backgroundColor: alpha(tintStart, 0.14) }, glowStyle]} pointerEvents="none" />
         <Animated.View style={[styles.sweepRing, { transform: [{ rotate: sweepRotate }] }]} pointerEvents="none">
@@ -660,6 +662,8 @@ export default function MasterControlOrb({
           </TouchableOpacity>
         </Animated.View>
 
+      </View>
+
         {/* Floating Pulsing Stop Pill (Anchored under the Orb in any running state) */}
         {isRunning && !isSafetyLocked && (
           <Animated.View
@@ -680,17 +684,12 @@ export default function MasterControlOrb({
               onPress={() => { tapHaptic(); handlePress(); }}
               activeOpacity={0.82}
               hitSlop={PILL_HIT_SLOP}
-              style={styles.stopPill}
+              style={styles.stopButton}
             >
-              <LinearGradient
-                colors={[c.danger, c.primary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.stopPillGradient}
-              >
+              <View style={styles.stopButtonInner}>
                 <View style={styles.stopIconSquare} />
-                <Text style={styles.stopPillText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>TAP TO STOP</Text>
-              </LinearGradient>
+                <Text style={styles.stopButtonText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Stop wingman</Text>
+              </View>
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -718,12 +717,11 @@ export default function MasterControlOrb({
             </TouchableOpacity>
           </View>
         )}
-      </View>
 
       {/* Dynamic Status Hint Subtitle */}
       {showHint ? (
         <Text style={styles.statusHint} accessibilityLiveRegion="polite" maxFontSizeMultiplier={uiTheme.fontScale.body}>
-          {config.hint}
+          {isRunning && !isSafetyLocked ? String(config.hint).replace(/\s*·\s*Tap to stop\s*$/i, '') : config.hint}
         </Text>
       ) : null}
     </View>
@@ -896,8 +894,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiTheme.spacing.xl,
   },
   stopPillWrapper: {
-    position: 'absolute',
-    bottom: -6,
+    marginTop: uiTheme.spacing.md,
     zIndex: 20,
     ...Platform.select({
       ios: {
@@ -927,10 +924,28 @@ const styles = StyleSheet.create({
     gap: uiTheme.spacing.sm - 2,
   },
   stopIconSquare: {
-    width: 8,
-    height: 8,
-    backgroundColor: c.onPrimary,
+    width: 9,
+    height: 9,
+    backgroundColor: c.error,
     borderRadius: 2,
+  },
+  stopButton: {
+    borderRadius: uiTheme.radius.pill,
+    borderWidth: 1,
+    borderColor: alpha(c.error, 0.45),
+    backgroundColor: alpha(c.error, 0.12),
+  },
+  stopButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: uiTheme.spacing.sm,
+    minHeight: 40,
+    paddingHorizontal: uiTheme.spacing.xl,
+  },
+  stopButtonText: {
+    ...t.buttonSmall,
+    color: c.error,
   },
   stopPillText: {
     ...t.overline,

@@ -419,7 +419,8 @@ export default function TinderCollections({ settings, onConnect }) {
           <AppText variant="headline" numberOfLines={1} accessibilityRole="header" style={styles.listHeaderTitle}>{config.full}</AppText>
           <AppText variant="footnote" numberOfLines={1}>{entries.length} {tab === 'chatting' ? (entries.length === 1 ? 'person' : 'people') : (entries.length === 1 ? 'profile' : 'profiles')}</AppText>
         </View>
-        {!!state.error && <AppText variant="footnote" color="error" align="center" style={styles.error}>{state.error}</AppText>}{tab === 'chatting' && !!state.conversationError && <AppText variant="footnote" color="error" align="center" style={styles.error}>{state.conversationError}</AppText>}
+        {!!state.error && <AppText variant="footnote" color="error" align="center" style={styles.error}>{state.error}</AppText>}{/* Chat refresh error text ("Could not refresh Tinder conversations…") hidden.
+        {tab === 'chatting' && !!state.conversationError && <AppText variant="footnote" color="error" align="center" style={styles.error}>{state.conversationError}</AppText>} */}
         {!!entries.length && tab === 'swiped' && <Rail gutter={gutter}>
           {entries.slice(0, limit).map((item, index) => <SwipeCard key={itemKey(item, index)} item={item} index={index} width={swipeWidth} onPress={() => openItem(item)} />)}
           {entries.length > limit && <MoreCard count={entries.length - limit} config={config} index={limit} width={Math.round(swipeWidth * 0.72)} onPress={openList} />}

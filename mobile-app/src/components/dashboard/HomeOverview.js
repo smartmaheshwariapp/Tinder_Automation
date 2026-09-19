@@ -307,6 +307,7 @@ export default function HomeOverview({
               style={styles.roundButton}
             />
           ) : null}
+          {/* Three-line quick menu (commented out; Pocket mode moved into the wingman card).
           {onMenu ? (
             <IconButton
               icon="menu-outline"
@@ -320,6 +321,7 @@ export default function HomeOverview({
               ]}
             />
           ) : null}
+          */}
         </View>
       </FadeIn>
 
@@ -435,15 +437,17 @@ export default function HomeOverview({
 
           {/* Live status */}
           <View style={styles.statusBlock} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${stateTitle}. ${statusLabel}`}>
-            <View style={styles.statusLine}>
+            <View style={styles.statusRow}>
               <LiveDot size={8} active={running || busy} color={statusColor} />
-              <Text style={[styles.statusLabel, { color: statusColor }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                {statusLabel.toUpperCase()}
+              <Text style={styles.statusTitle} numberOfLines={1} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                {stateTitle}
               </Text>
+              <View style={[styles.statusChip, { backgroundColor: alpha(statusColor, 0.14), borderColor: alpha(statusColor, 0.34) }]}>
+                <Text style={[styles.statusChipText, { color: statusColor }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  {statusLabel}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.stateTitle} numberOfLines={2} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-              {stateTitle}
-            </Text>
             {isLoggedIn && likesStatus.isExhausted && !isPaidPlan && (!checking || !likesStatus.isFallback) ? (
               <Badge
                 label={`Refills in ${likesStatus.formattedCountdown}`}
@@ -465,6 +469,44 @@ export default function HomeOverview({
             wellColor={c.background}
           />
 
+          {/* Pocket mode: permanent footer row of the wingman card */}
+          <View style={styles.pocketDivider} />
+          <TouchableOpacity
+            style={styles.pocketRow}
+            onPress={onEnterPocketMode}
+            disabled={!onEnterPocketMode}
+            activeOpacity={0.85}
+            pressScale={0.98}
+            accessibilityRole="button"
+            accessibilityLabel={running ? "Pocket mode. Wingman running. Lock the screen" : "Pocket mode. Dim, touch-locked screen"}
+          >
+            <LinearGradient
+              colors={[alpha(uiTheme.gradients.brand[0], 0.35), alpha(uiTheme.gradients.brand[uiTheme.gradients.brand.length - 1], 0.2)]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.pocketIcon}
+            >
+              <Ionicons name="moon" size={18} color={c.text} />
+            </LinearGradient>
+            <View style={styles.pocketCopy}>
+              <Text style={styles.pocketTitle} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Pocket mode</Text>
+              <Text style={styles.pocketHint} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                {running ? "Lock the screen while the wingman runs" : "Dim, touch-locked screen for your pocket"}
+              </Text>
+            </View>
+            {/* "Running" chip removed — the row always ends with a chevron.
+            {running ? (
+              <View style={styles.pocketLive}>
+                <LiveDot size={6} color={c.success} />
+                <Text style={styles.pocketLiveText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Running</Text>
+              </View>
+            ) : (
+              <Ionicons name="chevron-forward" size={18} color={c.muted} />
+            )}
+            */}
+            <Ionicons name="chevron-forward" size={18} color={c.muted} />
+          </TouchableOpacity>
+          {/* Previous pocket-mode pill (only while running) — replaced by the row above.
           {running && (
             <TouchableOpacity
               style={styles.contextualPocketBtn}
@@ -487,6 +529,7 @@ export default function HomeOverview({
               <LiveDot size={7} color={c.success} />
             </TouchableOpacity>
           )}
+          */}
 
           {/* "Likes this cycle" progress bar removed from the home page.
           {showCycle ? (
@@ -917,6 +960,32 @@ const styles = StyleSheet.create({
     ...t.footnote,
     color: c.muted,
   },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "stretch",
+    gap: sp.sm,
+    paddingHorizontal: sp.xs,
+  },
+  statusTitle: {
+    ...t.headline,
+    fontFamily: uiTheme.fonts.heading,
+    fontSize: 17,
+    color: c.text,
+    flex: 1,
+    minWidth: 0,
+  },
+  statusChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: r.pill,
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  statusChipText: {
+    ...t.footnote,
+    fontFamily: uiTheme.fonts.label,
+  },
   statusBlock: {
     alignItems: "center",
     marginTop: sp.xl,
@@ -1125,6 +1194,54 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: "55%",
+  },
+  pocketDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: c.divider,
+    marginTop: sp.xl,
+    marginHorizontal: -sp.lg,
+  },
+  pocketRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: sp.md,
+    minHeight: 56,
+    paddingTop: sp.lg,
+    paddingHorizontal: sp.xs,
+  },
+  pocketIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pocketCopy: { flex: 1, minWidth: 0 },
+  pocketTitle: {
+    ...t.headline,
+    fontFamily: uiTheme.fonts.heading,
+    fontSize: 15,
+    color: c.text,
+  },
+  pocketHint: {
+    ...t.footnote,
+    color: c.muted,
+  },
+  pocketLive: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: r.pill,
+    backgroundColor: c.successSoft,
+    borderWidth: 1,
+    borderColor: c.successBorder,
+  },
+  pocketLiveText: {
+    ...t.footnote,
+    fontFamily: uiTheme.fonts.label,
+    color: c.success,
   },
   contextualPocketBtn: {
     flexDirection: "row",

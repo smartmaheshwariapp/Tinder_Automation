@@ -1284,6 +1284,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
               badge={unreadNotifCount > 0}
               style={homeStyles.headerButton}
             />
+            {/* Three-line quick menu (commented out).
             <IconButton
               icon="menu-outline"
               onPress={() => setShowQuickMenu(true)}
@@ -1295,6 +1296,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                 isAutomationRunning && homeStyles.headerButtonActive,
               ]}
             />
+            */}
           </View>
         </View>
       )}
