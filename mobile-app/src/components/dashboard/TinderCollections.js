@@ -44,7 +44,8 @@ const itemKey = (item, index) => String(item.id || item.profileId || item.profil
 // Photo that fills its parent; falls back to initials (or a person glyph) on a soft gradient when missing or broken.
 function Photo({ profile, index = 0, iconSize = 26, textStyle, dim = false }) {
   const [failed, setFailed] = useState(false);
-  const uri = profile?.photos?.[index] || profile?.photos?.[0];
+  const raw = profile?.photos?.[index] || profile?.photos?.[0];
+  const uri = typeof raw === 'string' ? raw : raw?.url || null;
   if (uri && !failed) return <Image source={{ uri }} resizeMode="cover" style={[styles.photoFill, dim && styles.photoDim]} onError={() => setFailed(true)} accessibilityIgnoresInvertColors />;
   const initials = initialsOf(profile?.name);
   return (
@@ -318,23 +319,40 @@ function ConnectHero({ loading, error, onConnect }) {
 
 // Large swipeable-by-tap photo header for the profile detail view.
 function DetailHero({ item, tab, height }) {
-  const photos = item.profile?.photos || [];
+  const profile = item.profile || {};
+  const photos = profile.photos || [];
   const [index, setIndex] = useState(0);
-  const count = photos.length, name = item.profile?.name || 'Tinder profile';
+  const count = photos.length;
+  const name = profile.name || 'Tinder profile';
+  const age = profile.age;
+  const verified = profile.verified;
+  const city = profile.city;
+  const distanceMi = profile.distanceMi;
+  const locationText = [city, distanceMi != null ? `${distanceMi} mi away` : null].filter(Boolean).join(' · ');
+
   const status = tab === 'swiped'
     ? <Badge label={item.action === 'like' ? (item.matched ? 'MATCH' : 'LIKED') : 'PASSED'} icon={item.action === 'like' ? 'heart' : 'close'} tone={item.action === 'like' ? TABS.swiped.tone : 'neutral'} size="sm" style={styles.badgeOnPhoto} />
     : tab === 'strong' ? <Badge label="STRONG MATCH" icon="sparkles" tone="secondary" size="sm" style={styles.badgeOnPhoto} />
       : <Badge label="ACTIVE CHAT" dot tone="success" size="sm" style={styles.badgeOnPhoto} />;
   return (
     <View style={[styles.detailHero, { height }]}>
-      <Photo key={index} profile={item.profile} index={index} iconSize={56} textStyle={styles.initialsLarge} />
+      <Photo key={index} profile={profile} index={index} iconSize={56} textStyle={styles.initialsLarge} />
       {count > 1 && <Button style={StyleSheet.absoluteFill} onPress={() => setIndex((index + 1) % count)} activeOpacity={1} pressScale={1} accessibilityRole="button" accessibilityLabel={`Show photo ${((index + 1) % count) + 1} of ${count}`} />}
       {count > 1 && <View style={styles.pager} pointerEvents="none">{photos.map((uri, i) => <View key={`${uri}-${i}`} style={[styles.pagerBar, i === index && styles.pagerBarActive]} />)}</View>}
       <LinearGradient colors={['transparent', alpha(c.background, 0.5), c.background]} locations={[0.45, 0.72, 1]} style={styles.photoShade} pointerEvents="none" />
       <View style={styles.detailHeroCopy} pointerEvents="none">
         <View style={styles.detailHeroText}>
-          {status}
-          <AppText variant="title" numberOfLines={2} style={styles.detailName}>{name}</AppText>
+          <View style={styles.heroBadgeRow}>
+            {status}
+            {verified && <Badge label="VERIFIED" icon="checkmark-circle" tone="secondary" size="sm" style={styles.badgeOnPhoto} />}
+          </View>
+          <AppText variant="title" numberOfLines={2} style={styles.detailName}>{name}{age ? `, ${age}` : ''}</AppText>
+          {!!locationText && (
+            <View style={styles.locationRow}>
+              <Ionicons name="location-outline" size={13} color={alpha(c.white, 0.85)} />
+              <Text style={styles.locationText} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{locationText}</Text>
+            </View>
+          )}
         </View>
         {item.score != null && <ScoreRing value={item.score} size={66} big onPhoto />}
       </View>
@@ -355,16 +373,15 @@ export default function TinderCollections({ settings, onConnect }) {
     const stop = subscribeCollections(setState); update(getTinderAuthState());
     const stopAuth = subscribeTinderAuthState(update); return () => { stop(); stopAuth(); };
   }, []);
-  const messagers = useMemo(() => {
-    const data = state.data;
-    if (!data) return [];
-    const profiles = data.profiles || {};
-    return Object.values(data.conversations || {})
+  const lists = useMemo(() => {
+    const base = collectionLists(state.data, state.own, settings);
+    const profiles = state.data?.profiles || {};
+    const chatting = Object.values(state.data?.conversations || {})
       .filter(item => !item.archived)
       .sort((a, b) => (b.lastActivityAt || 0) - (a.lastActivityAt || 0))
-      .map(item => ({ id: item.id, name: profiles[item.profileId]?.name || 'Tinder match' }));
-  }, [state.data]);
-  const lists = useMemo(() => ({ ...collectionLists(state.data, state.own, settings), chatting: messagers }), [state.data, state.own, settings, messagers]);
+      .map(item => ({ ...item, profile: profiles[item.profileId] || item.profile || { name: 'Tinder match' } }));
+    return { ...base, chatting: chatting.length > 0 ? chatting : base.chatting };
+  }, [state.data, state.own, settings]);
   const entries = lists[tab], config = TABS[tab], limit = tab === 'swiped' ? 10 : 3;
   const openItem = item => { setSelected(item); setOpen(true); };
   const openList = () => { setSelected(null); setOpen(true); };
@@ -410,7 +427,6 @@ export default function TinderCollections({ settings, onConnect }) {
           {entries.length > limit && <MoreCard count={entries.length - limit} config={config} index={limit} width={96} onPress={openList} />}
         </Rail>}
         {tab === 'strong' && <StrongNote />}
-        {/* Chat rows (last message previews) — replaced by the names-only list below.
         {!!entries.length && tab === 'chatting' && <View style={styles.chatList}>
           {entries.slice(0, limit).map((item, index) => <FadeIn key={itemKey(item, index)} delay={index * STAGGER} offset={6}>
             {index > 0 && <View style={styles.chatDivider} />}
@@ -420,19 +436,6 @@ export default function TinderCollections({ settings, onConnect }) {
             <Text style={[styles.moreText, { color: config.color }]} maxFontSizeMultiplier={theme.fontScale.chrome}>View all {entries.length} conversations</Text>
             <Ionicons name="arrow-forward" size={14} color={config.color} />
           </Button>}
-        </View>}
-        */}
-        {!!entries.length && tab === 'chatting' && <View style={styles.nameList} accessibilityRole="list">
-          {entries.map((person, index) => <FadeIn key={person.id || index} delay={Math.min(index, 8) * STAGGER} offset={6}>
-            {index > 0 && <View style={styles.nameDivider} />}
-            <View style={styles.nameRow} accessible accessibilityLabel={`${person.name} messaged you`}>
-              <LinearGradient colors={theme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.nameInitial}>
-                <Text style={styles.nameInitialText} maxFontSizeMultiplier={theme.fontScale.chrome}>{person.name.slice(0, 1).toUpperCase()}</Text>
-              </LinearGradient>
-              <Text style={styles.nameText} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{person.name}</Text>
-              <Ionicons name="chatbubble-ellipses-outline" size={16} color={c.muted} />
-            </View>
-          </FadeIn>)}
         </View>}
         {!entries.length && <Empty tab={tab} loading={state.loading} />}
       </ContentTransition>
@@ -458,8 +461,57 @@ export default function TinderCollections({ settings, onConnect }) {
             {selected.score != null && <Score value={selected.score} />}
             {!!selected.profile?.bio && <AppText variant="callout" color="textSecondary" align="center" style={styles.bio}>{selected.profile.bio}</AppText>}
           </LinearGradient> */}
+          {!!selected.profile?.lookingFor && (
+            <View style={styles.detailCard}>
+              <AppText variant="overline" color="secondary" accessibilityRole="header">LOOKING FOR</AppText>
+              <View style={styles.vitalsRow}>
+                <Ionicons name="heart-outline" size={17} color={c.accent} />
+                <AppText variant="bodyStrong" color="text">{selected.profile.lookingFor}</AppText>
+              </View>
+            </View>
+          )}
+          {(!!selected.profile?.job || !!selected.profile?.school) && (
+            <View style={styles.detailCard}>
+              <AppText variant="overline" color="secondary" accessibilityRole="header">WORK & EDUCATION</AppText>
+              {!!selected.profile?.job && (
+                <View style={styles.vitalsRow}>
+                  <Ionicons name="briefcase-outline" size={16} color={c.muted} />
+                  <AppText variant="subhead" color="text">{selected.profile.job}</AppText>
+                </View>
+              )}
+              {!!selected.profile?.school && (
+                <View style={[styles.vitalsRow, !!selected.profile?.job && { marginTop: 2 }]}>
+                  <Ionicons name="school-outline" size={16} color={c.muted} />
+                  <AppText variant="subhead" color="text">{selected.profile.school}</AppText>
+                </View>
+              )}
+            </View>
+          )}
           {!!selected.profile?.bio && <View style={styles.detailCard}><AppText variant="overline" color="secondary" accessibilityRole="header">ABOUT</AppText><AppText variant="callout" color="textSecondary">{selected.profile.bio}</AppText></View>}
+          {!!selected.profile?.questionAnswers?.length && (
+            <View style={styles.detailCard}>
+              <AppText variant="overline" color="secondary" accessibilityRole="header">PROMPTS & CONVERSATION STARTERS</AppText>
+              {selected.profile.questionAnswers.map((qa, i) => (
+                <View key={i} style={[styles.promptBubble, i > 0 && { marginTop: sp.sm }]}>
+                  {!!qa.question && <Text style={styles.promptQuestion} maxFontSizeMultiplier={theme.fontScale.chrome}>{qa.question}</Text>}
+                  <Text style={styles.promptAnswer} maxFontSizeMultiplier={theme.fontScale.body}>{qa.answer}</Text>
+                </View>
+              ))}
+            </View>
+          )}
           {!!selected.reasons?.length && <View style={styles.detailCard}><AppText variant="overline" color="secondary" accessibilityRole="header">WHY YOU MAY CONNECT</AppText><View style={styles.chips}>{selected.reasons.map(reason => <View key={reason} style={styles.reason}><Ionicons name="sparkles" size={12} color={TABS.strong.color} /><Text style={styles.reasonText} maxFontSizeMultiplier={theme.fontScale.body}>{reason}</Text></View>)}</View><AppText variant="caption">Estimated fit: {selected.score}/100. Missing profile data does not increase the score.</AppText></View>}
+          {!!selected.profile?.descriptors?.length && (
+            <View style={styles.detailCard}>
+              <AppText variant="overline" color="secondary" accessibilityRole="header">LIFESTYLE & BASICS</AppText>
+              <View style={styles.chips}>
+                {selected.profile.descriptors.map(item => (
+                  <View key={item} style={styles.descriptor}>
+                    <Text style={styles.descriptorText} maxFontSizeMultiplier={theme.fontScale.body}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
           {!!selected.profile?.interests?.length && <View style={styles.detailCard}><AppText variant="overline" color="secondary" accessibilityRole="header">INTERESTS</AppText><View style={styles.chips}>{selected.profile.interests.map(value => <View key={value} style={styles.interest}><Text style={styles.interestText} maxFontSizeMultiplier={theme.fontScale.body}>{value}</Text></View>)}</View></View>}
           {!!selected.action && <View style={styles.actionDetail}><IconWell icon={selected.action === 'like' ? 'heart' : 'close'} tone={selected.action === 'like' ? config.tone : 'neutral'} size={44} iconSize={18} /><View style={styles.actionCopy}><AppText variant="bodyStrong">{selected.action === 'like' ? 'You liked this profile' : 'You passed this profile'}</AppText><AppText variant="footnote">{new Date(selected.swipedAt).toLocaleString()}</AppText></View>{selected.action === 'like' && selected.matched && <Badge label="MATCH" icon="heart" tone="primary" size="sm" />}</View>}
           {!!selected.messages?.length && <View style={styles.detailCard}>
@@ -663,4 +715,13 @@ const styles = StyleSheet.create({
   sender: { ...t.overline, fontSize: 10, color: c.muted, paddingHorizontal: sp.xs },
   senderMine: { color: c.secondary },
   messageText: { ...t.callout, color: c.text },
+  heroBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: sp.xs },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  locationText: { ...t.caption, color: alpha(c.white, 0.85) },
+  vitalsRow: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
+  promptBubble: { padding: sp.md, borderRadius: r.lg, backgroundColor: c.elevated, borderWidth: 1, borderColor: c.borderSubtle, gap: sp.xs },
+  promptQuestion: { ...t.caption, color: c.secondary, fontFamily: theme.fonts.label },
+  promptAnswer: { ...t.callout, color: c.text },
+  descriptor: { paddingVertical: sp.xs + 2, paddingHorizontal: sp.sm + 2, borderRadius: r.pill, backgroundColor: alpha(c.elevatedHigh, 0.6), borderWidth: 1, borderColor: c.borderSubtle, maxWidth: '100%' },
+  descriptorText: { ...t.footnote, color: c.textSecondary },
 });

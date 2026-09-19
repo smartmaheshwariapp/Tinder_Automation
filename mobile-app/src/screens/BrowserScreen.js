@@ -3835,16 +3835,20 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                       (msg.age
                         ? `Age ${msg.age} · Verified Profile`
                         : "AI Target Match · Safe Paced");
+                    const isPass = msg.action === "pass";
                     addLog(
-                      `❤️ Swiped profile: ${targetName} (${updatedCycle}/${cycleTarget})`,
+                      isPass
+                        ? `⏭️ Passed profile: ${targetName}`
+                        : `❤️ Swiped profile: ${targetName} (${updatedCycle}/${cycleTarget})`,
                       "action",
                     );
-                    trackingService.trackLike(1);
+                    if (!isPass) trackingService.trackLike(1);
                     pushProgressFeedEvent(
-                      "profile_liked",
+                      isPass ? "profile_passed" : "profile_liked",
                       detail,
                       targetName,
-                      5,
+                      isPass ? 1 : 5,
+                      msg.photoUrl || null,
                     );
                     const collectionToken = getTinderAuthState()?.token;
                     if (collectionToken) {
@@ -3859,6 +3863,16 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                             "warn",
                           ),
                         );
+                    }
+                  }
+                  if (msg.type === "FE_MATCHES_STREAM" && Array.isArray(msg.matches)) {
+                    const collectionToken = getTinderAuthState()?.token;
+                    if (collectionToken) {
+                      activateCollections(collectionToken)
+                        .then(() =>
+                          ingestCollectionEvent({ kind: 'matches', matches: msg.matches }, collectionToken),
+                        )
+                        .catch(() => {});
                     }
                   }
                   if (msg.type === "FE_MESSAGE") {

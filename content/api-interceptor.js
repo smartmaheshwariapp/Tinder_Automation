@@ -18,6 +18,15 @@
 
   const messageCache = new Map();
   const profileCache = new Map();
+  window.__flirtEasyRecsCache = window.__flirtEasyRecsCache || new Map();
+
+  window.__flirtEasyGetRecPhoto = function (nameOrId) {
+    if (!window.__flirtEasyRecsCache || !nameOrId) return null;
+    const key = String(nameOrId).trim().toLowerCase();
+    const found = window.__flirtEasyRecsCache.get(key) || window.__flirtEasyRecsCache.get(nameOrId);
+    return found?.photoUrl || found?.photos?.[0] || null;
+  };
+
   let globalBotId = null;
 
   function detectGlobalBotId() {
@@ -289,6 +298,135 @@
         }
       }
 
+      // Intercept recommendations API to cache full candidate profiles & photo URLs (ground truth)
+      if (typeof url === 'string' && (url.includes('/v2/recs/core') || url.includes('/v2/recs/quick-match') || url.includes('/v2/recs'))) {
+        try {
+          const clone = response.clone();
+          const data = await clone.json();
+          const results = data?.data?.results || data?.results;
+          if (Array.isArray(results)) {
+            window.__flirtEasyRecsCache = window.__flirtEasyRecsCache || new Map();
+            for (const rec of results) {
+              const u = rec?.user || rec?.person || rec;
+              if (!u) continue;
+              const name = typeof u.name === 'string' ? u.name.trim() : null;
+
+              // 1. Calculate age from birth_date or explicit age
+              let age = null;
+              if (u.birth_date) {
+                const bDate = new Date(u.birth_date);
+                const diff = Date.now() - bDate.getTime();
+                const calculated = Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+                if (Number.isFinite(calculated) && calculated >= 18 && calculated <= 99) {
+                  age = calculated;
+                }
+              }
+              if (!age && typeof u.age === 'number') {
+                age = u.age;
+              }
+
+              // 2. Extract all high-resolution photo URLs for gallery
+              const photos = (Array.isArray(u.photos) ? u.photos : []).map(p => {
+                if (typeof p === 'string') return p;
+                const files = Array.isArray(p?.processedFiles) ? p.processedFiles : [];
+                const best = files.find(f => f?.width >= 600 && f?.width <= 1200) ||
+                             files.find(f => f?.width >= 320 && f?.width <= 800) ||
+                             files[files.length - 1] ||
+                             files[0];
+                return best?.url || p?.url || null;
+              }).filter(uStr => typeof uStr === 'string' && uStr.startsWith('https://'));
+
+              // 3. Extract interests / passions chips
+              const interests = (Array.isArray(u.user_interests) ? u.user_interests : (Array.isArray(u.interests) ? u.interests : []))
+                .map(i => (typeof i === 'string' ? i : i?.name || ''))
+                .filter(Boolean);
+
+              // 4. Extract job & school
+              const jobObj = Array.isArray(u.jobs) && u.jobs[0] ? u.jobs[0] : null;
+              const jobTitle = jobObj?.title?.name || '';
+              const jobCompany = jobObj?.company?.name || '';
+              const job = jobTitle ? (jobCompany ? `${jobTitle} at ${jobCompany}` : jobTitle) : (jobCompany || null);
+              const school = Array.isArray(u.schools) && u.schools[0]?.name ? u.schools[0].name : null;
+
+              // 5. Extract city and distance
+              const city = typeof u.city === 'string' ? u.city : u.city?.name || null;
+              const distanceMi = typeof u.distance_mi === 'number' ? u.distance_mi : null;
+
+              // 6. Extract relationship intent / looking for
+              const lookingFor = typeof u.relationship_intent === 'string'
+                ? u.relationship_intent
+                : (u.relationship_intent?.body_text || u.relationship_intent?.title || u.lookingFor || null);
+
+              // 7. Extract lifestyle descriptors (Zodiac, workout, drinking, smoking, pets, etc.)
+              const descriptors = (Array.isArray(u.selected_descriptors) ? u.selected_descriptors : []).map(d => {
+                const choices = (Array.isArray(d?.choice_selections) ? d.choice_selections : [])
+                  .map(c => (typeof c === 'string' ? c : c?.name || ''))
+                  .filter(Boolean)
+                  .join(', ');
+                return choices ? `${d.name || ''}: ${choices}`.trim() : (d.name || null);
+              }).filter(Boolean);
+
+              // 8. Extract prompts / question answers / teasers
+              const rawPrompts = Array.isArray(u.question_answers)
+                ? u.question_answers
+                : (Array.isArray(u.teasers) ? u.teasers : (Array.isArray(rec.teasers) ? rec.teasers : []));
+              const questionAnswers = rawPrompts.map(qa => {
+                const question = qa.question || qa.prompt || qa.type || '';
+                const answer = qa.answer || qa.description || (typeof qa === 'string' ? qa : '');
+                return { question, answer };
+              }).filter(qa => qa.answer && qa.answer.length > 0);
+
+              // 9. Verified badge status
+              const verified = Boolean(u.is_tinder_u || u.verified || (Array.isArray(u.badges) && u.badges.length > 0));
+
+              const candidate = {
+                id: String(u._id || u.id || ''),
+                name,
+                age,
+                bio: typeof u.bio === 'string' ? u.bio.trim() : '',
+                photos,
+                photoUrl: photos[0] || null,
+                interests,
+                job,
+                school,
+                city,
+                distanceMi,
+                lookingFor,
+                descriptors,
+                questionAnswers,
+                verified,
+                timestamp: Date.now()
+              };
+
+              if (candidate.id) window.__flirtEasyRecsCache.set(candidate.id, candidate);
+              if (name) window.__flirtEasyRecsCache.set(name.toLowerCase(), candidate);
+            }
+            log(`[FlirtEasy] 📸 Cached ${results.length} rich recommendations in recsCache`);
+          }
+        } catch (e) {
+          warn('[FlirtEasy] Error parsing recs response:', e);
+        }
+      }
+
+      // Intercept matches list response to cache conversations
+      if (typeof url === 'string' && url.includes('/v2/matches') && !url.includes('/messages')) {
+        try {
+          const clone = response.clone();
+          const data = await clone.json();
+          const matches = data?.data?.matches || data?.matches;
+          if (Array.isArray(matches) && matches.length > 0) {
+            try {
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'FE_MATCHES_STREAM',
+                  matches: matches.slice(0, 50)
+                }));
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
       return response;
     });
   };
@@ -525,5 +663,22 @@
   window.clearMessageCache = function () {
     messageCache.clear();
   };
+
+  window.__flirtEasyGetFullRec = function (nameOrId) {
+    if (!nameOrId || !window.__flirtEasyRecsCache) return null;
+    const str = String(nameOrId).trim();
+    return window.__flirtEasyRecsCache.get(str.toLowerCase()) || window.__flirtEasyRecsCache.get(str) || null;
+  };
+
+  window.__flirtEasyGetRecPhoto = function (nameOrId) {
+    const rec = typeof window.__flirtEasyGetFullRec === 'function' ? window.__flirtEasyGetFullRec(nameOrId) : null;
+    return rec?.photoUrl || rec?.photos?.[0] || null;
+  };
+
+  document.addEventListener('flirteasy:getFullRec', function (e) {
+    const key = e?.detail?.key;
+    const rec = typeof window.__flirtEasyGetFullRec === 'function' ? window.__flirtEasyGetFullRec(key) : null;
+    document.dispatchEvent(new CustomEvent('flirteasy:fullRecResponse', { detail: { key, rec } }));
+  });
 
 })(); // End of IIFE

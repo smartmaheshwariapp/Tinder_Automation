@@ -1176,7 +1176,7 @@ try {
 
 export const getProgressFeed = () => [...progressFeedEvents];
 
-export const pushProgressFeedEvent = (typeOrEvent, detail, name, xp = 0) => {
+export const pushProgressFeedEvent = (typeOrEvent, detail, name, xp = 0, photoUrl = null) => {
   let event;
   if (typeof typeOrEvent === 'object' && typeOrEvent !== null) {
     const rawType = typeOrEvent.type || 'profile_liked';
@@ -1190,6 +1190,7 @@ export const pushProgressFeedEvent = (typeOrEvent, detail, name, xp = 0) => {
       type: mappedType,
       detail: typeOrEvent.detail || typeOrEvent.message || typeOrEvent.text || '',
       name: typeOrEvent.name || null,
+      photoUrl: typeOrEvent.photoUrl || typeOrEvent.photo || photoUrl || null,
       xp: typeOrEvent.xp || 0,
       timestamp: typeof typeOrEvent.timestamp === 'number' ? typeOrEvent.timestamp : Date.now(),
     };
@@ -1205,6 +1206,7 @@ export const pushProgressFeedEvent = (typeOrEvent, detail, name, xp = 0) => {
       type: mappedType,
       detail: detail || '',
       name: name || null,
+      photoUrl: photoUrl || null,
       xp: xp || 0,
       timestamp: Date.now(),
     };

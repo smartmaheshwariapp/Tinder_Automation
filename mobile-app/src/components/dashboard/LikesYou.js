@@ -40,7 +40,7 @@ function PersonPhoto({ person, locked, style, index = 0, iconSize = 28 }) {
     <Image
       source={{ uri }}
       style={[style, styles.photo]}
-      blurRadius={locked ? 18 : 0}
+      blurRadius={locked ? 4 : 0}
       onError={() => setFailedUri(uri)}
       accessibilityIgnoresInvertColors
     />

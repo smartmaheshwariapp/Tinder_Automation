@@ -344,7 +344,7 @@ function isProfileVisible() {
 
   // Layer 2: A valid Tinder candidate card MUST have either a candidate name or a photo URL
   const cardName = typeof getSwipeCardName === 'function' ? getSwipeCardName() : null;
-  const photoUrl = typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl() : null;
+  const photoUrl = typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl(cardName) : null;
 
   if (!cardName && !photoUrl) {
     console.log('[FlirtEasy] No candidate card name or photo found — Tinder is in searching/radar state');
@@ -706,27 +706,181 @@ async function getSwipeDelay() {
 
 
 
-function extractProfilePhotoUrl() {
+function pickTopVisibleCardElement(nodeList) {
+  if (!nodeList || nodeList.length === 0) return null;
+  for (let i = nodeList.length - 1; i >= 0; i--) {
+    const el = nodeList[i];
+    const rect = el.getBoundingClientRect();
+    const isVisibleY = rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0;
+    const isVisibleX = rect.left < window.innerWidth && rect.right > 0;
+    if (isVisibleX && isVisibleY) {
+      return el;
+    }
+  }
+  return nodeList[nodeList.length - 1] || null;
+}
+
+function extractProfilePhotoUrl(candidateName = null) {
   console.log('[FlirtEasy] Searching for profile photo...');
 
-  const photoDivs = document.querySelectorAll('div[role="img"][aria-hidden="false"]');
-  console.log('[FlirtEasy] Found divs:', photoDivs.length);
+  // Strategy 1: Ground-truth API recs cache (100% exact high-res URL)
+  const name = candidateName || (typeof getSwipeCardName === 'function' ? getSwipeCardName() : null);
+  if (name && typeof window.__flirtEasyGetRecPhoto === 'function') {
+    const cachedUrl = window.__flirtEasyGetRecPhoto(name);
+    if (cachedUrl) {
+      console.log('[FlirtEasy] ✅ Using photo from API recs cache for:', name, cachedUrl);
+      return cachedUrl;
+    }
+  }
 
-  for (const div of photoDivs) {
-    console.log('[FlirtEasy] Checking div:', div.getAttribute('aria-label'));
-    const style = div.style.backgroundImage;
-    if (style) {
-      console.log('[FlirtEasy] Background image style:', style);
-      const match = style.match(/url\(["']?([^"')]+)["']?\)/);
-      if (match && match[1]) {
-        console.log('[FlirtEasy] Extracted URL:', match[1]);
-        return match[1];
+  // Helper to extract clean url from style string or computed style
+  function parseBgUrl(styleStr) {
+    if (!styleStr) return null;
+    const match = styleStr.match(/url\(["']?([^"')]+)["']?\)/);
+    if (match && match[1] && match[1].startsWith('https://')) {
+      return match[1];
+    }
+    return null;
+  }
+
+  // Strategy 2: Active candidate card container in DOM
+  const cardSelectors = [
+    'div[data-testid="recsCard"]',
+    'div[data-testid="recCard"]',
+    '.recsCardboard__cards .Bxsh\\(\\$bxsh-card\\)',
+    '.recsCardboard__cardsContainer [data-keyboard-gamepad="true"]',
+    '.keen-slider__slide[aria-hidden="false"]',
+    'div.recCard',
+    'div.profileCard'
+  ];
+
+  for (const sel of cardSelectors) {
+    const cards = document.querySelectorAll(sel);
+    const topCard = pickTopVisibleCardElement(cards);
+    if (topCard) {
+      // Look for img inside top card
+      const img = topCard.querySelector('img[src*="gotinder.com"], img[src*="tinder"], img[src]');
+      if (img && img.src && img.src.startsWith('https://')) {
+        console.log('[FlirtEasy] ✅ Found photo in top card img:', img.src);
+        return img.src;
+      }
+      // Look for div with background-image inside top card
+      const bgDivs = topCard.querySelectorAll('div[style*="background-image"], div[role="img"]');
+      for (const div of bgDivs) {
+        const url = parseBgUrl(div.style.backgroundImage || window.getComputedStyle(div).backgroundImage);
+        if (url && (url.includes('images-ssl.gotinder.com') || url.includes('gotinder.com') || url.includes('tinder'))) {
+          console.log('[FlirtEasy] ✅ Found photo in top card bg:', url);
+          return url;
+        }
       }
     }
   }
 
-  console.log('[FlirtEasy] No profile photo found');
+  // Strategy 3: Any visible role="img" or background-image containing Tinder CDN URL (pick last visible)
+  const allPhotoDivs = document.querySelectorAll('div[role="img"], div[style*="background-image"]');
+  const visiblePhotoElements = [];
+  for (const div of allPhotoDivs) {
+    const url = parseBgUrl(div.style.backgroundImage || window.getComputedStyle(div).backgroundImage);
+    if (url && (url.includes('images-ssl.gotinder.com') || url.includes('gotinder.com'))) {
+      const rect = div.getBoundingClientRect();
+      if (rect.width > 50 && rect.height > 50 && rect.top < window.innerHeight && rect.bottom > 0) {
+        visiblePhotoElements.push({ el: div, url });
+      }
+    }
+  }
+
+  if (visiblePhotoElements.length > 0) {
+    // Pick the last rendered visible image (top card in z-stack)
+    const best = visiblePhotoElements[visiblePhotoElements.length - 1];
+    console.log('[FlirtEasy] ✅ Found photo in visible elements pool:', best.url);
+    return best.url;
+  }
+
+  console.log('[FlirtEasy] ⚠️ No profile photo found in DOM');
   return null;
+}
+
+/**
+ * Extracts complete candidate profile (photos, bio, interests, job, school, city,
+ * lookingFor, descriptors, prompts) using ground-truth API cache first, then DOM fallback.
+ */
+function extractCandidateProfile(candidateName = null) {
+  const name = candidateName || (typeof getSwipeCardName === 'function' ? getSwipeCardName() : null);
+
+  // Strategy 1: Ground-truth API recs cache
+  let cached = null;
+  if (typeof window.__flirtEasyGetFullRec === 'function') {
+    if (name) cached = window.__flirtEasyGetFullRec(name);
+    if (!cached && typeof getSwipeCardName === 'function') {
+      const altName = getSwipeCardName();
+      if (altName) cached = window.__flirtEasyGetFullRec(altName);
+    }
+  }
+
+  // Fallback: Synchronous DOM CustomEvent query in case of context isolation
+  if (!cached && typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+    try {
+      const searchKey = name || (typeof getSwipeCardName === 'function' ? getSwipeCardName() : null);
+      if (searchKey) {
+        const handler = function (e) {
+          if (e?.detail?.rec) cached = e.detail.rec;
+        };
+        document.addEventListener('flirteasy:fullRecResponse', handler);
+        document.dispatchEvent(new CustomEvent('flirteasy:getFullRec', { detail: { key: searchKey } }));
+        document.removeEventListener('flirteasy:fullRecResponse', handler);
+      }
+    } catch (_) {}
+  }
+
+  // Baseline profile structure
+  const profile = {
+    id: cached?.id || null,
+    name: cached?.name || name || 'Tinder profile',
+    age: cached?.age || (typeof getProfileAge === 'function' ? getProfileAge() : null),
+    bio: cached?.bio || (typeof getMatchBio === 'function' ? getMatchBio() : '') || '',
+    photos: Array.isArray(cached?.photos) && cached.photos.length > 0 ? [...cached.photos] : [],
+    photoUrl: cached?.photoUrl || null,
+    interests: Array.isArray(cached?.interests) ? [...cached.interests] : [],
+    job: cached?.job || null,
+    school: cached?.school || null,
+    city: cached?.city || null,
+    distanceMi: cached?.distanceMi ?? null,
+    lookingFor: cached?.lookingFor || null,
+    descriptors: Array.isArray(cached?.descriptors) ? [...cached.descriptors] : [],
+    questionAnswers: Array.isArray(cached?.questionAnswers) ? [...cached.questionAnswers] : [],
+    verified: Boolean(cached?.verified)
+  };
+
+  // Ensure photoUrl and photos are populated
+  if (!profile.photoUrl || profile.photos.length === 0) {
+    const domPhoto = typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl(profile.name) : null;
+    if (domPhoto) {
+      if (!profile.photoUrl) profile.photoUrl = domPhoto;
+      if (!profile.photos.includes(domPhoto)) profile.photos.unshift(domPhoto);
+    }
+  } else if (!profile.photoUrl && profile.photos.length > 0) {
+    profile.photoUrl = profile.photos[0];
+  }
+
+  // Strategy 2: Supplement missing fields from DOM if available
+  if (!profile.bio && typeof getMatchBio === 'function') {
+    const domBio = getMatchBio();
+    if (domBio) profile.bio = domBio;
+  }
+  if (profile.interests.length === 0 && typeof getMatchInterests === 'function') {
+    const domInterests = getMatchInterests();
+    if (Array.isArray(domInterests) && domInterests.length > 0) {
+      profile.interests = domInterests;
+    }
+  }
+  if (profile.questionAnswers.length === 0 && typeof getMatchQuestionAnswers === 'function') {
+    const domQA = getMatchQuestionAnswers();
+    if (Array.isArray(domQA) && domQA.length > 0) {
+      profile.questionAnswers = domQA;
+    }
+  }
+
+  return profile;
 }
 
 /**

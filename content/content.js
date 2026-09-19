@@ -1409,11 +1409,36 @@ async function autoLike(count = 50, initialProgress = undefined) {
 
           if (age < ageFilter.minAge || age > ageFilter.maxAge) {
             console.log(`[FlirtEasy] Age ${age} OUTSIDE range ${ageFilter.minAge}-${ageFilter.maxAge}, PASSING`);
+            const passCandidate = typeof extractCandidateProfile === 'function'
+              ? extractCandidateProfile()
+              : { name: 'Someone', age, photoUrl: null, photos: [] };
             const passed = clickPassButton();
             if (passed) {
               console.log(`[FlirtEasy] Successfully passed profile (age ${age})`);
-            } else {
-              console.warn(`[FlirtEasy] Failed to pass profile`);
+              try {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'FE_SWIPE',
+                    action: 'pass',
+                    profileId: passCandidate.id,
+                    name: passCandidate.name,
+                    age: passCandidate.age,
+                    bio: passCandidate.bio,
+                    photos: passCandidate.photos,
+                    photoUrl: passCandidate.photoUrl || passCandidate.photos?.[0] || null,
+                    interests: passCandidate.interests,
+                    job: passCandidate.job,
+                    school: passCandidate.school,
+                    city: passCandidate.city,
+                    distanceMi: passCandidate.distanceMi,
+                    lookingFor: passCandidate.lookingFor,
+                    descriptors: passCandidate.descriptors,
+                    questionAnswers: passCandidate.questionAnswers,
+                    verified: passCandidate.verified,
+                    detail: `Age ${age} outside target range`,
+                  }));
+                }
+              } catch (_) {}
             }
             await getSwipeDelay();
             continue;
@@ -1443,9 +1468,36 @@ async function autoLike(count = 50, initialProgress = undefined) {
 
             if (matchResult && matchResult.score < (visualPrefs.threshold || 75)) {
               console.log(`[FlirtEasy] Visual match score ${matchResult.score}% below threshold ${visualPrefs.threshold}%, PASSING`);
+              const passCandidate = typeof extractCandidateProfile === 'function'
+                ? extractCandidateProfile()
+                : { name: 'Someone', photoUrl, photos: photoUrl ? [photoUrl] : [] };
               const passed = clickPassButton();
               if (passed) {
                 console.log(`[FlirtEasy] Successfully passed profile (visual mismatch)`);
+                try {
+                  if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'FE_SWIPE',
+                      action: 'pass',
+                      profileId: passCandidate.id,
+                      name: passCandidate.name,
+                      age: passCandidate.age,
+                      bio: passCandidate.bio,
+                      photos: passCandidate.photos,
+                      photoUrl: photoUrl || passCandidate.photoUrl || rawPhotoUrl,
+                      interests: passCandidate.interests,
+                      job: passCandidate.job,
+                      school: passCandidate.school,
+                      city: passCandidate.city,
+                      distanceMi: passCandidate.distanceMi,
+                      lookingFor: passCandidate.lookingFor,
+                      descriptors: passCandidate.descriptors,
+                      questionAnswers: passCandidate.questionAnswers,
+                      verified: passCandidate.verified,
+                      detail: 'Passed · Visual criteria mismatch',
+                    }));
+                  }
+                } catch (_) {}
               }
               await getSwipeDelay();
               continue;
@@ -1461,13 +1513,32 @@ async function autoLike(count = 50, initialProgress = undefined) {
           continue;
         }
 
-        // STREAMING: Get candidate details for personalized feed BEFORE clicking
-        const profileInfo = typeof getCurrentProfile === 'function' ? getCurrentProfile() : {};
-        const currentAge = typeof getProfileAge === 'function' ? getProfileAge() : null;
-        const currentName = profileInfo.name || (typeof getSwipeCardName === 'function' ? getSwipeCardName() : getMatchName()) || 'Someone';
-        const profileDetail = currentAge
-          ? `Age ${currentAge} · Verified Profile`
-          : (profileInfo.bio ? profileInfo.bio.slice(0, 42).trim() : 'AI Target Match · Safe Paced');
+        // STREAMING: Get complete candidate details before clicking
+        const currentName = (typeof getSwipeCardName === 'function' ? getSwipeCardName() : null) || (typeof getMatchName === 'function' ? getMatchName() : null) || 'Someone';
+        const candidate = typeof extractCandidateProfile === 'function'
+          ? extractCandidateProfile(currentName)
+          : {
+              id: null,
+              name: currentName,
+              age: typeof getProfileAge === 'function' ? getProfileAge() : null,
+              bio: '',
+              photoUrl: typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl(currentName) : null,
+              photos: [],
+              interests: [],
+              job: null,
+              school: null,
+              city: null,
+              distanceMi: null,
+              lookingFor: null,
+              descriptors: [],
+              questionAnswers: [],
+              verified: false
+            };
+
+        const currentPhotoUrl = candidate.photoUrl || candidate.photos?.[0] || (typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl(currentName) : null);
+        const profileDetail = candidate.age
+          ? `Age ${candidate.age} · Verified Profile`
+          : (candidate.bio ? candidate.bio.slice(0, 42).trim() : 'AI Target Match · Safe Paced');
 
         const clicked = clickLikeButton();
         console.log(`[FlirtEasy] Click result: ${clicked}`);
@@ -1475,16 +1546,30 @@ async function autoLike(count = 50, initialProgress = undefined) {
         if (clicked) {
           consecutiveLikeFailures = 0;
           likesCompleted++;
-          console.log(`[FlirtEasy] Liked profile ${likesCompleted}/${count}`);
+          console.log(`[FlirtEasy] Liked profile ${likesCompleted}/${count} (photo: ${currentPhotoUrl ? 'extracted' : 'none'}, id: ${candidate.id || 'none'})`);
 
           try {
             if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'FE_SWIPE',
+                action: 'like',
                 swipeCount: likesCompleted,
                 total: count,
-                name: currentName,
-                age: currentAge,
+                profileId: candidate.id,
+                name: candidate.name,
+                age: candidate.age,
+                bio: candidate.bio,
+                photos: candidate.photos,
+                photoUrl: currentPhotoUrl,
+                interests: candidate.interests,
+                job: candidate.job,
+                school: candidate.school,
+                city: candidate.city,
+                distanceMi: candidate.distanceMi,
+                lookingFor: candidate.lookingFor,
+                descriptors: candidate.descriptors,
+                questionAnswers: candidate.questionAnswers,
+                verified: candidate.verified,
                 detail: profileDetail,
               }));
             }
@@ -1494,9 +1579,10 @@ async function autoLike(count = 50, initialProgress = undefined) {
             action: 'updateCycleStats',
             stats: { 
               likesCompleted, 
-              currentName,
-              age: currentAge,
+              currentName: candidate.name,
+              age: candidate.age,
               detail: profileDetail,
+              photoUrl: currentPhotoUrl,
             }
           }, (response) => {
             if (chrome.runtime.lastError) {

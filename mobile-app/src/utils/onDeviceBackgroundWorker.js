@@ -388,7 +388,7 @@ export class OnDeviceBackgroundWorker {
 
             const targetName = stats.currentName || 'Someone New';
             const detailText = stats.detail || (stats.age ? `Age ${stats.age} · Verified Profile` : 'AI Target Match · Safe Paced');
-            pushProgressFeedEvent('profile_liked', detailText, targetName, 5);
+            pushProgressFeedEvent('profile_liked', detailText, targetName, 5, stats.photoUrl || null);
 
             if (this._currentRunLikes > 0 && this._currentRunLikes % 5 === 0) {
               const target = this.settings.likesPerCycle || 50;

@@ -22,7 +22,7 @@ describe('Progress Feed Event Logger & Persistence', () => {
   it('pushes events, normalizes types, and prepends them (newest first)', () => {
     const { pushProgressFeedEvent, getProgressFeed } = loadSessionManager();
 
-    pushProgressFeedEvent('like', 'Liked Sarahs profile', 'Sarah', 5);
+    pushProgressFeedEvent('like', 'Liked Sarahs profile', 'Sarah', 5, 'https://images-ssl.gotinder.com/u/sarah/1.jpg');
     pushProgressFeedEvent('match', 'New Match Connected!', 'Jessica', 25);
 
     const feed = getProgressFeed();
@@ -33,6 +33,7 @@ describe('Progress Feed Event Logger & Persistence', () => {
 
     expect(feed[1].type).toBe('profile_liked');
     expect(feed[1].name).toBe('Sarah');
+    expect(feed[1].photoUrl).toBe('https://images-ssl.gotinder.com/u/sarah/1.jpg');
   });
 
   it('caps progress feed at 50 events', () => {
