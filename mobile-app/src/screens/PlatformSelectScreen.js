@@ -1318,6 +1318,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
             unreadCount={unreadNotifCount}
             user={currentUser || route?.params?.user}
             onNotifications={() => setShowNotifModal(true)}
+            onMenu={() => setShowQuickMenu(true)}
             onProfile={() => setHomeTab("profile")}
             onOpenBrowser={() => handleOpenLiveFeed("Tinder")}
             onToggleAgent={handleToggleAgent}

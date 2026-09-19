@@ -118,6 +118,7 @@ export default function HomeOverview({
   onNotifications,
   onProfile,
   onEnterPocketMode,
+  onMenu,
 }) {
   const { gutter, isCompact } = useResponsive();
   const effectiveStats = stats || agentState || {};
@@ -283,15 +284,30 @@ export default function HomeOverview({
             </Text>
           </View>
         </TouchableOpacity>
-        {onNotifications ? (
-          <IconButton
-            icon="notifications-outline"
-            onPress={onNotifications}
-            accessibilityLabel={`Notifications, ${unreadCount} unread`}
-            badge={unreadCount > 0}
-            style={styles.roundButton}
-          />
-        ) : null}
+        <View style={styles.topBarActions}>
+          {onNotifications ? (
+            <IconButton
+              icon="notifications-outline"
+              onPress={onNotifications}
+              accessibilityLabel={`Notifications, ${unreadCount} unread`}
+              badge={unreadCount > 0}
+              style={styles.roundButton}
+            />
+          ) : null}
+          {onMenu ? (
+            <IconButton
+              icon="menu-outline"
+              onPress={onMenu}
+              accessibilityLabel="Quick actions menu"
+              color={running ? "#FBBF24" : undefined}
+              badge={running}
+              style={[
+                styles.roundButton,
+                running && styles.roundButtonActive,
+              ]}
+            />
+          ) : null}
+        </View>
       </FadeIn>
 
       {/* ── Control center hero ── */}
@@ -757,7 +773,16 @@ const styles = StyleSheet.create({
     ...t.title,
     color: c.text,
   },
+  topBarActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: sp.sm,
+  },
   roundButton: { borderRadius: r.pill },
+  roundButtonActive: {
+    borderColor: "rgba(251, 191, 36, 0.35)",
+    backgroundColor: "rgba(251, 191, 36, 0.08)",
+  },
 
   // ── Hero ──
   hero: {
