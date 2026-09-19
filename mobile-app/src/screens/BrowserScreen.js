@@ -29,25 +29,6 @@ import {
   BackHandler,
   Animated,
   Easing,
-} from "react-native";
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Dimensions,
-  AppState,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  PanResponder,
-  Keyboard,
-  Modal,
-  Alert,
-  ScrollView,
-  BackHandler,
-  Animated,
-  Easing,
   StatusBar,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
