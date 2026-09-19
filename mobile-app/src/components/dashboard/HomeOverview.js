@@ -256,13 +256,16 @@ export default function HomeOverview({
 
       {/* ── Personal header ── */}
       <FadeIn style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.identity}
-          onPress={onProfile}
-          disabled={!onProfile}
-          accessibilityRole="button"
-          accessibilityLabel={`${greetingFor()}, ${name}. Open profile`}
-        >
+        {/* Only the avatar opens Profile; the greeting and name are plain text. */}
+        <View style={styles.identity}>
+          <TouchableOpacity
+            onPress={onProfile}
+            disabled={!onProfile}
+            pressScale={0.92}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+          >
           <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarRing}>
             <View style={styles.avatar}>
               <ProfilePhoto
@@ -276,7 +279,8 @@ export default function HomeOverview({
               />
             </View>
           </LinearGradient>
-          <View style={styles.greetingCopy}>
+          </TouchableOpacity>
+          <View style={styles.greetingCopy} accessible accessibilityLabel={`${greetingFor()}, ${name === "there" ? "welcome back" : name}`}>
             <Text style={styles.greetingLabel} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
               {greetingFor()}
             </Text>
@@ -284,7 +288,7 @@ export default function HomeOverview({
               {name === "there" ? "Welcome back" : name}
             </Text>
           </View>
-        </TouchableOpacity>
+        </View>
         <View style={styles.topBarActions}>
           {onNotifications ? (
             <IconButton

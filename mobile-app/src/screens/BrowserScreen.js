@@ -82,6 +82,7 @@ import {
   Badge,
   FocusInput,
   FadeIn,
+  LiveDot,
   MotionTouchable as TouchableOpacity,
 } from "../components/ui";
 import { useMotionReduced } from "../components/common/Motion";
@@ -3053,6 +3054,43 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
     onDeviceStatusColor = uiTheme.colors.primary;
   }
 
+  const headerState =
+    sessionStatus !== SESSION_SIGNED_IN
+      ? sessionStatus === SESSION_SIGNED_OUT
+        ? { icon: "log-in-outline", title: "Not signed in", detail: "Sign in to Tinder below" }
+        : { icon: "sync-outline", title: "Checking session…", detail: "One moment" }
+      : isLikesExhausted
+        ? { icon: "hourglass-outline", title: "Daily likes used", detail: "Wingman keeps chatting" }
+        : isSafetyLocked
+          ? { icon: "shield-checkmark-outline", title: `Cooldown · ${cooldownMin}m`, detail: `${currentLikes}/${currentTargetLikes} likes` }
+          : onDeviceSwiping
+            ? isMessagingMode
+              ? { icon: "chatbubbles-outline", title: "Chatting", detail: `${currentMessages}/${currentTargetMessages} messages` }
+              : { icon: "flash-outline", title: "Swiping", detail: `${currentLikes}/${currentTargetLikes} likes` }
+            : {
+                icon: "pause-outline",
+                title: "Standby",
+                detail: !swipingActive && messagingActive
+                  ? `${currentMessages}/${currentTargetMessages} messages`
+                  : `${currentLikes}/${currentTargetLikes} likes`,
+              };
+  const closeSession = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      cleanupCurrentSession();
+      navigation?.goBack?.();
+    }
+  };
+  const aiButtonLabel = onDeviceSwiping
+    ? isMessagingMode
+      ? `AI automation active, ${currentMessages} of ${currentTargetMessages} messages completed`
+      : `AI automation active, ${currentLikes} of ${currentTargetLikes} likes completed`
+    : isMessagingMode
+      ? `AI controls, ${currentMessages} of ${currentTargetMessages} messages completed`
+      : `AI controls, ${currentLikes} of ${currentTargetLikes} likes completed`;
+  const headerPad = isCompact ? uiTheme.spacing.md : uiTheme.spacing.lg;
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -3060,6 +3098,119 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={0}
       >
+        {isOnDevice ? (
+          /* ─── Tinder session header: toolbar + status capsule ─── */
+          <View style={styles.sessionHeader}>
+            <View style={[styles.toolbar, { paddingHorizontal: headerPad }]}>
+              <IconButton
+                icon="close"
+                variant="plain"
+                size={hdrBtn}
+                iconSize={24}
+                accessibilityLabel="Close session"
+                onPress={closeSession}
+              />
+              <View style={styles.wordmark} pointerEvents="none">
+                <LinearGradient
+                  colors={[uiTheme.colors.tinder, uiTheme.gradients.brand[uiTheme.gradients.brand.length - 1]]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.wordmarkTile}
+                >
+                  <Ionicons name="flame" size={15} color={uiTheme.colors.onPrimary} />
+                </LinearGradient>
+                <Text style={styles.wordmarkText} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  Tinder
+                </Text>
+                {sessionStatus !== SESSION_UNKNOWN ? (
+                  <View
+                    style={[
+                      styles.wordmarkDot,
+                      { backgroundColor: sessionStatus === SESSION_SIGNED_IN ? uiTheme.colors.success : uiTheme.colors.textTertiary },
+                    ]}
+                    accessible
+                    accessibilityLabel={sessionStatus === SESSION_SIGNED_IN ? "Live" : "Offline"}
+                  />
+                ) : null}
+              </View>
+              <View style={styles.toolbarActions}>
+                <IconButton
+                  icon="moon-outline"
+                  variant="plain"
+                  size={hdrBtn}
+                  iconSize={20}
+                  color={uiTheme.colors.textSecondary}
+                  onPress={() => togglePocketMode(true)}
+                  accessibilityLabel="Enter Pocket Mode"
+                  accessibilityHint="Locks the screen while the assistant keeps running"
+                />
+                {sessionStatus === SESSION_SIGNED_IN ? (
+                  <IconButton
+                    icon="log-out-outline"
+                    variant="plain"
+                    size={hdrBtn}
+                    iconSize={20}
+                    color={uiTheme.colors.error}
+                    onPress={confirmLogout}
+                    accessibilityLabel="Log out of Tinder"
+                  />
+                ) : (
+                  <View style={{ width: hdrBtn, height: hdrBtn }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
+                )}
+              </View>
+            </View>
+
+            <View style={[styles.capsuleRow, { paddingHorizontal: headerPad }]}>
+              <View style={[styles.capsule, { borderColor: alpha(onDeviceStatusColor, 0.28) }]}>
+                <View style={[styles.capsuleIcon, { backgroundColor: alpha(onDeviceStatusColor, 0.14) }]}>
+                  <Ionicons name={headerState.icon} size={17} color={onDeviceStatusColor} />
+                </View>
+                <View
+                  style={styles.capsuleCopy}
+                  accessible
+                  accessibilityLiveRegion="polite"
+                  accessibilityLabel={`${headerState.title}. ${headerState.detail}`}
+                >
+                  <View style={styles.capsuleTitleRow}>
+                    {sessionStatus === SESSION_SIGNED_IN ? (
+                      <LiveDot size={6} active={onDeviceSwiping} color={onDeviceStatusColor} />
+                    ) : null}
+                    <Text style={styles.capsuleTitle} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                      {headerState.title}
+                    </Text>
+                  </View>
+                  <Text style={styles.capsuleDetail} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    {headerState.detail}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.aiButton, onDeviceSwiping ? styles.aiButtonActive : styles.aiButtonIdle]}
+                  onPress={() => setShowDashboard(true)}
+                  activeOpacity={0.85}
+                  pressScale={0.95}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: sessionStatus !== SESSION_SIGNED_IN }}
+                  accessibilityLabel={aiButtonLabel}
+                >
+                  <Ionicons
+                    name={onDeviceSwiping ? "flash" : "options-outline"}
+                    size={14}
+                    color={onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.accent}
+                  />
+                  <Text
+                    style={[styles.aiButtonText, { color: onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.text }]}
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                  >
+                    {onDeviceSwiping ? "AI Active" : isCompact ? "AI" : "AI Controls"}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={13} color={uiTheme.colors.muted} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <>
         {/* ─── Top bar: close · title + connection badge · trailing actions ─── */}
         <View
           style={[
@@ -3085,6 +3236,26 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
               }
             }}
           />
+          {isOnDevice && !isCompact ? (
+            <View style={styles.brandTileWrap} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <LinearGradient
+                colors={[uiTheme.colors.tinder, uiTheme.gradients.brand[uiTheme.gradients.brand.length - 1]]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.brandTile, { width: hdrBtn, height: hdrBtn, borderRadius: Math.round(hdrBtn * 0.32) }]}
+              >
+                <Ionicons name="flame" size={Math.round(hdrBtn * 0.5)} color={uiTheme.colors.onPrimary} />
+              </LinearGradient>
+              {sessionStatus !== SESSION_UNKNOWN ? (
+                <View
+                  style={[
+                    styles.brandTileDot,
+                    { backgroundColor: sessionStatus === SESSION_SIGNED_IN ? uiTheme.colors.success : uiTheme.colors.textTertiary },
+                  ]}
+                />
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.headerLeft}>
             <View style={styles.headerTitleRow}>
               <Text
@@ -3095,6 +3266,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
               >
                 {isOnDevice ? "Tinder" : `${platform} Session`}
               </Text>
+              {/* Live / Offline now shows as the dot on the brand tile.
               {isOnDevice && !isCompact && sessionStatus !== SESSION_UNKNOWN ? (
                 <Badge
                   size="sm"
@@ -3107,14 +3279,15 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                   }
                 />
               ) : null}
+              */}
             </View>
             <View style={styles.subtitleRow}>
               {isOnDevice && sessionStatus === SESSION_SIGNED_IN && (
-                <View
-                  style={[
-                    styles.statusDot,
-                    { backgroundColor: onDeviceStatusColor },
-                  ]}
+                <LiveDot
+                  size={7}
+                  active={onDeviceSwiping}
+                  color={onDeviceStatusColor}
+                  style={styles.statusLiveDot}
                 />
               )}
               <Text
@@ -3307,6 +3480,8 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
             </View>
           )}
         </View>
+          </>
+        )}
 
         {/* ─── Full-screen Dashboard Modal (accessible at any loginStep) ─── */}
         <Modal
@@ -6003,16 +6178,149 @@ const styles = StyleSheet.create({
     // minHeight, not height: with the Android status-bar paddingTop below, a
     // fixed 56 left an 8px content box for 38px-tall children, so the row
     // squeezed and spilled into the WebView.
-    minHeight: 56,
-    marginTop: Platform.OS === "android" ? 6 : 0,
+    minHeight: 60,
     flexDirection: "row",
     alignItems: "center",
     gap: sp.sm,
-    paddingTop: Platform.OS === "android" ? 38 : 6,
-    paddingBottom: 10,
-    backgroundColor: c.background,
+    // The app root is a SafeAreaView, so the status bar is already cleared; the old
+    // Android paddingTop of 38 doubled that gap.
+    paddingTop: sp.sm,
+    paddingBottom: sp.sm,
+    backgroundColor: c.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: c.divider,
+  },
+  // ── Tinder session header ──
+  sessionHeader: {
+    backgroundColor: c.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.divider,
+    paddingTop: sp.xs,
+    paddingBottom: sp.md,
+  },
+  toolbar: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  wordmark: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: sp.sm,
+  },
+  wordmarkTile: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  wordmarkText: {
+    ...type.section,
+    fontFamily: uiTheme.fonts.display,
+    letterSpacing: -0.3,
+    color: c.text,
+  },
+  wordmarkDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: 2,
+  },
+  toolbarActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  capsuleRow: {
+    marginTop: sp.xs,
+  },
+  capsule: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: sp.md,
+    minHeight: 56,
+    paddingLeft: sp.sm,
+    paddingRight: sp.sm,
+    paddingVertical: sp.sm,
+    borderRadius: r.lg,
+    borderWidth: 1,
+    backgroundColor: c.elevated,
+  },
+  capsuleIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  capsuleCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  capsuleTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  capsuleTitle: {
+    ...type.headline,
+    fontFamily: uiTheme.fonts.heading,
+    color: c.text,
+    flexShrink: 1,
+  },
+  capsuleDetail: {
+    ...type.footnote,
+    color: c.muted,
+    fontVariant: ["tabular-nums"],
+    marginTop: 1,
+  },
+  aiButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    minHeight: 38,
+    paddingLeft: sp.md,
+    paddingRight: sp.sm,
+    borderRadius: r.pill,
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  aiButtonIdle: {
+    backgroundColor: c.primarySoft,
+    borderColor: c.primaryBorder,
+  },
+  aiButtonActive: {
+    backgroundColor: c.successSoft,
+    borderColor: c.successBorder,
+  },
+  aiButtonText: {
+    ...type.buttonSmall,
+  },
+  brandTileWrap: {
+    flexShrink: 0,
+  },
+  brandTile: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandTileDot: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: c.surface,
+  },
+  statusLiveDot: {
+    marginRight: 6,
   },
   // The flexible zone between the fixed close button and the fixed action group.
   // Without flex + minWidth: 0 it sized to its content and shoved the buttons off
@@ -6037,7 +6345,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   headerTitle: {
-    ...type.title2,
+    ...type.section,
+    fontFamily: uiTheme.fonts.display,
+    letterSpacing: -0.3,
     flexShrink: 1,
     color: c.text,
   },
@@ -6575,7 +6885,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    minHeight: 40,
+    minHeight: 38,
     paddingHorizontal: sp.md,
     borderRadius: r.pill,
     borderWidth: 1,

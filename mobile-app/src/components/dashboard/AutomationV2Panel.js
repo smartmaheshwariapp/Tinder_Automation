@@ -34,6 +34,7 @@ import Badge from '../ui/Badge';
 import Card from '../ui/Card';
 import IconButton from '../ui/IconButton';
 import IconWell from '../ui/IconWell';
+import LiveDot from '../ui/LiveDot';
 import SectionHeader from '../ui/SectionHeader';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -1748,6 +1749,15 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
     return String(value || '').trim() ? { tone: 'success', label: `${name} ready` } : { tone: 'warning', label: `${name} missing` };
   };
   const instagramBadge = handleBadge(instagramEnabled, form.contactDetails?.instagram?.value, 'Instagram');
+  // Short name of the goal for the journey strip (Match → Chat → goal).
+  const GOAL_STEP = { date: 'Date', phone: 'WhatsApp', instagram: 'Socials', move_to_instagram: 'Instagram', never: 'Keep chatting' };
+  const goalStep = GOAL_STEP[activeGoalId] || 'Goal';
+  const handleState = (enabled, value) => (!enabled ? 'off' : String(value || '').trim() ? 'ready' : 'missing');
+  const HANDLE_STATE = {
+    ready: { label: 'Ready', icon: 'checkmark-circle', color: uiTheme.colors.success },
+    missing: { label: 'Missing', icon: 'alert-circle', color: uiTheme.colors.warning },
+    off: { label: 'Off', icon: 'remove-circle-outline', color: uiTheme.colors.muted },
+  };
   const whatsappBadge = handleBadge(whatsappEnabled, form.contactDetails?.whatsapp?.value, 'WhatsApp');
   // Animates the input reveal/collapse, then applies the exact same field update as before.
   const toggleHandle = (path, value) => {
@@ -1764,7 +1774,105 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
         keyboardShouldPersistTaps="handled"
       >
 
-        {/* ════════════════════ PAGE INTRO: WHAT THE WINGMAN IS AIMING FOR ════════════════════ */}
+        {/* ════════════════════ WINGMAN MISSION CARD ════════════════════ */}
+        <FadeIn>
+          <LinearGradient
+            colors={[alpha(uiTheme.gradients.brand[0], 0.7), alpha(uiTheme.gradients.brand[uiTheme.gradients.brand.length - 1], 0.35), alpha(uiTheme.colors.border, 0.4)]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.wmFrame}
+          >
+            <View style={styles.wmCard}>
+              <LinearGradient colors={uiTheme.gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+              <Ionicons name={activeGoal.icon} size={150} color={alpha(uiTheme.colors.white, 0.04)} style={styles.wmWatermark} />
+
+              {/* Header: wingman + mode */}
+              <View style={styles.wmHeader}>
+                <View style={styles.wmLabelRow}>
+                  <LiveDot size={7} color={uiTheme.colors.success} />
+                  <AppText variant="overline" color="secondary">WINGMAN</AppText>
+                </View>
+                <View style={[styles.wmModePill, stopAfterGoalOn && styles.wmModePillOn]}>
+                  <Ionicons name={stopAfterGoalOn ? 'flag' : 'infinite'} size={12} color={stopAfterGoalOn ? uiTheme.colors.secondary : uiTheme.colors.muted} />
+                  <Text style={[styles.wmModeText, stopAfterGoalOn && { color: uiTheme.colors.secondary }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    {stopAfterGoalOn ? 'Stops after goal' : 'Keeps chatting'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Goal */}
+              <ContentTransition transitionKey={activeGoalId} style={styles.wmGoal}>
+                <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wmGoalIcon}>
+                  <Ionicons name={activeGoal.icon} size={26} color={uiTheme.colors.onPrimary} />
+                </LinearGradient>
+                <View style={styles.wmGoalCopy}>
+                  <AppText variant="footnote" color="muted">Aiming for</AppText>
+                  <AppText variant="title2" numberOfLines={2} accessibilityRole="header">{activeGoal.label}</AppText>
+                  <AppText variant="footnote" color="textSecondary" numberOfLines={2}>{activeGoal.desc}</AppText>
+                </View>
+              </ContentTransition>
+
+              {/* Journey: Match → Chat → goal */}
+              <View style={styles.wmJourney} accessible accessibilityLabel={`Journey: match, chat, ${goalStep}`}>
+                {[
+                  { icon: 'heart', label: 'Match' },
+                  { icon: 'chatbubbles', label: 'Chat' },
+                  { icon: activeGoalId === 'never' ? 'infinite' : activeGoal.icon, label: goalStep, goal: true },
+                ].map((step, index) => (
+                  <React.Fragment key={step.label + index}>
+                    {index > 0 ? (
+                      <LinearGradient
+                        colors={[alpha(uiTheme.colors.accent, 0.25), alpha(uiTheme.colors.accent, 0.6)]}
+                        start={{ x: 0, y: 0.5 }}
+                        end={{ x: 1, y: 0.5 }}
+                        style={styles.wmJourneyLine}
+                      />
+                    ) : null}
+                    <View style={styles.wmStep}>
+                      {step.goal ? (
+                        <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wmStepDot}>
+                          <Ionicons name={step.icon} size={14} color={uiTheme.colors.onPrimary} />
+                        </LinearGradient>
+                      ) : (
+                        <View style={[styles.wmStepDot, styles.wmStepDotPlain]}>
+                          <Ionicons name={step.icon} size={13} color={uiTheme.colors.accent} />
+                        </View>
+                      )}
+                      <Text style={[styles.wmStepLabel, step.goal && styles.wmStepLabelGoal]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                        {step.label}
+                      </Text>
+                    </View>
+                  </React.Fragment>
+                ))}
+              </View>
+
+              {/* Contact readiness */}
+              <View style={styles.wmHandles}>
+                {[
+                  { key: 'instagram', icon: 'logo-instagram', name: 'Instagram', state: handleState(instagramEnabled, form.contactDetails?.instagram?.value) },
+                  { key: 'whatsapp', icon: 'logo-whatsapp', name: 'WhatsApp', state: handleState(whatsappEnabled, form.contactDetails?.whatsapp?.value) },
+                ].map((item) => {
+                  const st = HANDLE_STATE[item.state];
+                  return (
+                    <View key={item.key} style={styles.wmHandle} accessible accessibilityLabel={`${item.name} ${st.label}`}>
+                      <Ionicons name={item.icon} size={16} color={uiTheme.colors.textSecondary} />
+                      <View style={styles.wmHandleCopy}>
+                        <Text style={styles.wmHandleName} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{item.name}</Text>
+                        <View style={styles.wmHandleStateRow}>
+                          <Ionicons name={st.icon} size={11} color={st.color} />
+                          <Text style={[styles.wmHandleState, { color: st.color }]} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{st.label}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </LinearGradient>
+        </FadeIn>
+
+        {/* Previous summary card (kept for reference).
+        {/-* ════════════════════ PAGE INTRO: WHAT THE WINGMAN IS AIMING FOR ════════════════════ *-/}
         <FadeIn>
           <View style={styles.heroCard}>
             <LinearGradient colors={uiTheme.gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
@@ -1790,6 +1898,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             </View>
           </View>
         </FadeIn>
+
+        */}
 
         {/* ════════════════════ SECTION: DATING GOAL ════════════════════ */}
         <View style={styles.pageSection}>
@@ -3716,6 +3826,31 @@ const r = uiTheme.radius;
 const ty = uiTheme.type;
 
 const styles = StyleSheet.create({
+  // ── Wingman mission card ──
+  wmFrame: { borderRadius: uiTheme.radius.xl + 1, padding: 1.2, ...uiTheme.shadows.md },
+  wmCard: { borderRadius: uiTheme.radius.xl, overflow: 'hidden', backgroundColor: uiTheme.colors.surface, padding: uiTheme.spacing.lg, gap: uiTheme.spacing.lg },
+  wmWatermark: { position: 'absolute', right: -28, top: -20, transform: [{ rotate: '-12deg' }] },
+  wmHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiTheme.spacing.sm },
+  wmLabelRow: { flexDirection: 'row', alignItems: 'center', gap: uiTheme.spacing.sm },
+  wmModePill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: uiTheme.radius.pill, backgroundColor: uiTheme.colors.neutralSoft, borderWidth: 1, borderColor: uiTheme.colors.neutralBorder, flexShrink: 1 },
+  wmModePillOn: { backgroundColor: uiTheme.colors.secondarySoft, borderColor: uiTheme.colors.secondaryBorder },
+  wmModeText: { ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.label, color: uiTheme.colors.muted, flexShrink: 1 },
+  wmGoal: { flexDirection: 'row', alignItems: 'center', gap: uiTheme.spacing.md },
+  wmGoalIcon: { width: 58, height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center', ...uiTheme.shadows.glow },
+  wmGoalCopy: { flex: 1, minWidth: 0, gap: 1 },
+  wmJourney: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: uiTheme.spacing.sm, paddingHorizontal: uiTheme.spacing.md, borderRadius: uiTheme.radius.lg, backgroundColor: alpha(uiTheme.colors.background, 0.45), borderWidth: 1, borderColor: uiTheme.colors.hairline },
+  wmStep: { alignItems: 'center', gap: 5, minWidth: 56, maxWidth: 96 },
+  wmStepDot: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  wmStepDotPlain: { backgroundColor: uiTheme.colors.primarySoft, borderWidth: 1, borderColor: uiTheme.colors.primaryBorder },
+  wmJourneyLine: { flex: 1, height: 2, borderRadius: 1, marginTop: 14 },
+  wmStepLabel: { ...uiTheme.type.footnote, fontSize: 11, lineHeight: 14, color: uiTheme.colors.muted, textAlign: 'center' },
+  wmStepLabelGoal: { fontFamily: uiTheme.fonts.label, color: uiTheme.colors.text },
+  wmHandles: { flexDirection: 'row', gap: uiTheme.spacing.sm },
+  wmHandle: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: uiTheme.spacing.sm, padding: uiTheme.spacing.md, borderRadius: uiTheme.radius.md, backgroundColor: uiTheme.colors.elevated, borderWidth: 1, borderColor: uiTheme.colors.hairline },
+  wmHandleCopy: { flex: 1, minWidth: 0 },
+  wmHandleName: { ...uiTheme.type.subhead, fontFamily: uiTheme.fonts.label, color: uiTheme.colors.text },
+  wmHandleStateRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  wmHandleState: { ...uiTheme.type.footnote, fontSize: 11, lineHeight: 14, fontFamily: uiTheme.fonts.label },
   container: {
     flex: 1,
     backgroundColor: c.background,
