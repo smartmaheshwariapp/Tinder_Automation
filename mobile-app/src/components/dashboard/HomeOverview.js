@@ -436,141 +436,29 @@ export default function HomeOverview({
             wellColor={c.background}
           />
 
+          {running && (
+            <TouchableOpacity
+              style={styles.contextualPocketBtn}
+              onPress={onEnterPocketMode}
+              activeOpacity={0.82}
+              accessibilityRole="button"
+              accessibilityLabel="Enter Pocket Mode"
+            >
+              <View style={styles.contextualPocketIconWrap}>
+                <Ionicons name="moon" size={13} color="#FBBF24" />
+              </View>
+              <Text style={styles.contextualPocketText}>
+                Enter Pocket Mode
+              </Text>
+              <View style={styles.contextualPocketDot} />
+            </TouchableOpacity>
+          )}
+
           {showCycle ? (
             <CycleProgress value={cycleLikes} total={cycleTarget} />
           ) : null}
-
-          {false && <View style={styles.tiles}>
-            {[
-              {
-                label: "GOAL",
-                value: GOALS[goal] || titleCase(goal),
-                icon: "flag-outline",
-                action: onAutomation,
-              },
-              {
-                label: "TONE",
-                value: titleCase(tone),
-                icon: "mic-outline",
-                action: onAutomation,
-              },
-              {
-                label: "SPEED",
-                value: safe ? "Human" : "Fast",
-                icon: "timer-outline",
-                action: onSettings,
-              },
-            ].map((tile) => (
-              <TouchableOpacity
-                key={tile.label}
-                style={styles.tile}
-                onPress={tile.action}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`Edit ${tile.label.toLowerCase()}: ${tile.value}`}
-              >
-                <View style={styles.tileHeader}>
-                  <Ionicons name={tile.icon} size={18} color={c.textSecondary} />
-                  <Text style={styles.tileLabel}>{tile.label}</Text>
-                </View>
-                <Text style={styles.tileValue} numberOfLines={1}>{tile.value}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>}
         </View>
       </FadeIn>
-
-      
-        <MasterControlOrb
-          stats={effectiveStats}
-          settings={settings}
-          isLoggedIn={isLoggedIn}
-          busy={busy}
-          onToggleAgent={onToggleAgent}
-          onOpenBrowser={onOpenBrowser}
-        />
-
-        {running && (
-          <TouchableOpacity
-            style={styles.contextualPocketBtn}
-            onPress={onEnterPocketMode}
-            activeOpacity={0.82}
-            accessibilityRole="button"
-            accessibilityLabel="Enter Pocket Mode"
-          >
-            <View style={styles.contextualPocketIconWrap}>
-              <Ionicons name="moon" size={13} color="#FBBF24" />
-            </View>
-            <Text style={styles.contextualPocketText}>
-              Enter Pocket Mode
-            </Text>
-            <View style={styles.contextualPocketDot} />
-          </TouchableOpacity>
-        )}
-
-        <View style={styles.tiles}>
-          {[
-            {
-              label: "GOAL",
-              value: GOALS[goal] || titleCase(goal),
-              icon: "flag-outline",
-              action: onAutomation,
-            },
-            {
-              label: "TONE",
-              value: titleCase(tone),
-              icon: "mic-outline",
-              action: onAutomation,
-            },
-            {
-              label: "SPEED",
-              value: safe ? "Human" : "Fast",
-              icon: "timer-outline",
-              action: onSettings,
-            },
-          ].map((tile) => (
-            <TouchableOpacity
-              key={tile.label}
-              style={styles.tile}
-              onPress={tile.action}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`Edit ${tile.label.toLowerCase()}: ${tile.value}`}
-            >
-              <View style={styles.tileHeader}>
-                <Ionicons
-                  name={tile.icon}
-                  size={18}
-                  color={uiTheme.colors.textSecondary}
-                />
-                <Text style={styles.tileLabel}>{tile.label}</Text>
-              </View>
-              <Text style={styles.tileValue} numberOfLines={1}>
-                {tile.value}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      {/* </View> */}
-      {false && <View style={styles.metrics}>
-      <View style={styles.metrics}>
-        {metrics.map((metric) => (
-          <TouchableOpacity
-            key={metric.label}
-            style={styles.metric}
-            onPress={onActivity}
-            accessibilityRole="button"
-            accessibilityLabel={`${metric.value} ${metric.label.toLowerCase()}, view activity`}
-          >
-            <Text style={styles.metricLabel}>{metric.label}</Text>
-            <View style={styles.metricValueRow}>
-              <Text style={styles.metricValue}>{Number(metric.value).toLocaleString()}</Text>
-              <Ionicons name={metric.icon} size={17} color={metric.color} />
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-      </View>}
 
       <FadeIn delay={STAGGER * 2}>
         <LikesYou count={likesYou.count} isLoggedIn={isLoggedIn} onOpenTinder={onOpenBrowser} />
