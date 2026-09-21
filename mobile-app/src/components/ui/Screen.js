@@ -9,11 +9,11 @@ import { theme } from '../../theme';
  * and a centered readable column with responsive gutters.
  */
 export default function Screen({
-  children, scroll = false, keyboard = false, edges = ['top', 'left', 'right'], maxWidth = theme.layout.readableMax,
+  children, scroll = false, keyboard = false, edges = ['top', 'left', 'right'], maxWidth,
   contentStyle, style, footer, refreshControl, scrollRef, background = theme.colors.background,
 }) {
-  const { gutter } = useResponsive();
-  const column = [{ width: '100%', maxWidth, alignSelf: 'center', paddingHorizontal: gutter }, contentStyle];
+  const { gutter, contentMax } = useResponsive();
+  const column = [{ width: '100%', maxWidth: maxWidth ?? contentMax, alignSelf: 'center', paddingHorizontal: gutter }, contentStyle];
   const body = scroll ? (
     <ScrollView
       ref={scrollRef}

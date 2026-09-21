@@ -5,6 +5,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { TONES } from '../ui/Badge';
 import IconWell from '../ui/IconWell';
 import CountUp from '../ui/CountUp';
+import useResponsive from '../../hooks/useResponsive';
 
 function formatNumber(n) {
   if (typeof n !== 'number' || isNaN(n)) return '0';
@@ -15,6 +16,10 @@ function formatNumber(n) {
 
 export default function QuickTelemetryCapsule({ lifetimeStats, style }) {
   const stats = lifetimeStats || {};
+  // Three cells always share the strip; only their breathing room changes with the window.
+  const { isCompact, pick } = useResponsive();
+  const cellPad = isCompact ? uiTheme.spacing.sm : pick({ phone: uiTheme.spacing.md - 2, tablet: uiTheme.spacing.lg, xl: uiTheme.spacing.xl });
+  const cell = { paddingHorizontal: cellPad };
 
   const totalSwipes   = stats.totalSwipes   ?? stats.totalLikes   ?? stats.swipes   ?? 0;
   const todaySwipes   = stats.todaySwipes   ?? stats.todayLikes   ?? stats.swipes   ?? 0;

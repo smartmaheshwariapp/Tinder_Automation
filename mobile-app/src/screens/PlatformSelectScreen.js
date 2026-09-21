@@ -57,6 +57,7 @@ import {
   getActiveUserId,
 } from "../utils/sessionManager";
 import useExtensionStats from "../hooks/useExtensionStats";
+import useResponsive from "../hooks/useResponsive";
 import { DashboardPanel } from "../components/dashboard";
 import HomeOverview, {
   HomeBottomNavigation,
@@ -141,6 +142,17 @@ const ENVIRONMENT_OPTIONS = [
 ];
 
 export default function PlatformSelectScreen({ navigation, route }) {
+  // Layout only: the shell header, the tab page headers and the App Preferences sheet all size
+  // themselves from the live window instead of module-level constants.
+  const {
+    gutter: screenGutter,
+    contentMax: screenContentMax,
+    height: windowHeight,
+    isLandscape,
+    pick: pickSize,
+  } = useResponsive();
+  const sheetMaxWidth = pickSize({ phone: 640, tablet: 640, xl: 720 });
+  const sheetMaxHeight = Math.round(windowHeight * (isLandscape ? 0.9 : 0.72));
   const [homeTab, setHomeTab] = useState("home");
   const [deviceLatencyMs, setDeviceLatencyMs] = useState(null);
   const [selectedPlatform, setSelectedPlatform] = useState("Tinder");
@@ -1237,7 +1249,12 @@ export default function PlatformSelectScreen({ navigation, route }) {
         "profile",
         "appSettings",
       ].includes(homeTab) && (
-        <View style={homeStyles.header}>
+        <View
+          style={[
+            homeStyles.header,
+            { maxWidth: screenContentMax, paddingHorizontal: screenGutter },
+          ]}
+        >
           <View
             style={homeStyles.brand}
             accessible
@@ -1372,7 +1389,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
         ) : (
           <View style={homeStyles.dashboard}>
             <ScreenHeader
-              style={homeStyles.sectionHeader}
+              style={[
+                homeStyles.sectionHeader,
+                { maxWidth: screenContentMax, paddingHorizontal: screenGutter },
+              ]}
               title={
                 homeTab === "settings"
                   ? "Controls"
@@ -1539,6 +1559,8 @@ export default function PlatformSelectScreen({ navigation, route }) {
               style={[
                 styles.modalSheet,
                 {
+                  maxWidth: sheetMaxWidth,
+                  maxHeight: sheetMaxHeight,
                   paddingBottom: uiTheme.spacing.lg,
                   transform: [{ translateY: modalSlide }],
                 },
@@ -2143,6 +2165,8 @@ const styles = StyleSheet.create({
   },
   modalSheet: {
     width: "100%",
+    // Baselines; the screen overrides maxWidth/maxHeight from the live window so the sheet
+    // follows rotation instead of the module-level Dimensions snapshot.
     maxWidth: 640,
     alignSelf: "center",
     backgroundColor: c.surface,
@@ -2577,6 +2601,7 @@ const homeStyles = StyleSheet.create({
   tabContent: { flex: 1 },
   header: {
     width: "100%",
+    // Baseline; the screen overrides maxWidth/paddingHorizontal from useResponsive().
     maxWidth: uiTheme.layout.contentMax,
     alignSelf: "center",
     flexDirection: "row",
@@ -2633,6 +2658,7 @@ const homeStyles = StyleSheet.create({
   },
   sectionHeader: {
     width: "100%",
+    // Baseline; the screen overrides maxWidth/paddingHorizontal from useResponsive().
     maxWidth: uiTheme.layout.contentMax,
     alignSelf: "center",
     paddingHorizontal: sp.xl,

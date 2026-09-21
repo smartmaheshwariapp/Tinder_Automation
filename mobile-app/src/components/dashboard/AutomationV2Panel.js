@@ -26,6 +26,7 @@ import TimeRangeSlider, { timeToMins, minsToDisplay, minsTo24 } from '../common/
 import V2Dropdown from '../common/V2Dropdown';
 import { CITY_PRESETS } from '../../utils/locationHubs';
 import { theme as uiTheme, alpha } from '../../theme';
+import useResponsive from '../../hooks/useResponsive';
 import { FocusInput, FadeIn, ContentTransition, MotionTouchable, useMotionReduced } from '../common/Motion';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppButton from '../ui/AppButton';
@@ -788,10 +789,10 @@ function SegmentedControl({ options, value, onChange, accessibilityLabel }) {
 }
 
 // Contact handle row: icon + label + switch; the input slides in below when the handle is shared.
-function ContactHandleRow({ icon, tone, title, switchLabel, enabled, onToggle, sentCount, value, inputLabel, missingHint, divider, inputProps }) {
+function ContactHandleRow({ icon, tone, title, switchLabel, enabled, onToggle, sentCount, value, inputLabel, missingHint, divider, inputProps, style }) {
   const missing = enabled && !String(value || '').trim();
   return (
-    <View style={[styles.handleRow, divider && styles.handleRowDivider]}>
+    <View style={[styles.handleRow, divider && styles.handleRowDivider, style]}>
       <View style={styles.handleRowHead}>
         <IconWell icon={icon} tone={enabled ? tone : 'neutral'} size={40} />
         <View style={styles.handleRowCopy}>
@@ -863,6 +864,15 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
   const [simLangModalOpen, setSimLangModalOpen] = useState(false);
   const [tooltipModal, setTooltipModal] = useState(null);
   const reduceMotion = useMotionReduced();
+
+  // ─── Responsive layout (phones stay single column; tablets get 2–3 across) ───
+  const { contentMax, columns, isTablet, isXL } = useResponsive();
+  // Wide option cards (icon + title + description + radio) need ~240pt each.
+  const optionCols = isTablet ? Math.min(columns, isXL ? 3 : 2) : 1;
+  const optionItemStyle = optionCols > 1
+    ? { flexGrow: 1, flexBasis: optionCols >= 3 ? '30%' : '46%', minWidth: 240 }
+    : null;
+  const handleCols = isTablet ? Math.min(columns, 2) : 1;
 
   // ─── Location Hub State (Global Geolocation Sync) ───
 
@@ -1769,7 +1779,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
     <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { maxWidth: contentMax }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -1906,9 +1916,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           <FadeIn delay={50}>
             <SectionHeader title="Dating goal" description="How the AI Wingman steers and closes conversations." />
           </FadeIn>
-          <View style={styles.goalList} accessibilityRole="radiogroup" accessibilityLabel="Primary Goal">
+          <View style={[styles.goalList, optionCols > 1 && styles.goalGrid]} accessibilityRole="radiogroup" accessibilityLabel="Primary Goal">
             {GOAL_OPTIONS.map((option, idx) => (
-              <FadeIn key={option.id} delay={100 + idx * 40}>
+              <FadeIn key={option.id} delay={100 + idx * 40} style={optionItemStyle}>
                 <GoalOptionCard
                   option={option}
                   selected={activeGoalId === option.id}
@@ -1944,7 +1954,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
         {/* ════════════════════ SECTION: CONTACT HANDLES ════════════════════ */}
         <FadeIn delay={370} style={styles.pageSection}>
           <SectionHeader title="Your contact details" description="Toggle on the details you want the AI to share when a match asks for your contact." />
-          <Card padding="none" style={styles.groupCard}>
+          <Card padding="none" style={[styles.groupCard, handleCols > 1 && styles.handleGridCard]}>
             <ContactHandleRow
               icon="logo-instagram"
               tone="primary"
@@ -1956,7 +1966,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               value={form.contactDetails?.instagram?.value}
               inputLabel="Your Instagram handle"
               missingHint="Add your handle so the wingman can share it."
-              divider
+              style={handleCols > 1 ? styles.handleGridCell : null}
+              divider={handleCols === 1}
               inputProps={{
                 placeholder: '@yourhandle',
                 accessibilityLabel: 'Instagram handle',
@@ -1976,6 +1987,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
               value={form.contactDetails?.whatsapp?.value}
               inputLabel="Your WhatsApp number"
               missingHint="Add your number so the wingman can share it."
+              style={handleCols > 1 ? [styles.handleGridCell, styles.handleGridCellSplit] : null}
               inputProps={{
                 placeholder: '+1 555 000 0000',
                 accessibilityLabel: 'WhatsApp number',
@@ -3872,6 +3884,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    width: '100%',
+    alignSelf: 'center',
     paddingHorizontal: sp.xxs,
     paddingTop: sp.xs,
     paddingBottom: sp.section,
@@ -3927,6 +3941,12 @@ const styles = StyleSheet.create({
   goalList: {
     gap: sp.sm,
     marginBottom: sp.md,
+  },
+  // Tablet/XL: goal cards flow 2–3 across instead of one very wide row.
+  goalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
   },
   goalCard: {
     flexDirection: 'row',
@@ -3992,6 +4012,19 @@ const styles = StyleSheet.create({
   handleRowDivider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: c.divider,
+  },
+  // Tablet/XL: the two contact handles sit side by side, split by a vertical rule.
+  handleGridCard: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  handleGridCell: {
+    flex: 1,
+    minWidth: 0,
+  },
+  handleGridCellSplit: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: c.divider,
   },
   handleRowHead: {
     flexDirection: 'row',

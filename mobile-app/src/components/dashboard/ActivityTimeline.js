@@ -5,6 +5,7 @@ import { theme as uiTheme } from '../../theme';
 import { MotionTouchable, ContentTransition, FadeIn, useMotionReduced } from '../common/Motion';
 import { AppButton, AppText, Badge, Card, Chip, CountUp, EmptyState, IconWell, LiveDot } from '../ui';
 import { TONES } from '../ui/Badge';
+import useResponsive from '../../hooks/useResponsive';
 
 const EVENT_CONFIG = {
   opener_sent:      { icon: 'mail-outline',          label: 'Opener Sent',        tone: 'info' },
@@ -112,6 +113,8 @@ function StatPill({ icon, tone, count, label }) {
 }
 
 export default function ActivityTimeline({ progressFeed }) {
+  // The feed itself stays one chronological column; only the summary card spreads out.
+  const { isTablet } = useResponsive();
   const [filter, setFilter] = useState('All');
   const [limit, setLimit] = useState(30);
   const [, tick] = useState(0);
@@ -147,13 +150,15 @@ export default function ActivityTimeline({ progressFeed }) {
           </View>
           {latest ? <AppText variant="footnote" numberOfLines={1} style={styles.latest} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{'Latest · ' + timeLabel(latest)}</AppText> : null}
         </View>
-        <View style={styles.hero} accessible accessibilityLabel={`Events: ${events.length.toLocaleString()}`}>
-          <CountUp value={events.length} style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} maxFontSizeMultiplier={uiTheme.fontScale.chrome} importantForAccessibility="no" />
-          <AppText variant="callout" color="textSecondary" style={styles.heroLabel}>{events.length === 1 ? 'update' : 'updates'} in your activity history</AppText>
-        </View>
-        <View style={styles.statRow}>
-          <StatPill icon="heart" tone="primary" count={matches} label="Matches" />
-          <StatPill icon="chatbubble" tone="info" count={messages} label="Messages" />
+        <View style={[styles.summaryBody, isTablet && styles.summaryBodyRow]}>
+          <View style={[styles.hero, isTablet && styles.heroRow]} accessible accessibilityLabel={`Events: ${events.length.toLocaleString()}`}>
+            <CountUp value={events.length} style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} maxFontSizeMultiplier={uiTheme.fontScale.chrome} importantForAccessibility="no" />
+            <AppText variant="callout" color="textSecondary" style={styles.heroLabel}>{events.length === 1 ? 'update' : 'updates'} in your activity history</AppText>
+          </View>
+          <View style={styles.statRow}>
+            <StatPill icon="heart" tone="primary" count={matches} label="Matches" />
+            <StatPill icon="chatbubble" tone="info" count={messages} label="Messages" />
+          </View>
         </View>
         {/* Previous three-cell summary + caption, replaced by the card above.
         <View style={styles.summaryLegacy}>…Events / Matches / Messages cells…</View>
@@ -207,7 +212,11 @@ const styles = StyleSheet.create({
   summaryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiTheme.spacing.sm },
   eyebrow: { flexDirection: 'row', alignItems: 'center', gap: uiTheme.spacing.sm, flexShrink: 1, minWidth: 0 },
   latest: { flexShrink: 1, minWidth: 0, textAlign: 'right' },
+  // Hero number and the count pills stack on phones and sit side by side on tablets.
+  summaryBody: { gap: uiTheme.spacing.md },
+  summaryBodyRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', columnGap: uiTheme.spacing.xl },
   hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: uiTheme.spacing.sm },
+  heroRow: { flex: 1, flexBasis: 240, minWidth: 0 },
   heroValue: { ...uiTheme.type.largeTitle, fontVariant: ['tabular-nums'], color: uiTheme.colors.text, maxWidth: '100%' },
   heroLabel: { flexShrink: 1, minWidth: 0 },
   statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: uiTheme.spacing.sm },

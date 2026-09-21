@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Image, Modal, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { FlatList, Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -368,8 +368,7 @@ export default function TinderCollections({ settings, onConnect }) {
   const [selected, setSelected] = useState(null);
   const [open, setOpen] = useState(false);
   const reduced = useMotionReduced();
-  const { gutter, isCompact, contentWidth } = useResponsive();
-  const { width: windowWidth } = useWindowDimensions();
+  const { gutter, isCompact, isTablet, isLandscape, columns, contentWidth, contentMax, width: windowWidth, height: windowHeight, pick } = useResponsive();
   useEffect(() => {
     const update = auth => auth?.isLoggedIn && auth?.token ? activateCollections(auth.token) : disconnectCollections();
     const stop = subscribeCollections(setState); update(getTinderAuthState());
@@ -384,13 +383,25 @@ export default function TinderCollections({ settings, onConnect }) {
       .map(item => ({ ...item, profile: profiles[item.profileId] || item.profile || { name: 'Tinder match' } }));
     return { ...base, chatting: chatting.length > 0 ? chatting : base.chatting };
   }, [state.data, state.own, settings]);
-  const entries = lists[tab], config = TABS[tab], limit = tab === 'swiped' ? 10 : 3;
+  const config = TABS[tab];
+  const entries = lists[tab];
+  // Rails and the chats preview show more before the "view all" tail once there is room.
+  const limit = tab === 'swiped' ? (isTablet ? 16 : 10) : (isTablet ? 6 : 3);
   const openItem = item => { setSelected(item); setOpen(true); };
   const openList = () => { setSelected(null); setOpen(true); };
   const close = () => { setSelected(null); setOpen(false); };
-  const swipeWidth = isCompact ? 118 : 132;
-  const strongWidth = Math.min(236, Math.round(contentWidth * 0.74));
-  const heroHeight = Math.min(Math.round((Math.min(windowWidth, theme.layout.readableMax) - sp.lg * 2) * 1.12), 480);
+  const swipeWidth = pick({ phone: isCompact ? 118 : 132, tablet: 150, xl: 164 });
+  // Strong-match cards: one comfortable card on phones, `columns` across the reading column on tablets.
+  const strongWidth = isTablet
+    ? Math.round((contentWidth - sp.md * (columns - 1)) / columns)
+    : Math.min(236, Math.round(contentWidth * 0.74));
+  // Chats preview and the full list go multi-column once the reading column is wide enough.
+  const rowColumns = isTablet ? Math.min(columns, 2) : 1;
+  const heroHeight = Math.min(
+    Math.round((Math.min(windowWidth, contentMax) - sp.lg * 2) * 1.12),
+    Math.round(windowHeight * (isLandscape ? 0.6 : 0.68)),
+    480,
+  );
   const ownerId = state.data?.ownerId;
 
   return <View style={styles.section}>
@@ -430,12 +441,12 @@ export default function TinderCollections({ settings, onConnect }) {
           {entries.length > limit && <MoreCard count={entries.length - limit} config={config} index={limit} width={96} onPress={openList} />}
         </Rail>}
         {tab === 'strong' && <StrongNote />}
-        {!!entries.length && tab === 'chatting' && <View style={styles.chatList}>
-          {entries.slice(0, limit).map((item, index) => <FadeIn key={itemKey(item, index)} delay={index * STAGGER} offset={6}>
-            {index > 0 && <View style={styles.chatDivider} />}
+        {!!entries.length && tab === 'chatting' && <View style={[styles.chatList, rowColumns > 1 && styles.chatGrid]}>
+          {entries.slice(0, limit).map((item, index) => <FadeIn key={itemKey(item, index)} delay={index * STAGGER} offset={6} style={rowColumns > 1 ? styles.chatCell : undefined}>
+            {rowColumns === 1 && index > 0 && <View style={styles.chatDivider} />}
             <ProfileRow item={item} tab={tab} ownerId={ownerId} onPress={() => openItem(item)} />
           </FadeIn>)}
-          {entries.length > limit && <Button style={styles.chatMore} onPress={openList} accessibilityRole="button" accessibilityLabel={`View all ${config.full.toLowerCase()}`}>
+          {entries.length > limit && <Button style={[styles.chatMore, rowColumns > 1 && styles.chatMoreGrid]} onPress={openList} accessibilityRole="button" accessibilityLabel={`View all ${config.full.toLowerCase()}`}>
             <Text style={[styles.moreText, { color: config.color }]} maxFontSizeMultiplier={theme.fontScale.chrome}>View all {entries.length} conversations</Text>
             <Ionicons name="arrow-forward" size={14} color={config.color} />
           </Button>}
@@ -449,7 +460,7 @@ export default function TinderCollections({ settings, onConnect }) {
     </>}
     <Modal visible={open} animationType={reduced ? 'fade' : 'slide'} presentationStyle="fullScreen" statusBarTranslucent onRequestClose={close}>
       <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.modal}>
-        <View style={styles.modalHeader}>
+        <View style={[styles.modalHeader, { maxWidth: contentMax }]}>
           <IconButton variant="plain" icon="chevron-back" iconSize={26} onPress={selected ? () => setSelected(null) : close} accessibilityLabel={selected ? 'Back to list' : 'Close connections'} />
           <View style={styles.modalHeading}>
             <AppText variant="overline" numberOfLines={1} align="center">{selected ? config.label.toUpperCase() : 'YOUR CONNECTIONS'}</AppText>
@@ -457,7 +468,7 @@ export default function TinderCollections({ settings, onConnect }) {
           </View>
           <IconWell icon={config.icon} tone={config.tone} size={36} iconSize={16} style={styles.modalIcon} />
         </View>
-        {selected ? <ScrollView contentContainerStyle={[styles.details, { paddingBottom: sp.section }]} showsVerticalScrollIndicator={false}>
+        {selected ? <ScrollView contentContainerStyle={[styles.details, { maxWidth: contentMax, paddingBottom: sp.section }]} showsVerticalScrollIndicator={false}>
           <FadeIn><DetailHero key={itemKey(selected, 0)} item={selected} tab={tab} height={heroHeight} /></FadeIn>
           {/* Previous hero: small avatar + centered name/score on a soft gradient.
           <LinearGradient colors={[alpha(c.primary, 0.16), alpha(c.secondary, 0.04), 'transparent']} style={styles.hero}>
@@ -535,16 +546,24 @@ export default function TinderCollections({ settings, onConnect }) {
             })}
           </View>}
         </ScrollView> : <FlatList
+          // numColumns cannot change on a mounted list, so the column count is part of the key.
+          key={`cols-${rowColumns}`}
           data={entries}
           keyExtractor={itemKey}
-          renderItem={({ item }) => <ProfileRow item={item} tab={tab} ownerId={ownerId} onPress={() => setSelected(item)} />}
+          numColumns={rowColumns}
+          columnWrapperStyle={rowColumns > 1 ? styles.listRow : undefined}
+          renderItem={({ item }) => (
+            <View style={rowColumns > 1 ? styles.listCell : undefined}>
+              <ProfileRow item={item} tab={tab} ownerId={ownerId} onPress={() => setSelected(item)} />
+            </View>
+          )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListHeaderComponent={<View style={styles.modalListHeader}>
             <AppText variant="footnote">{entries.length} {entries.length === 1 ? 'profile' : 'profiles'}</AppText>
             {tab === 'strong' && <StrongNote />}
           </View>}
           ListEmptyComponent={<Empty tab={tab} loading={state.loading} />}
-          contentContainerStyle={[styles.modalList, { paddingBottom: sp.section }]}
+          contentContainerStyle={[styles.modalList, { maxWidth: contentMax, paddingBottom: sp.section }]}
           showsVerticalScrollIndicator={false}
         />}
       </SafeAreaView>
@@ -644,8 +663,12 @@ const styles = StyleSheet.create({
 
   // Chats preview
   chatList: { borderRadius: r.card, backgroundColor: c.surface, borderWidth: 1, borderColor: c.borderSubtle, overflow: 'hidden' },
+  // Tablets: the single grouped card becomes a two-across grid of self-contained cards.
+  chatGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm, backgroundColor: 'transparent', borderWidth: 0, borderRadius: 0, overflow: 'visible' },
+  chatCell: { flexGrow: 1, flexBasis: 280, minWidth: 260, borderRadius: r.card, borderWidth: 1, borderColor: c.borderSubtle, overflow: 'hidden' },
   chatDivider: { height: StyleSheet.hairlineWidth, backgroundColor: c.divider, marginLeft: 52 + sp.md * 2 },
   chatMore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.xs, minHeight: 48, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
+  chatMoreGrid: { width: '100%', borderTopWidth: 0, borderRadius: r.card, borderWidth: 1, borderColor: c.borderSubtle, backgroundColor: c.surface },
   chatRow: { flexDirection: 'row', alignItems: 'center', gap: sp.md, minHeight: 76, paddingHorizontal: sp.md, paddingVertical: sp.md, backgroundColor: c.surface },
   presence: { position: 'absolute', right: 1, bottom: 1, width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: c.surface },
   chatPreview: { ...t.callout, color: c.muted, flex: 1, minWidth: 0 },
@@ -691,9 +714,14 @@ const styles = StyleSheet.create({
   modalHeader: { width: '100%', maxWidth: theme.layout.readableMax, alignSelf: 'center', minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingHorizontal: sp.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.divider },
   modalHeading: { flex: 1, minWidth: 0 },
   modalIcon: { marginRight: sp.xs },
+  // The three maxWidths below are the phone baseline; the modal overrides them with
+  // useResponsive().contentMax so tablets use the wider column.
   modalList: { width: '100%', maxWidth: theme.layout.readableMax, alignSelf: 'center', padding: sp.lg },
   modalListHeader: { gap: sp.sm, marginBottom: sp.md },
   separator: { height: sp.sm },
+  // Multi-column full list (tablets).
+  listRow: { gap: sp.sm },
+  listCell: { flex: 1, minWidth: 0 },
   details: { width: '100%', maxWidth: theme.layout.readableMax, alignSelf: 'center', paddingHorizontal: sp.lg, paddingTop: sp.lg, gap: sp.lg },
   detailHero: { width: '100%', borderRadius: r.xl, overflow: 'hidden', backgroundColor: c.elevated, borderWidth: 1, borderColor: c.hairline },
   pager: { position: 'absolute', top: sp.sm, left: sp.md, right: sp.md, flexDirection: 'row', gap: sp.xs },

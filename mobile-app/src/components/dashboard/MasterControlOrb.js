@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { theme as uiTheme, alpha } from '../../theme';
 import * as Haptics from 'expo-haptics';
 import { useMotionReduced, ContentTransition } from '../common/Motion';
+import useResponsive from '../../hooks/useResponsive';
 
 const c = uiTheme.colors;
 const t = uiTheme.type;
@@ -45,6 +46,12 @@ export default function MasterControlOrb({
   showHint = true,
 }) {
   const reduced = useMotionReduced();
+  // Hero sizing: the 220pt ring block shrinks when the viewport is short or landscape (so the
+  // whole hero still fits) and grows modestly on tablets. Every ring below is derived from it.
+  const { isTablet, isXL, isShort, isLandscape } = useResponsive();
+  const orbScale = isShort || isLandscape ? (isTablet ? 0.9 : 0.8) : isXL ? 1.16 : isTablet ? 1.08 : 1;
+  const px = (base) => Math.round(base * orbScale);
+  const circle = (base) => ({ width: px(base), height: px(base), borderRadius: px(base) / 2 });
   const agentState = stats?.agentState || stats || {};
   const isRunning = Boolean(
     (isLoggedIn || agentState?.isRunning === true) &&
@@ -568,16 +575,16 @@ export default function MasterControlOrb({
   const tapHaptic = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.orbCenterWrapper}>
+    <View style={[styles.container, (isShort || isLandscape) && styles.containerTight]}>
+      <View style={[styles.orbCenterWrapper, { width: px(220), height: px(220) }]}>
         {/* Concentric Decorative Rings */}
         {/* Static outer rings removed to declutter (glow, sweep ring and ripples remain).
         <View style={[styles.ringOuter, { borderColor: config.ringColor }]} pointerEvents="none" />
         <View style={[styles.ringMid, { borderColor: config.ringColor }]} pointerEvents="none" />
         */}
-        <Animated.View style={[styles.glowOuter, { backgroundColor: alpha(tintStart, 0.08) }, glowStyle]} pointerEvents="none" />
-        <Animated.View style={[styles.glowInner, { backgroundColor: alpha(tintStart, 0.14) }, glowStyle]} pointerEvents="none" />
-        <Animated.View style={[styles.sweepRing, { transform: [{ rotate: sweepRotate }] }]} pointerEvents="none">
+        <Animated.View style={[styles.glowOuter, circle(214), { backgroundColor: alpha(tintStart, 0.08) }, glowStyle]} pointerEvents="none" />
+        <Animated.View style={[styles.glowInner, circle(188), { backgroundColor: alpha(tintStart, 0.14) }, glowStyle]} pointerEvents="none" />
+        <Animated.View style={[styles.sweepRing, circle(172), { transform: [{ rotate: sweepRotate }] }]} pointerEvents="none">
           <LinearGradient
             colors={[tintStart, alpha(tintEnd, 0), tintEnd, alpha(tintStart, 0)]}
             start={{ x: 0, y: 0 }}
@@ -585,14 +592,14 @@ export default function MasterControlOrb({
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>
-        <View style={[styles.sweepMask, { backgroundColor: wellColor }]} pointerEvents="none" />
+        <View style={[styles.sweepMask, circle(166), { backgroundColor: wellColor }]} pointerEvents="none" />
 
         {/* Triple Staggered Pulse Rings (Active when running) */}
         {(isRunning || isStarting) && (
           <>
-            <Animated.View style={[styles.pulseRing, { borderColor: config.pulseColor, backgroundColor: alpha(tintStart, 0.1) }, getPulseStyle(pulse1)]} pointerEvents="none" />
-            <Animated.View style={[styles.pulseRing, { borderColor: config.pulseColor, backgroundColor: alpha(tintStart, 0.1) }, getPulseStyle(pulse2)]} pointerEvents="none" />
-            <Animated.View style={[styles.pulseRing, { borderColor: config.pulseColor, backgroundColor: alpha(tintStart, 0.1) }, getPulseStyle(pulse3)]} pointerEvents="none" />
+            <Animated.View style={[styles.pulseRing, circle(154), { borderColor: config.pulseColor, backgroundColor: alpha(tintStart, 0.1) }, getPulseStyle(pulse1)]} pointerEvents="none" />
+            <Animated.View style={[styles.pulseRing, circle(154), { borderColor: config.pulseColor, backgroundColor: alpha(tintStart, 0.1) }, getPulseStyle(pulse2)]} pointerEvents="none" />
+            <Animated.View style={[styles.pulseRing, circle(154), { borderColor: config.pulseColor, backgroundColor: alpha(tintStart, 0.1) }, getPulseStyle(pulse3)]} pointerEvents="none" />
           </>
         )}
 
@@ -608,7 +615,7 @@ export default function MasterControlOrb({
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
             activeOpacity={0.88}
-            style={styles.masterOrb}
+            style={[styles.masterOrb, circle(152)]}
           >
             <LinearGradient
               colors={config.gradient}
@@ -737,6 +744,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: uiTheme.spacing.md,
   },
+  // Short viewports / landscape: the orb already shrinks, so trim the block's own padding too.
+  containerTight: {
+    paddingVertical: uiTheme.spacing.xs,
+  },
+  // The ring/orb sizes below are the phone baseline; MasterControlOrb overrides width/height/
+  // borderRadius at render from useResponsive() so the hero fits short and landscape windows
+  // and can grow a little on tablets.
   orbCenterWrapper: {
     width: 220,
     height: 220,

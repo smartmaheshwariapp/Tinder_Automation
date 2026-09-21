@@ -874,7 +874,7 @@ export default function OnboardingScreen({ navigation }) {
   // ── Layout & motion environment (presentation only) ──
   const reduceMotion = useMotionReduced();
   const insets = useSafeAreaInsets();
-  const { gutter, height: windowHeight, contentWidth } = useResponsive();
+  const { gutter, width: windowWidth, height: windowHeight, contentWidth, contentMax, formMax, isLandscape, isShort, pick } = useResponsive();
 
   // ── Step Selections State ──
   const selectedPlatform = 'tinder'; // Tinder-dedicated app
@@ -2097,9 +2097,10 @@ export default function OnboardingScreen({ navigation }) {
   };
 
   // ── Native-Equivalent Multi-Stage Viewport Interpolations (Full Screen Width Slides) ──
+  // Slide distances use the live window width so rotation keeps each step fully off-stage.
   const step1TranslateX = stepIndexAnim.interpolate({
     inputRange: [1, 2, 3, 4, 5],
-    outputRange: [0, -SCREEN_WIDTH * 0.35, -SCREEN_WIDTH * 0.7, -SCREEN_WIDTH, -SCREEN_WIDTH * 1.3],
+    outputRange: [0, -windowWidth * 0.35, -windowWidth * 0.7, -windowWidth, -windowWidth * 1.3],
     extrapolate: 'clamp',
   });
   const step1Opacity = stepIndexAnim.interpolate({
@@ -2110,7 +2111,7 @@ export default function OnboardingScreen({ navigation }) {
 
   const step2TranslateX = stepIndexAnim.interpolate({
     inputRange: [1, 2, 3, 4, 5],
-    outputRange: [SCREEN_WIDTH, 0, -SCREEN_WIDTH * 0.35, -SCREEN_WIDTH * 0.7, -SCREEN_WIDTH],
+    outputRange: [windowWidth, 0, -windowWidth * 0.35, -windowWidth * 0.7, -windowWidth],
     extrapolate: 'clamp',
   });
   const step2Opacity = stepIndexAnim.interpolate({
@@ -2121,7 +2122,7 @@ export default function OnboardingScreen({ navigation }) {
 
   const step3TranslateX = stepIndexAnim.interpolate({
     inputRange: [1, 2, 3, 4, 5],
-    outputRange: [SCREEN_WIDTH * 2, SCREEN_WIDTH, 0, -SCREEN_WIDTH * 0.35, -SCREEN_WIDTH * 0.7],
+    outputRange: [windowWidth * 2, windowWidth, 0, -windowWidth * 0.35, -windowWidth * 0.7],
     extrapolate: 'clamp',
   });
   const step3Opacity = stepIndexAnim.interpolate({
@@ -2132,7 +2133,7 @@ export default function OnboardingScreen({ navigation }) {
 
   const step4TranslateX = stepIndexAnim.interpolate({
     inputRange: [1, 2, 3, 4, 5],
-    outputRange: [SCREEN_WIDTH * 3, SCREEN_WIDTH * 2, SCREEN_WIDTH, 0, -SCREEN_WIDTH * 0.35],
+    outputRange: [windowWidth * 3, windowWidth * 2, windowWidth, 0, -windowWidth * 0.35],
     extrapolate: 'clamp',
   });
   const step4Opacity = stepIndexAnim.interpolate({
@@ -2143,7 +2144,7 @@ export default function OnboardingScreen({ navigation }) {
 
   const step5TranslateX = stepIndexAnim.interpolate({
     inputRange: [1, 2, 3, 4, 5],
-    outputRange: [SCREEN_WIDTH * 4, SCREEN_WIDTH * 3, SCREEN_WIDTH * 2, SCREEN_WIDTH, 0],
+    outputRange: [windowWidth * 4, windowWidth * 3, windowWidth * 2, windowWidth, 0],
     extrapolate: 'clamp',
   });
   const step5Opacity = stepIndexAnim.interpolate({
@@ -2443,10 +2444,20 @@ export default function OnboardingScreen({ navigation }) {
   // Step 5 is a non-scrolling swipe deck: size the cards to the space left between the chrome.
   const stageHeight = windowHeight - insets.top - insets.bottom - TOP_BAR_HEIGHT - FOOTER_HEIGHT;
   const step5Reserved = 292; // step header + game plan deck + deck peek/margins
-  const deckCardHeight = Math.round(Math.max(280, Math.min(385, stageHeight - step5Reserved)));
-  const deckCardWidth = Math.round(Math.min(315, contentWidth, deckCardHeight * 0.82));
-  const step5NeedsScroll = stageHeight - step5Reserved < 280;
+  // Deck grows on tablets (a phone-sized card looks lost on an iPad) and falls back to its
+  // minimum in landscape / on short phones, where the stage then scrolls instead of clipping.
+  const deckMaxHeight = pick({ phone: 385, tablet: 470, xl: 520 });
+  const deckMaxWidth = pick({ phone: 315, tablet: 400, xl: 440 });
+  const deckMinHeight = isShort || isLandscape ? 240 : 280;
+  const deckCardHeight = Math.round(Math.max(deckMinHeight, Math.min(deckMaxHeight, stageHeight - step5Reserved)));
+  const deckCardWidth = Math.round(Math.min(deckMaxWidth, contentWidth, deckCardHeight * 0.82));
+  const step5NeedsScroll = stageHeight - step5Reserved < deckMinHeight;
   const scrollPadding = { paddingHorizontal: gutter };
+  // Centred content columns: hero/marketing uses contentMax, forms use formMax.
+  const wideColumn = { maxWidth: contentMax };
+  const formColumn = { maxWidth: formMax };
+  // Picker sheets (separate Modal windows) need most of a landscape window to stay usable.
+  const sheetHeight = { height: isLandscape || isShort ? '94%' : '82%' };
   const ctaLabel = currentStep === 1 ? 'Get Started' : currentStep === totalSteps ? 'Start Meeting Matches' : 'Continue';
 
   const renderLanguageChip = (lang) => {
@@ -2529,7 +2540,7 @@ export default function OnboardingScreen({ navigation }) {
       <View style={styles.safeArea}>
         {/* ── Progress Header: back + step X of N + segmented bar ── */}
         <View style={[styles.topBar, scrollPadding]}>
-          <View style={styles.topBarInner}>
+          <View style={[styles.topBarInner, wideColumn]}>
             <IconButton
               icon="chevron-back"
               onPress={handleBack}
@@ -2596,7 +2607,7 @@ export default function OnboardingScreen({ navigation }) {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.columnWide}>
+                <View style={[styles.columnWide, wideColumn]}>
                   <StepHeader
                     eyebrow={STEP_EYEBROWS[0]}
                     title="Better Dates, Less Effort"
@@ -2737,7 +2748,7 @@ export default function OnboardingScreen({ navigation }) {
                 keyboardDismissMode="on-drag"
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.columnForm}>
+                <View style={[styles.columnForm, formColumn]}>
                   <StepHeader
                     eyebrow={STEP_EYEBROWS[1]}
                     title="About you"
@@ -2967,7 +2978,7 @@ export default function OnboardingScreen({ navigation }) {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.columnForm}>
+                <View style={[styles.columnForm, formColumn]}>
                   <StepHeader eyebrow={STEP_EYEBROWS[2]} title="What's Your Goal?">
                     <View style={styles.goalSubtitleRow}>
                       <Text style={[styles.stepSubtitle, styles.flexShrink]}>
@@ -3038,7 +3049,7 @@ export default function OnboardingScreen({ navigation }) {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.columnForm}>
+                <View style={[styles.columnForm, formColumn]}>
                   <StepHeader
                     eyebrow={STEP_EYEBROWS[3]}
                     title="Behavior & Style"
@@ -3302,7 +3313,7 @@ export default function OnboardingScreen({ navigation }) {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                <View style={[styles.columnWide, styles.step5Container]}>
+                <View style={[styles.columnWide, wideColumn, styles.step5Container]}>
                   <StepHeader
                     eyebrow={STEP_EYEBROWS[4]}
                     title="Ready to Match"
@@ -3547,11 +3558,12 @@ export default function OnboardingScreen({ navigation }) {
               </ScrollView>
             </Animated.View>
           </View>
-        </KeyboardAvoidingView>
 
-        {/* ── Sticky Bottom Footer with Primary CTA ── */}
+        {/* ── Sticky Bottom Footer with Primary CTA ──
+             Inside the KeyboardAvoidingView so the CTA stays reachable above the keyboard
+             on short/landscape windows. */}
         <View style={[styles.footer, scrollPadding]}>
-          <View style={styles.footerInner}>
+          <View style={[styles.footerInner, formColumn]}>
             <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
               <AppButton
                 title={ctaLabel}
@@ -3621,6 +3633,7 @@ export default function OnboardingScreen({ navigation }) {
             </ContentTransition>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </View>
 
       {/* ── Country Picker Sheet ── */}
@@ -3649,7 +3662,7 @@ export default function OnboardingScreen({ navigation }) {
               setCountryModalVisible(false);
             }}
           />
-          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, SP.lg) }]} accessibilityViewIsModal>
+          <View style={[styles.modalContent, sheetHeight, { paddingBottom: Math.max(insets.bottom, SP.lg) }]} accessibilityViewIsModal>
             <View style={styles.sheetHandle} />
 
             {/* Header */}
@@ -3811,7 +3824,7 @@ export default function OnboardingScreen({ navigation }) {
               setDialModalVisible(false);
             }}
           />
-          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, SP.lg) }]} accessibilityViewIsModal>
+          <View style={[styles.modalContent, sheetHeight, { paddingBottom: Math.max(insets.bottom, SP.lg) }]} accessibilityViewIsModal>
             <View style={styles.sheetHandle} />
 
             {/* Header */}
@@ -4033,7 +4046,7 @@ const styles = StyleSheet.create({
   },
   topBarInner: {
     width: '100%',
-    maxWidth: uiTheme.layout.readableMax,
+    // maxWidth comes from useResponsive().contentMax at render time (600 / 720 / 860).
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
@@ -4053,6 +4066,7 @@ const styles = StyleSheet.create({
   progressLabel: {
     ...TY.overline,
     color: C.textSecondary,
+    flexShrink: 1,
   },
   progressStepName: {
     ...TY.caption,
@@ -4101,12 +4115,12 @@ const styles = StyleSheet.create({
   },
   columnWide: {
     width: '100%',
-    maxWidth: uiTheme.layout.readableMax,
+    // maxWidth comes from useResponsive().contentMax at render time (600 / 720 / 860).
     alignSelf: 'center',
   },
   columnForm: {
     width: '100%',
-    maxWidth: uiTheme.layout.formMax,
+    // maxWidth comes from useResponsive().formMax at render time (480 phone / 560 tablet).
     alignSelf: 'center',
   },
 
@@ -5140,7 +5154,7 @@ const styles = StyleSheet.create({
   },
   footerInner: {
     width: '100%',
-    maxWidth: uiTheme.layout.formMax,
+    // maxWidth comes from useResponsive().formMax at render time (480 phone / 560 tablet).
     alignSelf: 'center',
   },
   footerSubSlot: {

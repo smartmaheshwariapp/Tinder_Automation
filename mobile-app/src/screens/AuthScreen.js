@@ -11,7 +11,7 @@ import {
   Easing,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
+  // Dimensions, // responsiveness pass: layout now reads live sizes from useResponsive()
   Image,
   StatusBar,
   Keyboard,
@@ -57,7 +57,8 @@ const safeHaptic = (type) => {
   } catch (_) { }
 };
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+// Module-load window size removed: it never updates on rotation. Use useResponsive() at render time.
+// const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const FALLBACK_LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 const DOMAIN_SUGGESTIONS = ['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'];
 
@@ -124,7 +125,7 @@ export default function AuthScreen({ navigation, route }) {
 
   // ── Layout & motion preferences (UI only) ──
   const reducedMotion = useMotionReduced();
-  const { width: winWidth, height: winHeight, isCompact, isShort, gutter } = useResponsive();
+  const { width: winWidth, height: winHeight, isCompact, isShort, isLandscape, isTablet, gutter, formMax, pick } = useResponsive();
 
   useEffect(() => {
     trackingService.trackEvent('landing_page_viewed', { initial_mode: route?.params?.initialMode || 'welcome' });
@@ -946,28 +947,37 @@ export default function AuthScreen({ navigation, route }) {
   // MODULAR PHASE RENDERERS (With iOS Physics Transitions & Morphing)
   // ═════════════════════════════════════════════════════════════════
 
-  const emblemSize = isCompact || isShort ? 76 : 92;
+  // Hero art shrinks where vertical space is scarce and grows on tablets so it is not lost.
+  const compactHero = isCompact || isShort || isLandscape;
+  const emblemSize = pick({ phone: compactHero ? 72 : 92, tablet: 116, xl: 132 });
   const emblemRadius = Math.round(emblemSize * 0.3);
-  const cardPadding = isCompact ? SPACE.lg : SPACE.xxl;
+  const cardPadding = isCompact ? SPACE.lg : isTablet ? SPACE.section : SPACE.xxl;
   const otpHasError = phase === 'otp' && Boolean(errorMessage);
+  // Centred, bounded form/action column (formMax = 480 phone / 560 tablet).
+  const columnStyle = { maxWidth: formMax };
 
   const renderWelcome = () => (
-    <Animated.View
+    // Scrollable so the hero + action stack is never clipped on short or landscape windows.
+    <Animated.ScrollView
       style={[
-        styles.welcomeContainer,
-        { paddingHorizontal: gutter },
+        styles.scrollFlex,
         {
           opacity: welcomeFade,
           transform: [{ translateY: welcomeSlide }],
         },
       ]}
+      contentContainerStyle={[styles.welcomeContainer, { paddingHorizontal: gutter }]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      bounces={false}
     >
       {/* Top / Hero Zone: Refined Floating Emblem, Brand & Subtitle */}
-      <View style={styles.heroZone}>
+      <View style={[styles.heroZone, compactHero && styles.heroZoneTight]}>
         {/* Floating App Emblem with Pulsing Radiant Halo */}
         <Animated.View
           style={[
             styles.emblemContainer,
+            compactHero && styles.emblemContainerTight,
             {
               transform: [{ translateY: logoFloat }],
             },
@@ -1002,13 +1012,13 @@ export default function AuthScreen({ navigation, route }) {
         </Text>
 
         {/* Short, Warm Companion Subtitle */}
-        <Text style={styles.greetingSub} maxFontSizeMultiplier={uiTheme.fontScale.body}>
+        <Text style={[styles.greetingSub, isTablet && styles.greetingSubWide]} maxFontSizeMultiplier={uiTheme.fontScale.body}>
           Your personal dating companion,{'\n'}always in your corner.
         </Text>
       </View>
 
       {/* Bottom Authentication & Action Zone */}
-      <View style={styles.actionZone}>
+      <View style={[styles.actionZone, columnStyle]}>
         {/* Primary Action: HI, FlintAI! with Tactile Press Feedback & Shimmer */}
         <MotionTouchable
           style={styles.btnCreateAccount}
@@ -1127,7 +1137,7 @@ export default function AuthScreen({ navigation, route }) {
           <Text style={styles.guestLinkText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Continue as Guest</Text>
         </MotionTouchable>
       </View>
-    </Animated.View>
+    </Animated.ScrollView>
   );
 
   const renderForm = () => {
@@ -1140,7 +1150,7 @@ export default function AuthScreen({ navigation, route }) {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <View style={styles.formContainer}>
+        <View style={[styles.formContainer, columnStyle]}>
           {/* Header: back control, then the screen title for the current mode */}
           <View style={styles.heroWrap}>
             <IconButton
@@ -1655,7 +1665,7 @@ export default function AuthScreen({ navigation, route }) {
       showsVerticalScrollIndicator={false}
       bounces={false}
     >
-      <View style={styles.formContainer}>
+      <View style={[styles.formContainer, columnStyle]}>
         {/* Header: back control, title and destination email */}
         <View style={styles.heroWrap}>
           <IconButton
@@ -2277,7 +2287,8 @@ const styles = StyleSheet.create({
   // PHASE 1: WELCOME SCREEN STYLES
   // ═══════════════════════════════════════════
   welcomeContainer: {
-    flex: 1,
+    // flexGrow (not flex) so the welcome layer can scroll when the window is too short for it.
+    flexGrow: 1,
     justifyContent: 'space-between',
     paddingTop: Platform.OS === 'ios' ? SPACE.lg : SPACE.xxl,
     paddingBottom: Platform.OS === 'ios' ? SPACE.md : SPACE.xl,
@@ -2286,12 +2297,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: SPACE.xl,
   },
+  heroZoneTight: {
+    paddingTop: SPACE.xs,
+    paddingBottom: SPACE.lg,
+  },
 
   // ── Refined App Emblem ──
   emblemContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACE.xl,
+  },
+  emblemContainerTight: {
+    marginBottom: SPACE.md,
   },
   auraFrame: {
     padding: 3,
@@ -2345,11 +2363,15 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
   },
+  greetingSubWide: {
+    ...TYPE.headline,
+    maxWidth: 460,
+  },
 
   // ── Bottom Action Zone ──
   actionZone: {
     width: '100%',
-    maxWidth: uiTheme.layout.formMax,
+    // maxWidth comes from useResponsive().formMax at render time (480 phone / 560 tablet).
     alignSelf: 'center',
     gap: SPACE.sm,
     paddingBottom: SPACE.xs,
@@ -2471,7 +2493,7 @@ const styles = StyleSheet.create({
   // ═══════════════════════════════════════════
   formContainer: {
     width: '100%',
-    maxWidth: uiTheme.layout.formMax,
+    // maxWidth comes from useResponsive().formMax at render time (480 phone / 560 tablet).
     alignSelf: 'center',
     flex: 1,
     paddingTop: Platform.OS === 'ios' ? SPACE.md : SPACE.xl,

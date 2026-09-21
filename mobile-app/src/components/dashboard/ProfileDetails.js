@@ -85,7 +85,7 @@ export default function ProfileDetails({
   onLogout,
   onDeleteData,
 }) {
-  const { gutter } = useResponsive();
+  const { gutter, contentMax, formMax, isTablet } = useResponsive();
 
   // ── 1. Isolated Flint App User Profile ──
   const flintName = (
@@ -281,7 +281,7 @@ export default function ProfileDetails({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingHorizontal: gutter, paddingBottom: theme.layout.navHeight + sp.hero + sp.sm },
+          { paddingHorizontal: gutter, maxWidth: contentMax, paddingBottom: theme.layout.navHeight + sp.hero + sp.sm },
         ]}
       >
         {/* Top bar */}
@@ -360,8 +360,10 @@ export default function ProfileDetails({
           </View>
         )}
 
+        {/* ── 3 + 4. Groups: stacked on phones, side by side once there is room ── */}
+        <View style={[styles.groups, isTablet && styles.groupsRow]}>
         {/* ── 3. Connected Dating Platform (Isolated Tinder Session) ── */}
-        <FadeIn delay={120} style={styles.group}>
+        <FadeIn delay={120} style={[styles.group, isTablet && styles.groupColumn]}>
           <SectionHeader title="Connected accounts" style={styles.sectionHeader} />
           <TinderProfileCard
             profile={tinderProfile}
@@ -376,7 +378,7 @@ export default function ProfileDetails({
         </FadeIn>
 
         {/* ── 4. Account Actions ── */}
-        <FadeIn delay={180} style={styles.group}>
+        <FadeIn delay={180} style={[styles.group, isTablet && styles.groupColumn]}>
           <SectionHeader title="Account & privacy" style={styles.sectionHeader} />
           <Card padding="none" style={styles.list}>
             <ListRow
@@ -398,6 +400,7 @@ export default function ProfileDetails({
             />
           </Card>
         </FadeIn>
+        </View>
 
         {/* ── 5. App Version Footer ── */}
         <AppText variant="caption" align="center" style={styles.versionFooter}>
@@ -418,7 +421,7 @@ export default function ProfileDetails({
             contentContainerStyle={[
               styles.content,
               styles.modalContent,
-              { paddingHorizontal: gutter, paddingTop: sp.lg, paddingBottom: sp.xxl },
+              { paddingHorizontal: gutter, maxWidth: formMax, paddingTop: sp.lg, paddingBottom: sp.xxl },
             ]}
           >
             <View style={styles.modalHeader}>
@@ -503,6 +506,8 @@ export default function ProfileDetails({
 const styles = StyleSheet.create({
   content: {
     width: '100%',
+    // Phone baseline; the screen overrides maxWidth with useResponsive().contentMax (page) or
+    // formMax (edit sheet).
     maxWidth: theme.layout.readableMax,
     alignSelf: 'center',
     paddingTop: sp.sm,
@@ -649,6 +654,20 @@ const styles = StyleSheet.create({
   },
   group: {
     gap: 0,
+  },
+  // Groups stack on phones and sit two across on tablets.
+  groups: {
+    gap: sp.xl,
+  },
+  groupsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+  },
+  groupColumn: {
+    flexGrow: 1,
+    flexBasis: 300,
+    minWidth: 280,
   },
   sectionHeader: {
     marginBottom: sp.sm,

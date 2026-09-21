@@ -39,7 +39,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
   const { platform, vpsUrl: rawVpsUrl, proxyIp } = route.params;
   const vpsUrl = resolveLocalUrl(rawVpsUrl);
   const [loading, setLoading] = useState(false);
-  const { gutter } = useResponsive();
+  const { gutter, contentMax, formMax } = useResponsive();
 
   // V2 Dating Goal & Contact Handle
   const [selectedGoal, setSelectedGoal] = useState('date');
@@ -244,12 +244,12 @@ export default function PlatformConfigScreen({ route, navigation }) {
         style={{ flex: 1 }}
       >
         {/* Header */}
-        <View style={[styles.header, { paddingHorizontal: gutter }]}>
+        <View style={[styles.header, { paddingHorizontal: gutter, maxWidth: contentMax }]}>
           <IconButton icon="chevron-back" variant="plain" iconSize={26} onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={styles.backButton} />
         </View>
 
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter, paddingBottom: FOOTER_SPACE }]}
+          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter, maxWidth: contentMax, paddingBottom: FOOTER_SPACE }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -570,7 +570,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
             iconRight="arrow-forward"
             onPress={handleStartSession}
             loading={loading}
-            style={styles.launchBtn}
+            style={[styles.launchBtn, { maxWidth: formMax }]}
           />
           <AppText variant="footnote" color="muted" align="center" style={styles.footerNote}>
             Opens {platform} in a secure live screen

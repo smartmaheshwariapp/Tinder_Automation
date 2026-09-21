@@ -83,12 +83,15 @@ export default function StatCards({ lifetimeStats }) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
+    // Wraps instead of clipping when the window is very narrow or the text is scaled up.
+    flexWrap: 'wrap',
     gap: uiTheme.spacing.sm,
     marginBottom: uiTheme.spacing.md,
   },
   card: {
-    flex: 1,
-    minWidth: 0,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 88,
     backgroundColor: uiTheme.colors.surface,
     borderRadius: uiTheme.radius.card,
     borderWidth: 1,

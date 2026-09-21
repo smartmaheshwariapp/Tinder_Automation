@@ -75,7 +75,7 @@ export default function DashboardPanel({
   selectedTab,
   onTabChange,
 }) {
-  const { gutter } = useResponsive();
+  const { gutter, contentMax } = useResponsive();
   const [internalTab, setInternalTab] = useState('activity');
   const activeTab = selectedTab || internalTab;
   const [targetSettingsSection, setTargetSettingsSection] = useState(null);
@@ -177,7 +177,7 @@ export default function DashboardPanel({
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter }]}
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: gutter, maxWidth: contentMax }]}
       >
         {/* ── 1. Master Centerpiece Hero Controller (1:1 with Desktop V2) ── */}
         {/* Standby hero commented out on the Automation and Controls pages.
@@ -274,6 +274,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     width: '100%',
+    // Baseline; DashboardPanel overrides maxWidth with useResponsive().contentMax so phones keep
+    // a readable column and tablets use the wider one.
     maxWidth: uiTheme.layout.contentMax,
     alignSelf: 'center',
     paddingTop: uiTheme.spacing.md,

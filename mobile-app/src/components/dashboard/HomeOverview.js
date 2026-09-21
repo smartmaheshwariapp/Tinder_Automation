@@ -121,7 +121,7 @@ export default function HomeOverview({
   onMenu,
   onAppSettings,
 }) {
-  const { gutter, isCompact } = useResponsive();
+  const { gutter, isCompact, contentMax, isLandscape } = useResponsive();
   const effectiveStats = stats || agentState || {};
   const state = effectiveStats?.agentState || effectiveStats || {};
   const totals = effectiveStats?.lifetimeStats || state?.stats || {};
@@ -250,7 +250,7 @@ export default function HomeOverview({
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={[styles.content, { paddingHorizontal: gutter }]}
+      contentContainerStyle={[styles.content, { paddingHorizontal: gutter, maxWidth: contentMax }]}
     >
       <AmbientGlow />
 
@@ -436,7 +436,7 @@ export default function HomeOverview({
           */}
 
           {/* Live status */}
-          <View style={styles.statusBlock} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${stateTitle}. ${statusLabel}`}>
+          <View style={[styles.statusBlock, isLandscape && styles.statusBlockTight]} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${stateTitle}. ${statusLabel}`}>
             <View style={styles.statusRow}>
               <LiveDot size={8} active={running || busy} color={statusColor} />
               <Text style={styles.statusTitle} numberOfLines={1} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
@@ -637,7 +637,10 @@ const NAV_PAD = 6;
 const FAB_SIZE = 58;
 
 export function HomeBottomNavigation({ activeTab, onSelect }) {
-  const { gutter } = useResponsive();
+  // The dock stays centred and capped: a little wider on tablets so the five slots keep
+  // comfortable spacing, but never edge-to-edge on a large display.
+  const { gutter, pick } = useResponsive();
+  const dockMax = pick({ phone: 520, tablet: 600, xl: 640 });
   const reduced = useMotionReduced();
   const [barWidth, setBarWidth] = React.useState(0);
   const tabIndex = NAV_TABS.findIndex((tab) => tab.id === activeTab);
@@ -659,7 +662,7 @@ export function HomeBottomNavigation({ activeTab, onSelect }) {
       style={[styles.navigationWrap, { bottom: 10, left: gutter, right: gutter }]}
       pointerEvents="box-none"
     >
-      <View style={styles.navigationShadow}>
+      <View style={[styles.navigationShadow, { maxWidth: dockMax }]}>
         <View
           style={styles.navigation}
           accessibilityRole="tablist"
@@ -767,6 +770,8 @@ function CenterAction({ onPress }) {
 const styles = StyleSheet.create({
   content: {
     width: "100%",
+    // Phone baseline; HomeOverview overrides maxWidth with useResponsive().contentMax so
+    // tablets get the wider reading column.
     maxWidth: uiTheme.layout.readableMax,
     alignSelf: "center",
     paddingTop: sp.sm,
@@ -991,6 +996,10 @@ const styles = StyleSheet.create({
     marginTop: sp.xl,
     gap: sp.xs,
   },
+  // Landscape: the hero has far less vertical room, so the status block hugs the orb.
+  statusBlockTight: {
+    marginTop: sp.md,
+  },
   statusLine: {
     flexDirection: "row",
     alignItems: "center",
@@ -1106,6 +1115,7 @@ const styles = StyleSheet.create({
   },
   navigationShadow: {
     width: "100%",
+    // Phone baseline; HomeBottomNavigation widens the cap on tablets/XL.
     maxWidth: 520,
     borderRadius: r.sheet,
     ...uiTheme.shadows.lg,

@@ -28,9 +28,9 @@ function SettingsRow({ icon, tone = 'primary', title, description, onPress, busy
   );
 }
 
-function Section({ title, children, delay = 0 }) {
+function Section({ title, children, delay = 0, style }) {
   return (
-    <FadeIn delay={delay} style={styles.section}>
+    <FadeIn delay={delay} style={[styles.section, style]}>
       <SectionHeader title={title} style={styles.sectionHeader} />
       <Card padding="none" style={styles.card}>{children}</Card>
     </FadeIn>
@@ -40,7 +40,7 @@ function Section({ title, children, delay = 0 }) {
 export default function AppSettings({ settings, isLoggedIn, environment, unreadCount,
   updatingLocation, onRefreshLocation, onNotifications, onPreferences, onSession,
   onAutomation, onConnect, onBack }) {
-  const { gutter } = useResponsive();
+  const { gutter, contentMax, isTablet } = useResponsive();
   const [showThemes, setShowThemes] = useState(false);
   const activeTheme = THEME_OPTIONS.find((option) => option.id === getActiveTheme()) || THEME_OPTIONS[0];
   const profileName = settings?.userProfile?.name;
@@ -61,7 +61,7 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}
-      contentContainerStyle={[styles.content, { paddingHorizontal: gutter, paddingBottom: theme.layout.navHeight + theme.spacing.hero + theme.spacing.sm }]}>
+      contentContainerStyle={[styles.content, { paddingHorizontal: gutter, maxWidth: contentMax, paddingBottom: theme.layout.navHeight + theme.spacing.hero + theme.spacing.sm }]}>
       <ScreenHeader
         title="App settings"
         subtitle="Make Flint work for you."
@@ -143,7 +143,9 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
         */}
       </FadeIn>
 
-      <Section title="Account & session" delay={60}>
+      {/* Settings groups: one column on phones, two across once there is room. */}
+      <View style={[styles.sections, isTablet && styles.sectionsRow]}>
+      <Section title="Account & session" delay={60} style={isTablet && styles.sectionColumn}>
         {/* Open/Connect Tinder removed from App Settings (reachable from the Home dock and hero card).
         <SettingsRow icon="flame-outline" tone="primary" divider title={isLoggedIn ? 'Open Tinder' : 'Connect Tinder'}
           description={isLoggedIn ? 'View your connected account and live session' : 'Sign in to start using your dating assistant'} onPress={onConnect} />
@@ -164,14 +166,14 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
       </Section>
       */}
 
-      <Section title="Notifications & permissions" delay={180}>
+      <Section title="Notifications & permissions" delay={180} style={isTablet && styles.sectionColumn}>
         <SettingsRow icon="notifications-outline" tone="warning" divider title="Notification inbox"
           description={unreadCount ? `${unreadCount} unread notifications` : 'View your matches and session updates'} onPress={onNotifications} />
         <SettingsRow icon="shield-checkmark-outline" tone="info" title="Device permissions"
           description="Manage notification and location access in phone settings" onPress={openSystemSettings} />
       </Section>
 
-      <Section title="App & connection" delay={240}>
+      <Section title="App & connection" delay={240} style={isTablet && styles.sectionColumn}>
         <ListRow icon="color-palette-outline" iconTone="plus" divider title="Appearance"
           subtitle={`${activeTheme.name} · Tap to change theme`}
           onPress={() => setShowThemes(true)}
@@ -181,6 +183,7 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
           description={`Connection: ${{ on_device: 'On-device', hyperbeam: 'Cloud', vps: 'VPS', local: 'Local' }[environment] || 'Not configured'}. Manage your environment and server.`}
           onPress={onPreferences} />
       </Section>
+      </View>
       <AppText variant="caption" align="center" style={styles.footer}>Flint · Version {appConfig.expo.version}</AppText>
       <ThemePickerSheet visible={showThemes} onClose={() => setShowThemes(false)} />
     </ScrollView>
@@ -188,6 +191,7 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
 }
 
 const styles = StyleSheet.create({
+  // Phone baseline; the screen overrides maxWidth with useResponsive().contentMax.
   content: { width: '100%', maxWidth: theme.layout.readableMax, alignSelf: 'center', paddingTop: theme.spacing.sm, gap: theme.spacing.xxl },
   profile: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg },
   account: { borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.hairline, backgroundColor: theme.colors.surface, overflow: 'hidden', padding: theme.spacing.lg, gap: theme.spacing.lg, ...theme.shadows.md },
@@ -210,6 +214,9 @@ const styles = StyleSheet.create({
   profileCopy: { flex: 1, minWidth: 0 },
   profileBadge: { marginTop: theme.spacing.sm },
   section: { gap: 0 },
+  sections: { gap: theme.spacing.xxl },
+  sectionsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' },
+  sectionColumn: { flexGrow: 1, flexBasis: 300, minWidth: 280 },
   sectionHeader: { marginBottom: theme.spacing.sm },
   card: { overflow: 'hidden' },
   footer: { paddingVertical: theme.spacing.sm },

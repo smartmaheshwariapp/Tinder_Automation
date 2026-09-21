@@ -95,7 +95,10 @@ export default function NotificationCenterModal({
   onOpenStream,
 }) {
   const { width } = useWindowDimensions();
-  const { gutter } = useResponsive();
+  const { gutter, contentMax } = useResponsive();
+  // Side padding that keeps every column (header, pills, rows) on the same
+  // centred content column, capped at contentMax on tablets.
+  const railPad = Math.max(gutter, Math.round((width - contentMax) / 2));
   const reduced = useMotionReduced();
   const [notifications, setNotifications] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'milestones' | 'matches' | 'automation'
@@ -275,7 +278,7 @@ export default function NotificationCenterModal({
         ]}
       >
         <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.safe}>
-        <View style={[styles.column, { paddingHorizontal: gutter }]}>
+        <View style={[styles.column, { paddingHorizontal: railPad }]}>
           {/* Top bar */}
           <View style={styles.topBar}>
             <IconButton icon="chevron-back" variant="plain" iconSize={26} onPress={handleDismiss} accessibilityLabel="Back" style={styles.backButton} />
@@ -336,7 +339,7 @@ export default function NotificationCenterModal({
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.tabsScroll}
-          contentContainerStyle={[styles.tabs, { paddingHorizontal: gutter }]}
+          contentContainerStyle={[styles.tabs, { paddingHorizontal: railPad }]}
           accessibilityRole="tablist"
         >
           {FILTERS.map((f) => {
@@ -381,14 +384,14 @@ export default function NotificationCenterModal({
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             renderSectionHeader={({ section }) => (
-              <View style={[styles.sectionHeader, { paddingHorizontal: gutter }]}>
+              <View style={[styles.sectionHeader, { paddingHorizontal: railPad }]}>
                 <Text style={styles.sectionTitle} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
                   {section.title.toUpperCase()}
                 </Text>
               </View>
             )}
             stickySectionHeadersEnabled
-            contentContainerStyle={[styles.listContent, { paddingHorizontal: gutter, paddingBottom: uiTheme.spacing.section }]}
+            contentContainerStyle={[styles.listContent, { paddingHorizontal: railPad, paddingBottom: uiTheme.spacing.section }]}
             showsVerticalScrollIndicator={false}
           />
         )}
@@ -428,9 +431,10 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
   },
+  // Width is driven by the responsive rail padding so the header, filter pills
+  // and list all sit on the same centred column.
   column: {
     width: '100%',
-    maxWidth: uiTheme.layout.readableMax,
     alignSelf: 'center',
   },
   topBar: {
@@ -538,7 +542,6 @@ const styles = StyleSheet.create({
   // Feed
   listContent: {
     width: '100%',
-    maxWidth: uiTheme.layout.readableMax,
     alignSelf: 'center',
   },
   sectionHeader: {
@@ -653,6 +656,9 @@ const styles = StyleSheet.create({
   },
   emptyWrap: {
     flex: 1,
+    width: '100%',
+    maxWidth: uiTheme.layout.readableMax,
+    alignSelf: 'center',
     justifyContent: 'center',
     paddingBottom: 80,
   },

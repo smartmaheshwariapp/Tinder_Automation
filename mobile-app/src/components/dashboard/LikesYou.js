@@ -1,7 +1,7 @@
 // Home "Likes You" section: people who liked your Tinder profile.
 // Full details only when Tinder returns them for your plan; otherwise Tinder's blurred teasers (locked).
 import React, { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { AppButton, AppText, BottomSheet, FadeIn, LiveDot, MotionTouchable, Skeleton } from '../ui';
@@ -86,8 +86,14 @@ function PersonCard({ person, locked, width, onPress, index }) {
 
 function PersonDetail({ person, onOpenTinder, onClose }) {
   const [photoIndex, setPhotoIndex] = useState(0);
-  const { width } = useWindowDimensions();
-  const photoHeight = Math.min(460, Math.round(Math.min(width, 640) * 1.15));
+  const { width, height, isLandscape } = useResponsive();
+  // Keep the hero photo inside the sheet: bounded by the sheet width and by the window height,
+  // which matters most in landscape and on short phones.
+  const photoHeight = Math.min(
+    460,
+    Math.round(Math.min(width, 640) * 1.15),
+    Math.round(height * (isLandscape ? 0.46 : 0.62)),
+  );
   const count = person.photos.length;
   const distance = distanceFor(person);
   const facts = [
@@ -170,7 +176,7 @@ function PersonDetail({ person, onOpenTinder, onClose }) {
 }
 
 export default function LikesYou({ count, isLoggedIn, onOpenTinder }) {
-  const { gutter, isCompact, width } = useResponsive();
+  const { gutter, isCompact, isTablet, columns, width, pick } = useResponsive();
   const { people, locked, loading } = useTinderLikesYou();
   const [selected, setSelected] = useState(null);
   const [showAll, setShowAll] = useState(false);
@@ -179,11 +185,14 @@ export default function LikesYou({ count, isLoggedIn, onOpenTinder }) {
   const total = Number.isFinite(count) ? Math.max(count, people.length) : people.length;
   if (!loading && !people.length && !total) return null;
 
-  const cardWidth = isCompact ? 118 : 134;
-  // Two columns inside the bottom sheet (max width 640, xl side padding).
-  const gridWidth = Math.floor((Math.min(width, 640) - sp.xl * 2 - sp.md) / 2);
+  const cardWidth = pick({ phone: isCompact ? 118 : 134, tablet: 152, xl: 168 });
+  // Grid inside the bottom sheet (sheet is capped at 640 with xl side padding): two columns on
+  // phones, three once there is room.
+  const gridColumns = Math.min(Math.max(columns, 2), 3);
+  const gridWidth = Math.floor((Math.min(width, 640) - sp.xl * 2 - sp.md * (gridColumns - 1)) / gridColumns);
   const openPerson = (person) => (locked ? onOpenTinder?.() : setSelected(person));
-  const visible = people.slice(0, RAIL_LIMIT);
+  // A wider window fits more faces before the rail needs scrolling.
+  const visible = people.slice(0, isTablet ? RAIL_LIMIT * 2 : RAIL_LIMIT);
 
   return (
     <View style={styles.section}>

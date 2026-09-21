@@ -14,7 +14,7 @@ import {
   Image,
   Animated,
   Easing,
-  Dimensions,
+  // Dimensions, // responsiveness pass: layout now reads live sizes from useResponsive()
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,7 +46,8 @@ const safeHaptic = (type) => {
   } catch (_) { }
 };
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+// Module-load window size removed: it never updates on rotation. Use useResponsive() at render time.
+// const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const FALLBACK_LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 const DOMAIN_SUGGESTIONS = ['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'];
 const isValidEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
@@ -82,7 +83,7 @@ const FLINT_EMBLEM_URI =
   'https://lh3.googleusercontent.com/aida/AEtjO1XBLBCvT6YG6NjEQtmsjtWA5j_uCps04hYP22UuacAxVsDbTJ-8aEt7FTCHe54G4532OO4W9mUziOo89_l3f1s4bw-AKSf13KLGKYwV1JM7egtBa0zRtTlt6WR24SfQmVAI4KU4-pfv8GOxG7PNQAIU6vvTe82hpcB8hAGX_4vQVn3Yns7nE5T3vr7KmRLK5K2FWS_pPKMg3gmSBbNJvIWyqdTTRyPdOnrkGYitlXO70H45WmmZI8svYw';
 
 export default function LoginScreen({ navigation, route }) {
-  const { gutter, isCompact, isShort } = useResponsive();
+  const { gutter, isCompact, isShort, isLandscape, isTablet, formMax, pick } = useResponsive();
   const passwordInputRef = useRef(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -293,9 +294,15 @@ export default function LoginScreen({ navigation, route }) {
     setAccountConflict(null);
   };
 
-  const emblemSize = isCompact || isShort ? 72 : 84;
+  // Hero art scales with the window: smaller when vertical space is scarce, larger on tablets.
+  const compactHero = isCompact || isShort || isLandscape;
+  const emblemSize = pick({ phone: compactHero ? 72 : 84, tablet: 108, xl: 124 });
   const emblemRadius = Math.round(emblemSize * 0.3);
-  const cardPadding = isCompact ? SPACE.lg : SPACE.xxl;
+  const cardPadding = isCompact ? SPACE.lg : isTablet ? SPACE.section : SPACE.xxl;
+  // Keep the column centred and bounded (formMax = 480 phone / 560 tablet).
+  const columnStyle = { maxWidth: formMax };
+  const heroSpacing = { marginBottom: compactHero ? SPACE.lg : SPACE.xxl };
+  const verticalPadding = compactHero ? SPACE.lg : SPACE.xl + SPACE.sm;
 
   return (
     <View style={styles.container}>
@@ -343,10 +350,11 @@ export default function LoginScreen({ navigation, route }) {
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
+            columnStyle,
             {
               paddingHorizontal: gutter,
-              paddingTop: SPACE.xl + SPACE.sm,
-              paddingBottom: SPACE.xl + SPACE.sm,
+              paddingTop: verticalPadding,
+              paddingBottom: verticalPadding,
             },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -355,8 +363,8 @@ export default function LoginScreen({ navigation, route }) {
           bounces={false}
         >
           {/* Hero Branding */}
-          <FadeIn style={styles.brandContainer}>
-            <View style={styles.emblemWrapper}>
+          <FadeIn style={[styles.brandContainer, heroSpacing]}>
+            <View style={[styles.emblemWrapper, compactHero && styles.emblemWrapperTight]}>
               <LinearGradient
                 colors={[COLORS.primary, COLORS.secondary, COLORS.warning]}
                 start={{ x: 0, y: 1 }}
@@ -376,7 +384,7 @@ export default function LoginScreen({ navigation, route }) {
             </View>
 
             <Text style={styles.brandTitle} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Flint</Text>
-            <Text style={styles.heroDialogue}>Strike the spark. Ignite real chemistry.</Text>
+            <Text style={[styles.heroDialogue, isTablet && styles.heroDialogueWide]}>Strike the spark. Ignite real chemistry.</Text>
           </FadeIn>
 
           {/* Frosted Glass Auth Card */}
@@ -978,7 +986,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     width: '100%',
-    maxWidth: uiTheme.layout.formMax,
+    // maxWidth comes from useResponsive().formMax (480 phone / 560 tablet) at render time.
     alignSelf: 'center',
     flexGrow: 1,
     justifyContent: 'center',
@@ -993,6 +1001,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACE.lg,
+  },
+  emblemWrapperTight: {
+    marginBottom: SPACE.sm,
   },
   emblemFrame: {
     padding: 3,
@@ -1030,6 +1041,10 @@ const styles = StyleSheet.create({
     textShadowColor: alpha(COLORS.black, 0.65),
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
+  },
+  heroDialogueWide: {
+    ...TYPE.headline,
+    maxWidth: 440,
   },
 
   // ── Card ──

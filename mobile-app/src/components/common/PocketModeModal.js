@@ -15,6 +15,7 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { theme, alpha } from "../../theme";
+import useResponsive from "../../hooks/useResponsive";
 import { useMotionReduced } from "./Motion";
 import {
   getSharedAgentState,
@@ -50,6 +51,16 @@ export default function PocketModeModal({
   const [glanceActive, setGlanceActive] = useState(false);
   const lastTapRef = useRef(0);
   const glanceTimeoutRef = useRef(null);
+
+  // HUD scales with the window: bigger on tablets, tighter on short/landscape screens.
+  const { gutter, isTablet, isShort, isLandscape, pick } = useResponsive();
+  const tightHud = isShort || isLandscape;
+  // Landscape lays the HUD out as three columns, so it may use the full width.
+  const hudMaxWidth = isLandscape ? 860 : pick({ phone: 380, tablet: 520, xl: 620 });
+  const clockSize = tightHud ? (isTablet ? 66 : 48) : pick({ phone: 76, tablet: 104, xl: 118 });
+  const ringSize = tightHud ? (isTablet ? 104 : 82) : pick({ phone: 120, tablet: 152, xl: 168 });
+  const ringDisc = Math.round(ringSize * 0.7);
+  const statValueSize = tightHud ? 20 : pick({ phone: 24, tablet: 30, xl: 32 });
 
   // Synced real-time state from module singleton
   const [liveState, setLiveState] = useState(() => getSharedAgentState() || {});
@@ -471,8 +482,20 @@ export default function PocketModeModal({
           accessibilityRole="button"
           accessibilityLabel={`Pocket mode. ${displayStatus}. ${effectiveTotalSwipes} swipes, ${effectiveTotalMessages} messages. Double tap to unlock.`}
         >
-          <SafeAreaView edges={["top", "bottom", "left", "right"]} style={styles.safe}>
-            <Animated.View style={[styles.hud, driftStyle, { opacity: glanceAnim }]}>
+          <SafeAreaView edges={["top", "bottom", "left", "right"]} style={[styles.safe, { paddingHorizontal: gutter }]}>
+            <Animated.View
+              style={[
+                styles.hud,
+                isLandscape && styles.hudLandscape,
+                driftStyle,
+                {
+                  opacity: glanceAnim,
+                  maxWidth: hudMaxWidth,
+                  paddingTop: tightHud ? 12 : 36,
+                  paddingBottom: tightHud ? 10 : 20,
+                },
+              ]}
+            >
               {/* Lock-screen clock */}
               <View style={styles.clockBlock}>
                 <View style={styles.lockRow}>
@@ -480,18 +503,25 @@ export default function PocketModeModal({
                   <Text style={styles.lockText}>TOUCH LOCKED</Text>
                 </View>
                 <View style={styles.clockRow}>
-                  <Text style={styles.clock} maxFontSizeMultiplier={1.2}>{timeText}</Text>
+                  <Text
+                    style={[styles.clock, { fontSize: clockSize, lineHeight: Math.round(clockSize * 1.1) }]}
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={1.2}
+                  >
+                    {timeText}
+                  </Text>
                   {meridiem ? <Text style={styles.meridiem}>{meridiem}</Text> : null}
                 </View>
                 <Text style={styles.date} maxFontSizeMultiplier={1.3}>{dateText}</Text>
               </View>
 
               {/* Status ring: breathing halo + bloom on each action */}
-              <View style={styles.center}>
-                <View style={styles.ringWrap}>
+              <View style={[styles.center, tightHud && styles.centerTight, isLandscape && styles.centerLandscape]}>
+                <View style={[styles.ringWrap, { width: ringSize, height: ringSize }]}>
                   <Animated.View
                     style={[
                       styles.halo,
+                      { width: ringSize, height: ringSize, borderRadius: ringSize / 2 },
                       { backgroundColor: alpha(accent, 0.07), borderColor: alpha(accent, 0.22), opacity: pulseAnim, transform: [{ scale: actionPulseAnim }] },
                     ]}
                   />
@@ -499,10 +529,10 @@ export default function PocketModeModal({
                     colors={[alpha(theme.gradients.brand[0], 0.55), alpha(theme.gradients.brand[theme.gradients.brand.length - 1], 0.35)]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.ring}
+                    style={[styles.ring, { width: ringDisc, height: ringDisc, borderRadius: ringDisc / 2 }]}
                   >
-                    <View style={styles.ringInner}>
-                      <Ionicons name={isRunning ? "flame" : "moon"} size={30} color={alpha(accent, 0.9)} />
+                    <View style={[styles.ringInner, { borderRadius: ringDisc / 2 - 1 }]}>
+                      <Ionicons name={isRunning ? "flame" : "moon"} size={Math.round(ringDisc * 0.36)} color={alpha(accent, 0.9)} />
                     </View>
                   </LinearGradient>
                 </View>
@@ -517,7 +547,12 @@ export default function PocketModeModal({
                     <React.Fragment key={stat.label}>
                       {index > 0 ? <View style={styles.statDivider} /> : null}
                       <View style={styles.stat} accessible accessibilityLabel={`${stat.value} ${stat.label}`}>
-                        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.2}>
+                        <Text
+                          style={[styles.statValue, { fontSize: statValueSize, lineHeight: Math.round(statValueSize * 1.25) }]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          maxFontSizeMultiplier={1.2}
+                        >
                           {Number(stat.value || 0).toLocaleString()}
                         </Text>
                         <View style={styles.statLabelRow}>
@@ -537,7 +572,7 @@ export default function PocketModeModal({
               </View>
 
               {/* Unlock */}
-              <View style={styles.bottom}>
+              <View style={[styles.bottom, isLandscape && styles.bottomLandscape]}>
                 <Text style={[styles.hint, glanceActive && { color: alpha(accent, 0.9) }]}>
                   {glanceActive ? "Tap once more to unlock" : "Double-tap anywhere to unlock"}
                 </Text>
@@ -574,15 +609,21 @@ const DIM = {
 const styles = StyleSheet.create({
   fullscreen: { flex: 1, backgroundColor: "#000000" },
   touchSurface: { flex: 1, backgroundColor: "#000000" },
-  safe: { flex: 1, paddingHorizontal: 24 },
+  // paddingHorizontal, maxWidth and the vertical padding come from useResponsive().
+  safe: { flex: 1 },
   hud: {
     flex: 1,
     width: "100%",
-    maxWidth: 380,
     alignSelf: "center",
     justifyContent: "space-between",
-    paddingTop: 36,
-    paddingBottom: 20,
+  },
+  // Landscape: clock · status ring · unlock sit side by side so nothing overflows
+  // the short viewport.
+  hudLandscape: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 20,
   },
 
   clockBlock: { alignItems: "center" },
@@ -601,6 +642,8 @@ const styles = StyleSheet.create({
   date: { fontFamily: theme.fonts.caption, fontSize: 15, color: DIM.label, marginTop: 2 },
 
   center: { alignItems: "center", gap: 18 },
+  centerTight: { gap: 10 },
+  centerLandscape: { flex: 1, minWidth: 0, maxWidth: 420 },
   ringWrap: { width: 120, height: 120, alignItems: "center", justifyContent: "center" },
   halo: { position: "absolute", width: 120, height: 120, borderRadius: 60, borderWidth: 1 },
   ring: { width: 84, height: 84, borderRadius: 42, padding: 1.5 },
@@ -640,6 +683,7 @@ const styles = StyleSheet.create({
   tickerText: { fontFamily: theme.fonts.caption, fontSize: 12.5, color: DIM.label, flexShrink: 1 },
 
   bottom: { alignItems: "center", gap: 14 },
+  bottomLandscape: { flexShrink: 0, maxWidth: 200 },
   hint: { fontFamily: theme.fonts.caption, fontSize: 12.5, color: DIM.faint, letterSpacing: 0.2, textAlign: "center" },
   unlock: {
     flexDirection: "row",

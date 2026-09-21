@@ -363,7 +363,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0.4)).current;
   const reduceMotion = useMotionReduced();
-  const { isCompact, gutter } = useResponsive();
+  const { isCompact, gutter, contentMax, formMax, isShort, isLandscape, width: winWidth } = useResponsive();
   const hdrBtn = isCompact ? 36 : 40;
 
   // Rhythmic breathing pulse for the loader hero badge (static when reduce motion is on)
@@ -3089,7 +3089,72 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
     : isMessagingMode
       ? `AI controls, ${currentMessages} of ${currentTargetMessages} messages completed`
       : `AI controls, ${currentLikes} of ${currentTargetLikes} likes completed`;
-  const headerPad = isCompact ? uiTheme.spacing.md : uiTheme.spacing.lg;
+  // Header chrome: keep the gutter on phones, and on wide screens pad in so the
+  // toolbar + status capsule stay on a centred column instead of stretching.
+  const headerGutter = isCompact ? uiTheme.spacing.md : uiTheme.spacing.lg;
+  const headerPad = Math.max(headerGutter, Math.round((winWidth - contentMax) / 2));
+  // Dashboard modal header lines up with DashboardPanel's own content column.
+  const modalPad = Math.max(
+    uiTheme.spacing.lg,
+    Math.round((winWidth - Math.min(contentMax, uiTheme.layout.contentMax)) / 2),
+  );
+  // Short or landscape windows collapse the session header to a single row so the
+  // Tinder page keeps as much height as possible.
+  const compactHeader = isShort || isLandscape;
+  const statusCapsule = (
+    <View style={[styles.capsule, compactHeader && styles.capsuleCompact, { borderColor: alpha(onDeviceStatusColor, 0.28) }]}>
+      <View
+        style={[
+          styles.capsuleIcon,
+          compactHeader && styles.capsuleIconCompact,
+          { backgroundColor: alpha(onDeviceStatusColor, 0.14) },
+        ]}
+      >
+        <Ionicons name={headerState.icon} size={compactHeader ? 15 : 17} color={onDeviceStatusColor} />
+      </View>
+      <View
+        style={styles.capsuleCopy}
+        accessible
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={`${headerState.title}. ${headerState.detail}`}
+      >
+        <View style={styles.capsuleTitleRow}>
+          {sessionStatus === SESSION_SIGNED_IN ? (
+            <LiveDot size={6} active={onDeviceSwiping} color={onDeviceStatusColor} />
+          ) : null}
+          <Text style={styles.capsuleTitle} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+            {headerState.title}
+          </Text>
+        </View>
+        <Text style={styles.capsuleDetail} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+          {headerState.detail}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.aiButton, onDeviceSwiping ? styles.aiButtonActive : styles.aiButtonIdle]}
+        onPress={() => setShowDashboard(true)}
+        activeOpacity={0.85}
+        pressScale={0.95}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: sessionStatus !== SESSION_SIGNED_IN }}
+        accessibilityLabel={aiButtonLabel}
+      >
+        <Ionicons
+          name={onDeviceSwiping ? "flash" : "options-outline"}
+          size={14}
+          color={onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.accent}
+        />
+        <Text
+          style={[styles.aiButtonText, { color: onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.text }]}
+          numberOfLines={1}
+          maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+        >
+          {onDeviceSwiping ? "AI Active" : isCompact || compactHeader ? "AI" : "AI Controls"}
+        </Text>
+        <Ionicons name="chevron-forward" size={13} color={uiTheme.colors.muted} />
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -3100,8 +3165,8 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
       >
         {isOnDevice ? (
           /* ─── Tinder session header: toolbar + status capsule ─── */
-          <View style={styles.sessionHeader}>
-            <View style={[styles.toolbar, { paddingHorizontal: headerPad }]}>
+          <View style={[styles.sessionHeader, compactHeader && styles.sessionHeaderCompact]}>
+            <View style={[styles.toolbar, compactHeader && styles.toolbarCompact, { paddingHorizontal: headerPad }]}>
               <IconButton
                 icon="close"
                 variant="plain"
@@ -3110,29 +3175,34 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                 accessibilityLabel="Close session"
                 onPress={closeSession}
               />
-              <View style={styles.wordmark} pointerEvents="none">
-                <LinearGradient
-                  colors={[uiTheme.colors.tinder, uiTheme.gradients.brand[uiTheme.gradients.brand.length - 1]]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.wordmarkTile}
-                >
-                  <Ionicons name="flame" size={15} color={uiTheme.colors.onPrimary} />
-                </LinearGradient>
-                <Text style={styles.wordmarkText} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                  Tinder
-                </Text>
-                {sessionStatus !== SESSION_UNKNOWN ? (
-                  <View
-                    style={[
-                      styles.wordmarkDot,
-                      { backgroundColor: sessionStatus === SESSION_SIGNED_IN ? uiTheme.colors.success : uiTheme.colors.textTertiary },
-                    ]}
-                    accessible
-                    accessibilityLabel={sessionStatus === SESSION_SIGNED_IN ? "Live" : "Offline"}
-                  />
-                ) : null}
-              </View>
+              {compactHeader ? (
+                /* Single-row header: the status capsule takes the middle slot. */
+                <View style={styles.toolbarCapsule}>{statusCapsule}</View>
+              ) : (
+                <View style={styles.wordmark} pointerEvents="none">
+                  <LinearGradient
+                    colors={[uiTheme.colors.tinder, uiTheme.gradients.brand[uiTheme.gradients.brand.length - 1]]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.wordmarkTile}
+                  >
+                    <Ionicons name="flame" size={15} color={uiTheme.colors.onPrimary} />
+                  </LinearGradient>
+                  <Text style={styles.wordmarkText} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                    Tinder
+                  </Text>
+                  {sessionStatus !== SESSION_UNKNOWN ? (
+                    <View
+                      style={[
+                        styles.wordmarkDot,
+                        { backgroundColor: sessionStatus === SESSION_SIGNED_IN ? uiTheme.colors.success : uiTheme.colors.textTertiary },
+                      ]}
+                      accessible
+                      accessibilityLabel={sessionStatus === SESSION_SIGNED_IN ? "Live" : "Offline"}
+                    />
+                  ) : null}
+                </View>
+              )}
               <View style={styles.toolbarActions}>
                 <IconButton
                   icon="moon-outline"
@@ -3160,54 +3230,9 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
               </View>
             </View>
 
-            <View style={[styles.capsuleRow, { paddingHorizontal: headerPad }]}>
-              <View style={[styles.capsule, { borderColor: alpha(onDeviceStatusColor, 0.28) }]}>
-                <View style={[styles.capsuleIcon, { backgroundColor: alpha(onDeviceStatusColor, 0.14) }]}>
-                  <Ionicons name={headerState.icon} size={17} color={onDeviceStatusColor} />
-                </View>
-                <View
-                  style={styles.capsuleCopy}
-                  accessible
-                  accessibilityLiveRegion="polite"
-                  accessibilityLabel={`${headerState.title}. ${headerState.detail}`}
-                >
-                  <View style={styles.capsuleTitleRow}>
-                    {sessionStatus === SESSION_SIGNED_IN ? (
-                      <LiveDot size={6} active={onDeviceSwiping} color={onDeviceStatusColor} />
-                    ) : null}
-                    <Text style={styles.capsuleTitle} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                      {headerState.title}
-                    </Text>
-                  </View>
-                  <Text style={styles.capsuleDetail} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                    {headerState.detail}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.aiButton, onDeviceSwiping ? styles.aiButtonActive : styles.aiButtonIdle]}
-                  onPress={() => setShowDashboard(true)}
-                  activeOpacity={0.85}
-                  pressScale={0.95}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: sessionStatus !== SESSION_SIGNED_IN }}
-                  accessibilityLabel={aiButtonLabel}
-                >
-                  <Ionicons
-                    name={onDeviceSwiping ? "flash" : "options-outline"}
-                    size={14}
-                    color={onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.accent}
-                  />
-                  <Text
-                    style={[styles.aiButtonText, { color: onDeviceSwiping ? uiTheme.colors.success : uiTheme.colors.text }]}
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={uiTheme.fontScale.chrome}
-                  >
-                    {onDeviceSwiping ? "AI Active" : isCompact ? "AI" : "AI Controls"}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={13} color={uiTheme.colors.muted} />
-                </TouchableOpacity>
-              </View>
-            </View>
+            {!compactHeader ? (
+              <View style={[styles.capsuleRow, { paddingHorizontal: headerPad }]}>{statusCapsule}</View>
+            ) : null}
           </View>
         ) : (
           <>
@@ -3215,11 +3240,8 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
         <View
           style={[
             styles.header,
-            {
-              paddingHorizontal: isCompact
-                ? uiTheme.spacing.md
-                : uiTheme.spacing.lg,
-            },
+            compactHeader && styles.headerCompact,
+            { paddingHorizontal: headerPad },
           ]}
         >
           <IconButton
@@ -3491,7 +3513,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
           onRequestClose={() => setShowDashboard(false)}
         >
           <SafeAreaView style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, { paddingHorizontal: modalPad }]}>
               <View style={styles.modalTitleRow}>
                 <IconWell icon="stats-chart" tone="primary" size={36} />
                 <AppText
@@ -5102,7 +5124,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
               style={styles.wizardScroll}
               contentContainerStyle={[
                 styles.wizardScrollContent,
-                { paddingHorizontal: gutter },
+                { paddingHorizontal: gutter, maxWidth: formMax + gutter * 2 },
               ]}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -6174,6 +6196,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: c.background,
   },
+  headerCompact: {
+    minHeight: 48,
+    paddingTop: sp.xs,
+    paddingBottom: sp.xs,
+  },
   header: {
     // minHeight, not height: with the Android status-bar paddingTop below, a
     // fixed 56 left an 8px content box for 38px-tall children, so the row
@@ -6198,11 +6225,25 @@ const styles = StyleSheet.create({
     paddingTop: sp.xs,
     paddingBottom: sp.md,
   },
+  // Short / landscape windows: one slim row, so the Tinder page keeps its height.
+  sessionHeaderCompact: {
+    paddingTop: 2,
+    paddingBottom: sp.xs,
+  },
   toolbar: {
     minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  toolbarCompact: {
+    minHeight: 44,
+    gap: sp.sm,
+  },
+  // Middle slot of the single-row header; the capsule gives way, the buttons do not.
+  toolbarCapsule: {
+    flex: 1,
+    minWidth: 0,
   },
   wordmark: {
     position: "absolute",
@@ -6252,12 +6293,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: c.elevated,
   },
+  capsuleCompact: {
+    minHeight: 40,
+    gap: sp.sm,
+    paddingVertical: 4,
+    borderRadius: r.md,
+  },
   capsuleIcon: {
     width: 38,
     height: 38,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+  },
+  capsuleIconCompact: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
   },
   capsuleCopy: {
     flex: 1,
@@ -6543,13 +6595,15 @@ const styles = StyleSheet.create({
   },
   wizardScrollContent: {
     flexGrow: 1,
+    width: "100%",
+    alignSelf: "center",
     justifyContent: "center",
     paddingTop: sp.lg,
     paddingBottom: sp.xl,
   },
+  // Width comes from the scroll content column above (useResponsive().formMax).
   wizardStep: {
     width: "100%",
-    maxWidth: uiTheme.layout.formMax,
     alignSelf: "center",
   },
   wizardOptionsHeader: {

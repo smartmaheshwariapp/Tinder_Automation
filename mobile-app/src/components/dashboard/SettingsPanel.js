@@ -27,6 +27,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../../utils/network';
 import TinderProfileCard from './TinderProfileCard';
 import { theme as uiTheme, alpha } from '../../theme';
+import useResponsive from '../../hooks/useResponsive';
 import { FocusInput, MotionTouchable, FadeIn, ContentTransition, useMotionReduced } from '../common/Motion';
 import IconButton from '../ui/IconButton';
 import IconWell from '../ui/IconWell';
@@ -135,6 +136,14 @@ export default function SettingsPanel({
 
   const reducedMotion = useMotionReduced();
   const { width: windowWidth } = useWindowDimensions();
+
+  // ─── Responsive layout (tablets widen the column and fan tiles out) ───
+  const { contentMax, columns, isTablet } = useResponsive();
+  // Stat tiles stay 2-up on phones and go 3–4 across on tablets.
+  const statCols = Math.max(2, columns);
+  const statTileStyle = { flexBasis: statCols >= 4 ? '22%' : statCols === 3 ? '30%' : '45%' };
+  // Preset rows (swipes / messages per cycle) pair up on tablets.
+  const presetBlockStyle = isTablet ? { flexGrow: 1, flexBasis: '45%', minWidth: 260 } : null;
 
   const handleConnectPress = () => {
     if (typeof onConnect === 'function') {
@@ -715,7 +724,7 @@ export default function SettingsPanel({
   const renderStatTile = ({ key, icon, label, value, numeric, caption, captionShort, dim, live }) => (
     <View
       key={key}
-      style={styles.statTile}
+      style={[styles.statTile, statTileStyle]}
       accessible
       accessibilityLabel={`${label}: ${value}${caption ? `, ${caption}` : ''}`}
     >
@@ -736,7 +745,7 @@ export default function SettingsPanel({
   );
 
   const renderPresetRow = ({ label, noun, presets, active, field }) => (
-    <View style={styles.presetBlock}>
+    <View style={[styles.presetBlock, presetBlockStyle]}>
       <View style={styles.presetBlockHeader}>
         <AppText variant="label" color="textSecondary" numberOfLines={1} style={styles.presetBlockLabel}>{label}</AppText>
         <AppText variant="subhead" color="text" style={styles.presetBlockValue}>{active === 0 ? 'Off' : active}</AppText>
@@ -782,7 +791,7 @@ export default function SettingsPanel({
     <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { maxWidth: contentMax }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -978,7 +987,7 @@ export default function SettingsPanel({
                 </View>
 
                 {/* Speed & Batch Preset Controls (Locked with 55% opacity when Safety ON) */}
-                <View style={[styles.presetStack, isSafetyOn && styles.presetSectionLocked]}>
+                <View style={[styles.presetStack, isTablet && styles.presetStackRow, isSafetyOn && styles.presetSectionLocked]}>
                   {renderPresetRow({ label: 'Swipes per cycle', noun: 'swipes', presets: SWIPE_PRESETS, active: activeSwipes, field: 'likesPerCycle' })}
                   {renderPresetRow({ label: 'Messages per cycle', noun: 'messages', presets: MSG_PRESETS, active: activeMsgs, field: 'messagesPerCycle' })}
                 </View>
@@ -1898,6 +1907,12 @@ const styles = StyleSheet.create({
     gap: sp.lg,
     paddingTop: sp.xs,
   },
+  // Tablet/XL: the two preset rows sit side by side instead of stacking.
+  presetStackRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+  },
   presetBlock: {
     gap: sp.sm,
   },
@@ -2039,6 +2054,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    width: '100%',
+    alignSelf: 'center',
     paddingHorizontal: sp.xxs,
     paddingTop: sp.xs,
     paddingBottom: sp.section,

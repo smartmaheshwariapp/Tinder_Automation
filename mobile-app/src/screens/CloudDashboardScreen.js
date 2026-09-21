@@ -17,7 +17,7 @@ const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 export default function CloudDashboardScreen({ route, navigation }) {
   const { orchestratorUrl: rawOrchestratorUrl = 'https://api.smartmaheshwari.com', vpsUrl, platform = 'Tinder' } = route.params || {};
   const orchestratorUrl = resolveLocalUrl(rawOrchestratorUrl);
-  const { gutter, isCompact } = useResponsive();
+  const { gutter, isCompact, contentMax } = useResponsive();
 
   // Always poll live stats from the cloud VPS or local orchestrator
   const { stats, loading, error } = useExtensionStats(orchestratorUrl, true);
@@ -44,7 +44,7 @@ export default function CloudDashboardScreen({ route, navigation }) {
 
       {/* Header Bar */}
       <View style={styles.headerBand}>
-        <View style={[styles.header, { paddingHorizontal: gutter }]}>
+        <View style={[styles.header, { paddingHorizontal: gutter, maxWidth: contentMax }]}>
           <IconButton icon="chevron-back" onPress={() => navigation.goBack()} accessibilityLabel="Go back" />
           <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" accessibilityIgnoresInvertColors />
           <View style={styles.headerCopy}>
