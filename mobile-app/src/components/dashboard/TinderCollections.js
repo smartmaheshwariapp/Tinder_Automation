@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ContentTransition, FadeIn, MotionTouchable as Button, useMotionReduced } from '../common/Motion';
 import FeedbackState from '../common/FeedbackState';
 import { AppButton, AppText, Badge, CountUp, IconButton, IconWell, LiveDot } from '../ui';
-import { theme, alpha } from '../../theme';
+import { createStyles, theme, alpha } from '../../theme';
 import useResponsive from '../../hooks/useResponsive';
 import { getTinderAuthState, subscribeTinderAuthState } from '../../utils/sessionManager';
 import { collectionLists } from '../../utils/tinderCollectionsModel';
@@ -17,13 +17,25 @@ const t = theme.type;
 const sp = theme.spacing;
 const r = theme.radius;
 
-const TABS = {
-  swiped: { label: 'Swiped', full: 'Swiped profiles', icon: 'heart', tone: 'primary', color: c.accent, tint: c.primarySoft, border: c.primaryBorder },
-  strong: { label: 'Strong', full: 'Strong matches', icon: 'sparkles', tone: 'secondary', color: c.secondary, tint: c.secondarySoft, border: c.secondaryBorder },
-  chatting: { label: 'Chats', full: 'Messaged you', icon: 'chatbubbles', tone: 'success', color: c.success, tint: c.successSoft, border: c.successBorder },
+// Colours are read on access so an Appearance change applies without restarting.
+const TAB_META = {
+  swiped: { label: 'Swiped', full: 'Swiped profiles', icon: 'heart', tone: 'primary', key: 'accent', soft: 'primarySoft', line: 'primaryBorder' },
+  strong: { label: 'Strong', full: 'Strong matches', icon: 'sparkles', tone: 'secondary', key: 'secondary', soft: 'secondarySoft', line: 'secondaryBorder' },
+  chatting: { label: 'Chats', full: 'Messaged you', icon: 'chatbubbles', tone: 'success', key: 'success', soft: 'successSoft', line: 'successBorder' },
 };
+const buildTab = (id) => {
+  const meta = TAB_META[id];
+  if (!meta) return undefined;
+  return { ...meta, color: theme.colors[meta.key], tint: theme.colors[meta.soft], border: theme.colors[meta.line] };
+};
+const TABS = new Proxy({}, {
+  get: (_, key) => (typeof key === 'string' ? buildTab(key) : undefined),
+  has: (_, key) => key in TAB_META,
+  ownKeys: () => Object.keys(TAB_META),
+  getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true, value: undefined }),
+});
 const STAGGER = 35; // FadeIn step for rail items (≤ 40ms)
-const SHADE = ['transparent', alpha(c.background, 0.35), alpha(c.background, 0.94)];
+const shadeFn = () => ['transparent', alpha(theme.colors.background, 0.35), alpha(theme.colors.background, 0.94)];
 const relativeTime = value => {
   if (!value) return '';
   const age = Date.now() - value;
@@ -154,7 +166,7 @@ function SwipeCard({ item, width, index, onPress }) {
     <FadeIn delay={Math.min(index, 8) * STAGGER} offset={8}>
       <Button style={[styles.photoCard, { width, height: Math.round(width * 1.36) }]} onPress={onPress} pressScale={0.97} accessibilityRole="button" accessibilityLabel={`${name}. ${swipeSubtitle(item)}`}>
         <Photo profile={profile} dim={!liked} iconSize={30} />
-        <LinearGradient colors={SHADE} locations={[0.35, 0.6, 1]} style={styles.photoShade} pointerEvents="none" />
+        <LinearGradient colors={shadeFn()} locations={[0.35, 0.6, 1]} style={styles.photoShade} pointerEvents="none" />
         <View style={styles.cardTop} pointerEvents="none">
           <Badge label={liked ? 'LIKED' : 'PASSED'} icon={liked ? 'heart' : 'close'} tone={liked ? TABS.swiped.tone : 'neutral'} size="sm" style={styles.badgeOnPhoto} />
           {liked && item.matched && <LinearGradient colors={theme.gradients.brandShort} style={styles.matchMark}><Ionicons name="heart" size={12} color={c.onPrimary} /></LinearGradient>}
@@ -174,7 +186,7 @@ function StrongCard({ item, width, index, onPress }) {
       <Button style={[styles.strongCard, { width }]} onPress={onPress} pressScale={0.97} accessibilityRole="button" accessibilityLabel={`${name}. Estimated fit ${item.score} percent. ${reason}`}>
         <View style={[styles.strongPhoto, { height: Math.round(width * 0.7) }]}>
           <Photo profile={profile} iconSize={34} />
-          <LinearGradient colors={SHADE} locations={[0.3, 0.6, 1]} style={styles.photoShade} pointerEvents="none" />
+          <LinearGradient colors={shadeFn()} locations={[0.3, 0.6, 1]} style={styles.photoShade} pointerEvents="none" />
           <View style={styles.strongRing} pointerEvents="none"><ScoreRing value={item.score} size={46} onPhoto /></View>
           <View style={styles.cardCopy} pointerEvents="none">
             <Text style={styles.cardName} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{name}</Text>
@@ -571,7 +583,7 @@ export default function TinderCollections({ settings, onConnect }) {
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   // Names-only "Messaged you" list
   nameList: { borderRadius: r.card, backgroundColor: c.surface, borderWidth: 1, borderColor: c.borderSubtle, overflow: 'hidden' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: sp.md, minHeight: 56, paddingHorizontal: sp.lg, paddingVertical: sp.sm },
@@ -757,4 +769,4 @@ const styles = StyleSheet.create({
   promptAnswer: { ...t.callout, color: c.text },
   descriptor: { paddingVertical: sp.xs + 2, paddingHorizontal: sp.sm + 2, borderRadius: r.pill, backgroundColor: alpha(c.elevatedHigh, 0.6), borderWidth: 1, borderColor: c.borderSubtle, maxWidth: '100%' },
   descriptorText: { ...t.footnote, color: c.textSecondary },
-});
+}));

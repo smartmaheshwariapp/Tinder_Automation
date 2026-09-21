@@ -1,4 +1,4 @@
-import { theme as uiTheme, alpha } from "../theme";
+import { createStyles, theme as uiTheme, alpha } from "../theme";
 // PlatformSelectScreen.js — FlirtEasy AI Cockpit (Root Home Screen)
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
@@ -2128,7 +2128,7 @@ const t = uiTheme.type;
 const sp = uiTheme.spacing;
 const r = uiTheme.radius;
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     flex: 1,
     backgroundColor: c.background,
@@ -2595,9 +2595,9 @@ const styles = StyleSheet.create({
     color: "#FBBF24",
     letterSpacing: 0.5,
   },
-});
+}));
 
-const homeStyles = StyleSheet.create({
+const homeStyles = createStyles(() => ({
   tabContent: { flex: 1 },
   header: {
     width: "100%",
@@ -2678,4 +2678,4 @@ const homeStyles = StyleSheet.create({
     color: c.textSecondary,
     flexShrink: 1,
   },
-});
+}));

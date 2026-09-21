@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TONES } from './Badge';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 
 // Tinted rounded square holding an icon — the standard leading visual for rows and cards.
 export default function IconWell({ icon, tone = 'primary', size = 40, iconSize, style }) {
@@ -14,6 +14,6 @@ export default function IconWell({ icon, tone = 'primary', size = 40, iconSize, 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   base: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0 },
-});
+}));

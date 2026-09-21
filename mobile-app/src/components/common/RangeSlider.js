@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 
 export default function RangeSlider({
   min = 2,
@@ -65,7 +65,7 @@ export default function RangeSlider({
 }
 
 const c = uiTheme.colors;
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     marginVertical: uiTheme.spacing.xs,
   },
@@ -115,4 +115,4 @@ const styles = StyleSheet.create({
     color: c.muted,
     fontVariant: ['tabular-nums'],
   },
-});
+}));

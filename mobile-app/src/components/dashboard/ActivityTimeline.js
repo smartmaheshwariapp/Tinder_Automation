@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, LayoutAnimation, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 import { MotionTouchable, ContentTransition, FadeIn, useMotionReduced } from '../common/Motion';
 import { AppButton, AppText, Badge, Card, Chip, CountUp, EmptyState, IconWell, LiveDot } from '../ui';
 import { TONES } from '../ui/Badge';
@@ -202,7 +202,7 @@ export default function ActivityTimeline({ progressFeed }) {
     </ContentTransition>
   </View>;
 }
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: { gap: uiTheme.spacing.lg, paddingBottom: uiTheme.spacing.xl },
   intro: { gap: 6, paddingTop: uiTheme.spacing.md },
   title: { ...uiTheme.type.title, color: uiTheme.colors.text },
@@ -249,4 +249,4 @@ const styles = StyleSheet.create({
   milestone: { marginTop: uiTheme.spacing.xs },
   more: { marginTop: -uiTheme.spacing.xs },
   empty: { backgroundColor: uiTheme.colors.surface, borderRadius: uiTheme.radius.card, borderWidth: 1, borderColor: uiTheme.colors.borderSubtle },
-});
+}));

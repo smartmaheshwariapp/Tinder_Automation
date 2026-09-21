@@ -1,5 +1,5 @@
 import DialogContent from './DialogContent';
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 // mobile-app/src/components/common/PermissionPrePromptModal.js
 // Consumer-grade, high-converting permission pre-prompt modal with live feedback & GPS sync
 
@@ -335,7 +335,7 @@ export default function PermissionPrePromptModal({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   overlay: {
     flex: 1,
     backgroundColor: uiTheme.colors.scrim,
@@ -489,4 +489,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: uiTheme.spacing.sm,
   },
-});
+}));

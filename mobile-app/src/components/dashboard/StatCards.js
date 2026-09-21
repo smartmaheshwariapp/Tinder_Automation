@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 // src/components/dashboard/StatCards.js — High-end Glassmorphic Stat Metrics
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -80,7 +80,7 @@ export default function StatCards({ lifetimeStats }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: {
     flexDirection: 'row',
     // Wraps instead of clipping when the window is very narrow or the text is scaled up.
@@ -120,4 +120,4 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     maxWidth: '100%',
   },
-});
+}));

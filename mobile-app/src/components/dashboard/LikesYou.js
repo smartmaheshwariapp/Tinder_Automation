@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppButton, AppText, BottomSheet, FadeIn, LiveDot, MotionTouchable, Skeleton } from '../ui';
 import useResponsive from '../../hooks/useResponsive';
 import useTinderLikesYou from '../../hooks/useTinderLikesYou';
-import { theme, alpha } from '../../theme';
+import { createStyles, theme, alpha } from '../../theme';
 
 const c = theme.colors;
 const t = theme.type;
@@ -280,7 +280,7 @@ export default function LikesYou({ count, isLoggedIn, onOpenTinder }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   section: { gap: sp.md },
   header: { flexDirection: 'row', alignItems: 'flex-end', gap: sp.md },
   headerCopy: { flex: 1, minWidth: 0, gap: 2 },
@@ -380,4 +380,4 @@ const styles = StyleSheet.create({
   },
   chipText: { ...t.subhead, color: c.textSecondary },
   detailCta: { marginTop: sp.xs },
-});
+}));

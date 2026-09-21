@@ -1,5 +1,5 @@
 import DialogContent from './common/DialogContent';
-import { theme as uiTheme, alpha } from '../theme';
+import { createStyles, theme as uiTheme, alpha } from '../theme';
 // mobile-app/src/components/ExternalRedirectModal.js
 // Production-Grade External App Redirect Confirmation Modal with "Remember Preference"
 
@@ -217,7 +217,7 @@ export default function ExternalRedirectModal({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   backdrop: {
     flex: 1,
     backgroundColor: uiTheme.colors.scrim,
@@ -305,4 +305,4 @@ const styles = StyleSheet.create({
   copiedText: {
     color: uiTheme.colors.success,
   },
-});
+}));

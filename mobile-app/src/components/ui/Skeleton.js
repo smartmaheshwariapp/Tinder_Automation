@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMotionReduced } from '../common/Motion';
-import { theme, alpha } from '../../theme';
+import { createStyles, theme, alpha } from '../../theme';
 
 // Placeholder block with a light sweep moving across it (Airbnb / Facebook style shimmer).
 // Compose several to mirror the layout that is loading.
@@ -55,9 +55,9 @@ export function SkeletonRow({ style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   base: { backgroundColor: theme.colors.elevated, overflow: 'hidden' },
   band: { position: 'absolute', top: 0, bottom: 0, left: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, padding: theme.spacing.lg },
   lines: { flex: 1, gap: 8 },
-});
+}));

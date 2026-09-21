@@ -1,4 +1,4 @@
-import { theme as uiTheme, alpha } from '../../theme';
+import { createStyles, theme as uiTheme, alpha } from '../../theme';
 // src/components/dashboard/AgentStatusHero.js — Sleek Live Status Hero with Native Vector Icons
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
@@ -181,7 +181,7 @@ export default function AgentStatusHero({ agentState, onToggleAgent }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -249,4 +249,4 @@ const styles = StyleSheet.create({
   toggleBtnText: {
     ...uiTheme.type.buttonSmall,
   },
-});
+}));

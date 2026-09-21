@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, Image, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, alpha, getActiveTheme, THEME_OPTIONS } from '../../theme';
+import { createStyles, theme, alpha, getActiveTheme, THEME_OPTIONS } from '../../theme';
 import ThemePickerSheet from './ThemePickerSheet';
 import SafeActivityIndicator from '../common/SafeActivityIndicator';
 import { FadeIn } from '../common/Motion';
@@ -190,7 +190,7 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   // Phone baseline; the screen overrides maxWidth with useResponsive().contentMax.
   content: { width: '100%', maxWidth: theme.layout.readableMax, alignSelf: 'center', paddingTop: theme.spacing.sm, gap: theme.spacing.xxl },
   profile: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg },
@@ -220,4 +220,4 @@ const styles = StyleSheet.create({
   sectionHeader: { marginBottom: theme.spacing.sm },
   card: { overflow: 'hidden' },
   footer: { paddingVertical: theme.spacing.sm },
-});
+}));

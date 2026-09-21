@@ -8,7 +8,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 
 // Visual constants only: 44pt thumb hit box, fixed-width value bubble.
 const THUMB_HIT = 44;
@@ -325,7 +325,7 @@ export default function MultiRangeSlider({
 }
 
 const c = uiTheme.colors;
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     marginVertical: uiTheme.spacing.sm,
     paddingTop: uiTheme.spacing.xl,
@@ -418,4 +418,4 @@ const styles = StyleSheet.create({
     color: c.muted,
     fontVariant: ['tabular-nums'],
   },
-});
+}));

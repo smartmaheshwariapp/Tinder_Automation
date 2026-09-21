@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import IconButton from './IconButton';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 
 /**
  * In-screen navigation header: back button, centered-left title/subtitle, trailing actions.
@@ -29,11 +29,11 @@ export default function ScreenHeader({ title, subtitle, onBack, backLabel = 'Go 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: { width: '100%' },
   bar: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, minHeight: 52 },
   titleBox: { flex: 1, minWidth: 0 },
   right: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
   large: { marginTop: theme.spacing.sm },
   largeSubtitle: { marginTop: theme.spacing.xs },
-});
+}));

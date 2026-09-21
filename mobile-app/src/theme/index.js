@@ -360,6 +360,43 @@ export const getActiveTheme = () => activeThemeName;
 
 // Switches the palette in place. Must run before screen modules create their StyleSheets
 // (index.js does this at startup); changing it later requires an app reload.
+// ── Live theming ─────────────────────────────────────────────────────────────
+// Style sheets are created through createStyles() so they can be rebuilt in place when the
+// palette changes: the style objects keep their identity (components hold references to them)
+// but their entries are swapped for freshly built ones, and subscribers re-render. Plain objects
+// are used instead of StyleSheet.create() so the container itself stays writable.
+const styleRegistry = new Set();
+const themeListeners = new Set();
+
+export function createStyles(factory) {
+  const sheet = factory();
+  styleRegistry.add({ sheet, factory });
+  return sheet;
+}
+
+/** Subscribe to palette changes (returns an unsubscribe function). */
+export function subscribeTheme(listener) {
+  themeListeners.add(listener);
+  return () => themeListeners.delete(listener);
+}
+
+function rebuildStyles() {
+  styleRegistry.forEach((entry) => {
+    const next = entry.factory();
+    const sheet = entry.sheet;
+    // Replace each style object rather than writing into it: React Native freezes style
+    // objects once they have been used, so mutating them throws. Components read
+    // `styles.x` during render, so they pick up the replacements on the next render.
+    Object.keys(sheet).forEach((key) => {
+      if (!(key in next)) delete sheet[key];
+    });
+    Object.keys(next).forEach((key) => {
+      sheet[key] = next[key];
+    });
+  });
+}
+
+/** Switches the palette everywhere: tokens, rebuilt styles, then a re-render of subscribers. */
 export function applyTheme(name) {
   const next = THEMES[name];
   if (!next) return false;
@@ -367,6 +404,10 @@ export function applyTheme(name) {
   Object.assign(theme.colors, buildColors(next.palette, next.borderStrong));
   Object.assign(theme.gradients, buildGradients(next));
   theme.shadows.glow.shadowColor = next.palette.primary;
+  rebuildStyles();
+  themeListeners.forEach((listener) => {
+    try { listener(name); } catch (_) {}
+  });
   return true;
 }
 

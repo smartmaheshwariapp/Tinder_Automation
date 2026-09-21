@@ -1,4 +1,4 @@
-import { theme as uiTheme, alpha } from '../theme';
+import { createStyles, theme as uiTheme, alpha } from '../theme';
 // src/screens/OnboardingScreen.js — 6-Step Onboarding matching Desktop Plugin
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -3998,7 +3998,7 @@ function SectionHead({ icon, tone = 'primary', dimmed = false, title, subtitle, 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   root: {
     flex: 1,
     backgroundColor: C.background,
@@ -5369,4 +5369,4 @@ const styles = StyleSheet.create({
     ...TY.footnote,
     color: C.muted,
   },
-});
+}));

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import AppButton from '../ui/AppButton';
 import Badge from '../ui/Badge';
@@ -78,7 +78,7 @@ export default function FloatingSaveBar({ visible, saving, saveSuccess, error, o
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   anchor: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? uiTheme.spacing.xl : uiTheme.spacing.md,
@@ -154,4 +154,4 @@ const styles = StyleSheet.create({
   saveBtnStacked: { flexGrow: 1 },
   discardText: { color: c.textSecondary },
   savedBadge: { alignSelf: 'center', paddingHorizontal: uiTheme.spacing.md, paddingVertical: 6 },
-});
+}));

@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 // src/components/dashboard/AiInsightRow.js — Compact AI Engine Insight Pills
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -70,7 +70,7 @@ export default function AiInsightRow({ settings, lifetimeStats }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     gap: uiTheme.spacing.sm,
     marginBottom: uiTheme.spacing.md,
@@ -106,4 +106,4 @@ const styles = StyleSheet.create({
     fontFamily: uiTheme.fonts.label,
     marginTop: 1,
   },
-});
+}));

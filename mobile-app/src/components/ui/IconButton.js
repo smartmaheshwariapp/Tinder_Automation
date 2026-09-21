@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MotionTouchable } from '../common/Motion';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 
 /**
  * 44pt icon button. variant: filled (surface chip) | plain | tinted (primary soft).
@@ -35,10 +35,10 @@ export default function IconButton({ icon, onPress, accessibilityLabel, variant 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   base: { alignItems: 'center', justifyContent: 'center' },
   filled: { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.borderSubtle },
   tinted: { backgroundColor: theme.colors.primarySoft, borderWidth: 1, borderColor: theme.colors.primaryBorder },
   disabled: { opacity: 0.4 },
   badge: { position: 'absolute', top: 9, right: 10, width: 9, height: 9, borderRadius: 5, backgroundColor: theme.colors.primary, borderWidth: 2, borderColor: theme.colors.surface },
-});
+}));

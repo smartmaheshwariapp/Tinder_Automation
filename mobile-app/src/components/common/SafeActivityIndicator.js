@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 // mobile-app/src/components/common/SafeActivityIndicator.js
 // Universal, 100% crash-proof circular spinner for all React Native & Expo platforms
 // Replaces legacy RCTActivityIndicatorView with a high-FPS, hardware-accelerated Animated spinner
@@ -77,7 +77,7 @@ export default function SafeActivityIndicator({
 
 export { SafeActivityIndicator, SafeActivityIndicator as ActivityIndicator };
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -85,4 +85,4 @@ const styles = StyleSheet.create({
   spinnerRing: {
     borderStyle: 'solid',
   },
-});
+}));

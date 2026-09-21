@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import { MotionTouchable } from '../common/Motion';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 
 // Group heading above cards/lists: overline title, optional description and trailing text action.
 export default function SectionHeader({ title, description, actionLabel, onAction, style }) {
@@ -21,8 +21,8 @@ export default function SectionHeader({ title, description, actionLabel, onActio
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.md, paddingHorizontal: theme.spacing.xs, marginBottom: theme.spacing.sm },
   copy: { flex: 1, minWidth: 0 },
   description: { marginTop: 3 },
-});
+}));

@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../theme';
+import { createStyles, theme as uiTheme } from '../theme';
 // mobile-app/src/components/InAppNotificationBanner.js
 // Modern iOS Dynamic Island / Glassmorphism Floating In-App Push Banner HUD
 import React, { useState, useEffect, useRef } from 'react';
@@ -280,7 +280,7 @@ export default function InAppNotificationBanner({ onNavigateToStream }) {
 }
 
 const BANNER_MAX_WIDTH = 560;
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   bannerContainer: {
     position: 'absolute',
     zIndex: 9999,
@@ -405,4 +405,4 @@ const styles = StyleSheet.create({
     fontFamily: uiTheme.fonts.label,
     color: uiTheme.colors.muted,
   },
-});
+}));

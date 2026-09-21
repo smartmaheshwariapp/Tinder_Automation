@@ -23,7 +23,7 @@ import { useMotionReduced } from './common/Motion';
 import AppConfirmModal from './common/AppConfirmModal';
 import useResponsive from '../hooks/useResponsive';
 import NotificationService, { NOTIFICATION_CATEGORIES } from '../services/notifications';
-import { theme as uiTheme, alpha } from '../theme';
+import { createStyles, theme as uiTheme, alpha } from '../theme';
 
 let Haptics = null;
 try {
@@ -423,7 +423,7 @@ const c = uiTheme.colors;
 const sp = uiTheme.spacing;
 const t = uiTheme.type;
 const r = uiTheme.radius;
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   page: {
     flex: 1,
     backgroundColor: c.background,
@@ -662,4 +662,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingBottom: 80,
   },
-});
+}));

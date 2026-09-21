@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { theme, alpha } from '../../theme';
+import { createStyles, theme, alpha } from '../../theme';
 import { MotionTouchable } from '../common/Motion';
 import AppButton from '../ui/AppButton';
 import Badge from '../ui/Badge';
@@ -568,7 +568,7 @@ export default function TinderProfileCard({
 }
 
 const c = theme.colors;
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   cardContainer: {
     width: '100%',
     marginVertical: theme.spacing.xs,
@@ -1002,4 +1002,4 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: 150,
   },
-});
+}));

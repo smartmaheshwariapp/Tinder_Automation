@@ -5,17 +5,18 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { MotionTouchable } from '../common/Motion';
 import ActivityIndicator from '../common/SafeActivityIndicator';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 
 const c = theme.colors;
-const VARIANTS = {
+// Built per render so a theme change applies immediately.
+const variants = () => ({
   primary: { fg: c.onPrimary, gradient: theme.gradients.brandShort },
   secondary: { fg: c.text, bg: c.elevated, border: c.border },
   outline: { fg: c.text, bg: 'transparent', border: c.borderStrong },
   ghost: { fg: c.accent, bg: 'transparent' },
   danger: { fg: c.onPrimary, bg: c.danger },
   dangerSoft: { fg: c.error, bg: c.errorSoft, border: c.errorBorder },
-};
+});
 
 /**
  * Primary action button.
@@ -27,6 +28,7 @@ export default function AppButton({
   fullWidth = true, haptic = variant === 'primary' || variant === 'danger', style, textStyle,
   accessibilityLabel, accessibilityHint, accessibilityState, children, ...props
 }) {
+  const VARIANTS = variants();
   const v = VARIANTS[variant] || VARIANTS.primary;
   const small = size === 'sm';
   const inactive = disabled || loading;
@@ -78,7 +80,7 @@ export default function AppButton({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   base: { overflow: 'hidden', justifyContent: 'center' },
   full: { alignSelf: 'stretch' },
   hug: { alignSelf: 'flex-start' },
@@ -86,4 +88,4 @@ const styles = StyleSheet.create({
   innerSmall: { paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.sm, gap: 6 },
   text: { textAlign: 'center', flexShrink: 1 },
   disabled: { opacity: 0.45 },
-});
+}));

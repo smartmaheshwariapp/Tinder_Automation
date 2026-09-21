@@ -26,7 +26,7 @@ import IconButton from "../ui/IconButton";
 import useResponsive from "../../hooks/useResponsive";
 import useTinderLikesCount from "../../hooks/useTinderLikesCount";
 import CountUp from "../ui/CountUp";
-import { theme as uiTheme, alpha } from "../../theme";
+import { createStyles, theme as uiTheme, alpha } from "../../theme";
 
 const c = uiTheme.colors;
 const t = uiTheme.type;
@@ -767,7 +767,7 @@ function CenterAction({ onPress }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   content: {
     width: "100%",
     // Phone baseline; HomeOverview overrides maxWidth with useResponsive().contentMax so
@@ -1289,4 +1289,4 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     color: c.muted,
   },
-});
+}));

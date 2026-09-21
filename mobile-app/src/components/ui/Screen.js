@@ -2,7 +2,7 @@ import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import useResponsive from '../../hooks/useResponsive';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 
 /**
  * Screen container: safe areas, status bar, optional scrolling and keyboard avoidance,
@@ -37,7 +37,7 @@ export default function Screen({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   flex: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingBottom: theme.spacing.section },
-});
+}));

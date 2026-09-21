@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppButton, AppText, BottomSheet, FadeIn, MotionTouchable, SkeletonRow } from '../ui';
 import ActivityIndicator from '../common/SafeActivityIndicator';
 import { getCollections, refreshConversations, subscribeCollections } from '../../services/tinderCollections';
-import { theme, alpha } from '../../theme';
+import { createStyles, theme, alpha } from '../../theme';
 
 const c = theme.colors;
 const t = theme.type;
@@ -325,7 +325,7 @@ export default function MatchMessages({ settings, isLoggedIn, onOpenTinder }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   section: { gap: sp.md },
   header: { flexDirection: 'row', alignItems: 'flex-end', gap: sp.md },
   headerCopy: { flex: 1, minWidth: 0, gap: 2 },
@@ -383,4 +383,4 @@ const styles = StyleSheet.create({
   bubbleTextMine: { ...t.callout, color: c.onPrimary },
   bubbleTime: { ...t.footnote, fontSize: 11, color: c.muted, marginHorizontal: sp.xs },
   bubbleTimeMine: { textAlign: 'right' },
-});
+}));

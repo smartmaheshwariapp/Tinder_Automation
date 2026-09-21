@@ -1,4 +1,4 @@
-import { theme as uiTheme, alpha } from '../theme';
+import { createStyles, theme as uiTheme, alpha } from '../theme';
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -584,7 +584,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
 // Height reserved at the bottom of the scroll content so the sticky footer never covers it.
 const FOOTER_SPACE = uiTheme.layout.buttonHeight + uiTheme.spacing.section + uiTheme.spacing.xxl + uiTheme.spacing.lg;
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     flex: 1,
     backgroundColor: uiTheme.colors.background,
@@ -872,4 +872,4 @@ const styles = StyleSheet.create({
   loadingSubtext: {
     marginTop: uiTheme.spacing.xs,
   },
-});
+}));

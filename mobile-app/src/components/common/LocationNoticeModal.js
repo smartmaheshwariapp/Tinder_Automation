@@ -1,5 +1,5 @@
 import DialogContent from './DialogContent';
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 // mobile-app/src/components/common/LocationNoticeModal.js
 // Universal, high-converting location access, permission & feedback modal across all screens
 // Uses React Native native <Modal> portal to ensure viewport-centered, unclipped presentation over all ScrollViews
@@ -303,7 +303,7 @@ export default function LocationNoticeModal({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   modalOverlay: {
     flex: 1,
     backgroundColor: uiTheme.colors.scrim,
@@ -380,4 +380,4 @@ const styles = StyleSheet.create({
   tertiaryText: {
     color: uiTheme.colors.muted,
   },
-});
+}));

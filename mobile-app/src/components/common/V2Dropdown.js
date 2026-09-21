@@ -14,7 +14,7 @@ import {
   Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 import { useMotionReduced } from './Motion';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -152,7 +152,7 @@ export default function V2Dropdown({
 }
 
 const c = uiTheme.colors;
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     marginVertical: uiTheme.spacing.xs,
   },
@@ -262,4 +262,4 @@ const styles = StyleSheet.create({
     color: c.muted,
     marginTop: 1,
   },
-});
+}));

@@ -1,4 +1,4 @@
-import { theme as uiTheme, alpha } from "../theme";
+import { createStyles, theme as uiTheme, alpha } from "../theme";
 import { createSwipeEventFromDomMessage } from "../utils/tinderCollectionCapture";
 import {
   activateCollections,
@@ -6191,7 +6191,7 @@ const sp = uiTheme.spacing;
 const r = uiTheme.radius;
 const type = uiTheme.type;
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     flex: 1,
     backgroundColor: c.background,
@@ -7056,4 +7056,4 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-});
+}));

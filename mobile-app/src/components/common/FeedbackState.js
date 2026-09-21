@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 import ActivityIndicator from './SafeActivityIndicator';
 import { FadeIn } from './Motion';
 import AppText from '../ui/AppText';
@@ -35,7 +35,7 @@ export default function FeedbackState({ kind = 'empty', title, message, actionLa
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: { paddingHorizontal: theme.spacing.xxl, paddingVertical: theme.spacing.section, alignItems: 'center' },
   compact: { paddingVertical: theme.spacing.xl },
   inner: { alignItems: 'center', width: '100%', maxWidth: 360 },
@@ -43,4 +43,4 @@ const styles = StyleSheet.create({
   title: { marginTop: theme.spacing.lg },
   message: { marginTop: theme.spacing.sm },
   button: { marginTop: theme.spacing.xl, alignSelf: 'center' },
-});
+}));

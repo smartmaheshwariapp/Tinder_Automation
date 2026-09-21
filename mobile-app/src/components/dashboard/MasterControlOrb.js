@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme as uiTheme, alpha } from '../../theme';
+import { createStyles, theme as uiTheme, alpha } from '../../theme';
 import * as Haptics from 'expo-haptics';
 import { useMotionReduced, ContentTransition } from '../common/Motion';
 import useResponsive from '../../hooks/useResponsive';
@@ -738,7 +738,7 @@ export default function MasterControlOrb({
 // Extends the compact floating pills to a 44pt touch target.
 const PILL_HIT_SLOP = { top: 10, bottom: 10, left: 8, right: 8 };
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -969,4 +969,4 @@ const styles = StyleSheet.create({
   startPillText: {
     color: c.background,
   },
-});
+}));

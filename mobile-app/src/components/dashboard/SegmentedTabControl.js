@@ -1,4 +1,4 @@
-import { theme as uiTheme, alpha } from '../../theme';
+import { createStyles, theme as uiTheme, alpha } from '../../theme';
 // src/components/dashboard/SegmentedTabControl.js — Pill segmented switcher with a sliding selected indicator
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, View, Text, StyleSheet } from 'react-native';
@@ -100,7 +100,7 @@ export default function SegmentedTabControl({ activeTab, onSelectTab }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -143,4 +143,4 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: uiTheme.colors.text,
   },
-});
+}));

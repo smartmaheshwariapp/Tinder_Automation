@@ -1,4 +1,4 @@
-import { theme as uiTheme, alpha } from '../../theme';
+import { createStyles, theme as uiTheme, alpha } from '../../theme';
 // src/components/dashboard/MasterHeroController.js — Desktop V2 Master Control Center
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
@@ -522,7 +522,7 @@ export default function MasterHeroController({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     backgroundColor: uiTheme.colors.surface,
     borderRadius: uiTheme.radius.card,
@@ -731,4 +731,4 @@ const styles = StyleSheet.create({
     fontFamily: uiTheme.fonts.strong,
     color: uiTheme.colors.textSecondary,
   },
-});
+}));

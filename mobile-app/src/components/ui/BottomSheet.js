@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMotionReduced } from '../common/Motion';
 import AppText from './AppText';
 import IconButton from './IconButton';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 
 /**
  * Modal bottom sheet: fading scrim, spring slide-up, grab handle, title row with close,
@@ -61,7 +61,7 @@ export default function BottomSheet({ visible, onClose, title, subtitle, childre
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: theme.colors.scrim },
   anchor: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
@@ -75,4 +75,4 @@ const styles = StyleSheet.create({
   subtitle: { marginTop: 2 },
   bodyContent: { paddingHorizontal: theme.spacing.xl, paddingBottom: theme.spacing.lg },
   footer: { paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.md, gap: theme.spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.divider },
-});
+}));

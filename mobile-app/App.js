@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, StatusBar } from 'react-native';
 import SafeActivityIndicator from './src/components/common/SafeActivityIndicator';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
-import { theme } from './src/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createStyles, theme, applyTheme, subscribeTheme, THEME_STORAGE_KEY } from './src/theme';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
@@ -23,11 +24,12 @@ import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
 import SupabaseService from './src/services/supabase';
 import { MotionProvider } from './src/components/common/Motion';
 
-const navigationTheme = {
+// Built per render so an Appearance change is picked up without restarting.
+const buildNavigationTheme = () => ({
   ...DarkTheme,
   fonts: { regular: { fontFamily: theme.fonts.body, fontWeight: "normal" }, medium: { fontFamily: theme.fonts.label, fontWeight: "normal" }, bold: { fontFamily: theme.fonts.heading, fontWeight: "normal" }, heavy: { fontFamily: theme.fonts.display, fontWeight: "normal" } },
   colors: { ...DarkTheme.colors, primary: theme.colors.primary, background: theme.colors.background, card: theme.colors.surface, text: theme.colors.text, border: theme.colors.border, notification: theme.colors.primary },
-};
+});
 
 // Root shell shared by the splash and the app: gesture handling, safe-area context and a
 // safe-area inset view. Screens inside it no longer need to add the notch/home-indicator
@@ -50,6 +52,9 @@ export default function App() {
   const [initialUser, setInitialUser] = useState(null);
   const [updateStatus, setUpdateStatus] = useState("Checking for updates...");
   const [redirectNotif, setRedirectNotif] = useState(null);
+  // applyTheme() rebuilds every style sheet in place, so the app only needs to re-render.
+  const [, setThemeVersion] = useState(0);
+  useEffect(() => subscribeTheme(() => setThemeVersion((v) => v + 1)), []);
   const navigationRef = useRef(null);
 
   const [fontsLoaded, fontError] = useFonts({
@@ -87,6 +92,12 @@ export default function App() {
   useEffect(() => {
     const boot = async () => {
       try {
+        // Saved Appearance choice: applyTheme rebuilds the already-loaded style sheets.
+        try {
+          const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+          if (savedTheme) applyTheme(savedTheme);
+        } catch (_) {}
+
         if (!__DEV__) {
           try {
             setUpdateStatus("Checking for updates...");
@@ -144,7 +155,7 @@ export default function App() {
   return (
     <AppShell>
       <MotionProvider>
-      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+      <NavigationContainer ref={navigationRef} theme={buildNavigationTheme()}>
         <AppNavigator initialRouteName={initialRoute} initialUser={initialUser} />
         <InAppNotificationBanner
           onNavigateToStream={(notif) => {
@@ -167,7 +178,7 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   root: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -204,4 +215,4 @@ const styles = StyleSheet.create({
   splashSpinner: {
     marginTop: theme.spacing.xxl,
   },
-});
+}));

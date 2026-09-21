@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { useMotionReduced } from '../common/Motion';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 
 // Status dot with an expanding "live" ripple (Uber / WhatsApp live-location style).
 export default function LiveDot({ color = theme.colors.success, size = 10, active = true, ringColor, style }) {
@@ -32,7 +32,7 @@ export default function LiveDot({ color = theme.colors.success, size = 10, activ
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   center: { alignItems: 'center', justifyContent: 'center' },
   ripple: { position: 'absolute' },
-});
+}));

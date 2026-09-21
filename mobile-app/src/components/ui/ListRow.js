@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { MotionTouchable } from '../common/Motion';
 import AppText from './AppText';
 import IconWell from './IconWell';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 
 /**
  * Settings/list row: optional icon well, title + subtitle, trailing value/control/chevron.
@@ -34,11 +34,11 @@ export default function ListRow({ icon, iconTone = 'primary', title, subtitle, v
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, minHeight: 60, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.lg },
   divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
   copy: { flex: 1, minWidth: 0 },
   subtitle: { marginTop: 2 },
   value: { maxWidth: '40%', textAlign: 'right' },
   disabled: { opacity: 0.45 },
-});
+}));

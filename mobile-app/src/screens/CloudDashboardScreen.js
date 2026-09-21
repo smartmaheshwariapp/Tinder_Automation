@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../theme';
+import { createStyles, theme as uiTheme } from '../theme';
 import React from 'react';
 import {
   StyleSheet,
@@ -108,7 +108,7 @@ export default function CloudDashboardScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     flex: 1,
     backgroundColor: uiTheme.colors.background,
@@ -162,4 +162,4 @@ const styles = StyleSheet.create({
   openStreamBtn: {
     marginTop: uiTheme.spacing.lg,
   },
-});
+}));

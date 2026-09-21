@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 // src/components/dashboard/DashboardPanel.js — Apple iOS-Grade Root Dashboard Panel
 import React, { useState, useCallback } from 'react';
 import {
@@ -266,7 +266,7 @@ export default function DashboardPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   panel: {
     flex: 1,
     backgroundColor: uiTheme.colors.background,
@@ -316,4 +316,4 @@ const styles = StyleSheet.create({
   loadingRow: {
     paddingVertical: uiTheme.spacing.md,
   },
-});
+}));

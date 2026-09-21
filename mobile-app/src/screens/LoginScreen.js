@@ -1,4 +1,4 @@
-import { theme as uiTheme, alpha } from '../theme';
+import { createStyles, theme as uiTheme, alpha } from '../theme';
 // src/screens/LoginScreen.js — Upgraded Luxury Dark Dating App Login Screen
 // Featuring Cinematic Background Carousel, Luminous Aura Emblem, and Modern Glassmorphic Inputs
 import React, { useState, useRef, useEffect } from 'react';
@@ -971,7 +971,7 @@ export default function LoginScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -1396,4 +1396,4 @@ const styles = StyleSheet.create({
   conciergeContactBtn: {
     marginTop: SPACE.sm,
   },
-});
+}));

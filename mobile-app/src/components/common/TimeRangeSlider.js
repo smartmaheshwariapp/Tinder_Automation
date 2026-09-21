@@ -8,7 +8,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 
 // Visual constant only: 44pt thumb hit box.
 const THUMB_HIT = 44;
@@ -345,7 +345,7 @@ export default function TimeRangeSlider({
 }
 
 const c = uiTheme.colors;
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     marginVertical: uiTheme.spacing.xs,
   },
@@ -411,4 +411,4 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.12 }],
     borderColor: c.accent,
   },
-});
+}));

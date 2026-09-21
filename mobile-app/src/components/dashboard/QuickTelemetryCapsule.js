@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 // src/components/dashboard/QuickTelemetryCapsule.js — Compact lifetime stat strip (Swipes · Messages · Matches)
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -91,7 +91,7 @@ function Metric({ icon, tone, label, value, raw, badge }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -138,4 +138,4 @@ const styles = StyleSheet.create({
     marginVertical: uiTheme.spacing.xs,
     backgroundColor: uiTheme.colors.divider,
   },
-});
+}));

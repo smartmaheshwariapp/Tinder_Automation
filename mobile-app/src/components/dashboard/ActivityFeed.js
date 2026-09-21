@@ -1,4 +1,4 @@
-import { theme as uiTheme } from '../../theme';
+import { createStyles, theme as uiTheme } from '../../theme';
 // src/components/dashboard/ActivityFeed.js — Compact live stream of AI engine actions (rail timeline) with Match Moments count
 import React, { useRef, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
@@ -145,7 +145,7 @@ export default function ActivityFeed({ progressFeed }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   container: {
     backgroundColor: uiTheme.colors.surface,
     borderRadius: uiTheme.radius.card,
@@ -237,4 +237,4 @@ const styles = StyleSheet.create({
     color: uiTheme.colors.muted,
     flexShrink: 0,
   },
-});
+}));

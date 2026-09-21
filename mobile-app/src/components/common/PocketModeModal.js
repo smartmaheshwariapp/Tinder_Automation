@@ -14,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { theme, alpha } from "../../theme";
+import { createStyles, theme, alpha } from "../../theme";
 import useResponsive from "../../hooks/useResponsive";
 import { useMotionReduced } from "./Motion";
 import {
@@ -606,7 +606,7 @@ const DIM = {
   fill: "rgba(255, 255, 255, 0.035)",
 };
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   fullscreen: { flex: 1, backgroundColor: "#000000" },
   touchSurface: { flex: 1, backgroundColor: "#000000" },
   // paddingHorizontal, maxWidth and the vertical padding come from useResponsive().
@@ -697,4 +697,4 @@ const styles = StyleSheet.create({
     backgroundColor: DIM.fill,
   },
   unlockText: { fontFamily: theme.fonts.label, fontSize: 13, color: DIM.label, letterSpacing: 0.3 },
-});
+}));

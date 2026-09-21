@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MotionTouchable } from '../common/Motion';
-import { theme } from '../../theme';
+import { createStyles, theme } from '../../theme';
 
 // Selectable pill for filters and multi-choice options.
 export default function Chip({ label, selected = false, onPress, icon, disabled = false, style, accessibilityLabel, accessibilityRole = 'button' }) {
@@ -23,9 +23,9 @@ export default function Chip({ label, selected = false, onPress, icon, disabled 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   base: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 14, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
   selected: { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primaryBorder },
   disabled: { opacity: 0.45 },
   text: { flexShrink: 1 },
-});
+}));

@@ -26,7 +26,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../../utils/network';
 import TinderProfileCard from './TinderProfileCard';
-import { theme as uiTheme, alpha } from '../../theme';
+import { createStyles, theme as uiTheme, alpha } from '../../theme';
 import useResponsive from '../../hooks/useResponsive';
 import { FocusInput, MotionTouchable, FadeIn, ContentTransition, useMotionReduced } from '../common/Motion';
 import IconButton from '../ui/IconButton';
@@ -1763,7 +1763,7 @@ const r = uiTheme.radius;
 const ty = uiTheme.type;
 const L = uiTheme.layout;
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   // ─── Control centre (v3 layout) ───
   statusCard: {
     borderRadius: r.xl,
@@ -3463,4 +3463,4 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingRight: sp.sm,
   },
-});
+}));

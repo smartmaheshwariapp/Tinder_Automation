@@ -25,7 +25,7 @@ import MultiRangeSlider from '../common/MultiRangeSlider';
 import TimeRangeSlider, { timeToMins, minsToDisplay, minsTo24 } from '../common/TimeRangeSlider';
 import V2Dropdown from '../common/V2Dropdown';
 import { CITY_PRESETS } from '../../utils/locationHubs';
-import { theme as uiTheme, alpha } from '../../theme';
+import { createStyles, theme as uiTheme, alpha } from '../../theme';
 import useResponsive from '../../hooks/useResponsive';
 import { FocusInput, FadeIn, ContentTransition, MotionTouchable, useMotionReduced } from '../common/Motion';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -3837,7 +3837,7 @@ const sp = uiTheme.spacing;
 const r = uiTheme.radius;
 const ty = uiTheme.type;
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   // ── Wingman mission card ──
   wmFrame: { borderRadius: uiTheme.radius.xl + 1, padding: 1.2, ...uiTheme.shadows.md },
   wmCard: { borderRadius: uiTheme.radius.xl, overflow: 'hidden', backgroundColor: uiTheme.colors.surface, padding: uiTheme.spacing.lg, gap: uiTheme.spacing.lg },
@@ -5473,4 +5473,4 @@ const styles = StyleSheet.create({
     ...ty.buttonSmall,
     color: c.accent,
   },
-});
+}));

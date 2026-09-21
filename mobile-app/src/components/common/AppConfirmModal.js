@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AppButton from '../ui/AppButton';
 import { useMotionReduced } from './Motion';
-import { theme, alpha } from '../../theme';
+import { createStyles, theme, alpha } from '../../theme';
 import DialogContent from './DialogContent';
 
 const c = theme.colors;
@@ -177,7 +177,7 @@ export default function AppConfirmModal({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   overlay: {
     flex: 1,
     alignItems: 'center',
@@ -299,4 +299,4 @@ const styles = StyleSheet.create({
   warningText: {
     color: c.background,
   },
-});
+}));

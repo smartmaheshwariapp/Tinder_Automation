@@ -1,4 +1,4 @@
-import { theme as uiTheme, alpha } from '../theme';
+import { createStyles, theme as uiTheme, alpha } from '../theme';
 // src/screens/AuthScreen.js — Upgraded Luxury Dark Dating App Auth Flow
 // Ken-Burns Crossfade Carousel, Luminous Emblem Aura & Seamless Multi-Phase Auth
 import React, { useState, useRef, useEffect } from 'react';
@@ -2209,7 +2209,7 @@ export default function AuthScreen({ navigation, route }) {
 // ═══════════════════════════════════════════════════════════════════
 // STYLES
 // ═══════════════════════════════════════════════════════════════════
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   root: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -2918,4 +2918,4 @@ const styles = StyleSheet.create({
   conciergeContactBtn: {
     marginTop: SPACE.sm,
   },
-});
+}));

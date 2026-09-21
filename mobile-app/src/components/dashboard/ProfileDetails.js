@@ -11,7 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { theme, alpha } from '../../theme';
+import { createStyles, theme, alpha } from '../../theme';
 import AppConfirmModal from '../common/AppConfirmModal';
 import { FadeIn, FocusInput, MotionTouchable } from '../common/Motion';
 import { AppButton, AppText, Badge, Card, CountUp, IconButton, ListRow, SectionHeader } from '../ui';
@@ -503,7 +503,7 @@ export default function ProfileDetails({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   content: {
     width: '100%',
     // Phone baseline; the screen overrides maxWidth with useResponsive().contentMax (page) or
@@ -711,4 +711,4 @@ const styles = StyleSheet.create({
     gap: sp.md,
     marginTop: sp.sm,
   },
-});
+}));

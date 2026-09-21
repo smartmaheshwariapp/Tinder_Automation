@@ -1,26 +1,16 @@
-// Appearance picker: preview each theme and apply it (saved on the device, app reloads to apply).
+// Appearance picker: preview each theme and apply it live (saved on the device).
 import React, { useEffect, useState } from 'react';
-import { Alert, DevSettings, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Updates from 'expo-updates';
 import { AppButton, AppText, BottomSheet, MotionTouchable } from '../ui';
-import { theme, getActiveTheme, THEME_OPTIONS, THEME_STORAGE_KEY } from '../../theme';
+import { createStyles, theme, applyTheme, getActiveTheme, THEME_OPTIONS, THEME_STORAGE_KEY } from '../../theme';
 
 const c = theme.colors;
 const sp = theme.spacing;
 const r = theme.radius;
 
-async function reloadApp() {
-  try {
-    await Updates.reloadAsync();
-  } catch (_) {
-    // Development builds: fall back to the dev reload.
-    if (DevSettings?.reload) DevSettings.reload();
-    else throw _;
-  }
-}
 
 // Miniature screen drawn in the theme's own colours.
 function Preview({ preview }) {
@@ -54,12 +44,14 @@ export default function ThemePickerSheet({ visible, onClose }) {
   const apply = async () => {
     if (!changed) { onClose?.(); return; }
     setApplying(true);
+    // Applies immediately: the palette rebuilds every style sheet and re-renders the app.
+    applyTheme(choice);
+    onClose?.();
+    setApplying(false);
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, choice);
-      await reloadApp();
     } catch (_) {
-      setApplying(false);
-      Alert.alert('Theme saved', 'Close and reopen Flint to see your new theme.');
+      Alert.alert('Theme not saved', `${selected.name} is active now, but Flint could not remember it for next time.`);
     }
   };
 
@@ -80,7 +72,7 @@ export default function ThemePickerSheet({ visible, onClose }) {
             onPress={apply}
           />
           {changed ? (
-            <AppText variant="footnote" align="center">Flint restarts for a moment to apply the new theme.</AppText>
+            <AppText variant="footnote" align="center">Applies straight away and is remembered next time.</AppText>
           ) : null}
         </>
       }
@@ -126,7 +118,7 @@ export default function ThemePickerSheet({ visible, onClose }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   list: { gap: sp.md, paddingTop: sp.xs },
   option: {
     flexDirection: 'row',
@@ -165,4 +157,4 @@ const styles = StyleSheet.create({
   swatch: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.14)' },
   radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: c.borderStrong, alignItems: 'center', justifyContent: 'center' },
   radioSelected: { backgroundColor: c.primary, borderColor: c.primary },
-});
+}));
