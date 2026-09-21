@@ -6,7 +6,6 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import useExtensionStats from '../hooks/useExtensionStats';
 import useResponsive from '../hooks/useResponsive';
 import { DashboardPanel } from '../components/dashboard';
@@ -40,7 +39,7 @@ export default function CloudDashboardScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={uiTheme.colors.background} />
 
       {/* Header Bar */}
@@ -105,7 +104,7 @@ export default function CloudDashboardScreen({ route, navigation }) {
           </Card>
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

@@ -24,7 +24,6 @@ import {
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SupabaseService from '../services/supabase';
@@ -1975,7 +1974,7 @@ export default function AuthScreen({ navigation, route }) {
         <View style={[styles.scrimVignette, { zIndex: 1002 }]} />
       </View>
 
-      <SafeAreaView style={styles.safeArea}>
+      <View style={styles.safeArea}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.kavContainer}
@@ -1984,7 +1983,7 @@ export default function AuthScreen({ navigation, route }) {
         >
           {renderStage()}
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
 
       {/* ═══════════════════════════════════════════════════ */}
       {/* LEGAL & PRIVACY IN-APP SHEET (App Store 5.1.1)     */}

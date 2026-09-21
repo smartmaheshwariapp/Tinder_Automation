@@ -20,7 +20,6 @@ import {
 } from "react-native";
 import ActivityIndicator from "../components/common/SafeActivityIndicator";
 
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -1194,7 +1193,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
     0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <LinearGradient
         pointerEvents="none"
         colors={[
@@ -1878,7 +1877,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
           style={styles.dropdownOverlay}
           onPress={() => setShowQuickMenu(false)}
         >
-          <SafeAreaView edges={["top"]} style={styles.dropdownSafeArea} pointerEvents="box-none">
+          <View style={styles.dropdownSafeArea} pointerEvents="box-none">
             <Pressable
               style={styles.dropdownMenu}
               onPress={(e) => e.stopPropagation()}
@@ -1978,7 +1977,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                 <Ionicons name="chevron-forward" size={14} color="#6B5E75" />
               </TouchableOpacity>
             </Pressable>
-          </SafeAreaView>
+          </View>
         </Pressable>
       </Modal>
 
@@ -2098,7 +2097,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
         matches={pocketModeMatches}
         isRunning={isAutomationRunning}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

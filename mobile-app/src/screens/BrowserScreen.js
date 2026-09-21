@@ -3092,7 +3092,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
   const headerPad = isCompact ? uiTheme.spacing.md : uiTheme.spacing.lg;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -6147,7 +6147,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
         matches={onDeviceMatches}
         isRunning={Boolean(onDeviceSwiping)}
       />
-    </SafeAreaView>
+    </View>
   );
 });
 

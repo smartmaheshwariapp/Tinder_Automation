@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import ActivityIndicator from '../components/common/SafeActivityIndicator';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveLocalUrl } from '../utils/network';
 import { terminatePreviousSessions, registerActiveSession, startHyperbeamCloudSession, getSharedExtensionSettings } from '../utils/sessionManager';
@@ -227,7 +226,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={uiTheme.colors.background} />
       {loading && (
         <View style={styles.loadingOverlay} accessibilityViewIsModal accessibilityLiveRegion="polite">
@@ -578,7 +577,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
           </AppText>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

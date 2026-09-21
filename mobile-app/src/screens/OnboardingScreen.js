@@ -32,7 +32,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StackActions } from '@react-navigation/native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import trackingService from '../services/trackingService';
@@ -2526,7 +2526,7 @@ export default function OnboardingScreen({ navigation }) {
         pointerEvents="none"
       />
 
-      <SafeAreaView style={styles.safeArea}>
+      <View style={styles.safeArea}>
         {/* ── Progress Header: back + step X of N + segmented bar ── */}
         <View style={[styles.topBar, scrollPadding]}>
           <View style={styles.topBarInner}>
@@ -3621,7 +3621,7 @@ export default function OnboardingScreen({ navigation }) {
             </ContentTransition>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* ── Country Picker Sheet ── */}
       <Modal
