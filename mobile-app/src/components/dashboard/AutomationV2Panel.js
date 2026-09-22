@@ -42,11 +42,11 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// ─── Feature Flags (Hidden in On-Device mode for clean UX, preserved for future cloud mode) ───
+// ─── Feature Flags ───
 const SHOW_CHAT_STYLE_TRAINING = false;
 const SHOW_AI_ACTIVE_TIME = false;
-const SHOW_SWIPING_CONTROLS = false;
-const SHOW_MESSAGING_CONTROLS = false;
+const SHOW_SWIPING_CONTROLS = true;
+const SHOW_MESSAGING_CONTROLS = true;
 const SHOW_LOCATION_FEATURE = false;
 const SHOW_DEFAULT_LANGUAGE = false;
 // Previous accordion layout of the "Your Dating Goal" card, kept for reference.
@@ -58,9 +58,6 @@ const GOAL_OPTIONS = [
   { id: 'date', label: 'Set up a Date', desc: 'Propose coffee, drinks, dinner or activity', icon: 'calendar-outline' },
   { id: 'phone', label: 'Get Phone Number / WhatsApp', desc: 'Move conversation to WhatsApp or SMS', icon: 'logo-whatsapp' },
   { id: 'instagram', label: 'Get Social Media', desc: 'Exchange Instagram handles and socials', icon: 'logo-instagram' },
-  // { id: 'move_to_telegram', label: 'Move to Telegram', desc: 'Direct match to your Telegram username', icon: 'paper-plane-outline' },
-  { id: 'move_to_instagram', label: 'Move to Instagram (Pitch)', desc: 'Pitch your IG profile handle directly', icon: 'camera-outline' },
-  // { id: 'move_to_tango', label: 'Move to Tango', desc: 'Direct contact transition to Tango', icon: 'call-outline' },
   { id: 'never', label: 'Keep Engaging', desc: 'Continuous natural AI conversation on-app', icon: 'infinite-outline' },
 ];
 
@@ -708,7 +705,7 @@ function GoalOptionCard({ option, selected, onPress }) {
   return (
     <MotionTouchable
       onPress={onPress}
-      accessibilityRole="radio"
+      accessibilityRole="checkbox"
       accessibilityLabel={`${option.label}. ${option.desc}`}
       accessibilityState={{ checked: selected, selected }}
       pressScale={0.98}
@@ -938,12 +935,30 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
     if (settings) {
       const cloned = JSON.parse(JSON.stringify(settings));
 
-      // Resolve goal and stopAfterGoal from settings / stopConditions
-      if (!cloned.goal && Array.isArray(cloned.stopConditions)) {
-        cloned.goal = cloned.stopConditions[0] || 'never';
+      // Resolve goal, stopConditions, and selectedGoals from settings
+      let initialGoals = [];
+      if (Array.isArray(cloned.selectedGoals) && cloned.selectedGoals.length > 0) {
+        initialGoals = cloned.selectedGoals;
+      } else if (Array.isArray(cloned.stopConditions) && cloned.stopConditions.length > 0) {
+        initialGoals = cloned.stopConditions;
+      } else if (cloned.goal) {
+        initialGoals = [cloned.goal];
+      } else {
+        initialGoals = ['never'];
       }
+      initialGoals = initialGoals.map(g => g === 'never_stop' ? 'never' : g);
+      if (initialGoals.includes('never') || initialGoals.length === 0) {
+        initialGoals = ['never'];
+      }
+      cloned.selectedGoals = initialGoals;
+      cloned.goal = initialGoals[0] || 'never';
+      cloned.stopConditions = initialGoals.includes('never') ? [] : initialGoals;
       if (cloned.stopAfterGoal === undefined && cloned.stopAfterGoalEnabled !== undefined) {
         cloned.stopAfterGoal = cloned.stopAfterGoalEnabled;
+      }
+      if (cloned.goal === 'never') {
+        cloned.stopAfterGoal = false;
+        cloned.stopAfterGoalEnabled = false;
       }
       if (cloned.locationLatitude === undefined) cloned.locationLatitude = 40.7128;
       if (cloned.locationLongitude === undefined) cloned.locationLongitude = -74.0060;
@@ -985,6 +1000,14 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
     }
   }, [saveSuccess, hideSaveBar, onDirtyChange]);
 
+  useEffect(() => {
+    return () => {
+      if (formRef.current && hasUnsavedChanges) {
+        handleSavePress(formRef.current);
+      }
+    };
+  }, [hasUnsavedChanges, handleSavePress]);
+
   const toggleCard = (cardKey) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setOpenCards(prev => ({
@@ -1002,11 +1025,29 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
     if (settings) {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const cloned = JSON.parse(JSON.stringify(settings));
-      if (!cloned.goal && Array.isArray(cloned.stopConditions)) {
-        cloned.goal = cloned.stopConditions[0] || 'never';
+      let initialGoals = [];
+      if (Array.isArray(cloned.selectedGoals) && cloned.selectedGoals.length > 0) {
+        initialGoals = cloned.selectedGoals;
+      } else if (Array.isArray(cloned.stopConditions) && cloned.stopConditions.length > 0) {
+        initialGoals = cloned.stopConditions;
+      } else if (cloned.goal) {
+        initialGoals = [cloned.goal];
+      } else {
+        initialGoals = ['never'];
       }
+      initialGoals = initialGoals.map(g => g === 'never_stop' ? 'never' : g);
+      if (initialGoals.includes('never') || initialGoals.length === 0) {
+        initialGoals = ['never'];
+      }
+      cloned.selectedGoals = initialGoals;
+      cloned.goal = initialGoals[0] || 'never';
+      cloned.stopConditions = initialGoals.includes('never') ? [] : initialGoals;
       if (cloned.stopAfterGoal === undefined && cloned.stopAfterGoalEnabled !== undefined) {
         cloned.stopAfterGoal = cloned.stopAfterGoalEnabled;
+      }
+      if (cloned.goal === 'never') {
+        cloned.stopAfterGoal = false;
+        cloned.stopAfterGoalEnabled = false;
       }
       setForm(cloned);
       formRef.current = cloned;
@@ -1024,10 +1065,17 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
       const payload = { ...targetForm };
 
       // Ensure goal, stopConditions, and stopAfterGoal are in 100% parity with Desktop V2
-      const activeGoal = payload.goal || 'never';
-      payload.goal = activeGoal;
-      payload.stopConditions = activeGoal === 'never' ? [] : [activeGoal];
-      payload.stopAfterGoalEnabled = payload.stopAfterGoal !== false && activeGoal !== 'never';
+      let activeGoals = Array.isArray(payload.selectedGoals) && payload.selectedGoals.length > 0
+        ? payload.selectedGoals
+        : [payload.goal || 'never'];
+      activeGoals = activeGoals.map(g => g === 'never_stop' ? 'never' : g);
+      if (activeGoals.includes('never') || activeGoals.length === 0) {
+        activeGoals = ['never'];
+      }
+      payload.selectedGoals = activeGoals;
+      payload.goal = activeGoals[0] || 'never';
+      payload.stopConditions = activeGoals.includes('never') ? [] : activeGoals;
+      payload.stopAfterGoalEnabled = payload.stopAfterGoal !== false && !activeGoals.includes('never');
       payload.stopAfterGoal = payload.stopAfterGoalEnabled;
 
       // Ensure tone and chattingStyle are both set
@@ -1746,11 +1794,18 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
   };
 
   // ─── Redesigned page: derived display values (read-only views of `form`) ───
-  const activeGoalId = form.goal || 'never';
+  let selectedGoalIds = Array.isArray(form.selectedGoals) && form.selectedGoals.length > 0
+    ? form.selectedGoals.map(g => g === 'never_stop' ? 'never' : g)
+    : [form.goal || 'never'];
+  if (selectedGoalIds.includes('never') || selectedGoalIds.length === 0) {
+    selectedGoalIds = ['never'];
+  }
+  const isNeverActive = selectedGoalIds.includes('never');
+  const activeGoalId = selectedGoalIds[0] || 'never';
   const activeGoal = GOAL_OPTIONS.find(g => g.id === activeGoalId)
     || { id: activeGoalId, label: 'Custom goal', desc: 'Pick a goal below to change how the wingman steers chats', icon: 'flag-outline' };
   // Mirrors what gets saved (handleSavePress treats a missing goal as 'never').
-  const stopAfterGoalOn = form.stopAfterGoal !== false && activeGoalId !== 'never';
+  const stopAfterGoalOn = form.stopAfterGoal !== false && !isNeverActive;
   const instagramEnabled = form.contactDetails?.instagram?.enabled !== false;
   const whatsappEnabled = form.contactDetails?.whatsapp?.enabled !== false;
   const currentGender = (form.userGenderOverride || 'auto').toLowerCase();
@@ -1760,8 +1815,51 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
   };
   const instagramBadge = handleBadge(instagramEnabled, form.contactDetails?.instagram?.value, 'Instagram');
   // Short name of the goal for the journey strip (Match → Chat → goal).
-  const GOAL_STEP = { date: 'Date', phone: 'WhatsApp', instagram: 'Socials', move_to_instagram: 'Instagram', never: 'Keep chatting' };
-  const goalStep = GOAL_STEP[activeGoalId] || 'Goal';
+  const GOAL_STEP = { date: 'Date', phone: 'WhatsApp', instagram: 'Socials', never: 'Keep chatting' };
+  const goalStep = isNeverActive ? 'Keep chatting' : selectedGoalIds.map(id => GOAL_STEP[id] || id).join(' / ');
+
+  const handleGoalPress = (goalId) => {
+    let current = Array.isArray(form.selectedGoals) && form.selectedGoals.length > 0
+      ? form.selectedGoals.map(g => g === 'never_stop' ? 'never' : g)
+      : [form.goal || 'never'];
+
+    if (goalId === 'never' || goalId === 'never_stop') {
+      // If user chooses keep engaging, all other options are cleared!
+      updateFields({
+        selectedGoals: ['never'],
+        goal: 'never',
+        stopConditions: [],
+        stopAfterGoal: false,
+      });
+      return;
+    }
+
+    // User chooses one of the 3 specific options (date, phone, instagram)
+    // Remove 'never' since keep engaging is mutually exclusive
+    let filtered = current.filter(g => g !== 'never' && g !== 'never_stop');
+
+    if (filtered.includes(goalId)) {
+      filtered = filtered.filter(g => g !== goalId);
+      // If no options remain, fall back to Keep Engaging ('never')
+      if (filtered.length === 0) {
+        filtered = ['never'];
+      }
+    } else {
+      // Add this option (up to 3)
+      filtered.push(goalId);
+    }
+
+    const isNever = filtered.includes('never') || filtered.length === 0;
+    const newSelected = isNever ? ['never'] : filtered;
+    const primaryGoal = isNever ? 'never' : newSelected[0];
+
+    updateFields({
+      selectedGoals: newSelected,
+      goal: primaryGoal,
+      stopConditions: isNever ? [] : newSelected,
+      stopAfterGoal: !isNever && form.stopAfterGoal !== false,
+    });
+  };
   const handleState = (enabled, value) => (!enabled ? 'off' : String(value || '').trim() ? 'ready' : 'missing');
   const HANDLE_STATE = {
     ready: { label: 'Ready', icon: 'checkmark-circle', color: uiTheme.colors.success },
@@ -1914,33 +2012,41 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
         {/* ════════════════════ SECTION: DATING GOAL ════════════════════ */}
         <View style={styles.pageSection}>
           <FadeIn delay={50}>
-            <SectionHeader title="Dating goal" description="How the AI Wingman steers and closes conversations." />
+            <SectionHeader
+              title="Dating goal"
+              description={isNeverActive
+                ? "Keep Engaging is active — continuous natural AI conversation on-app with no rush."
+                : "Select up to 3 goals. Choose Keep Engaging anytime to clear all and chat non-stop."}
+            />
           </FadeIn>
-          <View style={[styles.goalList, optionCols > 1 && styles.goalGrid]} accessibilityRole="radiogroup" accessibilityLabel="Primary Goal">
-            {GOAL_OPTIONS.map((option, idx) => (
-              <FadeIn key={option.id} delay={100 + idx * 40} style={optionItemStyle}>
-                <GoalOptionCard
-                  option={option}
-                  selected={activeGoalId === option.id}
-                  onPress={() => updateField('goal', option.id)}
-                />
-              </FadeIn>
-            ))}
+          <View style={[styles.goalList, optionCols > 1 && styles.goalGrid]} accessibilityRole="group" accessibilityLabel="Dating Goals">
+            {GOAL_OPTIONS.map((option, idx) => {
+              const isSelected = selectedGoalIds.includes(option.id);
+              return (
+                <FadeIn key={option.id} delay={100 + idx * 40} style={optionItemStyle}>
+                  <GoalOptionCard
+                    option={option}
+                    selected={isSelected}
+                    onPress={() => handleGoalPress(option.id)}
+                  />
+                </FadeIn>
+              );
+            })}
           </View>
           <FadeIn delay={320}>
             <Card padding="none" style={styles.groupCard}>
-              <View style={[styles.settingRow, form.goal === 'never' && styles.settingRowDisabled]}>
+              <View style={[styles.settingRow, isNeverActive && styles.settingRowDisabled]}>
                 <IconWell icon="flag-outline" tone={stopAfterGoalOn ? 'secondary' : 'neutral'} size={40} />
                 <View style={styles.settingRowCopy}>
                   <AppText variant="bodyStrong" numberOfLines={1}>Stop After Goal</AppText>
                   <AppText variant="footnote" numberOfLines={2} style={styles.settingRowSub}>
-                    {form.goal === 'never' ? 'Not used while Keep Engaging is selected' : 'Stop messaging a match once the goal is reached'}
+                    {isNeverActive ? 'Not used while Keep Engaging is selected' : 'Stop messaging a match once any selected goal is reached'}
                   </AppText>
                 </View>
                 <Switch
                   accessibilityLabel="Stop After Goal"
-                  value={form.stopAfterGoal !== false && form.goal !== 'never'}
-                  disabled={form.goal === 'never'}
+                  value={form.stopAfterGoal !== false && !isNeverActive}
+                  disabled={isNeverActive}
                   onValueChange={v => updateField('stopAfterGoal', v)}
                   trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
                   thumbColor={uiTheme.colors.white}
@@ -2017,6 +2123,198 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             </View>
           </Card>
         </FadeIn>
+
+        {/* ════════════════════ SECTION: SMART MATCH INTELLIGENCE ════════════════════ */}
+        {(() => {
+          const userProfile = form?.userProfile || settings?.userProfile;
+          const isProfileSynced = Boolean(userProfile && userProfile.name);
+          const syncTimestamp = userProfile?.syncedAt || userProfile?.lastSyncedAt;
+          const syncAgeDays = syncTimestamp ? (Date.now() - syncTimestamp) / (1000 * 60 * 60 * 24) : 999;
+          const isProfileValid = isProfileSynced && syncAgeDays <= 7;
+          const isSmartMatchOn = form?.aiMatchEnabled === true;
+          const currentThreshold = typeof form?.aiMatchThreshold === 'number' ? form.aiMatchThreshold : 60;
+          const maxDistance = typeof form?.aiMatchMaxDistance === 'number' ? form.aiMatchMaxDistance : 0;
+
+          return (
+            <FadeIn delay={460} style={styles.pageSection}>
+              <SectionHeader
+                title="Smart Match Intelligence"
+                description="AI analyzes compatibility against your profile to like the right matches."
+              />
+              <Card padding="none" style={styles.groupCard}>
+                {/* Master Toggle Row */}
+                <View style={styles.settingRow}>
+                  <IconWell
+                    icon="sparkles"
+                    tone={isSmartMatchOn ? "primary" : "neutral"}
+                    size={40}
+                  />
+                  <View style={styles.settingRowCopy}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <AppText variant="bodyStrong" numberOfLines={1}>Smart Match Mode</AppText>
+                      {isSmartMatchOn && (
+                        <Badge
+                          tone={isProfileValid ? "primary" : "warning"}
+                          label={isProfileValid ? "Active" : "Ready"}
+                          style={{ paddingHorizontal: 6, paddingVertical: 1 }}
+                        />
+                      )}
+                    </View>
+                    <AppText variant="footnote" numberOfLines={2} style={styles.settingRowSub}>
+                      {isSmartMatchOn
+                        ? (isProfileValid
+                            ? `Only auto-likes profiles with ≥ ${currentThreshold}% compatibility`
+                            : 'Smart Match is ON. Will start scoring as soon as Tinder loads your profile.')
+                        : 'Score profiles before swiping (currently OFF)'}
+                    </AppText>
+                  </View>
+                  <Switch
+                    accessibilityLabel="Smart Match Mode"
+                    value={isSmartMatchOn}
+                    onValueChange={v => {
+                      updateField('aiMatchEnabled', v);
+                      handleSavePress({ ...(formRef.current || form || {}), aiMatchEnabled: v });
+                    }}
+                    trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                    thumbColor={uiTheme.colors.white}
+                    ios_backgroundColor={uiTheme.colors.elevatedHigh}
+                  />
+                </View>
+
+                {!isProfileValid && isSmartMatchOn && (
+                  <View style={{ padding: 12, backgroundColor: alpha(uiTheme.colors.warning, 0.08), borderTopWidth: 1, borderColor: alpha(uiTheme.colors.warning, 0.2), flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="information-circle-outline" size={16} color={uiTheme.colors.warning} />
+                    <AppText variant="footnote" style={{ color: uiTheme.colors.warning, flex: 1 }}>
+                      {!isProfileSynced
+                        ? 'Profile sync pending. Smart Match is armed and will evaluate profiles as soon as Tinder loads.'
+                        : 'Profile data is over 7 days old. Smart Match will refresh your profile automatically.'}
+                    </AppText>
+                  </View>
+                )}
+
+                {/* Sub-controls when Smart Match is ON */}
+                {isSmartMatchOn && (
+                  <View style={{ padding: 16, borderTopWidth: 1, borderColor: uiTheme.colors.border }}>
+                    {/* Minimum Compatibility Threshold Slider */}
+                    <View style={{ marginBottom: 18 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <AppText variant="bodyStrong">Minimum Compatibility</AppText>
+                        <View style={styles.v2ValueBadge}>
+                          <Text style={styles.v2ValueBadgeText}>{currentThreshold}%</Text>
+                        </View>
+                      </View>
+                      <RangeSlider
+                        min={30}
+                        max={90}
+                        step={5}
+                        value={currentThreshold}
+                        unit="%"
+                        onValueChange={val => {
+                          updateField('aiMatchThreshold', val);
+                          handleSavePress({ ...(formRef.current || form || {}), aiMatchThreshold: val });
+                        }}
+                      />
+                      <AppText variant="footnote" color="textSecondary" style={{ marginTop: 6 }}>
+                        Profiles scoring below {currentThreshold}% will be passed automatically.
+                      </AppText>
+                    </View>
+
+                    {/* Strict Relationship Goals Filter */}
+                    <View style={[styles.rowBetween, { paddingVertical: 12, borderTopWidth: 1, borderColor: uiTheme.colors.border }]}>
+                      <View style={{ flex: 1, paddingRight: 12 }}>
+                        <AppText variant="bodyStrong">Filter by Relationship Goal</AppText>
+                        <AppText variant="footnote" color="textSecondary" style={{ marginTop: 2 }}>
+                          Automatically pass profiles whose dating intent conflicts with yours
+                        </AppText>
+                      </View>
+                      <Switch
+                        accessibilityLabel="Filter by Relationship Goal"
+                        value={form?.aiMatchStrictGoals !== false}
+                        onValueChange={v => {
+                          updateField('aiMatchStrictGoals', v);
+                          handleSavePress({ ...(formRef.current || form || {}), aiMatchStrictGoals: v });
+                        }}
+                        trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                        thumbColor={uiTheme.colors.white}
+                        ios_backgroundColor={uiTheme.colors.elevatedHigh}
+                      />
+                    </View>
+
+                    {/* Distance Limit Slider */}
+                    <View style={{ paddingVertical: 12, borderTopWidth: 1, borderColor: uiTheme.colors.border }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <AppText variant="bodyStrong">Maximum Distance</AppText>
+                        <View style={styles.v2ValueBadge}>
+                          <Text style={styles.v2ValueBadgeText}>
+                            {maxDistance > 0 ? `${maxDistance} mi` : 'No Limit (Off)'}
+                          </Text>
+                        </View>
+                      </View>
+                      <RangeSlider
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={maxDistance}
+                        unit=" mi"
+                        onValueChange={val => {
+                          updateField('aiMatchMaxDistance', val);
+                          handleSavePress({ ...(formRef.current || form || {}), aiMatchMaxDistance: val });
+                        }}
+                      />
+                      <AppText variant="footnote" color="textSecondary" style={{ marginTop: 6 }}>
+                        {maxDistance > 0
+                          ? `Pass profiles farther than ${maxDistance} miles.`
+                          : 'No distance dealbreaker. Distance is only scored for proximity bonus.'}
+                      </AppText>
+                    </View>
+
+                    {/* Deep AI Analysis Toggle */}
+                    <View style={[styles.rowBetween, { paddingVertical: 12, borderTopWidth: 1, borderColor: uiTheme.colors.border }]}>
+                      <View style={{ flex: 1, paddingRight: 12 }}>
+                        <AppText variant="bodyStrong">Deep AI Analysis</AppText>
+                        <AppText variant="footnote" color="textSecondary" style={{ marginTop: 2 }}>
+                          Use advanced AI to evaluate profiles that are close to your match threshold.
+                        </AppText>
+                      </View>
+                      <Switch
+                        accessibilityLabel="Deep AI Analysis"
+                        value={Boolean(form?.aiMatchUseLLM)}
+                        onValueChange={v => {
+                          updateField('aiMatchUseLLM', v);
+                          handleSavePress({ ...(formRef.current || form || {}), aiMatchUseLLM: v });
+                        }}
+                        trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                        thumbColor={uiTheme.colors.white}
+                        ios_backgroundColor={uiTheme.colors.elevatedHigh}
+                      />
+                    </View>
+
+                    {/* Show Compatibility Scores Toggle */}
+                    <View style={[styles.rowBetween, { paddingVertical: 12, borderTopWidth: 1, borderColor: uiTheme.colors.border }]}>
+                      <View style={{ flex: 1, paddingRight: 12 }}>
+                        <AppText variant="bodyStrong">Show Compatibility Scores</AppText>
+                        <AppText variant="footnote" color="textSecondary" style={{ marginTop: 2 }}>
+                          Display compatibility badges and breakdown chips on cards
+                        </AppText>
+                      </View>
+                      <Switch
+                        accessibilityLabel="Show Compatibility Scores"
+                        value={form?.aiMatchShowScores !== false}
+                        onValueChange={v => {
+                          updateField('aiMatchShowScores', v);
+                          handleSavePress({ ...(formRef.current || form || {}), aiMatchShowScores: v });
+                        }}
+                        trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
+                        thumbColor={uiTheme.colors.white}
+                        ios_backgroundColor={uiTheme.colors.elevatedHigh}
+                      />
+                    </View>
+                  </View>
+                )}
+              </Card>
+            </FadeIn>
+          );
+        })()}
 
         {/* ════════════════════ CARD 1 (LEGACY ACCORDION LAYOUT, HIDDEN): YOUR DATING GOAL (V2 DESKTOP PARITY) ════════════════════ */}
         {SHOW_LEGACY_GOAL_ACCORDION && (
@@ -2690,10 +2988,6 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 <Text style={styles.v2ChipText}>{getMessagingSummary().intention}</Text>
               </View>
               <View style={styles.v2Chip}>
-                <Ionicons name="swap-horizontal" size={11} color={uiTheme.colors.info} />
-                <Text style={styles.v2ChipText}>{getMessagingSummary().priority}</Text>
-              </View>
-              <View style={styles.v2Chip}>
                 <Ionicons name="color-wand" size={11} color={uiTheme.colors.success} />
                 <Text style={styles.v2ChipText}>{getMessagingSummary().tone}</Text>
               </View>
@@ -2898,59 +3192,6 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   />
                 </View>
               )}
-
-              {/* ─── Messaging Priority (Replies vs New Matches) ─── */}
-              <View style={styles.subBox}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.subBoxTitle}>
-                    Messaging Priority <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.body, color: uiTheme.colors.muted }}>(Replies : New Matches)</Text>
-                  </Text>
-                  <TouchableOpacity accessibilityRole="button"
-                    onPress={() => setTooltipModal({
-                      title: 'Messaging Priority',
-                      lines: [
-                        'Splits AI time between replies & new outreach',
-                        '⬅ 70:30 → mostly replies to current chats',
-                        '⬛ 50:50 → balanced (recommended)',
-                        '➡ 30:70 → aggressively messages new matches'
-                      ]
-                    })}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="information-circle-outline" size={14} color={uiTheme.colors.muted} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={[styles.labelMuted, { marginBottom: 8 }]}>Splits AI time between ongoing conversation replies & new match outreach:</Text>
-                
-                <View style={styles.speedButtonGroup}>
-                  {PRIORITY_PRESETS.map(preset => {
-                    const currentVal = form.prioritySlider ?? form.minReplySlots ?? 50;
-                    const isSelected = currentVal === preset.value;
-                    return (
-                      <TouchableOpacity accessibilityRole="button"
-                        key={preset.value}
-                        style={[styles.speedBtn, isSelected && styles.speedBtnActive]}
-                        onPress={() => {
-                          updateField('prioritySlider', preset.value);
-                          updateField('minReplySlots', preset.value === 30 ? 70 : (preset.value === 70 ? 30 : 50));
-                          updateField('maxNewMatchSlots', preset.value === 30 ? 30 : (preset.value === 70 ? 70 : 50));
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[styles.speedBtnText, isSelected && styles.speedBtnTextActive]}>
-                          {preset.ratio}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <View style={{ marginTop: 8 }}>
-                  <Text style={{ ...uiTheme.type.footnote, fontFamily: uiTheme.fonts.label, color: uiTheme.colors.primary }}>
-                    {PRIORITY_PRESETS.find(p => p.value === (form.prioritySlider ?? form.minReplySlots ?? 50))?.desc || 'Balanced outreach & replies (Recommended)'}
-                  </Text>
-                </View>
-              </View>
             </View>
           )}
         </View>

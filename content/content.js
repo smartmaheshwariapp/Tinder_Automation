@@ -224,6 +224,15 @@ function stopAllAutomation() {
 window.__flirteasyStopAutomation = stopAllAutomation;
 window.__linksyStopSwiping = stopAllAutomation;
 window.__flirteasyStartAutomation = function(count, initialProgress) {
+  try {
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'FE_LOG',
+        text: '🚀 Auto-swiping engine engaged in DOM (Target: ' + (count || 50) + ')',
+        logType: 'success'
+      }));
+    }
+  } catch (_) {}
   try { chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }, () => {}); } catch (_) {}
   window.__flirteasyAutoStartCount = count || 50;
   if (initialProgress !== undefined) window.__flirteasyAutoStartProgress = initialProgress;
@@ -1168,6 +1177,12 @@ async function autoLike(count = 50, initialProgress = undefined) {
     console.log(`[FlirtEasy]   About Myself         : ${settings.aboutMyself ? `"${settings.aboutMyself.substring(0, 60)}${settings.aboutMyself.length > 60 ? '...' : ''}"` : 'Not set'}`);
     console.log(`[FlirtEasy]   Custom Prompt        : ${settings.customPrompt ? `"${settings.customPrompt.substring(0, 60)}${settings.customPrompt.length > 60 ? '...' : ''}"` : 'Not set'}`);
 
+    console.log('%c[FlirtEasy] ── SMART MATCH SCORER ──', 'color:#667085;font-weight:bold;');
+    console.log(`[FlirtEasy]   Smart Match Enabled  : ${settings.aiMatchEnabled ? 'YES' : 'NO'}`);
+    console.log(`[FlirtEasy]   Match Threshold      : ${settings.aiMatchThreshold ?? 60}%`);
+    console.log(`[FlirtEasy]   Max Distance (mi)    : ${settings.aiMatchMaxDistance ? `${settings.aiMatchMaxDistance} mi` : 'No Limit'}`);
+    console.log(`[FlirtEasy]   Strict Goals Filter  : ${settings.aiMatchStrictGoals !== false ? 'YES' : 'NO'}`);
+
     console.log('%c[FlirtEasy] ════════════════════════════════════', 'color:#e91e8c;font-weight:bold;');
 
     // 1. Wait for Tinder DOM to be hydrated and user logged in (up to 15s)
@@ -1186,6 +1201,15 @@ async function autoLike(count = 50, initialProgress = undefined) {
 
     if (!isLoggedIn()) {
       console.warn('[FlirtEasy] Timed out waiting for Tinder session to hydrate.');
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FE_ERROR',
+            message: 'Tinder session not ready: please ensure you are logged into Tinder',
+            errors: ['Tinder session not ready']
+          }));
+        }
+      } catch (_) {}
       return { success: false, likesCompleted: 0, errors: ['Tinder session not ready'] };
     }
 
@@ -1346,13 +1370,13 @@ async function autoLike(count = 50, initialProgress = undefined) {
           break;
         }
 
-        if (isStackEmpty()) {
+        let profileVisible = isProfileVisible();
+        console.log(`[FlirtEasy] Profile visible: ${profileVisible}`);
+
+        if (!profileVisible && isStackEmpty()) {
           console.log('[FlirtEasy] Stack is empty (no more matches), stopping cycle');
           break;
         }
-
-        let profileVisible = isProfileVisible();
-        console.log(`[FlirtEasy] Profile visible: ${profileVisible}`);
 
         if (!profileVisible) {
           console.warn(`[FlirtEasy] No profile card loaded at check ${profilesChecked} — Tinder is searching/loading recs`);
@@ -1536,9 +1560,110 @@ async function autoLike(count = 50, initialProgress = undefined) {
             };
 
         const currentPhotoUrl = candidate.photoUrl || candidate.photos?.[0] || (typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl(currentName) : null);
-        const profileDetail = candidate.age
-          ? `Age ${candidate.age} · Verified Profile`
-          : (candidate.bio ? candidate.bio.slice(0, 42).trim() : 'AI Target Match · Safe Paced');
+
+        // Smart AI Compatibility Scorer Gate (Smart Match Mode)
+        let aiScore = null;
+        if (typeof scoreCandidateLocal === 'function') {
+          try {
+            aiScore = scoreCandidateLocal(candidate, settings.userProfile, settings);
+          } catch (err) {
+            console.warn('[FlirtEasy] scoreCandidateLocal error:', err);
+          }
+        }
+
+        // Smart Match Mode Gate: enforce hard filters & minimum compatibility threshold
+        if (settings.aiMatchEnabled) {
+          console.log(`[FlirtEasy] Smart Match Mode active: evaluating candidate "${candidate.name}"...`);
+
+          // 1. Hard filters check (relationship goal alignment & max distance dealbreaker)
+          const hardFilterCheck = typeof checkHardFilters === 'function'
+            ? checkHardFilters(candidate, settings.userProfile, settings)
+            : { passed: true };
+
+          if (!hardFilterCheck.passed) {
+            console.log(`[FlirtEasy] Hard filter rejected candidate "${candidate.name}": ${hardFilterCheck.reason}, PASSING`);
+            const passed = clickPassButton();
+            if (passed) {
+              console.log(`[FlirtEasy] Successfully passed profile (${hardFilterCheck.reason})`);
+              try {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'FE_SWIPE',
+                    action: 'pass',
+                    profileId: candidate.id,
+                    name: candidate.name,
+                    age: candidate.age,
+                    bio: candidate.bio,
+                    photos: candidate.photos,
+                    photoUrl: currentPhotoUrl,
+                    interests: candidate.interests,
+                    job: candidate.job,
+                    school: candidate.school,
+                    city: candidate.city,
+                    distanceMi: candidate.distanceMi,
+                    lookingFor: candidate.lookingFor,
+                    descriptors: candidate.descriptors,
+                    questionAnswers: candidate.questionAnswers,
+                    verified: candidate.verified,
+                    detail: `Passed · ${hardFilterCheck.reason}`,
+                    matchScore: aiScore?.score ?? null,
+                    matchConfidence: aiScore?.confidence ?? null,
+                    matchLabel: aiScore?.label ?? 'Filtered Out',
+                    matchBreakdown: aiScore?.breakdown ?? [],
+                  }));
+                }
+              } catch (_) {}
+            }
+            await getSwipeDelay();
+            continue;
+          }
+
+          // 2. Compatibility threshold check
+          const threshold = typeof settings.aiMatchThreshold === 'number' ? settings.aiMatchThreshold : 60;
+          if (aiScore && typeof aiScore.score === 'number' && aiScore.score < threshold) {
+            console.log(`[FlirtEasy] Compatibility score ${aiScore.score}% is below threshold ${threshold}% (${aiScore.label}), PASSING "${candidate.name}"`);
+            const passed = clickPassButton();
+            if (passed) {
+              console.log(`[FlirtEasy] Successfully passed profile (score ${aiScore.score}% < ${threshold}%)`);
+              try {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'FE_SWIPE',
+                    action: 'pass',
+                    profileId: candidate.id,
+                    name: candidate.name,
+                    age: candidate.age,
+                    bio: candidate.bio,
+                    photos: candidate.photos,
+                    photoUrl: currentPhotoUrl,
+                    interests: candidate.interests,
+                    job: candidate.job,
+                    school: candidate.school,
+                    city: candidate.city,
+                    distanceMi: candidate.distanceMi,
+                    lookingFor: candidate.lookingFor,
+                    descriptors: candidate.descriptors,
+                    questionAnswers: candidate.questionAnswers,
+                    verified: candidate.verified,
+                    detail: `Passed · Compatibility ${aiScore.score}% (${aiScore.label})`,
+                    matchScore: aiScore.score,
+                    matchConfidence: aiScore.confidence,
+                    matchLabel: aiScore.label,
+                    matchBreakdown: aiScore.breakdown,
+                  }));
+                }
+              } catch (_) {}
+            }
+            await getSwipeDelay();
+            continue;
+          }
+
+          console.log(`[FlirtEasy] Smart Match approved candidate "${candidate.name}" (score ${aiScore ? aiScore.score + '%' : 'N/A'} >= ${threshold}%), proceeding to like`);
+        }
+
+        const profileDetail = (aiScore && typeof aiScore.score === 'number')
+          ? (candidate.age ? `Age ${candidate.age} · ${aiScore.label} (${aiScore.score}%)` : `${aiScore.label} · ${aiScore.score}%`)
+          : (candidate.age ? `Age ${candidate.age} · Verified Profile` : (candidate.bio ? candidate.bio.slice(0, 42).trim() : 'AI Target Match · Safe Paced'));
 
         const clicked = clickLikeButton();
         console.log(`[FlirtEasy] Click result: ${clicked}`);
@@ -1571,6 +1696,10 @@ async function autoLike(count = 50, initialProgress = undefined) {
                 questionAnswers: candidate.questionAnswers,
                 verified: candidate.verified,
                 detail: profileDetail,
+                matchScore: aiScore?.score ?? null,
+                matchConfidence: aiScore?.confidence ?? null,
+                matchLabel: aiScore?.label ?? null,
+                matchBreakdown: aiScore?.breakdown ?? [],
               }));
             }
           } catch (_) {}
@@ -1583,6 +1712,8 @@ async function autoLike(count = 50, initialProgress = undefined) {
               age: candidate.age,
               detail: profileDetail,
               photoUrl: currentPhotoUrl,
+              matchScore: aiScore?.score ?? null,
+              matchLabel: aiScore?.label ?? null,
             }
           }, (response) => {
             if (chrome.runtime.lastError) {

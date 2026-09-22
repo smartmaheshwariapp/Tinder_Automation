@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { emptyCollections, mergeCollectionEvent, mergeProgressFeedSwipes, normalizeProfile } from '../utils/tinderCollectionsModel';
-import { getProgressFeed } from '../utils/sessionManager';
+import { getProgressFeed, registerCollectionsDisconnector } from '../utils/sessionManager';
 let current = { data: null, own: null, loading: false, error: null, conversationError: null };
 let token = null, generation = 0, serial = Promise.resolve(), activation = null;
 const listeners = new Set(), publish = patch => { current = { ...current, ...patch }; listeners.forEach(listener => listener(current)); };
@@ -9,6 +9,7 @@ async function request(url, sessionToken) { const controller = new AbortControll
 export const getCollections = () => current;
 export const subscribeCollections = listener => { listeners.add(listener); return () => listeners.delete(listener); };
 export function disconnectCollections() { generation++; token = null; activation = null; publish({ data: null, own: null, loading: false, error: null, conversationError: null }); }
+registerCollectionsDisconnector(disconnectCollections);
 export async function activateCollections(sessionToken) {
   if (!sessionToken) { disconnectCollections(); return; }
   if (token === sessionToken && activation) return activation; if (token === sessionToken && current.data) return;

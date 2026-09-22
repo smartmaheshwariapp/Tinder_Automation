@@ -108,13 +108,48 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
       try {
         var t = localStorage.getItem('TinderWeb/APIToken');
         if (t && t.length > 15) { _notifyTinderToken(t, 'storage_api_token'); return; }
+
+        var apiStore = localStorage.getItem('TinderWeb/APIStore');
+        if (apiStore) {
+          try {
+            var parsed = JSON.parse(apiStore);
+            var tok = parsed && (parsed.token || parsed.auth_token || (parsed.user && parsed.user.api_token));
+            if (tok && tok.length > 15) { _notifyTinderToken(tok, 'storage_api_store'); return; }
+          } catch (_) {}
+        }
+
         var persistRoot = localStorage.getItem('persist:root');
         if (persistRoot) {
-          var rootObj = JSON.parse(persistRoot);
-          if (rootObj && rootObj.auth) {
-            var authObj = typeof rootObj.auth === 'string' ? JSON.parse(rootObj.auth) : rootObj.auth;
-            var rTok = authObj && (authObj.apiToken || authObj.token || authObj.authToken || authObj.api_token);
-            if (rTok && rTok.length > 15) { _notifyTinderToken(rTok, 'storage_persist_root'); return; }
+          try {
+            var rootObj = JSON.parse(persistRoot);
+            if (rootObj && rootObj.auth) {
+              var authObj = typeof rootObj.auth === 'string' ? JSON.parse(rootObj.auth) : rootObj.auth;
+              var rTok = authObj && (authObj.apiToken || authObj.token || authObj.authToken || authObj.api_token);
+              if (rTok && rTok.length > 15) { _notifyTinderToken(rTok, 'storage_persist_root'); return; }
+            }
+          } catch (_) {}
+        }
+
+        var persistAuth = localStorage.getItem('persist:auth');
+        if (persistAuth) {
+          try {
+            var authObj2 = typeof persistAuth === 'string' ? JSON.parse(persistAuth) : persistAuth;
+            var rTok2 = authObj2 && (authObj2.apiToken || authObj2.token || authObj2.authToken || authObj2.api_token);
+            if (rTok2 && rTok2.length > 15) { _notifyTinderToken(rTok2, 'storage_persist_auth'); return; }
+          } catch (_) {}
+        }
+
+        var tokenKeyRegex = /(?:api|auth).*token/i;
+        var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (!k || !tokenKeyRegex.test(k)) continue;
+          var val = localStorage.getItem(k);
+          if (!val) continue;
+          var cleanVal = val.replace(/^["'](.*)["']$/, '$1').trim();
+          if (uuidRegex.test(cleanVal)) {
+            _notifyTinderToken(cleanVal, 'storage_regex');
+            return;
           }
         }
       } catch(_) {}
@@ -221,21 +256,88 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
     // creates a click -> mutation -> click feedback loop that pegs the main
     // thread and makes the page unresponsive to taps. Click at most once.
     var _consentDone = false;
+    var _cookieClick = function(el) {
+      if (!el) return;
+      var target = el.closest('button, a, [role="button"]') || el;
+      try { if (typeof target.focus === 'function') target.focus(); } catch(_) {}
+      try {
+        var r = target.getBoundingClientRect();
+        var x = r.left + r.width / 2;
+        var y = r.top + r.height / 2;
+        var evOpts = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, screenX: x, screenY: y };
+        try { target.dispatchEvent(new PointerEvent('pointerdown', evOpts)); } catch(_) {}
+        try { target.dispatchEvent(new MouseEvent('mousedown', evOpts)); } catch(_) {}
+        try { target.dispatchEvent(new PointerEvent('pointerup', evOpts)); } catch(_) {}
+        try { target.dispatchEvent(new MouseEvent('mouseup', evOpts)); } catch(_) {}
+        try { target.dispatchEvent(new MouseEvent('click', evOpts)); } catch(_) {}
+      } catch(_) {}
+      try { target.click(); } catch(_) {}
+      if (target !== el) {
+        try { el.click(); } catch(_) {}
+      }
+    };
+
+    var _hasVisibleConsent = function() {
+      return Boolean(
+        document.querySelector('#onetrust-consent-sdk, #onetrust-banner-sdk, .onetrust-pc-dark-filter, [data-testid="cookie-accept"], [data-testid="cookie-banner-accept"], [data-testid*="cookie" i], div[role="dialog"][aria-label*="cookie" i]')
+      );
+    };
+
     var _dismissConsentFast = function() {
       try {
-        if (!_consentDone) {
-          var btn = document.getElementById('onetrust-accept-btn-handler') ||
-                    document.querySelector('#onetrust-consent-sdk button') ||
-                    document.querySelector('[data-testid="cookie-accept"]') ||
-                    document.querySelector('[aria-label="Accept all"]');
-          if (btn) {
-            btn.click();
-            _consentDone = true;
+        if (!_consentDone || _hasVisibleConsent()) {
+          // 1. Selector-based lookup (OneTrust, Tinder custom data-testid, aria-labels)
+          var sel = [
+            '#onetrust-accept-btn-handler',
+            '#onetrust-consent-sdk button',
+            '[data-testid="cookie-accept"]',
+            '[data-testid="cookie-banner-accept"]',
+            '[data-testid*="cookie" i] button',
+            '[data-testid*="consent" i] button',
+            'button[data-testid*="cookie" i]',
+            'button[data-testid*="consent" i]',
+            'button[aria-label*="accept" i]',
+            'button[aria-label*="agree" i]',
+            '[aria-label="Accept all"]',
+            '[aria-label="I accept"]',
+            '[aria-label="I Agree"]',
+            'div[role="dialog"][aria-label*="cookie" i] button',
+            'div[role="dialog"][aria-label*="privacy" i] button'
+          ];
+          var btn = null;
+          for (var i = 0; i < sel.length; i++) {
+            var el = document.querySelector(sel[i]);
+            if (el) { btn = el; break; }
           }
-          var filters = document.querySelectorAll('.onetrust-pc-dark-filter');
-          for (var i = 0; i < filters.length; i++) {
-            filters[i].style.pointerEvents = 'none';
-            filters[i].style.display = 'none';
+
+          // 2. Text-based fallback across clickable buttons
+          if (!btn) {
+            var allBtns = Array.from(document.querySelectorAll('button, a, [role="button"], span, div[role="button"]'));
+            var acceptPhrases = [
+              'i accept', 'accept all', 'accept all cookies', 'accept',
+              'i agree', 'agree', 'got it', 'allow all', 'allow all cookies',
+              'aceptar', 'accepter', 'accetta', 'alle akzeptieren', 'akzeptieren'
+            ];
+            btn = allBtns.find(function(b) {
+              var txt = (b.innerText || b.textContent || '').trim().toLowerCase();
+              var aria = (b.getAttribute('aria-label') || '').trim().toLowerCase();
+              return acceptPhrases.indexOf(txt) !== -1 || acceptPhrases.indexOf(aria) !== -1;
+            });
+          }
+
+          if (btn) {
+            console.log('[ChromeShim] Auto-accepting cookie / consent banner...');
+            _cookieClick(btn);
+            if (!_hasVisibleConsent()) {
+              _consentDone = true;
+            }
+          }
+
+          // Clean up any sticky backdrop filter that intercepts touches
+          var filters = document.querySelectorAll('.onetrust-pc-dark-filter, [class*="cookie-backdrop"], [class*="consent-backdrop"]');
+          for (var j = 0; j < filters.length; j++) {
+            filters[j].style.pointerEvents = 'none';
+            filters[j].style.display = 'none';
           }
         }
       } catch(_) {}
@@ -851,8 +953,7 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
     // Visual Veil: Hide landing page hero, banners, and flame splash from user
     // while the 3-button login modal is being triggered in the background.
     try {
-      var hasToken = Boolean(localStorage.getItem('TinderWeb/APIToken') || window.__tinderAuthToken);
-      if (!hasToken && window.location.pathname.indexOf('/app') === -1) {
+      if (window.location.pathname.indexOf('/app') === -1) {
         var veilStyle = document.createElement('style');
         veilStyle.id = 'fe-landing-veil';
         veilStyle.textContent = 'html, body { background-color: #0F0F13 !important; } body:not(.fe-login-ready) main, body:not(.fe-login-ready) header, body:not(.fe-login-ready) [data-testid="page-container"], body:not(.fe-login-ready) #rebrand-mobile-menu { opacity: 0 !important; }';
@@ -865,7 +966,9 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
       try {
         var rect = element.getBoundingClientRect();
         var style = window.getComputedStyle(element);
-        return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && (rect.width > 0 || rect.height > 0);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        // Do not check style.opacity !== '0' as fe-landing-veil intentionally sets opacity 0 on parent containers
+        return (rect.width > 0 || rect.height > 0 || element.offsetWidth > 0 || element.offsetHeight > 0);
       } catch (_) {
         return (element.offsetWidth > 0 || element.offsetHeight > 0);
       }
@@ -873,24 +976,23 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
 
     var clickEl = function(el) {
       if (!el) return;
-      try { if (typeof el.focus === 'function') el.focus(); } catch(_) {}
+      var target = el.closest('button, a, [role="button"]') || el;
+      try { if (typeof target.focus === 'function') target.focus(); } catch(_) {}
       try {
-        var r = el.getBoundingClientRect();
+        var r = target.getBoundingClientRect();
         var x = r.left + r.width / 2;
         var y = r.top + r.height / 2;
         var evOpts = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, screenX: x, screenY: y };
-        try { el.dispatchEvent(new PointerEvent('pointerdown', evOpts)); } catch(_) {}
-        try { el.dispatchEvent(new MouseEvent('mousedown', evOpts)); } catch(_) {}
-        try { el.dispatchEvent(new PointerEvent('pointerup', evOpts)); } catch(_) {}
-        try { el.dispatchEvent(new MouseEvent('mouseup', evOpts)); } catch(_) {}
-        try { el.dispatchEvent(new MouseEvent('click', evOpts)); } catch(_) {}
-        var child = el.firstElementChild;
-        if (child) {
-          try { child.dispatchEvent(new MouseEvent('click', evOpts)); } catch(_) {}
-          try { child.click(); } catch(_) {}
-        }
+        try { target.dispatchEvent(new PointerEvent('pointerdown', evOpts)); } catch(_) {}
+        try { target.dispatchEvent(new MouseEvent('mousedown', evOpts)); } catch(_) {}
+        try { target.dispatchEvent(new PointerEvent('pointerup', evOpts)); } catch(_) {}
+        try { target.dispatchEvent(new MouseEvent('mouseup', evOpts)); } catch(_) {}
+        try { target.dispatchEvent(new MouseEvent('click', evOpts)); } catch(_) {}
       } catch(_) {}
-      try { el.click(); } catch(_) {}
+      try { target.click(); } catch(_) {}
+      if (target !== el) {
+        try { el.click(); } catch(_) {}
+      }
     };
 
     var onLoginModalReady = function() {
@@ -899,28 +1001,64 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
         if (document.body) document.body.classList.add('fe-login-ready');
         var veil = document.getElementById('fe-landing-veil');
         if (veil) veil.remove();
-        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'FE_LOGIN_SHEET_READY'
-          }));
+        var post = function() {
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_LOGIN_SHEET_READY'
+              }));
+              return true;
+            }
+          } catch (_) {}
+          return false;
+        };
+        if (!post()) {
+          var tries = 0;
+          var t = setInterval(function() {
+            tries++;
+            if (post() || tries >= 30) {
+              clearInterval(t);
+            }
+          }, 50);
         }
       } catch (_) {}
     };
 
     var isLoginModalReady = function() {
       try {
-        // 1. Phone number or OTP or email input
+        // 1. Phone number or OTP or email input (only if not inside mobile menu drawer)
         var input = document.querySelector('input[type="tel"], input[name="phone_number"], input[type="email"], input[autocomplete="one-time-code"]');
-        if (input && isVisible(input)) return true;
+        if (input && isVisible(input) && !input.closest('#rebrand-mobile-menu')) return true;
 
         // 2. Google Identity iframe
         var gsi = document.querySelector('iframe[src*="accounts.google.com"]');
         if (gsi && isVisible(gsi)) return true;
 
-        // 3. The actual 3 login provider buttons: Google, Apple, Facebook, Phone
+        // 3. Explicit MODAL_LOGIN dialog containing provider buttons
+        var modalLogin = document.querySelector('[aria-labelledby="MODAL_LOGIN"]');
+        if (modalLogin && isVisible(modalLogin)) return true;
+
+        // 4. Any [role="dialog"] (that is NOT rebrand-mobile-menu) containing login provider buttons
+        var dialog = document.querySelector('[role="dialog"]:not(#rebrand-mobile-menu)');
+        if (dialog && isVisible(dialog)) {
+          var dialogBtns = Array.from(dialog.querySelectorAll('button, a, [role="button"]'));
+          var hasProviderInDialog = dialogBtns.some(function(b) {
+            var t = (b.innerText || b.textContent || '').trim().toLowerCase();
+            var a = (b.getAttribute('aria-label') || '').toLowerCase();
+            var str = t + ' ' + a;
+            var hasProvider = str.indexOf('google') !== -1 || str.indexOf('phone') !== -1 || str.indexOf('facebook') !== -1 || str.indexOf('apple') !== -1;
+            var hasAction = str.indexOf('log in') !== -1 || str.indexOf('continue') !== -1 || str.indexOf('sign in') !== -1 || str.indexOf('sign up') !== -1;
+            return hasProvider || hasAction;
+          });
+          if (hasProviderInDialog) return true;
+        }
+
+        // 5. Provider buttons: MUST be inside a modal dialog container, NEVER inside #rebrand-mobile-menu
         var allBtns = Array.from(document.querySelectorAll('button, a, [role="button"]'));
-        var hasProviderButton = allBtns.some(function(b) {
+        var hasModalProviderButton = allBtns.some(function(b) {
           if (!isVisible(b)) return false;
+          if (b.closest('#rebrand-mobile-menu')) return false;
+          if (!b.closest('[role="dialog"], [aria-labelledby="MODAL_LOGIN"], #modal-manager, .modal-manager-portal')) return false;
           var t = (b.innerText || b.textContent || '').trim().toLowerCase();
           var a = (b.getAttribute('aria-label') || '').toLowerCase();
           var str = t + ' ' + a;
@@ -928,17 +1066,12 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
           var hasAction = str.indexOf('log in') !== -1 || str.indexOf('continue') !== -1 || str.indexOf('sign in') !== -1;
           return hasProvider && hasAction;
         });
-        if (hasProviderButton) {
-          var menu = document.getElementById('rebrand-mobile-menu');
-          if (menu) {
-            menu.style.setProperty('display', 'none', 'important');
-            menu.style.setProperty('pointer-events', 'none', 'important');
-          }
-          return true;
-        }
+        if (hasModalProviderButton) return true;
 
-        // 4. "Trouble logging in?" or "More options" buttons in modal
+        // 6. "Trouble logging in?" or "More options" buttons inside modal
         var hasTroubleOrMore = allBtns.some(function(b) {
+          if (b.closest('#rebrand-mobile-menu')) return false;
+          if (!b.closest('[role="dialog"], [aria-labelledby="MODAL_LOGIN"], #modal-manager, .modal-manager-portal')) return false;
           if (!isVisible(b)) return false;
           var t = (b.innerText || b.textContent || '').trim().toLowerCase();
           return t.indexOf('trouble logging in') !== -1 || t === 'more options';
@@ -949,17 +1082,51 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
     };
 
     var findLoginTrigger = function() {
-      var allClickables = Array.from(document.querySelectorAll('a, button, [role="button"]'));
+      var allClickables = Array.from(document.querySelectorAll('a, button, [role="button"], span, div[role="button"]'));
       
-      // 1. Direct "Log in" / "Sign in" trigger
-      var loginBtn = allClickables.find(function(el) {
+      // 1. PRIMARY: Direct "Create account" / "Sign up" trigger (opens the 3-button login modal by default)
+      var createAccountBtn = allClickables.find(function(el) {
         if (!isVisible(el)) return false;
-        if (el.closest('[aria-labelledby="MODAL_LOGIN"]') || el.closest('.StretchedBox')) return false;
+        // Never click elements inside dialogs/modals or inside the hamburger menu drawer
+        if (el.closest('[aria-labelledby="MODAL_LOGIN"]') || el.closest('[role="dialog"]') || el.closest('#rebrand-mobile-menu')) return false;
+        var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+        var aria = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+        var testId = (el.getAttribute('data-testid') || '').trim().toLowerCase();
+        var href = (el.getAttribute('href') || '').trim().toLowerCase();
+        var label = txt || aria;
+
+        // Strictly ignore "Get the app", download buttons, language pickers, and external store links
+        if (label.indexOf('get the app') !== -1 || label.indexOf('download') !== -1) return false;
+        if (txt.indexOf('language') !== -1 || aria.indexOf('language') !== -1) return false;
+        if (href.indexOf('play.google.com') !== -1 || href.indexOf('apps.apple.com') !== -1) return false;
+
+        return (
+          label === 'create account' ||
+          label === 'create an account' ||
+          label.indexOf('create account') !== -1 ||
+          label.indexOf('create an account') !== -1 ||
+          label === 'sign up' ||
+          label === 'crear cuenta' ||
+          aria === 'create account' ||
+          aria === 'create an account' ||
+          testId.indexOf('create-account') !== -1 ||
+          testId.indexOf('signup') !== -1 ||
+          href.indexOf('/app/signup') !== -1
+        );
+      });
+      if (createAccountBtn) return createAccountBtn;
+
+      // 2. SECONDARY: "Log in" / "Sign in" trigger
+      return allClickables.find(function(el) {
+        if (!isVisible(el)) return false;
+        if (el.closest('[aria-labelledby="MODAL_LOGIN"]') || el.closest('[role="dialog"]') || el.closest('#rebrand-mobile-menu')) return false;
         var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
         var aria = (el.getAttribute('aria-label') || '').toLowerCase();
         var testId = (el.getAttribute('data-testid') || '').toLowerCase();
         var href = (el.getAttribute('href') || '').toLowerCase();
+        var label = txt || aria;
 
+        if (label.indexOf('get the app') !== -1 || label.indexOf('download') !== -1) return false;
         if (txt.indexOf('language') !== -1 || aria.indexOf('language') !== -1) return false;
         if (href.indexOf('play.google.com') !== -1 || href.indexOf('apps.apple.com') !== -1) return false;
 
@@ -970,33 +1137,12 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
           href.indexOf('/app/login') !== -1
         );
       });
-      if (loginBtn) return loginBtn;
-
-      // 2. Direct "Create account" / "Sign up" trigger (opens identical 3-button modal)
-      return allClickables.find(function(el) {
-        if (!isVisible(el)) return false;
-        if (el.closest('[aria-labelledby="MODAL_LOGIN"]') || el.closest('.StretchedBox')) return false;
-        var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-        var aria = (el.getAttribute('aria-label') || '').toLowerCase();
-        var testId = (el.getAttribute('data-testid') || '').toLowerCase();
-        var href = (el.getAttribute('href') || '').toLowerCase();
-
-        if (txt.indexOf('language') !== -1 || aria.indexOf('language') !== -1) return false;
-        if (href.indexOf('play.google.com') !== -1 || href.indexOf('apps.apple.com') !== -1) return false;
-
-        return (
-          txt === 'create account' || txt === 'create an account' || txt === 'sign up' || txt === 'crear cuenta' ||
-          aria === 'create account' || aria === 'create an account' ||
-          testId.indexOf('create-account') !== -1 || testId.indexOf('signup') !== -1 ||
-          href.indexOf('/app/signup') !== -1
-        );
-      });
     };
 
-    var _loginTries = 0;
     var _landingNavTimer = null;
     var _observer = null;
     var _lastClickTime = 0;
+    var _startTime = Date.now();
 
     var cleanup = function() {
       if (_landingNavTimer) {
@@ -1010,12 +1156,6 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
     };
 
     var checkAndTrigger = function() {
-      _loginTries++;
-      if (_loginTries > 50) {
-        onLoginModalReady();
-        cleanup();
-        return true;
-      }
       try {
         var isLoggedRoute = (
           window.location.pathname.indexOf('/app/recs') !== -1 ||
@@ -1023,7 +1163,7 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
           window.location.pathname.indexOf('/app/explore') !== -1 ||
           window.location.pathname.indexOf('/app/profile') !== -1
         );
-        if (isLoggedRoute || localStorage.getItem('TinderWeb/APIToken') || window.__tinderAuthToken) {
+        if (isLoggedRoute) {
           onLoginModalReady();
           cleanup();
           return true;
@@ -1045,12 +1185,20 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
           }
         } catch(_) {}
 
+        // Timeout safety: after 2.5 seconds, reveal page anyway so user is never permanently veiled
+        if (Date.now() - _startTime > 2500) {
+          console.log('[ChromeShim] Max trigger wait reached (2.5s) — revealing page.');
+          onLoginModalReady();
+          cleanup();
+          return true;
+        }
+
         var now = Date.now();
-        if (now - _lastClickTime > 1200) {
+        if (now - _lastClickTime > 600) {
           var btn = findLoginTrigger();
           if (btn) {
             _lastClickTime = now;
-            console.log('[ChromeShim] Fast-clicking login trigger button...');
+            console.log('[ChromeShim] Fast-clicking "Create account" / login trigger button...');
             clickEl(btn);
           }
         }
@@ -1060,9 +1208,11 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
       return false;
     };
 
+    window.__feTriggerLoginModal = checkAndTrigger;
+
     // 1. Run immediately
     if (!checkAndTrigger()) {
-      // 2. MutationObserver for instant sub-50ms execution on element insertion
+      // 2. MutationObserver for instant execution when elements mount
       try {
         _observer = new MutationObserver(function() {
           if (checkAndTrigger()) {
@@ -1072,12 +1222,12 @@ export const generateChromeShim = (selectorsJson, locationOptions = {}) => {
         _observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
       } catch (_) {}
 
-      // 3. Fast fallback interval (runs every 60ms)
+      // 3. Fast fallback interval (every 150ms)
       _landingNavTimer = setInterval(function() {
         if (checkAndTrigger()) {
           cleanup();
         }
-      }, 60);
+      }, 150);
     }
   })();
 

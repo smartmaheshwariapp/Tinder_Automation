@@ -3,7 +3,10 @@ import { createSwipeEventFromDomMessage } from "../utils/tinderCollectionCapture
 import {
   activateCollections,
   ingestCollectionEvent,
+  getCollections,
 } from "../services/tinderCollections";
+import { scoreCandidateLLM } from "../utils/aiMatchScorer";
+import { API_CONFIG } from "../config/api";
 import React, {
   useRef,
   useState,
@@ -293,7 +296,8 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
       ? rawVpsUrl
       : resolveLocalUrl(rawVpsUrl);
   const shouldForceLogout = Boolean(
-    route.params?.forceLogout || getPendingWebViewPurge(),
+    route.params?.forceLogout ||
+      (getPendingWebViewPurge() && !getTinderAuthState()?.isLoggedIn),
   );
 
   useEffect(() => {
@@ -505,6 +509,18 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
     }
   }, [loading, isHeadless, veilOpacity]);
 
+  // Master failsafe timer: never allow the full-screen pulsing flame loading veil to get stuck indefinitely
+  useEffect(() => {
+    if (!loading) return;
+    const failsafeTimer = setTimeout(() => {
+      if (isMountedRef.current && loading) {
+        console.log('[Browser] Master failsafe timer reached (4.5s) — dismissing loading veil');
+        setLoading(false);
+      }
+    }, 4500);
+    return () => clearTimeout(failsafeTimer);
+  }, [loading]);
+
   // Dynamic user-facing progress hints (zero technical jargon)
   useEffect(() => {
     if (!loading && !revealActive) {
@@ -568,6 +584,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
   );
   const [currentTinderAuth, setCurrentTinderAuth] =
     useState(getTinderAuthState);
+  const currentUrlRef = useRef("");
 
   useEffect(() => {
     if (propIsLoggedIn && sessionStatus !== SESSION_SIGNED_IN) {
@@ -585,7 +602,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
           if (state?.isLoggedIn) {
             setSessionStatus(SESSION_SIGNED_IN);
             setLoginStep("done");
-          } else {
+          } else if (state?.lastUpdated > 0) {
             setSessionStatus(SESSION_SIGNED_OUT);
             setLoginStep("options");
             delete persistentLoginCache[sessionKey];
@@ -595,6 +612,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
     });
     return unsub;
   }, [sessionKey]);
+
   const [showNeko, setShowNeko] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
   const [inputText, setInputText] = useState("");
@@ -1175,9 +1193,25 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
       const swipingEnabled = isAutoSwipeEnabled(extensionSettings);
       const messagingEnabled = isAutoMessagingEnabled(extensionSettings);
       const sessionState = getOnDeviceSessionState();
-      const isLikesExhausted =
+
+      // If Auto-Swipe is enabled and swiping is initiated, clear any stale likes_exhausted lock
+      // to give swiping an active attempt. If Tinder genuinely has an active paywall dialog,
+      // autoLike in the DOM will detect the modal and report FE_OUT_OF_LIKES cleanly.
+      let isLikesExhausted =
         sessionState?.waitingReason === "likes_exhausted" &&
         (sessionState?.likesReplenishTimestamp || 0) > Date.now();
+
+      if (swipingEnabled && isLikesExhausted) {
+        isLikesExhausted = false;
+        saveOnDeviceSessionState({
+          waitingReason: null,
+          likesReplenishTimestamp: null,
+        });
+        if (worker) {
+          worker.agentState.waitingReason = null;
+          worker.agentState.likesReplenishTimestamp = null;
+        }
+      }
 
       // If both are disabled, warn user and do not proceed
       if (!swipingEnabled && !messagingEnabled) {
@@ -1249,6 +1283,14 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
         window.__flirteasyAutoStartCount = targetCount;
         window.__flirteasyAutoStartProgress = initialProgress;
         window.__flirteasy_stop = false;
+        try {
+          if (typeof window !== 'undefined') {
+            window.__flirtEasyLikesReplenishTimestamp = null;
+          }
+          sessionStorage.setItem('flirteasy_auto_resume', 'true');
+          sessionStorage.setItem('flirteasy_auto_target', String(targetCount));
+          sessionStorage.setItem('flirteasy_auto_progress', String(initialProgress));
+        } catch(_) {}
         if (window.chrome && window.chrome.runtime && window.chrome.runtime.sendMessage) {
           try { window.chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }); } catch(_) {}
         }
@@ -1272,8 +1314,16 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
               }
             }
 
-            // 3. If not on recs deck, attempt navigation
-            if (!window.location.pathname.includes('/app/recs')) {
+            // Proactive Bundle Recovery: if content script hooks are missing, request bundle re-injection
+            if (attemptsLeft <= 28 && attemptsLeft % 4 === 0) {
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'FE_REINJECT_BUNDLE' }));
+              }
+            }
+
+            // 3. If not on recs deck and no card is visible, attempt navigation
+            var hasVisibleCard = typeof window.isProfileVisible === 'function' && window.isProfileVisible();
+            if (!hasVisibleCard && !window.location.pathname.includes('/app/recs')) {
               var recsLink = document.querySelector('a[href*="/app/recs"], a[href*="/recs"], [aria-label*="Recommendations" i], [aria-label*="Tinder" i], nav a:nth-child(1)');
               if (recsLink) recsLink.click();
             }
@@ -1284,6 +1334,13 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
           attemptsLeft--;
           if (attemptsLeft > 0) {
             setTimeout(sendStart, 800);
+          } else {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_ERROR',
+                message: 'Failed to engage Tinder automation in DOM after 30 attempts'
+              }));
+            }
           }
         }
 
@@ -1349,14 +1406,24 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
 
         // Only block if explicitly confirmed logged out
         if (shouldStart && sessionStatus === SESSION_SIGNED_OUT) {
-          onDeviceSwipingRef.current = false;
-          setOnDeviceSwiping(false);
-          saveOnDeviceSessionState({ isRunning: false });
-          addLog(
-            "Cannot start automation: Please log into Tinder first",
-            "warn",
-          );
-          return;
+          const currentUrl = currentUrlRef.current || "";
+          const isAppRoute =
+            currentUrl.includes("/app") &&
+            !currentUrl.includes("/app/login") &&
+            !currentUrl.includes("/app/signup");
+          if (!isAppRoute) {
+            onDeviceSwipingRef.current = false;
+            setOnDeviceSwiping(false);
+            saveOnDeviceSessionState({ isRunning: false });
+            addLog(
+              "Cannot start automation: Please log into Tinder first",
+              "warn",
+            );
+            return;
+          } else {
+            setSessionStatus(SESSION_SIGNED_IN);
+            setLoginStep("done");
+          }
         }
 
         if (!shouldStart) {
@@ -1425,6 +1492,27 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
     },
     [addLog, extensionSettings, dispatchStartToDOM, sessionStatus],
   );
+
+  // Shared agent state synchronization: if toggled from Home Screen, sync on-device swiping
+  useEffect(() => {
+    if (!isOnDevice) return;
+    const unsub = subscribeSharedAgentState((state) => {
+      const isRunning = Boolean(
+        state?.agentState?.isRunning === true ||
+        (state?.agentState?.isRunning !== false &&
+          state?.agentState?.currentPhase &&
+          !["stopped", "idle", "waiting", "paused"].includes(
+            state.agentState.currentPhase,
+          )),
+      );
+      if (isRunning && !onDeviceSwipingRef.current && !isTogglingRef.current) {
+        toggleOnDeviceSwiping(true);
+      } else if (!isRunning && onDeviceSwipingRef.current && !isTogglingRef.current) {
+        toggleOnDeviceSwiping(false);
+      }
+    });
+    return unsub;
+  }, [isOnDevice, toggleOnDeviceSwiping]);
 
   // Start / stop FlirtEasy AI swiping & messaging agent (local on-device or remote orchestrator CDP bridge)
   const handleToggleAgent = useCallback(async () => {
@@ -2042,23 +2130,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
     }
   }, [isOnDevice, route.params?.autoStartAgent, dispatchStartToDOM, addLog]);
 
-  // Sync external start / stop commands from Home Screen
-  useEffect(() => {
-    const unsub = subscribeSharedAgentState((state) => {
-      if (state?.agentState?.source === "home_screen") {
-        if (state?.agentState?.isRunning === true) {
-          if (!onDeviceSwipingRef.current && !isTogglingRef.current) {
-            toggleOnDeviceSwiping(true);
-          }
-        } else if (state?.agentState?.isRunning === false) {
-          if (onDeviceSwipingRef.current && !isTogglingRef.current) {
-            toggleOnDeviceSwiping(false);
-          }
-        }
-      }
-    });
-    return unsub;
-  }, [toggleOnDeviceSwiping]);
+
 
   // ── Production-Grade Silent AppState Foreground Auto-Resume Engine ──
   const appStateRef = useRef(AppState.currentState);
@@ -2636,8 +2708,10 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
       purgeSession: handleLogout,
       togglePocketMode,
       isPocketModeActive: () => pocketModeActiveRef.current,
+      toggleOnDeviceSwiping,
+      handleToggleAgent,
     }),
-    [handleLogout, togglePocketMode],
+    [handleLogout, togglePocketMode, toggleOnDeviceSwiping, handleToggleAgent],
   );
 
   useEffect(() => {
@@ -2747,31 +2821,28 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
 
       if (isOnDevice && isReturning) {
         // ── On-device foreground recovery ──
-        // The WebView renderer can be killed by the OS while backgrounded.
-        // Probe whether the content script is still alive by asking it to echo
-        // back. If the bridge is gone, the page is blank and we reload.
-        // We also flush the last-known swiping state back to the worker so it
-        // stays in sync if the callbacks were stale during backgrounding.
+        // NEVER reload on-device — it would destroy the live Tinder login or in-progress OTP entry!
+        // The WebView maintains DOM and form inputs across backgrounding.
+        // React Native WebView already handles true OS renderer crashes via onRenderProcessGone and onContentProcessDidTerminate.
+        // If the content script bundle was lost on an authenticated app route (/app/*), quietly re-inject it without reloading.
         if (webViewRef.current) {
           webViewRef.current.injectJavaScript(`
             (function() {
               try {
-                // If the bundle loaded flag is missing the renderer was reset.
-                if (!window.__flirtEasyBundleLoaded) {
+                if (typeof window.__feTriggerLoginModal === 'function') {
+                  window.__feTriggerLoginModal();
+                }
+                if (!window.__flirtEasyBundleLoaded && window.location.pathname.indexOf('/app') !== -1 && window.location.pathname.indexOf('/app/login') === -1) {
                   window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
-                    JSON.stringify({ type: 'FE_RENDERER_NEEDS_RELOAD' })
+                    JSON.stringify({ type: 'FE_REINJECT_BUNDLE' })
                   );
                 }
-              } catch(e) {
-                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
-                  JSON.stringify({ type: 'FE_RENDERER_NEEDS_RELOAD' })
-                );
-              }
+              } catch(e) {}
             })(); true;
           `);
         }
         console.log(
-          "[Browser] On-device: returned to foreground, checked renderer health.",
+          "[Browser] On-device: returned to foreground, session preserved.",
         );
       } else if (!isOnDevice && !isHyperbeam && isReturning) {
         // ── Neko/VPS stream reconnect ──
@@ -3585,6 +3656,12 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                       title="Reply to Unread Matches with AI"
                       icon="chatbubbles"
                       variant="secondary"
+                      onPress={() => {
+                        setShowDashboard(false);
+                        triggerProcessChats();
+                      }}
+                      style={{ marginBottom: 8 }}
+                      accessibilityLabel="Reply to unread matches with AI"
                     />
                     <TouchableOpacity
                       style={[
@@ -3592,7 +3669,6 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                         {
                           backgroundColor: "rgba(251, 191, 36, 0.12)",
                           borderColor: "rgba(251, 191, 36, 0.35)",
-                          marginBottom: 8,
                         },
                       ]}
                       onPress={() => {
@@ -3616,16 +3692,6 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                           : "🌙 Start in Pocket Mode"}
                       </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      style={styles.onDeviceQuickChatsBtn}
-                      onPress={() => {
-                        setShowDashboard(false);
-                        triggerProcessChats();
-                      }}
-                      style={styles.onDeviceQuickChatsBtn}
-                      textStyle={styles.onDeviceQuickChatsBtnText}
-                    />
                   </View>
                 ) : (
                   <View style={styles.inputPanel}>
@@ -3740,20 +3806,26 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                 if (!isDisconnectedOnDevice || loginSheetReadyRef.current) {
                   setLoading(false);
                 } else {
-                  // Keep loading veil active until 3-button login modal is signaled by WebView.
-                  // Failsafe: reveal page after 15s in case Tinder layout changes or network hangs.
+                  // Keep loading veil active briefly until 3-button login modal is signaled by WebView.
+                  // Failsafe: reveal page after at most 1800ms so user is never stuck on the fire logo animation
                   if (loginSheetTimeoutRef.current)
                     clearTimeout(loginSheetTimeoutRef.current);
                   loginSheetTimeoutRef.current = setTimeout(() => {
                     if (isMountedRef.current) {
                       setLoading(false);
                     }
-                  }, 15000);
+                  }, 1800);
                 }
                 injectConfigScript();
                 // If opening after an external logout (from Home Screen), purge and reset session cleanly once
+                const activeAuth = getTinderAuthState();
+                const userHasValidTinderSession = Boolean(
+                  activeAuth?.token && activeAuth?.isLoggedIn,
+                );
+
                 if (
                   isOnDevice &&
+                  !userHasValidTinderSession &&
                   (getPendingWebViewPurge() ||
                     (shouldForceLogout && !hasExecutedPurgeRef.current))
                 ) {
@@ -3770,6 +3842,13 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                     webViewRef.current?.clearHistory();
                   } catch (_) {}
                   webViewRef.current?.injectJavaScript(MASTER_PURGE_SCRIPT);
+                } else if (
+                  isOnDevice &&
+                  userHasValidTinderSession &&
+                  getPendingWebViewPurge()
+                ) {
+                  // User is actively authenticated — disarm any stale purge flag so their session is never wiped
+                  setPendingWebViewPurge(false);
                 }
 
                 // Deferred logout stage: a loaded page with no Tinder SPA holding
@@ -3793,9 +3872,57 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                   } catch (_) {}
                   webViewRef.current?.injectJavaScript(STORAGE_TEARDOWN_SCRIPT);
                 }
-                // The "landing page -> Create account" helper lives in the
-                // content script bundle (injectedJavaScript), so there is
-                // nothing to inject from here.
+                // Landing page auto-trigger: invoke the unified login helper on initial page load / navigation
+                if (isOnDevice && !getTinderAuthState()?.isLoggedIn) {
+                  webViewRef.current?.injectJavaScript(`
+                    (function() {
+                      try {
+                        if (typeof window.__feTriggerLoginModal === 'function') {
+                          window.__feTriggerLoginModal();
+                        }
+                      } catch(_) {}
+                    })(); true;
+                  `);
+                }
+
+                // Auto-dismiss cookies / consent banner on page load
+                if (isOnDevice) {
+                  webViewRef.current?.injectJavaScript(`
+                    (function() {
+                      try {
+                        var sel = [
+                          '#onetrust-accept-btn-handler',
+                          '#onetrust-consent-sdk button',
+                          '[data-testid="cookie-accept"]',
+                          '[data-testid="cookie-banner-accept"]',
+                          '[data-testid*="cookie" i] button',
+                          '[data-testid*="consent" i] button',
+                          'button[data-testid*="cookie" i]',
+                          'button[data-testid*="consent" i]',
+                          'button[aria-label*="accept" i]',
+                          'button[aria-label*="agree" i]',
+                          '[aria-label="Accept all"]',
+                          '[aria-label="I accept"]',
+                          '[aria-label="I Agree"]'
+                        ];
+                        for (var i = 0; i < sel.length; i++) {
+                          var el = document.querySelector(sel[i]);
+                          if (el) { el.click(); break; }
+                        }
+                        var btns = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+                        var phrases = ['i accept', 'accept all', 'accept all cookies', 'accept', 'i agree', 'agree', 'got it', 'allow all', 'aceptar', 'accepter'];
+                        for (var j = 0; j < btns.length; j++) {
+                          var t = (btns[j].innerText || btns[j].textContent || '').trim().toLowerCase();
+                          var a = (btns[j].getAttribute('aria-label') || '').trim().toLowerCase();
+                          if (phrases.indexOf(t) !== -1 || phrases.indexOf(a) !== -1) {
+                            btns[j].click();
+                            break;
+                          }
+                        }
+                      } catch(_) {}
+                    })(); true;
+                  `);
+                }
 
                 // Auto-start only if explicitly requested from Home Screen via autoStartAgent
                 if (
@@ -3808,18 +3935,24 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
               }}
               onNavigationStateChange={(navState) => {
                 setCanGoBackWeb(navState.canGoBack);
+                if (navState.url) {
+                  currentUrlRef.current = navState.url;
+                }
                 if (
                   isOnDevice &&
                   navState.url &&
                   navState.url.includes("/app") &&
-                  !navState.url.includes("/app/login")
+                  !navState.url.includes("/app/login") &&
+                  !navState.url.includes("/app/signup")
                 ) {
                   setSessionStatus(SESSION_SIGNED_IN);
+                  setLoginStep("done");
                   const current = getTinderAuthState();
+                  const validToken = current?.token || currentTinderAuth?.token;
                   if (!current?.isLoggedIn) {
                     setTinderAuthState({
                       isLoggedIn: true,
-                      token: current?.token || undefined,
+                      token: validToken || null,
                       accountName: current?.accountName || "Tinder Account",
                     });
                   }
@@ -3842,8 +3975,23 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                     return;
                   }
 
+                  // ── In-page Bundle Re-injection (On-Device Safe Recovery) ──
+                  if (msg.type === "FE_REINJECT_BUNDLE") {
+                    if (webViewRef.current && isOnDevice) {
+                      webViewRef.current.injectJavaScript(CONTENT_SCRIPT_BUNDLE);
+                    }
+                    return;
+                  }
+
                   // ── Foreground renderer health probe response ──
                   if (msg.type === "FE_RENDERER_NEEDS_RELOAD") {
+                    // NEVER reload on-device — it destroys in-progress OTP/login form state!
+                    if (isOnDevice) {
+                      console.log(
+                        "[Browser] Ignored FE_RENDERER_NEEDS_RELOAD in on-device mode to preserve login session",
+                      );
+                      return;
+                    }
                     addLog(
                       "Browser engine was reset while backgrounded — reloading session",
                       "warn",
@@ -3966,8 +4114,66 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                     return;
                   }
 
+                  if (msg.type === "FE_MATCH_SCORE_REQUEST") {
+                    const { requestId, candidate } = msg;
+                    if (!requestId) return;
+                    const settings = getSharedExtensionSettings();
+                    const ownProfile = settings?.userProfile;
+
+                    if (!ownProfile || !candidate) {
+                      if (webViewRef.current) {
+                        const payload = JSON.stringify({
+                          type: "FE_MATCH_SCORE_RESPONSE",
+                          requestId,
+                          success: false,
+                          score: null,
+                          reasons: [],
+                        });
+                        webViewRef.current.injectJavaScript(`
+                          window.dispatchEvent(new CustomEvent('FE_MATCH_SCORE_RESPONSE', { detail: ${payload} }));
+                          true;
+                        `);
+                      }
+                      return;
+                    }
+
+                    scoreCandidateLLM(candidate, ownProfile, {
+                      apiKey: settings?.apiKey,
+                      endpoints: API_CONFIG.getEndpoints(),
+                      headers: API_CONFIG.getHeaders(),
+                    })
+                      .then((llmResult) => {
+                        if (webViewRef.current) {
+                          const payload = JSON.stringify({
+                            type: "FE_MATCH_SCORE_RESPONSE",
+                            requestId,
+                            success: Boolean(llmResult && typeof llmResult.score === "number"),
+                            score: llmResult?.score ?? null,
+                            reasons: (llmResult?.reasons || []).slice(0, 2),
+                          });
+                          webViewRef.current.injectJavaScript(`
+                            window.dispatchEvent(new CustomEvent('FE_MATCH_SCORE_RESPONSE', { detail: ${payload} }));
+                            true;
+                          `);
+                        }
+                      })
+                      .catch(() => {
+                        if (webViewRef.current) {
+                          webViewRef.current.injectJavaScript(`
+                            window.dispatchEvent(new CustomEvent('FE_MATCH_SCORE_RESPONSE', { detail: { type: 'FE_MATCH_SCORE_RESPONSE', requestId: '${requestId}', error: true } }));
+                            true;
+                          `);
+                        }
+                      });
+                    return;
+                  }
+
                   if (msg.type === "FE_LOG") {
                     addLog(msg.text, msg.logType || "info");
+                  }
+                  if (msg.type === "FE_ERROR") {
+                    addLog(`⚠️ ${msg.message || "Automation error in DOM"}`, "warn");
+                    return;
                   }
                   if (msg.type === "FE_COORD") {
                     setLastCoord({ x: msg.x, y: msg.y });
@@ -4043,7 +4249,9 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                     );
                     const collectionToken = getTinderAuthState()?.token;
                     if (collectionToken) {
-                      const swipeEvent = createSwipeEventFromDomMessage(msg);
+                      const currentSettings = getSharedExtensionSettings();
+                      const ownProfile = getCollections()?.own || currentSettings?.userProfile;
+                      const swipeEvent = createSwipeEventFromDomMessage(msg, Date.now(), ownProfile, currentSettings);
                       activateCollections(collectionToken)
                         .then(() =>
                           ingestCollectionEvent(swipeEvent, collectionToken),
@@ -4607,31 +4815,42 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                     );
                   }
                   if (msg.type === "FE_PAGE_STATUS") {
+                    if (msg.url) currentUrlRef.current = msg.url;
                     // Ignore page status reports while a logout is actively executing or pending
                     if (isLoggingOutRef.current || getPendingWebViewPurge())
                       return;
                     // ── Initial Page Status Report (fired on content.js inject) ──
                     // Syncs the home screen to the live WebView page state on load.
+                    const capturedToken = (msg.token && typeof msg.token === "string" && msg.token.trim().length >= 16)
+                      ? msg.token.trim()
+                      : undefined;
+                    const hasActiveToken = Boolean(
+                      capturedToken ||
+                      (currentTinderAuth?.token && typeof currentTinderAuth.token === "string" && currentTinderAuth.token.trim().length >= 16)
+                    );
                     const isAppUrl =
                       msg.url &&
                       msg.url.includes("/app") &&
-                      !msg.url.includes("/app/login");
+                      !msg.url.includes("/app/login") &&
+                      !msg.url.includes("/app/signup");
+
                     if (msg.isLoggedIn || isAppUrl) {
                       setSessionStatus(SESSION_SIGNED_IN);
                       setLoginStep("done");
-                      const capturedToken = msg.token || undefined;
+                      const tokenToUse = capturedToken || currentTinderAuth?.token;
                       const isLandingOrLoginUrl =
                         msg.url &&
                         (!msg.url.includes("/app") ||
-                          msg.url.includes("/app/login"));
+                          msg.url.includes("/app/login") ||
+                          msg.url.includes("/app/signup"));
                       if (isLandingOrLoginUrl) {
-                        if (capturedToken) {
-                          probeTinderSession(capturedToken)
+                        if (tokenToUse) {
+                          probeTinderSession(tokenToUse)
                             .then((res) => {
                               if (res?.ok) {
                                 setTinderAuthState({
                                   isLoggedIn: true,
-                                  token: capturedToken,
+                                  token: tokenToUse,
                                   accountName:
                                     msg.accountName || "Tinder Account",
                                 });
@@ -4651,21 +4870,16 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                                 token: null,
                               });
                             });
-                        } else {
-                          setTinderAuthState({
-                            isLoggedIn: false,
-                            accountName: null,
-                            token: null,
-                          });
                         }
                       } else {
                         setTinderAuthState({
                           isLoggedIn: true,
-                          token: capturedToken,
+                          token: tokenToUse || null,
                           accountName: msg.accountName || "Tinder Account",
                         });
-                        if (capturedToken) {
-                          probeTinderSession(capturedToken)
+                        triggerAutoStartIfReady();
+                        if (tokenToUse) {
+                          probeTinderSession(tokenToUse)
                             .then((res) => {
                               if (res?.ok && (res.profile || res.user)) {
                                 const profile =
@@ -4686,7 +4900,6 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                             })
                             .catch(() => {});
                         }
-                        triggerAutoStartIfReady();
                       }
                     } else if (typeof msg.isLoggedIn === "boolean") {
                       const current = getTinderAuthState();
@@ -4700,12 +4913,27 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                       );
                       // Never clobber a believed-good session while the user is
                       // partway through entering a code or number, or while the page is still hydrating recs.
-                      const midLogin =
-                        loginStep === "otp" || loginStep === "phone";
+                      // On-device mode user enters credentials directly into Tinder's web UI, so any landing/login
+                      // URL represents an active login in progress that must never be disrupted.
                       const isLandingOrLoginUrl =
                         msg.url &&
                         (!msg.url.includes("/app") ||
-                          msg.url.includes("/app/login"));
+                          msg.url.includes("/app/login") ||
+                          msg.url.includes("/app/signup"));
+                      const midLogin = isOnDevice
+                        ? isLandingOrLoginUrl
+                        : [
+                            "otp",
+                            "waiting_otp",
+                            "phone",
+                            "email",
+                            "waiting_email",
+                            "options",
+                            "captcha",
+                            "google_email",
+                            "google_password",
+                          ].includes(loginStep);
+
                       if (
                         !midLogin &&
                         !hasActiveToken &&
@@ -4720,7 +4948,8 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                         });
                       }
                       // If we have an active token and landed on the landing page, auto-redirect to /app/recs
-                      if (hasActiveToken && isLandingOrLoginUrl && !midLogin) {
+                      // But NEVER in on-device mode if midLogin or user is entering OTP/credentials!
+                      if (hasActiveToken && isLandingOrLoginUrl && !midLogin && !isOnDevice) {
                         webViewRef.current?.injectJavaScript(`
                         (function() {
                           if (window.location.pathname.indexOf('/app') === -1) {
@@ -4732,24 +4961,28 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                     }
                   }
                   if (msg.type === "FE_URL_CHANGE") {
+                    if (msg.url) currentUrlRef.current = msg.url;
                     if (
                       msg.pathname &&
                       msg.pathname.includes("/app") &&
-                      !msg.pathname.includes("/app/login")
+                      !msg.pathname.includes("/app/login") &&
+                      !msg.pathname.includes("/app/signup")
                     ) {
                       setSessionStatus(SESSION_SIGNED_IN);
                       setLoginStep("done");
                       const current = getTinderAuthState();
+                      const validToken = current?.token || currentTinderAuth?.token;
                       if (!current?.isLoggedIn) {
                         setTinderAuthState({
                           isLoggedIn: true,
-                          token: current?.token || undefined,
+                          token: validToken || null,
                           accountName: current?.accountName || "Tinder Account",
                         });
                       }
                     }
                   }
                   if (msg.type === "FE_AUTH_STEP") {
+                    if (msg.url) currentUrlRef.current = msg.url;
                     if (msg.step === "logged_in") {
                       if (isLoggingOutRef.current || getPendingWebViewPurge())
                         return;
@@ -4908,8 +5141,17 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                         if (activeToken && activeToken.length >= 16) {
                           window.__tinderAuthToken = activeToken;
                           try {
-                            if (!localStorage.getItem('TinderWeb/APIToken')) {
+                            if (localStorage.getItem('TinderWeb/APIToken') !== activeToken) {
                               localStorage.setItem('TinderWeb/APIToken', activeToken);
+                            }
+                          } catch(e) {}
+                        } else {
+                          // Do NOT delete TinderWeb/APIToken if already present in WebView localStorage!
+                          // Preserves existing login session so Tinder never gets stuck in a broken 401 state.
+                          try {
+                            var existingTok = localStorage.getItem('TinderWeb/APIToken');
+                            if (existingTok && existingTok.length >= 16) {
+                              window.__tinderAuthToken = existingTok;
                             }
                           } catch(e) {}
                         }

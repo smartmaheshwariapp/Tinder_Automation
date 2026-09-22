@@ -1,3 +1,5 @@
+import { scoreCandidateLocal } from './aiMatchScorer';
+
 export const COLLECTION_LIMIT = 500;
 const text = (value, max = 500) => typeof value === 'string' ? value.slice(0, max) : '';
 const list = value => (Array.isArray(value) ? value : []).map(item => text(typeof item === 'string' ? item : item?.name, 80)).filter(Boolean).slice(0, 30);
@@ -29,7 +31,15 @@ export function normalizeProfile(raw) {
     questionAnswers: (Array.isArray(profile.questionAnswers || profile.question_answers || profile.teasers)
       ? (profile.questionAnswers || profile.question_answers || profile.teasers)
       : []).map(qa => ({ question: text(qa?.question || qa?.prompt || qa?.type, 120), answer: text(qa?.answer || qa?.description || qa, 500) })).filter(qa => qa.answer),
-    verified: Boolean(profile.verified || profile.is_tinder_u || (Array.isArray(profile.badges) && profile.badges.length > 0))
+    verified: Boolean(profile.verified || profile.is_tinder_u || (Array.isArray(profile.badges) && profile.badges.length > 0)),
+    matchScore: profile.matchScore != null && Number.isFinite(Number(profile.matchScore)) ? Math.round(Number(profile.matchScore)) : null,
+    matchConfidence: profile.matchConfidence != null && Number.isFinite(Number(profile.matchConfidence)) ? Number(profile.matchConfidence) : null,
+    matchLabel: text(profile.matchLabel, 30) || null,
+    matchBreakdown: (Array.isArray(profile.matchBreakdown) ? profile.matchBreakdown : []).slice(0, 10).map(b => ({
+      axis: text(b?.axis, 30),
+      earned: Number(b?.earned) || 0,
+      max: Number(b?.max) || 0,
+    })),
   };
 }
 
@@ -88,6 +98,12 @@ export function mergeCollectionEvent(state, event, now = Date.now()) {
       if (existing.lookingFor && !profile.lookingFor) merged.lookingFor = existing.lookingFor;
       if (existing.descriptors?.length && !profile.descriptors?.length) merged.descriptors = existing.descriptors;
       if (existing.questionAnswers?.length && !profile.questionAnswers?.length) merged.questionAnswers = existing.questionAnswers;
+      if (existing.matchScore != null && profile.matchScore == null) {
+        merged.matchScore = existing.matchScore;
+        merged.matchConfidence = existing.matchConfidence;
+        merged.matchLabel = existing.matchLabel;
+        merged.matchBreakdown = existing.matchBreakdown;
+      }
       next.profiles[profile.id] = merged;
     }
     return profile;
@@ -128,10 +144,39 @@ export function mergeCollectionEvent(state, event, now = Date.now()) {
 
 export function collectionLists(state, own, preferences) {
   const profiles = state?.profiles || {};
-  const swiped = Object.values(state?.swipes || {}).sort((a, b) => b.swipedAt - a.swipedAt).map(item => ({ ...item, profile: profiles[item.profileId] }));
-  const chatting = Object.values(state?.conversations || {}).filter(item => !item.archived && item.messages?.length).sort((a, b) => b.lastActivityAt - a.lastActivityAt).map(item => ({ ...item, profile: profiles[item.profileId] }));
+  const enrichProfile = rawProfile => {
+    if (!rawProfile) return rawProfile;
+    if (
+      rawProfile.matchScore != null &&
+      rawProfile.matchScore > 0 &&
+      Array.isArray(rawProfile.matchBreakdown) &&
+      rawProfile.matchBreakdown.length > 0
+    ) {
+      return rawProfile;
+    }
+    const scored = scoreCandidateLocal(rawProfile, own, preferences);
+    return {
+      ...rawProfile,
+      matchScore: scored.score,
+      matchConfidence: scored.confidence,
+      matchLabel: scored.label,
+      matchBreakdown: scored.breakdown,
+    };
+  };
+
+  const swiped = Object.values(state?.swipes || {})
+    .sort((a, b) => b.swipedAt - a.swipedAt)
+    .map(item => ({ ...item, profile: enrichProfile(profiles[item.profileId]) }));
+  const chatting = Object.values(state?.conversations || {})
+    .filter(item => !item.archived && item.messages?.length)
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
+    .map(item => ({ ...item, profile: enrichProfile(profiles[item.profileId]) }));
   const rejected = new Set(swiped.filter(item => item.action === 'pass').map(item => item.profileId));
-  const strong = Object.values(profiles).filter(profile => !rejected.has(profile.id)).map(profile => ({ profile, ...compatibility(profile, own, preferences) })).filter(item => item.strong).sort((a, b) => b.score - a.score);
+  const strong = Object.values(profiles)
+    .filter(profile => !rejected.has(profile.id))
+    .map(profile => ({ profile: enrichProfile(profile), ...compatibility(profile, own, preferences) }))
+    .filter(item => item.strong)
+    .sort((a, b) => b.score - a.score);
   return { swiped, strong, chatting };
 }
 

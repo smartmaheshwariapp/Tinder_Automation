@@ -543,16 +543,76 @@ export default function HomeOverview({
         <LikesYou count={likesYou.count} isLoggedIn={isLoggedIn} onOpenTinder={onOpenBrowser} />
       </FadeIn>
 
-      {/* Separate Chats section removed — chats live in the Connection Intelligence "Chats" tab.
-      <FadeIn delay={STAGGER * 3}>
-        <MatchMessages settings={settings} isLoggedIn={isLoggedIn} onOpenTinder={onOpenBrowser} />
-      </FadeIn>
-      */}
+      {settings?.aiMatchEnabled && (
+        <FadeIn delay={STAGGER * 3}>
+          <SmartMatchRateCard settings={settings} stats={effectiveStats} onAutomation={onAutomation} />
+        </FadeIn>
+      )}
 
       <FadeIn delay={STAGGER * 4}>
         <TinderCollections settings={settings} onConnect={onOpenBrowser} />
       </FadeIn>
     </ScrollView>
+  );
+}
+
+// Smart Match Compatibility Filter Stat Card
+function SmartMatchRateCard({ settings, stats, onAutomation }) {
+  const currentThreshold = typeof settings?.aiMatchThreshold === 'number' ? settings.aiMatchThreshold : 60;
+  const strictGoals = settings?.aiMatchStrictGoals !== false;
+  const useLLM = Boolean(settings?.aiMatchUseLLM);
+
+  return (
+    <View style={styles.smartMatchCard}>
+      <LinearGradient
+        colors={[alpha(c.primary, 0.12), alpha(c.secondary, 0.04), c.surface]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.smartMatchHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={styles.smartMatchIconWrap}>
+            <Ionicons name="sparkles" size={16} color={c.accent} />
+          </View>
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.smartMatchTitle}>Compatibility Filter</Text>
+              <Badge tone="primary" label="ACTIVE" size="sm" />
+            </View>
+            <Text style={styles.smartMatchSub}>Threshold: ≥ {currentThreshold}% compatibility</Text>
+          </View>
+        </View>
+        {onAutomation && (
+          <TouchableOpacity
+            onPress={onAutomation}
+            style={styles.smartMatchAdjustBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Adjust Smart Match settings"
+          >
+            <Ionicons name="options-outline" size={14} color={c.accent} />
+            <Text style={styles.smartMatchAdjustText}>Adjust</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.smartMatchStatsRow}>
+        <View style={styles.smartMatchStat}>
+          <Text style={styles.smartMatchStatVal}>{currentThreshold}%</Text>
+          <Text style={styles.smartMatchStatLabel}>Min Score</Text>
+        </View>
+        <View style={styles.smartMatchStatDivider} />
+        <View style={styles.smartMatchStat}>
+          <Text style={styles.smartMatchStatVal}>{strictGoals ? 'Strict' : 'Flexible'}</Text>
+          <Text style={styles.smartMatchStatLabel}>Goals Filter</Text>
+        </View>
+        <View style={styles.smartMatchStatDivider} />
+        <View style={styles.smartMatchStat}>
+          <Text style={styles.smartMatchStatVal}>{useLLM ? 'Deep AI' : 'Fast Match'}</Text>
+          <Text style={styles.smartMatchStatLabel}>Scoring Mode</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -1288,5 +1348,82 @@ const styles = createStyles(() => ({
     fontSize: 11,
     lineHeight: 14,
     color: c.muted,
+  },
+  smartMatchCard: {
+    borderRadius: r.card,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.borderSubtle,
+    overflow: 'hidden',
+    padding: sp.lg,
+    marginBottom: sp.md,
+  },
+  smartMatchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: sp.md,
+  },
+  smartMatchIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: c.primarySoft,
+    borderWidth: 1,
+    borderColor: c.primaryBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smartMatchTitle: {
+    ...t.bodyStrong,
+    color: c.text,
+  },
+  smartMatchSub: {
+    ...t.caption,
+    color: c.textSecondary,
+    marginTop: 1,
+  },
+  smartMatchAdjustBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: r.pill,
+    backgroundColor: c.primarySoft,
+    borderWidth: 1,
+    borderColor: c.primaryBorder,
+  },
+  smartMatchAdjustText: {
+    ...t.caption,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.accent,
+  },
+  smartMatchStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingTop: sp.sm,
+    borderTopWidth: 1,
+    borderColor: alpha(c.white, 0.08),
+  },
+  smartMatchStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  smartMatchStatVal: {
+    ...t.bodyStrong,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.text,
+  },
+  smartMatchStatLabel: {
+    ...t.caption,
+    color: c.muted,
+    marginTop: 2,
+  },
+  smartMatchStatDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 24,
+    backgroundColor: c.divider,
   },
 }));

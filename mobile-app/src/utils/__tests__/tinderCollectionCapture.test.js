@@ -1,5 +1,5 @@
 import { createSwipeEventFromDomMessage } from '../tinderCollectionCapture';
-import { collectionLists, emptyCollections, mergeCollectionEvent, mergeProgressFeedSwipes } from '../tinderCollectionsModel';
+import { collectionLists, emptyCollections, mergeCollectionEvent, mergeProgressFeedSwipes, normalizeProfile } from '../tinderCollectionsModel';
 
 describe('local Tinder collection bridge', () => {
   it('turns a confirmed swipe into a homepage row', () => {
@@ -189,5 +189,75 @@ describe('local Tinder collection bridge', () => {
       'Lifestyle match: Zodiac: Taurus'
     ]));
   });
+
+  it('preserves null for matchScore and matchConfidence when not set (does not coerce null to 0)', () => {
+    const normalized = normalizeProfile({
+      _id: 'test_null_profile',
+      name: 'Null Test',
+      matchScore: null,
+      matchConfidence: null,
+    });
+    expect(normalized.matchScore).toBeNull();
+    expect(normalized.matchConfidence).toBeNull();
+  });
+
+  it('automatically calculates smart AI compatibility score and trait breakdown for candidate profiles', () => {
+    const jenniferMsg = {
+      profileId: 'tinder_jennifer_37',
+      name: 'Jennifer',
+      age: 37,
+      job: 'manager at boarding',
+      school: 'pitman',
+      city: 'Pitman',
+      bio: "Hey!!! Im Jennifer, I'm 37 years young.. I love where I work and i'm pretty sure i have the best job",
+      photos: ['https://images-ssl.gotinder.com/u/jennifer/1.jpg'],
+      photoUrl: 'https://images-ssl.gotinder.com/u/jennifer/1.jpg',
+      verified: true,
+      action: 'like',
+      swipeCount: 1,
+    };
+
+    const swipeEvent = createSwipeEventFromDomMessage(jenniferMsg, 3000);
+    expect(swipeEvent.profile.matchScore).toBeGreaterThan(0);
+    expect(swipeEvent.profile.matchConfidence).toBeGreaterThan(0);
+    expect(swipeEvent.profile.matchLabel).toBeTruthy();
+    expect(swipeEvent.profile.matchBreakdown.length).toBeGreaterThanOrEqual(2);
+
+    const axes = swipeEvent.profile.matchBreakdown.map(b => b.axis);
+    expect(axes).toContain('Career & Education');
+    expect(axes).toContain('Location');
+    expect(axes).toContain('Completeness');
+
+    // Also verify collectionLists enriches existing raw profiles missing scores
+    const rawState = {
+      version: 1,
+      ownerId: 'owner',
+      profiles: {
+        raw_jennifer: {
+          id: 'raw_jennifer',
+          name: 'Jennifer',
+          age: 37,
+          job: 'manager at boarding',
+          school: 'pitman',
+          city: 'Pitman',
+          bio: "Hey!!! Im Jennifer, I'm 37 years young.. I love where I work and i'm pretty sure i have the best job",
+          photos: ['https://images-ssl.gotinder.com/u/jennifer/1.jpg'],
+          matchScore: 0,
+          matchConfidence: 0,
+          matchBreakdown: [],
+        }
+      },
+      swipes: {
+        raw_jennifer: { profileId: 'raw_jennifer', action: 'like', swipedAt: 3000 }
+      },
+      conversations: {},
+      updatedAt: 3000,
+    };
+
+    const enriched = collectionLists(rawState, {}, {});
+    expect(enriched.swiped[0].profile.matchScore).toBeGreaterThan(0);
+    expect(enriched.swiped[0].profile.matchBreakdown.length).toBeGreaterThanOrEqual(2);
+  });
 });
+
 

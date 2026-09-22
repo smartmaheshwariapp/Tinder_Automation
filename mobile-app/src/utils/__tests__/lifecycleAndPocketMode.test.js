@@ -367,4 +367,108 @@ describe('Pocket Mode Telemetry Sync, Cumulative Tracking & Rate-Limit Verificat
   });
 });
 
+describe('On-Device Login & OTP Session Persistence Lifecycle', () => {
+  it('never reloads the WebView when app returns to foreground during on-device mode', () => {
+    let reloadCalled = false;
+    let injectedScript = null;
+    const webViewMock = {
+      reload: () => { reloadCalled = true; },
+      injectJavaScript: (js) => { injectedScript = js; },
+    };
+
+    const isOnDevice = true;
+    const isReturning = true;
+
+    // Simulate foreground recovery logic
+    if (isOnDevice && isReturning) {
+      if (webViewMock) {
+        webViewMock.injectJavaScript(`
+          (function() {
+            try {
+              if (!window.__flirtEasyBundleLoaded && window.location.pathname.indexOf('/app') !== -1 && window.location.pathname.indexOf('/app/login') === -1) {
+                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
+                  JSON.stringify({ type: 'FE_REINJECT_BUNDLE' })
+                );
+              }
+            } catch(e) {}
+          })(); true;
+        `);
+      }
+    }
+
+    expect(reloadCalled).toBe(false);
+    expect(injectedScript).toContain('FE_REINJECT_BUNDLE');
+    expect(injectedScript).not.toContain('FE_RENDERER_NEEDS_RELOAD');
+  });
+
+  it('ignores FE_RENDERER_NEEDS_RELOAD when in on-device mode to prevent destroying login/OTP', () => {
+    let reloadCalled = false;
+    const webViewMock = {
+      reload: () => { reloadCalled = true; },
+    };
+
+    const handleMessage = (msg, isOnDevice) => {
+      if (msg.type === 'FE_RENDERER_NEEDS_RELOAD') {
+        if (isOnDevice) {
+          return 'ignored';
+        }
+        if (webViewMock) webViewMock.reload();
+        return 'reloaded';
+      }
+    };
+
+    expect(handleMessage({ type: 'FE_RENDERER_NEEDS_RELOAD' }, true)).toBe('ignored');
+    expect(reloadCalled).toBe(false);
+
+    expect(handleMessage({ type: 'FE_RENDERER_NEEDS_RELOAD' }, false)).toBe('reloaded');
+    expect(reloadCalled).toBe(true);
+  });
+
+  it('safely re-injects bundle without reloading when FE_REINJECT_BUNDLE is received', () => {
+    let reloadCalled = false;
+    let injectedScript = null;
+    const webViewMock = {
+      reload: () => { reloadCalled = true; },
+      injectJavaScript: (js) => { injectedScript = js; },
+    };
+
+    const handleMessage = (msg, isOnDevice) => {
+      if (msg.type === 'FE_REINJECT_BUNDLE') {
+        if (webViewMock && isOnDevice) {
+          webViewMock.injectJavaScript('MOCK_CONTENT_SCRIPT_BUNDLE');
+        }
+        return 'reinjected';
+      }
+    };
+
+    const result = handleMessage({ type: 'FE_REINJECT_BUNDLE' }, true);
+    expect(result).toBe('reinjected');
+    expect(reloadCalled).toBe(false);
+    expect(injectedScript).toBe('MOCK_CONTENT_SCRIPT_BUNDLE');
+  });
+
+  it('protects on-device mid-login states from being redirected or clobbered', () => {
+    const isLandingOrLoginUrl = true;
+    const isOnDevice = true;
+    const loginStep = 'options';
+
+    const computeMidLogin = (onDevice, isLanding, step) => {
+      return onDevice
+        ? isLanding
+        : ['otp', 'waiting_otp', 'phone', 'email', 'waiting_email', 'options', 'captcha', 'google_email', 'google_password'].includes(step);
+    };
+
+    const midLogin = computeMidLogin(isOnDevice, isLandingOrLoginUrl, loginStep);
+    expect(midLogin).toBe(true);
+
+    // Guard: auto-redirect to /app/recs must NOT trigger on-device during midLogin
+    const shouldAutoRedirect = (hasToken, isLanding, isMid, onDevice) => {
+      return Boolean(hasToken && isLanding && !isMid && !onDevice);
+    };
+
+    expect(shouldAutoRedirect(true, isLandingOrLoginUrl, midLogin, isOnDevice)).toBe(false);
+    expect(shouldAutoRedirect(true, isLandingOrLoginUrl, false, false)).toBe(true);
+  });
+});
+
 

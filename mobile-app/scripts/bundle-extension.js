@@ -128,7 +128,18 @@ ${content}
 true;
 `;
 
-  // ── 4. Write the bundle module ──
+  // ── 4. Verify bundle syntax with vm.Script ──
+  const vm = require('vm');
+  try {
+    new vm.Script(bundle);
+    console.log('[Bundle] ✅ Syntax validation passed (bundle is 100% valid JavaScript)');
+  } catch (err) {
+    console.error('[Bundle] ❌ FATAL: Syntax error in bundled content scripts!');
+    console.error(err.message);
+    process.exit(1);
+  }
+
+  // ── 5. Write the bundle module ──
   // We JSON.stringify the bundle to create a safe string literal,
   // then export it. This handles all escaping (backticks, quotes, etc.)
   const moduleContent = `// AUTO-GENERATED — Do not edit manually.

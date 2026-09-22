@@ -80,17 +80,38 @@ export default function DashboardPanel({
   const activeTab = selectedTab || internalTab;
   const [targetSettingsSection, setTargetSettingsSection] = useState(null);
 
+  // ─── Global Dynamic Floating Save Bar Controller ───
+  const [dirtyState, setDirtyState] = useState({
+    isDirty: false,
+    saveFn: null,
+    discardFn: null,
+  });
+
+  const handleDirtyChange = useCallback((isDirty, saveFn, discardFn) => {
+    setDirtyState({
+      isDirty: Boolean(isDirty),
+      saveFn: saveFn || null,
+      discardFn: discardFn || null,
+    });
+  }, []);
+
   const handleTabSelect = useCallback((tab) => {
+    if (dirtyState.isDirty && typeof dirtyState.saveFn === 'function') {
+      try { dirtyState.saveFn(); } catch (_) {}
+    }
     setTargetSettingsSection(null);
     setInternalTab(tab);
     onTabChange?.(tab);
-  }, [onTabChange]);
+  }, [onTabChange, dirtyState]);
 
   const handleNavigateToSettings = useCallback((section) => {
+    if (dirtyState.isDirty && typeof dirtyState.saveFn === 'function') {
+      try { dirtyState.saveFn(); } catch (_) {}
+    }
     if (section) setTargetSettingsSection(section);
     setInternalTab('settings');
     onTabChange?.('settings');
-  }, [onTabChange]);
+  }, [onTabChange, dirtyState]);
 
   const agentState    = stats?.agentState    ?? null;
   const lifetimeStats = stats?.lifetimeStats ?? null;
@@ -141,21 +162,6 @@ export default function DashboardPanel({
     }
     return await handleSaveV2Settings(updated);
   }, [onSaveSettings, effectiveSettings, handleSaveV2Settings]);
-
-  // ─── Global Dynamic Floating Save Bar Controller ───
-  const [dirtyState, setDirtyState] = useState({
-    isDirty: false,
-    saveFn: null,
-    discardFn: null,
-  });
-
-  const handleDirtyChange = useCallback((isDirty, saveFn, discardFn) => {
-    setDirtyState({
-      isDirty: Boolean(isDirty),
-      saveFn: saveFn || null,
-      discardFn: discardFn || null,
-    });
-  }, []);
 
   const handleGlobalSave = useCallback(() => {
     if (dirtyState.saveFn) {

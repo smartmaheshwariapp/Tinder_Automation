@@ -19,6 +19,7 @@ import {
   getTinderAuthState,
   isAutoSwipeEnabled,
   isAutoMessagingEnabled,
+  getSharedExtensionSettings,
 } from './sessionManager';
 import {
   canPerformLikes,
@@ -259,7 +260,10 @@ export class OnDeviceBackgroundWorker {
     switch (action) {
       // ── Settings & State ──
       case 'getSettings':
-        return { ...this.settings };
+        return {
+          ...this.settings,
+          ...(typeof getSharedExtensionSettings === 'function' ? getSharedExtensionSettings() : {}),
+        };
 
       case 'checkAccountTier': {
         const auth = typeof getTinderAuthState === 'function' ? getTinderAuthState() : null;

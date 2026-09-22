@@ -8,8 +8,9 @@ import FeedbackState from '../common/FeedbackState';
 import { AppButton, AppText, Badge, CountUp, IconButton, IconWell, LiveDot } from '../ui';
 import { createStyles, theme, alpha } from '../../theme';
 import useResponsive from '../../hooks/useResponsive';
-import { getTinderAuthState, subscribeTinderAuthState } from '../../utils/sessionManager';
+import { getTinderAuthState, subscribeTinderAuthState, getSharedExtensionSettings } from '../../utils/sessionManager';
 import { collectionLists } from '../../utils/tinderCollectionsModel';
+import { scoreCandidateLocal } from '../../utils/aiMatchScorer';
 import { activateCollections, disconnectCollections, getCollections, refreshConversations, subscribeCollections } from '../../services/tinderCollections';
 
 const c = theme.colors;
@@ -80,23 +81,58 @@ function Avatar({ profile, round = false }) {
 //     : <LinearGradient colors={[c.elevatedHigh, c.surface]} style={[styles.avatarFrame, size, styles.placeholder]}><Ionicons name="person-outline" size={large ? 38 : 24} color={c.textSecondary} /></LinearGradient>;
 // }
 
-// Fit score as a segmented dial (20 ticks — scores move in steps of 20, so every step is visible).
-const TICKS = 20;
+// Fit score ring as a modern circular gauge.
 function ScoreRing({ value, size = 48, big = false, onPhoto = false }) {
   const pct = Math.max(0, Math.min(100, Number(value) || 0));
-  const color = pct >= 80 ? TABS.chatting.color : TABS.strong.color;
-  const filled = Math.round((pct / 100) * TICKS);
-  const tickHeight = Math.max(5, Math.round(size * 0.13));
+  const color = pct >= 75 ? (c.secondary || '#A855F7') : pct >= 50 ? (c.accent || '#FF5E7E') : (c.muted || '#AD96A6');
+  const borderWidth = big ? 3 : 2;
+  const innerInset = big ? 6 : 4;
+
   return (
-    <View style={[styles.ring, { width: size, height: size, borderRadius: size / 2 }, onPhoto && styles.ringOnPhoto]} accessible accessibilityLabel={`Estimated fit ${pct} percent`}>
-      {Array.from({ length: TICKS }, (_, i) => (
-        <View key={i} pointerEvents="none" style={[styles.tickArm, { transform: [{ rotate: `${(i * 360) / TICKS}deg` }] }]}>
-          <View style={[styles.tick, { height: tickHeight, backgroundColor: i < filled ? color : alpha(c.white, 0.14) }]} />
-        </View>
-      ))}
-      <View style={styles.ringCenter}>
-        <Text style={[big ? styles.ringValueBig : styles.ringValue, { color }]} maxFontSizeMultiplier={theme.fontScale.chrome}>{pct}</Text>
-        <Text style={styles.ringUnit} maxFontSizeMultiplier={theme.fontScale.chrome}>%</Text>
+    <View
+      style={[
+        styles.ring,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          borderWidth,
+          borderColor: color,
+          backgroundColor: onPhoto ? alpha(c.background, 0.82) : alpha(color, 0.12),
+        },
+        onPhoto && styles.ringOnPhoto,
+      ]}
+      accessible
+      accessibilityLabel={`Estimated fit ${pct} percent`}
+    >
+      {/* Concentric inner track for depth */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: innerInset,
+          left: innerInset,
+          right: innerInset,
+          bottom: innerInset,
+          borderRadius: (size - innerInset * 2) / 2,
+          borderWidth: 1,
+          borderColor: alpha(color, 0.3),
+          borderStyle: 'dashed',
+        }}
+      />
+      <View style={styles.ringCenter} pointerEvents="none">
+        <Text
+          style={[big ? styles.ringValueBig : styles.ringValue, { color }]}
+          maxFontSizeMultiplier={theme.fontScale.chrome}
+        >
+          {pct}
+        </Text>
+        <Text
+          style={[styles.ringUnit, { color: alpha(color, 0.85) }]}
+          maxFontSizeMultiplier={theme.fontScale.chrome}
+        >
+          %
+        </Text>
       </View>
     </View>
   );
@@ -162,18 +198,53 @@ function Rail({ gutter, children }) {
 }
 function SwipeCard({ item, width, index, onPress }) {
   const profile = item.profile, liked = item.action === 'like', name = profile?.name || 'Tinder profile';
+  const hasScore = typeof profile?.matchScore === 'number';
+  const matchScore = profile?.matchScore;
+  const isLowInfo = (profile?.matchConfidence != null && profile.matchConfidence < 0.3) || profile?.matchLabel === 'Low Info';
+  const topTrait = Array.isArray(profile?.matchBreakdown) && profile.matchBreakdown.length > 0
+    ? profile.matchBreakdown[0]?.axis
+    : null;
+
   return (
     <FadeIn delay={Math.min(index, 8) * STAGGER} offset={8}>
-      <Button style={[styles.photoCard, { width, height: Math.round(width * 1.36) }]} onPress={onPress} pressScale={0.97} accessibilityRole="button" accessibilityLabel={`${name}. ${swipeSubtitle(item)}`}>
+      <Button style={[styles.photoCard, { width, height: Math.round(width * 1.36) }]} onPress={onPress} pressScale={0.97} accessibilityRole="button" accessibilityLabel={`${name}. ${hasScore ? `${profile.matchLabel || 'Match'} ${matchScore}%` : swipeSubtitle(item)}`}>
         <Photo profile={profile} dim={!liked} iconSize={30} />
         <LinearGradient colors={shadeFn()} locations={[0.35, 0.6, 1]} style={styles.photoShade} pointerEvents="none" />
         <View style={styles.cardTop} pointerEvents="none">
           <Badge label={liked ? 'LIKED' : 'PASSED'} icon={liked ? 'heart' : 'close'} tone={liked ? TABS.swiped.tone : 'neutral'} size="sm" style={styles.badgeOnPhoto} />
+          {hasScore && (
+            <View style={[
+              styles.scoreBadgeOnCard,
+              {
+                backgroundColor: isLowInfo
+                  ? alpha(c.textSecondary, 0.85)
+                  : matchScore >= 70
+                    ? alpha(c.success, 0.85)
+                    : matchScore >= 40
+                      ? alpha(c.warning, 0.85)
+                      : alpha(c.error, 0.85),
+              }
+            ]}>
+              <Text style={styles.scoreBadgeText}>
+                {isLowInfo ? '?' : `${matchScore}%`}
+              </Text>
+            </View>
+          )}
           {liked && item.matched && <LinearGradient colors={theme.gradients.brandShort} style={styles.matchMark}><Ionicons name="heart" size={12} color={c.onPrimary} /></LinearGradient>}
         </View>
         <View style={styles.cardCopy} pointerEvents="none">
-          <Text style={styles.cardName} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{name}</Text>
-          <Text style={styles.cardMeta} numberOfLines={2} maxFontSizeMultiplier={theme.fontScale.chrome}>{swipeSubtitle(item)}</Text>
+          <Text style={styles.cardName} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{name}{profile?.age ? `, ${profile.age}` : ''}</Text>
+          <Text style={styles.cardMeta} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
+            {hasScore && !isLowInfo ? `${profile.matchLabel || 'Compatibility'} · ${matchScore}%` : swipeSubtitle(item)}
+          </Text>
+          {topTrait && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+              <Ionicons name="sparkles" size={10} color={c.accent} />
+              <Text style={[styles.cardMeta, { color: c.accent, fontSize: 10 }]} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                {topTrait}
+              </Text>
+            </View>
+          )}
         </View>
       </Button>
     </FadeIn>
@@ -218,8 +289,14 @@ function MoreCard({ count, config, index, width, onPress }) {
 
 function ProfileRow({ item, tab, ownerId, onPress }) {
   const profile = item.profile, config = TABS[tab], latest = item.messages?.[0];
+  const hasScore = typeof profile?.matchScore === 'number';
+  const isLowInfo = (profile?.matchConfidence != null && profile.matchConfidence < 0.3) || profile?.matchLabel === 'Low Info';
+  const topTrait = Array.isArray(profile?.matchBreakdown) && profile.matchBreakdown.length > 0
+    ? profile.matchBreakdown[0]?.axis
+    : null;
+
   const subtitle = tab === 'swiped'
-    ? swipeSubtitle(item)
+    ? (profile?.bio ? profile.bio.slice(0, 56).trim() : ([profile?.job, profile?.school, profile?.city].filter(Boolean).join(' · ') || swipeSubtitle(item)))
     : tab === 'strong' ? item.reasons?.[0] || 'High estimated compatibility'
       : `${latest?.senderId === ownerId ? 'You: ' : ''}${latest?.text || 'Open conversation'}`;
   // Chats: the other person spoke last, so it is "your turn" — shown as an unread-style dot.
@@ -249,16 +326,36 @@ function ProfileRow({ item, tab, ownerId, onPress }) {
       <Avatar profile={profile} />
       <View style={styles.rowCopy}>
         <View style={styles.nameLine}>
-          <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{name}</Text>
+          <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{name}{profile?.age ? `, ${profile.age}` : ''}</Text>
           {tab === 'swiped' && !!item.swipedAt && <Text style={styles.time} maxFontSizeMultiplier={theme.fontScale.chrome}>{relativeTime(item.swipedAt)}</Text>}
         </View>
         <Text style={styles.subtitle} numberOfLines={2} maxFontSizeMultiplier={theme.fontScale.body}>{subtitle}</Text>
         <View style={styles.meta}>
-          {tab === 'swiped' && <Badge label={item.action === 'like' ? 'LIKED' : 'PASSED'} icon={item.action === 'like' ? 'heart' : 'close'} tone={item.action === 'like' ? config.tone : 'neutral'} size="sm" />}
+          {tab === 'swiped' && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+              <Badge label={item.action === 'like' ? 'LIKED' : 'PASSED'} icon={item.action === 'like' ? 'heart' : 'close'} tone={item.action === 'like' ? config.tone : 'neutral'} size="sm" />
+              {hasScore && (
+                <Badge
+                  label={isLowInfo ? 'Low Info' : `${profile.matchLabel ? `${profile.matchLabel} · ` : ''}${profile.matchScore}%`}
+                  tone={profile.matchScore >= 70 ? 'success' : profile.matchScore >= 40 ? 'warning' : 'neutral'}
+                  icon="sparkles"
+                  size="sm"
+                />
+              )}
+              {topTrait && (
+                <Badge
+                  label={topTrait}
+                  tone="secondary"
+                  size="sm"
+                  style={{ opacity: 0.9 }}
+                />
+              )}
+            </View>
+          )}
           {tab === 'strong' && <Text style={styles.metaText} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>{item.reasons?.[1] || 'Compatibility estimate'}</Text>}
         </View>
       </View>
-      {tab === 'strong' ? <ScoreRing value={item.score} size={50} /> : <Ionicons name="chevron-forward" size={18} color={c.muted} />}
+      {tab === 'strong' ? <ScoreRing value={item.score} size={50} /> : (hasScore ? <ScoreRing value={profile.matchScore} size={42} /> : <Ionicons name="chevron-forward" size={18} color={c.muted} />)}
     </Button>
   );
 }
@@ -353,7 +450,7 @@ function DetailHero({ item, tab, height }) {
       <Photo key={index} profile={profile} index={index} iconSize={56} textStyle={styles.initialsLarge} />
       {count > 1 && <Button style={StyleSheet.absoluteFill} onPress={() => setIndex((index + 1) % count)} activeOpacity={1} pressScale={1} accessibilityRole="button" accessibilityLabel={`Show photo ${((index + 1) % count) + 1} of ${count}`} />}
       {count > 1 && <View style={styles.pager} pointerEvents="none">{photos.map((uri, i) => <View key={`${uri}-${i}`} style={[styles.pagerBar, i === index && styles.pagerBarActive]} />)}</View>}
-      <LinearGradient colors={['transparent', alpha(c.background, 0.5), c.background]} locations={[0.45, 0.72, 1]} style={styles.photoShade} pointerEvents="none" />
+      <LinearGradient colors={['transparent', alpha(c.background, 0.65), c.background]} locations={[0.35, 0.68, 1]} style={styles.photoShade} pointerEvents="none" />
       <View style={styles.detailHeroCopy} pointerEvents="none">
         <View style={styles.detailHeroText}>
           <View style={styles.heroBadgeRow}>
@@ -368,7 +465,9 @@ function DetailHero({ item, tab, height }) {
             </View>
           )}
         </View>
-        {item.score != null && <ScoreRing value={item.score} size={66} big onPhoto />}
+        {(item.score != null || profile.matchScore != null) && (
+          <ScoreRing value={item.score != null ? item.score : profile.matchScore} size={66} big onPhoto />
+        )}
       </View>
     </View>
   );
@@ -415,6 +514,26 @@ export default function TinderCollections({ settings, onConnect }) {
     480,
   );
   const ownerId = state.data?.ownerId;
+
+  const selectedScoreData = useMemo(() => {
+    if (!selected?.profile) return null;
+    const p = selected.profile;
+    const hasValidScore =
+      p.matchScore != null &&
+      p.matchScore > 0 &&
+      Array.isArray(p.matchBreakdown) &&
+      p.matchBreakdown.length > 0;
+    if (hasValidScore) {
+      return {
+        score: p.matchScore,
+        confidence: p.matchConfidence,
+        label: p.matchLabel || (p.matchScore >= 75 ? 'Strong Match' : 'Good Potential'),
+        breakdown: p.matchBreakdown,
+      };
+    }
+    const own = state.own || settings?.userProfile || getSharedExtensionSettings()?.userProfile;
+    return scoreCandidateLocal(p, own, settings || getSharedExtensionSettings());
+  }, [selected, state.own, settings]);
 
   return <View style={styles.section}>
     <View style={styles.header}>
@@ -481,14 +600,46 @@ export default function TinderCollections({ settings, onConnect }) {
           <IconWell icon={config.icon} tone={config.tone} size={36} iconSize={16} style={styles.modalIcon} />
         </View>
         {selected ? <ScrollView contentContainerStyle={[styles.details, { maxWidth: contentMax, paddingBottom: sp.section }]} showsVerticalScrollIndicator={false}>
-          <FadeIn><DetailHero key={itemKey(selected, 0)} item={selected} tab={tab} height={heroHeight} /></FadeIn>
-          {/* Previous hero: small avatar + centered name/score on a soft gradient.
-          <LinearGradient colors={[alpha(c.primary, 0.16), alpha(c.secondary, 0.04), 'transparent']} style={styles.hero}>
-            <Avatar profile={selected.profile} large />
-            <AppText variant="title" align="center" numberOfLines={2} style={styles.detailName}>{selected.profile?.name || 'Tinder profile'}</AppText>
-            {selected.score != null && <Score value={selected.score} />}
-            {!!selected.profile?.bio && <AppText variant="callout" color="textSecondary" align="center" style={styles.bio}>{selected.profile.bio}</AppText>}
-          </LinearGradient> */}
+          <FadeIn><DetailHero key={itemKey(selected, 0)} item={selectedScoreData ? { ...selected, profile: { ...selected.profile, matchScore: selectedScoreData.score } } : selected} tab={tab} height={heroHeight} /></FadeIn>
+          {selectedScoreData != null && (
+            <View style={styles.detailCard}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <AppText variant="overline" color="secondary" accessibilityRole="header">AI COMPATIBILITY SCORE</AppText>
+                <Badge
+                  label={selectedScoreData.label || (selectedScoreData.score >= 75 ? 'Strong Match' : 'Good Potential')}
+                  tone={selectedScoreData.score >= 75 ? 'secondary' : selectedScoreData.score >= 50 ? 'primary' : 'neutral'}
+                  size="sm"
+                />
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 12, marginBottom: 8 }}>
+                <ScoreRing value={selectedScoreData.score} size={64} big />
+                <View style={{ flex: 1 }}>
+                  <AppText variant="title2">
+                    {selectedScoreData.label || (selectedScoreData.score >= 75 ? 'Strong Match' : 'Good Potential')}
+                  </AppText>
+                  <AppText variant="footnote" color="textSecondary" style={{ marginTop: 2 }}>
+                    {selectedScoreData.confidence != null
+                      ? `Match Quality: ${Math.round(selectedScoreData.confidence * 100)}% (${selectedScoreData.breakdown?.length || 0} traits evaluated)`
+                      : 'Based on shared traits & preferences'}
+                  </AppText>
+                </View>
+              </View>
+              {Array.isArray(selectedScoreData.breakdown) && selectedScoreData.breakdown.length > 0 && (
+                <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: alpha(c.white, 0.08) }}>
+                  <AppText variant="caption" color="muted" style={{ marginBottom: 6 }}>TRAIT BREAKDOWN</AppText>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {selectedScoreData.breakdown.map((b, idx) => (
+                      <View key={idx} style={[styles.reason, { paddingHorizontal: 10, paddingVertical: 4 }]}>
+                        <Text style={styles.reasonText} maxFontSizeMultiplier={theme.fontScale.body}>
+                          {b.axis} · {Math.round((b.earned / (b.max || 1)) * 100)}%
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
           {!!selected.profile?.lookingFor && (
             <View style={styles.detailCard}>
               <AppText variant="overline" color="secondary" accessibilityRole="header">LOOKING FOR</AppText>
@@ -706,14 +857,42 @@ const styles = createStyles(() => ({
   // scoreUnit: { ...t.caption, fontSize: 10, lineHeight: 13, color: c.muted },
 
   // Score ring
-  ring: { alignItems: 'center', justifyContent: 'center', backgroundColor: c.background },
-  ringOnPhoto: { backgroundColor: alpha(c.background, 0.8) },
-  tickArm: { ...StyleSheet.absoluteFillObject, alignItems: 'center', paddingTop: 3 },
-  tick: { width: 3, borderRadius: 2 },
-  ringCenter: { flexDirection: 'row', alignItems: 'baseline' },
-  ringValue: { ...t.label, fontFamily: theme.fonts.strong, fontVariant: ['tabular-nums'] },
-  ringValueBig: { ...t.title2, fontFamily: theme.fonts.strong, fontVariant: ['tabular-nums'] },
-  ringUnit: { ...t.caption, fontSize: 10, lineHeight: 13, color: c.muted },
+  ring: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  ringOnPhoto: {
+    ...theme.shadows.md,
+  },
+  ringCenter: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringValue: {
+    ...t.label,
+    fontFamily: theme.fonts.strong,
+    fontVariant: ['tabular-nums'],
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  ringValueBig: {
+    ...t.title2,
+    fontFamily: theme.fonts.strong,
+    fontVariant: ['tabular-nums'],
+    fontSize: 17,
+    lineHeight: 21,
+  },
+  ringUnit: {
+    ...t.caption,
+    fontSize: 10,
+    lineHeight: 13,
+    marginLeft: 1,
+    marginTop: 2,
+  },
 
   // Empty state container (FeedbackState inside a dashed well)
   empty: { borderRadius: r.lg, backgroundColor: c.surface, borderWidth: 1, borderStyle: 'dashed', borderColor: c.border },
@@ -769,4 +948,17 @@ const styles = createStyles(() => ({
   promptAnswer: { ...t.callout, color: c.text },
   descriptor: { paddingVertical: sp.xs + 2, paddingHorizontal: sp.sm + 2, borderRadius: r.pill, backgroundColor: alpha(c.elevatedHigh, 0.6), borderWidth: 1, borderColor: c.borderSubtle, maxWidth: '100%' },
   descriptorText: { ...t.footnote, color: c.textSecondary },
+  scoreBadgeOnCard: {
+    paddingHorizontal: sp.xs + 2,
+    paddingVertical: 2,
+    borderRadius: r.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scoreBadgeText: {
+    color: c.white,
+    fontFamily: theme.fonts.strong,
+    fontSize: 10,
+    letterSpacing: 0.2,
+  },
 }));
