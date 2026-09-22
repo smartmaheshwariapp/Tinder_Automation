@@ -51,7 +51,7 @@ export const siteConfig = {
     operatorName: null,
     postalAddress: null,
     governingLaw: null,
-    effectiveDate: null,
+    effectiveDate: '2026-09-22',
   } satisfies LegalEntity as LegalEntity,
 } as const;
 

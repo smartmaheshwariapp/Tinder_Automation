@@ -6,7 +6,8 @@ import { createStyles, theme, alpha, getActiveTheme, THEME_OPTIONS } from '../..
 import ThemePickerSheet from './ThemePickerSheet';
 import SafeActivityIndicator from '../common/SafeActivityIndicator';
 import { FadeIn } from '../common/Motion';
-import { AppText, Badge, Card, ListRow, LiveDot, ScreenHeader, SectionHeader } from '../ui';
+import { AppText, Badge, BottomSheet, Card, ListRow, LiveDot, ScreenHeader, SectionHeader } from '../ui';
+import LegalDocument from '../legal/LegalDocument';
 import useResponsive from '../../hooks/useResponsive';
 import appConfig from '../../../app.json';
 
@@ -42,6 +43,7 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
   onAutomation, onConnect, onBack }) {
   const { gutter, contentMax, isTablet } = useResponsive();
   const [showThemes, setShowThemes] = useState(false);
+  const [legalDocument, setLegalDocument] = useState(null);
   const activeTheme = THEME_OPTIONS.find((option) => option.id === getActiveTheme()) || THEME_OPTIONS[0];
   const profileName = settings?.userProfile?.name;
   // Tinder account details for the connection card (display only).
@@ -183,9 +185,20 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
           description={`Connection: ${{ on_device: 'On-device', hyperbeam: 'Cloud', vps: 'VPS', local: 'Local' }[environment] || 'Not configured'}. Manage your environment and server.`}
           onPress={onPreferences} />
       </Section>
+      <Section title="Legal" delay={300} style={isTablet && styles.sectionColumn}>
+        <SettingsRow icon="document-text-outline" tone="neutral" divider title="Terms and Conditions"
+          description="How the dating assistant and automation work" onPress={() => setLegalDocument('terms')} />
+        <SettingsRow icon="lock-closed-outline" tone="neutral" title="Privacy Policy"
+          description="What stays on your device and what is shared" onPress={() => setLegalDocument('privacy')} />
+      </Section>
       </View>
       <AppText variant="caption" align="center" style={styles.footer}>Flint · Version {appConfig.expo.version}</AppText>
       <ThemePickerSheet visible={showThemes} onClose={() => setShowThemes(false)} />
+      <BottomSheet visible={!!legalDocument} onClose={() => setLegalDocument(null)}
+        title={legalDocument === 'privacy' ? 'Privacy Policy' : 'Terms and Conditions'}
+        subtitle="Legal information" maxHeightRatio={0.9} closeLabel="Close legal document">
+        <LegalDocument type={legalDocument || 'terms'} />
+      </BottomSheet>
     </ScrollView>
   );
 }

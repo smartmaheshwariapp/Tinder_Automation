@@ -261,9 +261,9 @@ export default function ProfileDetails({
       iconColor: c.error,
       iconBg: c.errorSoft,
       iconBorder: c.errorBorder,
-      title: 'Delete your account?',
-      message: 'This will permanently delete your Flint account, history, and preferences. This action cannot be undone.',
-      confirmText: 'Delete Account',
+      title: 'Clear data on this device?',
+      message: 'This signs you out and clears local app data. It does not delete cloud records or your connected dating account. See the Privacy Policy for how to request cloud-data deletion.',
+      confirmText: 'Clear Device Data',
       cancelText: 'Cancel',
       confirmVariant: 'destructive',
       onConfirm: () => {
@@ -392,11 +392,11 @@ export default function ProfileDetails({
             />
             <ListRow
               icon="trash-outline"
-              title="Delete account"
-              subtitle="Permanently erase your account and data"
+              title="Clear app data"
+              subtitle="Sign out and erase data on this device"
               onPress={confirmDeleteData}
               destructive
-              accessibilityLabel="Delete account"
+              accessibilityLabel="Clear app data on this device"
             />
           </Card>
         </FadeIn>

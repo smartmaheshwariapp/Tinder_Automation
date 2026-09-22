@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SupabaseService from '../services/supabase';
 import { AppButton, IconWell, Chip, BottomSheet, MotionTouchable, ContentTransition, FadeIn } from '../components/ui';
+import LegalDocument from '../components/legal/LegalDocument';
 import useResponsive from '../hooks/useResponsive';
 
 const COLORS = uiTheme.colors;
@@ -768,17 +769,15 @@ export default function LoginScreen({ navigation, route }) {
         onClose={() => setLegalModalVisible(false)}
         closeLabel="Close legal document"
         title="Legal & Privacy"
-        subtitle="Flint Trust, Safety & Compliance"
+        subtitle="Terms and privacy information"
         maxHeightRatio={0.86}
         footer={
           <AppButton
-            title="I Understand & Agree"
-            accessibilityLabel="I Understand and Accept"
+            title="Close"
+            accessibilityLabel="Close legal document"
             haptic={false}
             onPress={() => {
               safeHaptic('medium');
-              setIsAgreed(true);
-              setAgreementError(false);
               setLegalModalVisible(false);
             }}
           />
@@ -843,61 +842,7 @@ export default function LoginScreen({ navigation, route }) {
 
         {/* Legal Document Body */}
         <ContentTransition transitionKey={legalTab}>
-          {legalTab === 'terms' ? (
-            <View style={styles.legalSection}>
-              <View style={styles.legalBadgeRow}>
-                <Ionicons name="shield-checkmark" size={14} color={COLORS.secondary} />
-                <Text style={styles.legalBadgeText}>18+ Age Requirement & Community Honor Code</Text>
-              </View>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">1. Eligibility & Age Restriction</Text>
-              <Text style={styles.legalParagraph}>
-                You must be at least 18 years of age to create an account on Flint and use our service. By creating an account or signing in, you affirm, represent, and warrant that you are at least 18 years old and are legally capable of entering into this binding agreement. Any account found to be operated by a minor will be immediately and permanently terminated.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">2. Member Conduct & Mutual Respect</Text>
-              <Text style={styles.legalParagraph}>
-                Flint is a community dedicated to real romantic chemistry, dignity, and authentic connections. We enforce a zero-tolerance policy against hate speech, harassment, impersonation, commercial solicitation, unsolicited explicit media, and scamming. Every profile is subject to automated and human trust screening.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">3. Safety & Profile Authenticity</Text>
-              <Text style={styles.legalParagraph}>
-                To maintain an authentic network, Flint may require live biometric liveness selfie checks to verify your identity. You agree to upload only your own authentic, recent photos and to represent yourself truthfully.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">4. Subscriptions & Account Termination</Text>
-              <Text style={styles.legalParagraph}>
-                You retain the right to delete your Flint account at any time in App Settings. Any premium subscriptions or boosts are managed through Apple App Store or Google Play Store billing terms.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.legalSection}>
-              <View style={styles.legalBadgeRow}>
-                <Ionicons name="lock-closed" size={14} color={COLORS.secondary} />
-                <Text style={styles.legalBadgeText}>256-Bit TLS Encryption & GDPR / CCPA Compliant</Text>
-              </View>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">1. Personal Data We Collect</Text>
-              <Text style={styles.legalParagraph}>
-                We only collect information necessary to create your romantic match profile: your name, verified email, dating preferences, approximate geolocation (strictly while using the app, never tracked continuously in the background), and photos you explicitly upload.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">2. Zero Third-Party Data Brokers</Text>
-              <Text style={styles.legalParagraph}>
-                Flint does not sell, rent, or trade your personal data to advertisers or third-party data brokers. Your private chat messages are encrypted and only accessible to you and your match.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">3. Data Ownership & Deletion Rights</Text>
-              <Text style={styles.legalParagraph}>
-                Under GDPR, CCPA, and global privacy standards, you maintain total ownership over your data. You may request a complete export of your account data or trigger immediate permanent erasure by tapping "Delete Account" in Flint Settings.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">4. Data Protection Contact</Text>
-              <Text style={styles.legalParagraph}>
-                Questions regarding data security or privacy compliance may be addressed directly to our Data Protection Officer at privacy@flint.dating.
-              </Text>
-            </View>
-          )}
+          <LegalDocument type={legalTab} />
         </ContentTransition>
       </BottomSheet>
 
