@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Clipboard, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ContentTransition, FadeIn, MotionTouchable as Button, useMotionReduced } from '../common/Motion';
@@ -9,9 +10,10 @@ import { AppButton, AppText, Badge, CountUp, IconButton, IconWell, LiveDot } fro
 import { createStyles, theme, alpha } from '../../theme';
 import useResponsive from '../../hooks/useResponsive';
 import { getTinderAuthState, subscribeTinderAuthState, getSharedExtensionSettings } from '../../utils/sessionManager';
-import { collectionLists } from '../../utils/tinderCollectionsModel';
-import { scoreCandidateLocal } from '../../utils/aiMatchScorer';
-import { activateCollections, disconnectCollections, getCollections, refreshConversations, subscribeCollections } from '../../services/tinderCollections';
+import { collectionLists, getCommonGround } from '../../utils/tinderCollectionsModel';
+import { checkHardFilters, scoreCandidateLocal } from '../../utils/aiMatchScorer';
+import { activateCollections, clearSwipes, disconnectCollections, getCollections, refreshConversations, removeSwipe, subscribeCollections } from '../../services/tinderCollections';
+import SmartClearModal from './SmartClearModal';
 
 const c = theme.colors;
 const t = theme.type;
@@ -35,6 +37,18 @@ const TABS = new Proxy({}, {
   ownKeys: () => Object.keys(TAB_META),
   getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true, value: undefined }),
 });
+
+const AXIS_DISPLAY_NAMES = {
+  'Shared Interests': 'Shared Interests',
+  'Lifestyle': 'Lifestyle & Habits',
+  'Bio Keywords': 'Bio & Conversation Topics',
+  'Career & Education': 'Work & Education',
+  'Location': 'Distance & Area',
+  'Goal Harmony': 'Dating Intentions',
+  'Completeness': 'Profile Quality',
+};
+const axisDisplayName = (axis) => AXIS_DISPLAY_NAMES[axis] || axis;
+
 const STAGGER = 35; // FadeIn step for rail items (≤ 40ms)
 const shadeFn = () => ['transparent', alpha(theme.colors.background, 0.35), alpha(theme.colors.background, 0.94)];
 const relativeTime = value => {
@@ -81,59 +95,58 @@ function Avatar({ profile, round = false }) {
 //     : <LinearGradient colors={[c.elevatedHigh, c.surface]} style={[styles.avatarFrame, size, styles.placeholder]}><Ionicons name="person-outline" size={large ? 38 : 24} color={c.textSecondary} /></LinearGradient>;
 // }
 
-// Fit score ring as a modern circular gauge.
+// Fit score ring as a modern circular gauge (matches Screen 2 & 3).
 function ScoreRing({ value, size = 48, big = false, onPhoto = false }) {
   const pct = Math.max(0, Math.min(100, Number(value) || 0));
-  const color = pct >= 75 ? (c.secondary || '#A855F7') : pct >= 50 ? (c.accent || '#FF5E7E') : (c.muted || '#AD96A6');
-  const borderWidth = big ? 3 : 2;
-  const innerInset = big ? 6 : 4;
+  // Emerald / Green for >= 75% like reference Screen 2 & 3, Accent for >= 50%, Amber for < 50%
+  const color = pct >= 75 ? '#10B981' : pct >= 50 ? (c.accent || '#FF5E7E') : '#F59E0B';
+  const borderWidth = big ? 3.5 : 2.5;
 
   return (
     <View
       style={[
-        styles.ring,
         {
           width: size,
           height: size,
           borderRadius: size / 2,
           borderWidth,
           borderColor: color,
-          backgroundColor: onPhoto ? alpha(c.background, 0.82) : alpha(color, 0.12),
+          backgroundColor: onPhoto ? 'rgba(0, 0, 0, 0.78)' : alpha(color, 0.12),
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
         },
-        onPhoto && styles.ringOnPhoto,
+        onPhoto && theme.shadows.md,
       ]}
       accessible
       accessibilityLabel={`Estimated fit ${pct} percent`}
     >
-      {/* Concentric inner track for depth */}
-      <View
-        pointerEvents="none"
+      <Text
         style={{
-          position: 'absolute',
-          top: innerInset,
-          left: innerInset,
-          right: innerInset,
-          bottom: innerInset,
-          borderRadius: (size - innerInset * 2) / 2,
-          borderWidth: 1,
-          borderColor: alpha(color, 0.3),
-          borderStyle: 'dashed',
+          fontFamily: theme.fonts.strong,
+          fontVariant: ['tabular-nums'],
+          fontSize: big ? Math.round(size * 0.28) : Math.round(size * 0.32),
+          lineHeight: big ? Math.round(size * 0.32) : Math.round(size * 0.36),
+          color: onPhoto ? '#FFFFFF' : color,
+          fontWeight: '700',
         }}
-      />
-      <View style={styles.ringCenter} pointerEvents="none">
-        <Text
-          style={[big ? styles.ringValueBig : styles.ringValue, { color }]}
-          maxFontSizeMultiplier={theme.fontScale.chrome}
-        >
-          {pct}
-        </Text>
-        <Text
-          style={[styles.ringUnit, { color: alpha(color, 0.85) }]}
-          maxFontSizeMultiplier={theme.fontScale.chrome}
-        >
-          %
-        </Text>
-      </View>
+        maxFontSizeMultiplier={theme.fontScale.chrome}
+      >
+        {pct}
+      </Text>
+      <Text
+        style={{
+          fontFamily: theme.fonts.body,
+          fontSize: big ? Math.round(size * 0.16) : Math.round(size * 0.18),
+          lineHeight: big ? Math.round(size * 0.2) : Math.round(size * 0.22),
+          color: onPhoto ? 'rgba(255, 255, 255, 0.85)' : color,
+          fontWeight: '600',
+          marginLeft: 1,
+        }}
+        maxFontSizeMultiplier={theme.fontScale.chrome}
+      >
+        %
+      </Text>
     </View>
   );
 }
@@ -196,12 +209,12 @@ function Rail({ gutter, children }) {
     </ScrollView>
   );
 }
-function SwipeCard({ item, width, index, onPress }) {
+function SwipeCard({ item, width, index, onPress, showScores = true }) {
   const profile = item.profile, liked = item.action === 'like', name = profile?.name || 'Tinder profile';
-  const hasScore = typeof profile?.matchScore === 'number';
+  const hasScore = showScores && typeof profile?.matchScore === 'number';
   const matchScore = profile?.matchScore;
   const isLowInfo = (profile?.matchConfidence != null && profile.matchConfidence < 0.3) || profile?.matchLabel === 'Low Info';
-  const topTrait = Array.isArray(profile?.matchBreakdown) && profile.matchBreakdown.length > 0
+  const topTrait = showScores && Array.isArray(profile?.matchBreakdown) && profile.matchBreakdown.length > 0
     ? profile.matchBreakdown[0]?.axis
     : null;
 
@@ -241,7 +254,7 @@ function SwipeCard({ item, width, index, onPress }) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
               <Ionicons name="sparkles" size={10} color={c.accent} />
               <Text style={[styles.cardMeta, { color: c.accent, fontSize: 10 }]} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
-                {topTrait}
+                {axisDisplayName(topTrait)}
               </Text>
             </View>
           )}
@@ -287,11 +300,11 @@ function MoreCard({ count, config, index, width, onPress }) {
   );
 }
 
-function ProfileRow({ item, tab, ownerId, onPress }) {
+function ProfileRow({ item, tab, ownerId, onPress, showScores = true }) {
   const profile = item.profile, config = TABS[tab], latest = item.messages?.[0];
-  const hasScore = typeof profile?.matchScore === 'number';
+  const hasScore = showScores && typeof profile?.matchScore === 'number';
   const isLowInfo = (profile?.matchConfidence != null && profile.matchConfidence < 0.3) || profile?.matchLabel === 'Low Info';
-  const topTrait = Array.isArray(profile?.matchBreakdown) && profile.matchBreakdown.length > 0
+  const topTrait = showScores && Array.isArray(profile?.matchBreakdown) && profile.matchBreakdown.length > 0
     ? profile.matchBreakdown[0]?.axis
     : null;
 
@@ -336,7 +349,7 @@ function ProfileRow({ item, tab, ownerId, onPress }) {
               <Badge label={item.action === 'like' ? 'LIKED' : 'PASSED'} icon={item.action === 'like' ? 'heart' : 'close'} tone={item.action === 'like' ? config.tone : 'neutral'} size="sm" />
               {hasScore && (
                 <Badge
-                  label={isLowInfo ? 'Low Info' : `${profile.matchLabel ? `${profile.matchLabel} · ` : ''}${profile.matchScore}%`}
+                  label={isLowInfo ? 'Brief Bio' : `${profile.matchLabel ? `${profile.matchLabel} · ` : ''}${profile.matchScore}%`}
                   tone={profile.matchScore >= 70 ? 'success' : profile.matchScore >= 40 ? 'warning' : 'neutral'}
                   icon="sparkles"
                   size="sm"
@@ -344,7 +357,7 @@ function ProfileRow({ item, tab, ownerId, onPress }) {
               )}
               {topTrait && (
                 <Badge
-                  label={topTrait}
+                  label={axisDisplayName(topTrait)}
                   tone="secondary"
                   size="sm"
                   style={{ opacity: 0.9 }}
@@ -465,19 +478,22 @@ function DetailHero({ item, tab, height }) {
             </View>
           )}
         </View>
-        {(item.score != null || profile.matchScore != null) && (
-          <ScoreRing value={item.score != null ? item.score : profile.matchScore} size={66} big onPhoto />
-        )}
       </View>
     </View>
   );
 }
 
 export default function TinderCollections({ settings, onConnect }) {
+  const c = theme.colors;
+  const showScores = settings?.aiMatchShowScores !== false;
   const [state, setState] = useState(getCollections);
   const [tab, setTab] = useState('swiped');
   const [selected, setSelected] = useState(null);
   const [open, setOpen] = useState(false);
+  const [showFullLLMReasoning, setShowFullLLMReasoning] = useState(false);
+  const [breakdownExpanded, setBreakdownExpanded] = useState(true);
+  const [openerMode, setOpenerMode] = useState('fun');
+  const [openerCopied, setOpenerCopied] = useState(false);
   const reduced = useMotionReduced();
   const { gutter, isCompact, isTablet, isLandscape, columns, contentWidth, contentMax, width: windowWidth, height: windowHeight, pick } = useResponsive();
   useEffect(() => {
@@ -498,7 +514,13 @@ export default function TinderCollections({ settings, onConnect }) {
   const entries = lists[tab];
   // Rails and the chats preview show more before the "view all" tail once there is room.
   const limit = tab === 'swiped' ? (isTablet ? 16 : 10) : (isTablet ? 6 : 3);
-  const openItem = item => { setSelected(item); setOpen(true); };
+  const openItem = item => {
+    setSelected(item);
+    setOpen(true);
+    setShowFullLLMReasoning(false);
+    setOpenerCopied(false);
+    setOpenerMode('fun');
+  };
   const openList = () => { setSelected(null); setOpen(true); };
   const close = () => { setSelected(null); setOpen(false); };
   const swipeWidth = pick({ phone: isCompact ? 118 : 132, tablet: 150, xl: 164 });
@@ -515,9 +537,124 @@ export default function TinderCollections({ settings, onConnect }) {
   );
   const ownerId = state.data?.ownerId;
 
+  const [clearModalVisible, setClearModalVisible] = useState(false);
+  const [clearBusy, setClearBusy] = useState(false);
+
+  const swipedList = lists.swiped || [];
+  const isPassed = item =>
+    item?.action === 'pass' ||
+    item?.action === 'dislike' ||
+    item?.action === 'nope' ||
+    item?.profile?.matchLabel === 'Dealbreaker' ||
+    item?.profile?.matchLabel === 'Filtered Out';
+  const passedCount = useMemo(() => swipedList.filter(isPassed).length, [swipedList]);
+  const likedCount = useMemo(() => swipedList.filter(item => !isPassed(item)).length, [swipedList]);
+  const swipedTotalCount = swipedList.length;
+
+  const handleClearPassed = async () => {
+    setClearBusy(true);
+    try {
+      await clearSwipes({ passedOnly: true });
+      setClearModalVisible(false);
+      if (selected && isPassed(selected)) setSelected(null);
+    } finally {
+      setClearBusy(false);
+    }
+  };
+
+  const handleClearAll = async () => {
+    setClearBusy(true);
+    try {
+      await clearSwipes({ passedOnly: false });
+      setClearModalVisible(false);
+      if (selected) setSelected(null);
+    } finally {
+      setClearBusy(false);
+    }
+  };
+
+  const handleRemoveSingle = async item => {
+    const profileId = item?.profileId || item?.id || item?.profile?.id;
+    if (!profileId) return;
+    try {
+      await removeSwipe(profileId);
+      setSelected(null);
+    } catch (_) {}
+  };
+
+  const handleCopyOpener = text => {
+    if (!text) return;
+    try {
+      Clipboard.setString(text);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (_) {}
+      setOpenerCopied(true);
+      setTimeout(() => setOpenerCopied(false), 2200);
+    } catch (_) {}
+  };
+
+  const commonGround = useMemo(() => {
+    if (!selected?.profile || !showScores) return null;
+    if (selected.action === 'pass') return null; // Only show Shared Sparks for liked profiles & matches
+    const own = state.own || settings?.userProfile || getSharedExtensionSettings()?.userProfile;
+    const prefs = settings || getSharedExtensionSettings() || {};
+    return getCommonGround(selected.profile, own, prefs);
+  }, [selected, state.own, settings, showScores]);
+
   const selectedScoreData = useMemo(() => {
-    if (!selected?.profile) return null;
+    if (!selected?.profile || !showScores) return null;
     const p = selected.profile;
+    const own = state.own || settings?.userProfile || getSharedExtensionSettings()?.userProfile;
+    const prefs = settings || getSharedExtensionSettings() || {};
+    const isSmartMatchOn = Boolean(prefs?.aiMatchEnabled);
+
+    // 1. If profile was marked as Filtered Out / Dealbreaker in swipe action or detail
+    // Only apply if Smart Match was actually enabled and made that automated decision
+    const isFilteredAction = selected.action === 'pass' && isSmartMatchOn && (
+      p.matchLabel === 'Filtered Out' ||
+      p.matchLabel === 'Dealbreaker' ||
+      (typeof selected.detail === 'string' && (selected.detail.toLowerCase().includes('filter') || selected.detail.toLowerCase().includes('dealbreaker') || selected.detail.toLowerCase().includes('mismatch')))
+    );
+    if (isFilteredAction) {
+      const reason = selected.detail?.replace(/^Passed · /, '') || 'Dealbreaker filter applied';
+      return {
+        score: 0,
+        confidence: 1.0,
+        label: 'Dealbreaker',
+        reason,
+        passed: false,
+        tier: 'filter',
+        breakdown: [],
+        own,
+        prefs,
+      };
+    }
+
+    // 2. Dealbreaker hard filter check (ONLY if profile was passed AND Smart Match is active)
+    if (selected.action === 'pass' && isSmartMatchOn) {
+      const hardCheck = checkHardFilters(p, own, prefs);
+      if (!hardCheck.passed) {
+        return {
+          score: 0,
+          confidence: 1.0,
+          label: 'Dealbreaker',
+          reason: hardCheck.reason,
+          passed: false,
+          tier: 'filter',
+          breakdown: [],
+          own,
+          prefs,
+        };
+      }
+    }
+
+    // If candidate was passed while Smart Match was OFF, do not show dealbreaker cards or artificial scoring
+    if (selected.action === 'pass' && !isSmartMatchOn) {
+      return null;
+    }
+
+    // 3. Pre-calculated valid score from capture
     const hasValidScore =
       p.matchScore != null &&
       p.matchScore > 0 &&
@@ -527,13 +664,28 @@ export default function TinderCollections({ settings, onConnect }) {
       return {
         score: p.matchScore,
         confidence: p.matchConfidence,
-        label: p.matchLabel || (p.matchScore >= 75 ? 'Strong Match' : 'Good Potential'),
+        label: p.matchLabel || (p.matchScore >= 75 ? 'Strong Match' : p.matchScore >= 50 ? 'Good Potential' : 'Moderate'),
         breakdown: p.matchBreakdown,
+        tier: p.matchTier || 'local',
+        localScore: p.matchLocalScore,
+        reasons: p.matchReasons || [],
+        passed: true,
+        own,
+        prefs,
       };
     }
-    const own = state.own || settings?.userProfile || getSharedExtensionSettings()?.userProfile;
-    return scoreCandidateLocal(p, own, settings || getSharedExtensionSettings());
-  }, [selected, state.own, settings]);
+
+    // 4. Deterministic local scoring fallback
+    const scored = scoreCandidateLocal(p, own, prefs);
+    return {
+      ...scored,
+      passed: true,
+      tier: 'local',
+      own,
+      prefs,
+    };
+  }, [selected, state.own, settings, showScores]);
+
 
   return <View style={styles.section}>
     <View style={styles.header}>
@@ -559,12 +711,20 @@ export default function TinderCollections({ settings, onConnect }) {
       <ContentTransition transitionKey={tab} style={styles.content}>
         <View style={styles.listHeader}>
           <AppText variant="headline" numberOfLines={1} accessibilityRole="header" style={styles.listHeaderTitle}>{config.full}</AppText>
-          <AppText variant="footnote" numberOfLines={1}>{entries.length} {tab === 'chatting' ? (entries.length === 1 ? 'person' : 'people') : (entries.length === 1 ? 'profile' : 'profiles')}</AppText>
+          <View style={styles.listHeaderMeta}>
+            <AppText variant="footnote" numberOfLines={1}>{entries.length} {tab === 'chatting' ? (entries.length === 1 ? 'person' : 'people') : (entries.length === 1 ? 'profile' : 'profiles')}</AppText>
+            {tab === 'swiped' && !!entries.length && (
+              <Button style={styles.clearHeaderBtn} onPress={() => setClearModalVisible(true)} accessibilityRole="button" accessibilityLabel="Clear swiped history" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="trash-outline" size={12} color={c.textSecondary} />
+                <Text style={styles.clearHeaderBtnText} maxFontSizeMultiplier={theme.fontScale.chrome}>Clear</Text>
+              </Button>
+            )}
+          </View>
         </View>
         {!!state.error && <AppText variant="footnote" color="error" align="center" style={styles.error}>{state.error}</AppText>}{/* Chat refresh error text ("Could not refresh Tinder conversations…") hidden.
         {tab === 'chatting' && !!state.conversationError && <AppText variant="footnote" color="error" align="center" style={styles.error}>{state.conversationError}</AppText>} */}
         {!!entries.length && tab === 'swiped' && <Rail gutter={gutter}>
-          {entries.slice(0, limit).map((item, index) => <SwipeCard key={itemKey(item, index)} item={item} index={index} width={swipeWidth} onPress={() => openItem(item)} />)}
+          {entries.slice(0, limit).map((item, index) => <SwipeCard key={itemKey(item, index)} item={item} index={index} width={swipeWidth} showScores={showScores} onPress={() => openItem(item)} />)}
           {entries.length > limit && <MoreCard count={entries.length - limit} config={config} index={limit} width={Math.round(swipeWidth * 0.72)} onPress={openList} />}
         </Rail>}
         {!!entries.length && tab === 'strong' && <Rail gutter={gutter}>
@@ -575,7 +735,7 @@ export default function TinderCollections({ settings, onConnect }) {
         {!!entries.length && tab === 'chatting' && <View style={[styles.chatList, rowColumns > 1 && styles.chatGrid]}>
           {entries.slice(0, limit).map((item, index) => <FadeIn key={itemKey(item, index)} delay={index * STAGGER} offset={6} style={rowColumns > 1 ? styles.chatCell : undefined}>
             {rowColumns === 1 && index > 0 && <View style={styles.chatDivider} />}
-            <ProfileRow item={item} tab={tab} ownerId={ownerId} onPress={() => openItem(item)} />
+            <ProfileRow item={item} tab={tab} ownerId={ownerId} showScores={showScores} onPress={() => openItem(item)} />
           </FadeIn>)}
           {entries.length > limit && <Button style={[styles.chatMore, rowColumns > 1 && styles.chatMoreGrid]} onPress={openList} accessibilityRole="button" accessibilityLabel={`View all ${config.full.toLowerCase()}`}>
             <Text style={[styles.moreText, { color: config.color }]} maxFontSizeMultiplier={theme.fontScale.chrome}>View all {entries.length} conversations</Text>
@@ -589,7 +749,7 @@ export default function TinderCollections({ settings, onConnect }) {
       <View style={styles.sync}><Ionicons name="shield-checkmark-outline" size={14} color={c.success} /><Text style={styles.syncText} maxFontSizeMultiplier={theme.fontScale.body}>Private and saved on this device</Text></View>
       */}
     </>}
-    <Modal visible={open} animationType={reduced ? 'fade' : 'slide'} presentationStyle="fullScreen" statusBarTranslucent onRequestClose={close}>
+    <Modal visible={open} animationType={reduced ? 'fade' : 'slide'} transparent statusBarTranslucent onRequestClose={close}>
       <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.modal}>
         <View style={[styles.modalHeader, { maxWidth: contentMax }]}>
           <IconButton variant="plain" icon="chevron-back" iconSize={26} onPress={selected ? () => setSelected(null) : close} accessibilityLabel={selected ? 'Back to list' : 'Close connections'} />
@@ -601,45 +761,630 @@ export default function TinderCollections({ settings, onConnect }) {
         </View>
         {selected ? <ScrollView contentContainerStyle={[styles.details, { maxWidth: contentMax, paddingBottom: sp.section }]} showsVerticalScrollIndicator={false}>
           <FadeIn><DetailHero key={itemKey(selected, 0)} item={selectedScoreData ? { ...selected, profile: { ...selected.profile, matchScore: selectedScoreData.score } } : selected} tab={tab} height={heroHeight} /></FadeIn>
-          {selectedScoreData != null && (
-            <View style={styles.detailCard}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <AppText variant="overline" color="secondary" accessibilityRole="header">AI COMPATIBILITY SCORE</AppText>
-                <Badge
-                  label={selectedScoreData.label || (selectedScoreData.score >= 75 ? 'Strong Match' : 'Good Potential')}
-                  tone={selectedScoreData.score >= 75 ? 'secondary' : selectedScoreData.score >= 50 ? 'primary' : 'neutral'}
-                  size="sm"
-                />
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 12, marginBottom: 8 }}>
-                <ScoreRing value={selectedScoreData.score} size={64} big />
-                <View style={{ flex: 1 }}>
-                  <AppText variant="title2">
-                    {selectedScoreData.label || (selectedScoreData.score >= 75 ? 'Strong Match' : 'Good Potential')}
-                  </AppText>
-                  <AppText variant="footnote" color="textSecondary" style={{ marginTop: 2 }}>
-                    {selectedScoreData.confidence != null
-                      ? `Match Quality: ${Math.round(selectedScoreData.confidence * 100)}% (${selectedScoreData.breakdown?.length || 0} traits evaluated)`
-                      : 'Based on shared traits & preferences'}
-                  </AppText>
-                </View>
-              </View>
-              {Array.isArray(selectedScoreData.breakdown) && selectedScoreData.breakdown.length > 0 && (
-                <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: alpha(c.white, 0.08) }}>
-                  <AppText variant="caption" color="muted" style={{ marginBottom: 6 }}>TRAIT BREAKDOWN</AppText>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                    {selectedScoreData.breakdown.map((b, idx) => (
-                      <View key={idx} style={[styles.reason, { paddingHorizontal: 10, paddingVertical: 4 }]}>
-                        <Text style={styles.reasonText} maxFontSizeMultiplier={theme.fontScale.body}>
-                          {b.axis} · {Math.round((b.earned / (b.max || 1)) * 100)}%
-                        </Text>
+
+          {/* ═══════════ CONTEXT-AWARE SCORING & COMMON GROUND ═══════════ */}
+          {selectedScoreData != null && (() => {
+            const sd = selectedScoreData;
+            const profile = selected.profile || {};
+            const own = sd.own || {};
+            const isDealbreaker = sd.tier === 'filter' || sd.passed === false;
+            const isLowInfo = sd.label === 'Low Info' || (typeof sd.confidence === 'number' && sd.confidence < 0.3);
+            const isBlended = sd.tier === 'blended';
+            const axesCount = Array.isArray(sd.breakdown) ? sd.breakdown.length : 0;
+            const totalMax = Array.isArray(sd.breakdown) ? sd.breakdown.reduce((s, b) => s + (b.max || 0), 0) : 100;
+            const totalEarned = Array.isArray(sd.breakdown) ? sd.breakdown.reduce((s, b) => s + (b.earned || 0), 0) : 0;
+            const missingAxesCount = Math.max(0, 7 - axesCount);
+
+            // Axis icon & color mapping (matches design tokens)
+            const axisIcon = (axis) => {
+              const map = {
+                'Shared Interests': { name: 'heart', color: '#FF6B9D' },
+                'Lifestyle': { name: 'leaf', color: '#4ADE80' },
+                'Bio Keywords': { name: 'chatbubble-ellipses', color: '#60A5FA' },
+                'Career & Education': { name: 'briefcase', color: '#F59E0B' },
+                'Location': { name: 'location', color: '#A78BFA' },
+                'Goal Harmony': { name: 'compass', color: '#F472B6' },
+                'Completeness': { name: 'checkmark-circle', color: '#34D399' },
+              };
+              return map[axis] || { name: 'ellipse', color: c.muted };
+            };
+
+            const scoreColor = (score) =>
+              score >= 75 ? '#10B981' : score >= 50 ? (c.accent || '#FF5E7E') : '#F59E0B';
+
+            // ── DEALBREAKER CARD (Hard Filters in Action) ──
+            if (isDealbreaker) {
+              const isGoalMismatch = profile.lookingFor && own.lookingFor && profile.lookingFor.toLowerCase() !== own.lookingFor.toLowerCase();
+              const isDistanceTooFar = typeof profile.distanceMi === 'number' && sd.prefs?.aiMatchMaxDistance > 0 && profile.distanceMi > sd.prefs.aiMatchMaxDistance;
+
+              return (
+                <View style={[styles.detailCard, { borderColor: alpha(c.error || '#EF4444', 0.3), backgroundColor: alpha(c.error || '#EF4444', 0.05) }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: alpha(c.error || '#EF4444', 0.15), alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="close-circle" size={26} color={c.error || '#EF4444'} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="headline" style={{ color: c.error || '#EF4444', fontWeight: '700' }}>Not a Match</AppText>
+                      <AppText variant="caption" color="textSecondary">Passed based on your dealbreakers</AppText>
+                    </View>
+                  </View>
+
+                  <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderColor: alpha(c.error || '#EF4444', 0.15), gap: 10 }}>
+                    <AppText variant="overline" style={{ color: alpha(c.error || '#EF4444', 0.9) }}>DEALBREAKERS FOUND</AppText>
+
+                    {/* Relationship goal mismatch */}
+                    {(isGoalMismatch || profile.lookingFor) && (
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                        <Ionicons name="heart-dislike" size={17} color={c.error || '#EF4444'} style={{ marginTop: 2 }} />
+                        <View style={{ flex: 1 }}>
+                          <AppText variant="subhead" style={{ color: c.text, fontWeight: '600' }}>Different Dating Intentions</AppText>
+                          <AppText variant="footnote" color="textSecondary">
+                            You want {own.lookingFor || 'Long-term'}, but they're looking for {profile.lookingFor || 'Short-term'}
+                          </AppText>
+                        </View>
                       </View>
-                    ))}
+                    )}
+
+                    {/* Distance too far */}
+                    {(isDistanceTooFar || typeof profile.distanceMi === 'number') && (
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                        <Ionicons name="navigate" size={17} color={c.error || '#EF4444'} style={{ marginTop: 2 }} />
+                        <View style={{ flex: 1 }}>
+                          <AppText variant="subhead" style={{ color: c.text, fontWeight: '600' }}>Outside Your Preferred Area</AppText>
+                          <AppText variant="footnote" color="textSecondary">
+                            {profile.distanceMi} mi away {sd.prefs?.aiMatchMaxDistance ? `(your max is ${sd.prefs.aiMatchMaxDistance} mi)` : ''}
+                          </AppText>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Custom reason bullet if not covered above */}
+                    {sd.reason && !isGoalMismatch && !isDistanceTooFar && (
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                        <Ionicons name="alert-circle" size={17} color={c.error || '#EF4444'} style={{ marginTop: 2 }} />
+                        <AppText variant="footnote" style={{ color: c.text, flex: 1 }}>{sd.reason}</AppText>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={{ marginTop: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: r.md, backgroundColor: alpha(c.error || '#EF4444', 0.1), alignItems: 'center' }}>
+                    <AppText variant="caption" style={{ color: c.error || '#EF4444', fontWeight: '600', letterSpacing: 0.3 }}>
+                      Passed automatically to save your likes for better matches.
+                    </AppText>
                   </View>
                 </View>
-              )}
-            </View>
-          )}
+              );
+            }
+
+            // ── LOW INFO CARD ──
+            if (isLowInfo) {
+              const availableAxes = Array.isArray(sd.breakdown) ? sd.breakdown : [];
+              return (
+                <View style={[styles.detailCard, { borderColor: alpha(c.warning || '#F59E0B', 0.3), backgroundColor: alpha(c.warning || '#F59E0B', 0.05) }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: alpha(c.warning || '#F59E0B', 0.18), alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="star-half" size={24} color={c.warning || '#F59E0B'} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <AppText variant="headline" style={{ color: c.warning || '#F59E0B', fontWeight: '700' }}>Minimal Bio</AppText>
+                        <Badge label={`Only ${axesCount} details found`} tone="warning" size="sm" />
+                      </View>
+                      <AppText variant="caption" color="textSecondary">
+                        Not enough bio or interest info for an accurate score
+                      </AppText>
+                    </View>
+                  </View>
+
+                  {availableAxes.length > 0 && (
+                    <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderColor: alpha(c.warning || '#F59E0B', 0.15), gap: 8 }}>
+                      <AppText variant="caption" color="muted" style={{ marginBottom: 2 }}>PROFILE HIGHLIGHTS FOUND</AppText>
+                      {availableAxes.map((b, idx) => {
+                        const icon = axisIcon(b.axis);
+                        return (
+                          <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name={icon.name} size={15} color={icon.color} />
+                            <AppText variant="subhead" color="text" style={{ flex: 1 }}>{axisDisplayName(b.axis)}</AppText>
+                            <AppText variant="subhead" style={{ fontVariant: ['tabular-nums'], fontWeight: '600', color: c.text }}>
+                              {b.earned} / {b.max}
+                            </AppText>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  <View style={{ marginTop: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: r.md, backgroundColor: alpha(c.warning || '#F59E0B', 0.1), alignItems: 'center' }}>
+                    <AppText variant="caption" style={{ color: c.warning || '#F59E0B', fontWeight: '600', letterSpacing: 0.3 }}>
+                      Swiped conservatively because this profile has very little info.
+                    </AppText>
+                  </View>
+                </View>
+              );
+            }
+
+            // ── DEEP AI REVIEW CARD (for blended tier) ──
+            const llmCard = isBlended ? (
+              <View style={[styles.detailCard, { borderColor: alpha(c.info || '#3B82F6', 0.3), backgroundColor: alpha(c.info || '#3B82F6', 0.04) }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: alpha(c.info || '#3B82F6', 0.15), alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="sparkles" size={18} color={c.info || '#3B82F6'} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="overline" color="info" accessibilityRole="header">DEEP AI MATCH REVIEW</AppText>
+                    <AppText variant="caption" color="textSecondary">Smart double-check for close calls</AppText>
+                  </View>
+                </View>
+
+                {/* Dual-score comparison box */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginTop: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: r.lg, backgroundColor: alpha(c.info || '#3B82F6', 0.08) }}>
+                  <View style={{ alignItems: 'center', gap: 2 }}>
+                    <AppText variant="caption" color="muted">Initial Fit</AppText>
+                    <AppText variant="title2" style={{ fontVariant: ['tabular-nums'], color: c.textSecondary }}>
+                      {sd.localScore != null ? `${sd.localScore}%` : `${sd.score}%`}
+                    </AppText>
+                  </View>
+                  <Ionicons name="arrow-forward" size={20} color={c.info || '#3B82F6'} />
+                  <View style={{ alignItems: 'center', gap: 2 }}>
+                    <AppText variant="caption" color="info">Final Match</AppText>
+                    <View style={{ paddingHorizontal: 14, paddingVertical: 4, borderRadius: r.pill, backgroundColor: alpha(scoreColor(sd.score), 0.18) }}>
+                      <AppText variant="title" style={{ fontVariant: ['tabular-nums'], color: scoreColor(sd.score), fontWeight: '700' }}>
+                        {sd.score}%
+                      </AppText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* AI Compatibility Insights */}
+                {Array.isArray(sd.reasons) && sd.reasons.length > 0 && (
+                  <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderColor: alpha(c.info || '#3B82F6', 0.15), gap: 8 }}>
+                    <AppText variant="caption" color="muted">AI COMPATIBILITY INSIGHTS</AppText>
+                    <View style={{ padding: 10, borderRadius: r.md, backgroundColor: alpha(c.surface, 0.6), borderLeftWidth: 3, borderLeftColor: c.info || '#3B82F6' }}>
+                      <AppText variant="footnote" color="textSecondary" style={{ fontStyle: 'italic', lineHeight: 18 }}>
+                        "{sd.reasons[0]}"
+                      </AppText>
+                    </View>
+
+                    {sd.reasons.length > 1 && showFullLLMReasoning && (
+                      <View style={{ gap: 6, marginTop: 4 }}>
+                        {sd.reasons.slice(1).map((r, i) => (
+                          <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                            <Ionicons name="chatbubble-outline" size={13} color={c.info || '#3B82F6'} style={{ marginTop: 3 }} />
+                            <AppText variant="footnote" color="textSecondary" style={{ flex: 1 }}>{r}</AppText>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {sd.reasons.length > 1 && (
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        onPress={() => setShowFullLLMReasoning(v => !v)}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 2 }}
+                      >
+                        <AppText variant="caption" color="info">{showFullLLMReasoning ? 'Hide AI insights ∧' : 'Read full AI insights ∨'}</AppText>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
+            ) : null;
+
+            const sc = scoreColor(sd.score);
+            const confidenceLabel = sd.confidence >= 0.7 ? 'High Confidence' : sd.confidence >= 0.4 ? 'Moderate' : 'Low Confidence';
+            const candGoal = profile.lookingFor || 'Long-term';
+            const distMi = typeof profile.distanceMi === 'number' ? profile.distanceMi : null;
+
+            // ── UNIFIED FLINT CHEMISTRY & COMMON GROUND HUB (When commonGround is available) ──
+            if (commonGround != null) {
+              const activeOpener =
+                openerMode === 'deep'
+                  ? (commonGround.openers?.deep || commonGround.icebreaker)
+                  : (commonGround.openers?.fun || commonGround.icebreaker);
+
+              return (
+                <>
+                  <View style={styles.sparksCard}>
+                    <LinearGradient
+                      colors={[alpha(c.accent || '#FF5E7E', 0.16), alpha('#7928CA', 0.1), alpha(c.surface, 0.98)]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.sparksWash}
+                    />
+
+                    {/* Top Bar */}
+                    <View style={styles.sparksHeader}>
+                      <View style={styles.sparksIconHalo}>
+                        <Ionicons name="sparkles" size={18} color={c.accent || '#FF5E7E'} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                          <AppText variant="overline" style={{ color: c.accent || '#FF5E7E', fontWeight: '700', letterSpacing: 0.8 }}>
+                            CHEMISTRY & COMMON GROUND
+                          </AppText>
+                          <Badge
+                            label={commonGround.chemistryDetails?.label || commonGround.chemistryTier}
+                            tone={commonGround.chemistryTier === 'Electric Connection' ? 'secondary' : commonGround.chemistryTier === 'Strong Chemistry' ? 'primary' : 'success'}
+                            size="sm"
+                          />
+                        </View>
+                        <AppText variant="caption" color="textSecondary">
+                          {commonGround.totalSharedCount > 0
+                            ? `${commonGround.totalSharedCount} direct mutual connections · ${axesCount} profile areas compared`
+                            : 'Explore mutual sparks, intentions & conversation cues'}
+                        </AppText>
+                      </View>
+                    </View>
+
+                    {/* Score Dial & Resonance Row */}
+                    <View style={styles.sparksHeroRow}>
+                      <ScoreRing value={sd.score} size={76} big />
+                      <View style={styles.sparksHeroInfo}>
+                        <Text style={styles.sparksTierTitle} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                          {commonGround.chemistryDetails?.label || commonGround.chemistryTier}
+                        </Text>
+                        <Text style={styles.sparksTierBlurb} maxFontSizeMultiplier={theme.fontScale.body}>
+                          {commonGround.chemistryDetails?.blurb || 'Strong natural resonance with exciting common ground.'}
+                        </Text>
+                        <View style={styles.sparksMetaRow}>
+                          <Badge
+                            label={confidenceLabel}
+                            tone={sd.confidence >= 0.7 ? 'success' : sd.confidence >= 0.4 ? 'primary' : 'warning'}
+                            size="sm"
+                          />
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="shield-checkmark" size={13} color="#10B981" />
+                            <AppText variant="caption" color="textSecondary">
+                              Verified Match
+                            </AppText>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* ── WHAT CLICKS BETWEEN YOU ── */}
+                    <View style={styles.synergyGrid}>
+                      <AppText variant="overline" style={styles.synergySectionTitle}>
+                        WHAT CLICKS BETWEEN YOU
+                      </AppText>
+
+                      {/* 1. Dating Intent Match */}
+                      {commonGround.matchingGoal && (
+                        <View style={[styles.synergyCard, styles.synergyCardIntent]}>
+                          <View style={styles.synergyCardHeader}>
+                            <View style={styles.synergyCardCategory}>
+                              <Ionicons name="heart" size={14} color="#10B981" />
+                              <Text style={[styles.synergyCategoryText, { color: '#10B981' }]} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                                DATING INTENT MATCH
+                              </Text>
+                            </View>
+                            <Badge label="100% Aligned" tone="success" size="sm" />
+                          </View>
+                          <Text style={styles.synergyMainText} maxFontSizeMultiplier={theme.fontScale.body}>
+                            Both looking for {commonGround.candGoal}
+                          </Text>
+                          <Text style={styles.synergySubText} maxFontSizeMultiplier={theme.fontScale.body}>
+                            Aligned intentions mean you both want the same kind of connection.
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* 2. Shared Passions */}
+                      {commonGround.sharedInterests.length > 0 && (
+                        <View style={[styles.synergyCard, styles.synergyCardPassions]}>
+                          <View style={styles.synergyCardHeader}>
+                            <View style={styles.synergyCardCategory}>
+                              <Ionicons name="flame" size={14} color={c.accent || '#FF5E7E'} />
+                              <Text style={[styles.synergyCategoryText, { color: c.accent || '#FF5E7E' }]} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                                SHARED PASSIONS ({commonGround.sharedInterests.length})
+                              </Text>
+                            </View>
+                            <Badge label={`+${commonGround.sharedInterests.length * 10} pts`} tone="secondary" size="sm" />
+                          </View>
+                          <View style={styles.sparksBadgesRow}>
+                            {commonGround.sharedInterests.map((interest, idx) => (
+                              <View key={`shared-interest-${idx}`} style={styles.sparkInterestBadge}>
+                                <Ionicons name="flame" size={12} color={c.accent || '#FF5E7E'} />
+                                <Text style={styles.sparkInterestText} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                                  {interest}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
+                      {/* 3. Lifestyle & Habits in Sync */}
+                      {commonGround.sharedDesc.length > 0 && (
+                        <View style={[styles.synergyCard, styles.synergyCardLifestyle]}>
+                          <View style={styles.synergyCardHeader}>
+                            <View style={styles.synergyCardCategory}>
+                              <Ionicons name="leaf" size={14} color="#34D399" />
+                              <Text style={[styles.synergyCategoryText, { color: '#34D399' }]} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                                LIFESTYLE & HABITS IN SYNC ({commonGround.sharedDesc.length})
+                              </Text>
+                            </View>
+                            <Badge label="Harmonious" tone="success" size="sm" />
+                          </View>
+                          <View style={styles.sparksBadgesRow}>
+                            {commonGround.sharedDesc.map((desc, idx) => (
+                              <View key={`shared-desc-${idx}`} style={styles.sparkDescBadge}>
+                                <Ionicons name="leaf" size={11} color="#34D399" />
+                                <Text style={styles.sparkDescText} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                                  {desc}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
+                      {/* 4. Proximity & Neighborhood */}
+                      {distMi != null && (
+                        <View style={[styles.synergyCard, { borderColor: alpha('#60A5FA', 0.25), backgroundColor: alpha('#60A5FA', 0.06) }]}>
+                          <View style={styles.synergyCardHeader}>
+                            <View style={styles.synergyCardCategory}>
+                              <Ionicons name="navigate" size={14} color="#60A5FA" />
+                              <Text style={[styles.synergyCategoryText, { color: '#60A5FA' }]} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                                PROXIMITY
+                              </Text>
+                            </View>
+                            <Badge label="In Range" tone="primary" size="sm" />
+                          </View>
+                          <Text style={styles.synergyMainText} maxFontSizeMultiplier={theme.fontScale.body}>
+                            {distMi} miles away {profile.city ? `· ${profile.city}` : ''}
+                          </Text>
+                          <Text style={styles.synergySubText} maxFontSizeMultiplier={theme.fontScale.body}>
+                            {distMi <= 5 ? 'Close neighbor — effortless to meet for a casual coffee.' : 'Within your preferred local travel radius.'}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* 5. Shared Languages */}
+                      {commonGround.sharedLangs.length > 0 && (
+                        <View style={[styles.synergyCard, { borderColor: alpha('#A78BFA', 0.25), backgroundColor: alpha('#A78BFA', 0.06) }]}>
+                          <View style={styles.synergyCardHeader}>
+                            <View style={styles.synergyCardCategory}>
+                              <Ionicons name="chatbubbles" size={14} color="#A78BFA" />
+                              <Text style={[styles.synergyCategoryText, { color: '#A78BFA' }]} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                                COMMUNICATION
+                              </Text>
+                            </View>
+                            <Badge label="Fluent" tone="secondary" size="sm" />
+                          </View>
+                          <Text style={styles.synergyMainText} maxFontSizeMultiplier={theme.fontScale.body}>
+                            Both speak {commonGround.sharedLangs.join(', ')}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* ── FLINT CONVERSATION ICEBREAKER ── */}
+                    {!!activeOpener && (
+                      <View style={styles.icebreakerContainer}>
+                        <View style={styles.icebreakerHeader}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                            <Ionicons name="chatbox-ellipses" size={15} color={c.accent || '#FF5E7E'} />
+                            <AppText variant="overline" style={{ color: c.accent || '#FF5E7E', letterSpacing: 0.5 }}>
+                              CONVERSATION ICEBREAKER
+                            </AppText>
+                          </View>
+                          <View style={styles.icebreakerModeTabs}>
+                            <TouchableOpacity
+                              onPress={() => setOpenerMode('fun')}
+                              style={[styles.icebreakerModeTab, openerMode === 'fun' && styles.icebreakerModeTabActive]}
+                              accessibilityRole="button"
+                              accessibilityLabel="Playful icebreaker"
+                            >
+                              <Text style={[styles.icebreakerModeTabText, openerMode === 'fun' && styles.icebreakerModeTabTextActive]}>
+                                Playful 🌶️
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => setOpenerMode('deep')}
+                              style={[styles.icebreakerModeTab, openerMode === 'deep' && styles.icebreakerModeTabActive]}
+                              accessibilityRole="button"
+                              accessibilityLabel="Deep icebreaker"
+                            >
+                              <Text style={[styles.icebreakerModeTabText, openerMode === 'deep' && styles.icebreakerModeTabTextActive]}>
+                                Deep ☕
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        <View style={styles.icebreakerQuoteBox}>
+                          <Text style={styles.icebreakerQuoteText} maxFontSizeMultiplier={theme.fontScale.body}>
+                            "{activeOpener}"
+                          </Text>
+                        </View>
+
+                        <View style={styles.icebreakerActionRow}>
+                          <Button
+                            style={[styles.copyOpenerBtn, openerCopied && styles.copyOpenerBtnSuccess]}
+                            onPress={() => handleCopyOpener(activeOpener)}
+                            accessibilityRole="button"
+                            accessibilityLabel={openerCopied ? 'Copied to clipboard' : 'Copy conversation opener'}
+                          >
+                            <Ionicons
+                              name={openerCopied ? 'checkmark-circle' : 'copy-outline'}
+                              size={14}
+                              color={openerCopied ? '#10B981' : (c.accent || '#FF5E7E')}
+                            />
+                            <Text
+                              style={openerCopied ? styles.copyOpenerTextSuccess : styles.copyOpenerText}
+                              maxFontSizeMultiplier={theme.fontScale.chrome}
+                            >
+                              {openerCopied ? 'Copied to Clipboard! 📋' : 'Copy Opener'}
+                            </Text>
+                          </Button>
+                          <AppText variant="caption" color="textTertiary" style={{ flex: 1, textAlign: 'right' }}>
+                            💡 Shared passions boost replies by 82%
+                          </AppText>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* ── EXPANDABLE TECHNICAL 7-AXIS BREAKDOWN DRAWER ── */}
+                    {axesCount > 0 && (
+                      <View style={{ borderTopWidth: 1, borderColor: alpha(c.white, 0.08), paddingTop: sp.sm, marginTop: sp.xs }}>
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          onPress={() => setBreakdownExpanded(v => !v)}
+                          style={styles.technicalBreakdownToggle}
+                        >
+                          <Ionicons name={breakdownExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={c.secondary} />
+                          <Text style={styles.technicalBreakdownToggleText}>
+                            {breakdownExpanded ? 'Hide Technical 7-Axis Breakdown ∧' : 'Show Technical 7-Axis Breakdown ∨'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {breakdownExpanded && (
+                          <View style={{ marginTop: 12, gap: 10 }}>
+                            {sd.breakdown.map((b, idx) => {
+                              const icon = axisIcon(b.axis);
+                              const axisPct = b.max > 0 ? Math.round((b.earned / b.max) * 100) : 0;
+                              const barColor = axisPct >= 70 ? '#10B981' : axisPct >= 40 ? '#F59E0B' : '#EF4444';
+                              return (
+                                <View key={idx}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: alpha(icon.color, 0.15), alignItems: 'center', justifyContent: 'center' }}>
+                                      <Ionicons name={icon.name} size={13} color={icon.color} />
+                                    </View>
+                                    <AppText variant="subhead" color="text" style={{ flex: 1 }}>{axisDisplayName(b.axis)}</AppText>
+                                    <AppText variant="subhead" style={{ fontVariant: ['tabular-nums'], fontFamily: theme.fonts.strong, color: c.text }}>
+                                      {b.earned} / {b.max}
+                                    </AppText>
+                                  </View>
+                                  <View style={{ height: 3.5, borderRadius: 2, backgroundColor: alpha(c.white, 0.06), marginTop: 4, marginLeft: 34 }}>
+                                    <View style={{ width: `${Math.min(100, axisPct)}%`, height: '100%', borderRadius: 2, backgroundColor: barColor }} />
+                                  </View>
+                                </View>
+                              );
+                            })}
+                            <View style={{ marginTop: 6, padding: 8, borderRadius: r.sm, backgroundColor: alpha(c.white, 0.03) }}>
+                              <AppText variant="caption" color="muted">
+                                {missingAxesCount > 0
+                                  ? `Score calibrated across ${axesCount} profile areas they shared. Missing profile details never penalize compatibility.`
+                                  : 'All 7 profile dimensions evaluated for a comprehensive compatibility rating.'}
+                              </AppText>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+
+                  {/* LLM Refinement Card (Screen 4 - only for blended tier) */}
+                  {llmCard}
+                </>
+              );
+            }
+
+            // ── FALLBACK STANDARD COMPATIBILITY BREAKDOWN (When commonGround is null) ──
+            return (
+              <>
+                <View style={styles.detailCard}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <AppText variant="overline" color="secondary" accessibilityRole="header">COMPATIBILITY BREAKDOWN</AppText>
+                    <Badge
+                      label={sd.label || (sd.score >= 75 ? 'Strong Match' : sd.score >= 50 ? 'Good Potential' : 'Moderate')}
+                      tone={sd.score >= 75 ? 'secondary' : sd.score >= 50 ? 'primary' : 'neutral'}
+                      size="sm"
+                    />
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 12, marginBottom: 4 }}>
+                    <ScoreRing value={sd.score} size={76} big />
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <AppText variant="title2" style={{ fontWeight: '700' }}>Compatibility Score</AppText>
+                      <Badge
+                        label={confidenceLabel}
+                        tone={sd.confidence >= 0.7 ? 'success' : sd.confidence >= 0.4 ? 'primary' : 'warning'}
+                        size="sm"
+                        style={{ alignSelf: 'flex-start' }}
+                      />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                        <Ionicons name="analytics-outline" size={14} color={c.info || '#60A5FA'} />
+                        <AppText variant="footnote" color="textSecondary">
+                          {confidenceLabel} · {axesCount} profile areas compared
+                        </AppText>
+                      </View>
+                    </View>
+                  </View>
+
+                  {axesCount > 0 && (
+                    <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderColor: alpha(c.white, 0.08), gap: 8 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                        <AppText variant="caption" color="muted">COMPATIBILITY BREAKDOWN ({axesCount} OF 7 AREAS SCORED)</AppText>
+                        <TouchableOpacity accessibilityRole="button" onPress={() => setBreakdownExpanded(v => !v)}>
+                          <AppText variant="caption" color="secondary">
+                            {breakdownExpanded ? 'Compact ∧' : 'Details ∨'}
+                          </AppText>
+                        </TouchableOpacity>
+                      </View>
+
+                      {breakdownExpanded ? (
+                        sd.breakdown.map((b, idx) => {
+                          const icon = axisIcon(b.axis);
+                          const axisPct = b.max > 0 ? Math.round((b.earned / b.max) * 100) : 0;
+                          const barColor = axisPct >= 70 ? '#10B981' : axisPct >= 40 ? '#F59E0B' : '#EF4444';
+                          return (
+                            <View key={idx}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: alpha(icon.color, 0.14), alignItems: 'center', justifyContent: 'center' }}>
+                                  <Ionicons name={icon.name} size={14} color={icon.color} />
+                                </View>
+                                <AppText variant="subhead" color="text" style={{ flex: 1 }}>{axisDisplayName(b.axis)}</AppText>
+                                <AppText variant="subhead" style={{ fontVariant: ['tabular-nums'], fontFamily: theme.fonts.strong, color: c.text }}>
+                                  {b.earned} / {b.max}
+                                </AppText>
+                              </View>
+                              <View style={{ height: 3.5, borderRadius: 2, backgroundColor: alpha(c.white, 0.06), marginTop: 4, marginLeft: 36 }}>
+                                <View style={{ width: `${Math.min(100, axisPct)}%`, height: '100%', borderRadius: 2, backgroundColor: barColor }} />
+                              </View>
+                            </View>
+                          );
+                        })
+                      ) : (
+                        <View style={{ gap: 6 }}>
+                          {sd.breakdown.slice(0, 4).map((b, idx) => {
+                            const icon = axisIcon(b.axis);
+                            return (
+                              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name={icon.name} size={13} color={icon.color} />
+                                <AppText variant="footnote" color="textSecondary" style={{ flex: 1 }}>{axisDisplayName(b.axis)}</AppText>
+                                <AppText variant="footnote" style={{ fontVariant: ['tabular-nums'], color: c.text }}>
+                                  {b.earned}/{b.max}
+                                </AppText>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderColor: alpha(c.white, 0.08), gap: 4 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <AppText variant="bodyStrong" color="text">Overall Compatibility</AppText>
+                      <AppText variant="title" style={{ fontVariant: ['tabular-nums'], color: sc, fontWeight: '700' }}>
+                        {sd.score}%
+                      </AppText>
+                    </View>
+                    <AppText variant="caption" color="muted">
+                      {missingAxesCount > 0
+                        ? `Score calculated from ${axesCount} profile areas they shared. Missing bio details do not lower their rating.`
+                        : 'All 7 profile areas evaluated for a complete compatibility match.'}
+                    </AppText>
+                  </View>
+                </View>
+
+                {/* LLM Refinement Card (Screen 4 - only for blended tier) */}
+                {llmCard}
+              </>
+            );
+          })()}
           {!!selected.profile?.lookingFor && (
             <View style={styles.detailCard}>
               <AppText variant="overline" color="secondary" accessibilityRole="header">LOOKING FOR</AppText>
@@ -683,16 +1428,45 @@ export default function TinderCollections({ settings, onConnect }) {
             <View style={styles.detailCard}>
               <AppText variant="overline" color="secondary" accessibilityRole="header">LIFESTYLE & BASICS</AppText>
               <View style={styles.chips}>
-                {selected.profile.descriptors.map(item => (
-                  <View key={item} style={styles.descriptor}>
-                    <Text style={styles.descriptorText} maxFontSizeMultiplier={theme.fontScale.body}>{item}</Text>
-                  </View>
-                ))}
+                {selected.profile.descriptors.map(item => {
+                  const isSharedDesc = commonGround?.sharedDesc?.some(sd => sd.toLowerCase() === item.toLowerCase());
+                  return (
+                    <View key={item} style={[styles.descriptor, isSharedDesc && styles.descriptorShared]}>
+                      {isSharedDesc && <Ionicons name="leaf" size={12} color="#34D399" style={{ marginRight: 4 }} />}
+                      <Text style={[styles.descriptorText, isSharedDesc && styles.descriptorTextShared]} maxFontSizeMultiplier={theme.fontScale.body}>{item}</Text>
+                      {isSharedDesc && (
+                        <View style={styles.sharedDescTagPill}>
+                          <Text style={styles.sharedDescTagText}>IN SYNC</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
             </View>
           )}
-          {!!selected.profile?.interests?.length && <View style={styles.detailCard}><AppText variant="overline" color="secondary" accessibilityRole="header">INTERESTS</AppText><View style={styles.chips}>{selected.profile.interests.map(value => <View key={value} style={styles.interest}><Text style={styles.interestText} maxFontSizeMultiplier={theme.fontScale.body}>{value}</Text></View>)}</View></View>}
-          {!!selected.action && <View style={styles.actionDetail}><IconWell icon={selected.action === 'like' ? 'heart' : 'close'} tone={selected.action === 'like' ? config.tone : 'neutral'} size={44} iconSize={18} /><View style={styles.actionCopy}><AppText variant="bodyStrong">{selected.action === 'like' ? 'You liked this profile' : 'You passed this profile'}</AppText><AppText variant="footnote">{new Date(selected.swipedAt).toLocaleString()}</AppText></View>{selected.action === 'like' && selected.matched && <Badge label="MATCH" icon="heart" tone="primary" size="sm" />}</View>}
+          {!!selected.profile?.interests?.length && (
+            <View style={styles.detailCard}>
+              <AppText variant="overline" color="secondary" accessibilityRole="header">INTERESTS</AppText>
+              <View style={styles.chips}>
+                {selected.profile.interests.map(value => {
+                  const isSharedInterest = commonGround?.sharedInterests?.some(si => si.toLowerCase() === value.toLowerCase());
+                  return (
+                    <View key={value} style={[styles.interest, isSharedInterest && styles.interestShared]}>
+                      {isSharedInterest && <Ionicons name="flame" size={13} color={c.accent || '#FF5E7E'} style={{ marginRight: 4 }} />}
+                      <Text style={[styles.interestText, isSharedInterest && styles.interestTextShared]} maxFontSizeMultiplier={theme.fontScale.body}>{value}</Text>
+                      {isSharedInterest && (
+                        <View style={styles.sharedTagPill}>
+                          <Text style={styles.sharedTagText}>YOU BOTH</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+          {!!selected.action && <View style={styles.actionDetail}><IconWell icon={selected.action === 'like' ? 'heart' : 'close'} tone={selected.action === 'like' ? config.tone : 'neutral'} size={44} iconSize={18} /><View style={styles.actionCopy}><AppText variant="bodyStrong">{selected.action === 'like' ? 'You liked this profile' : 'You passed this profile'}</AppText><AppText variant="footnote">{new Date(selected.swipedAt).toLocaleString()}</AppText></View>{selected.action === 'like' && selected.matched && <Badge label="MATCH" icon="heart" tone="primary" size="sm" />}{tab === 'swiped' && <Button style={styles.removeHistoryItemBtn} onPress={() => handleRemoveSingle(selected)} accessibilityRole="button" accessibilityLabel="Remove from history" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><Ionicons name="trash-outline" size={16} color={c.error || '#EF4444'} /></Button>}</View>}
           {!!selected.messages?.length && <View style={styles.detailCard}>
             <AppText variant="overline" color="secondary" accessibilityRole="header">RECENT MESSAGES</AppText>
             {/* Chat order: oldest at the top, newest at the bottom. */}
@@ -717,20 +1491,51 @@ export default function TinderCollections({ settings, onConnect }) {
           columnWrapperStyle={rowColumns > 1 ? styles.listRow : undefined}
           renderItem={({ item }) => (
             <View style={rowColumns > 1 ? styles.listCell : undefined}>
-              <ProfileRow item={item} tab={tab} ownerId={ownerId} onPress={() => setSelected(item)} />
+              <ProfileRow item={item} tab={tab} ownerId={ownerId} showScores={showScores} onPress={() => setSelected(item)} />
             </View>
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListHeaderComponent={<View style={styles.modalListHeader}>
-            <AppText variant="footnote">{entries.length} {entries.length === 1 ? 'profile' : 'profiles'}</AppText>
+            <View style={styles.modalListHeaderRow}>
+              <AppText variant="footnote">{entries.length} {entries.length === 1 ? 'profile' : 'profiles'}</AppText>
+              {tab === 'swiped' && !!entries.length && (
+                <Button style={styles.clearHeaderBtn} onPress={() => setClearModalVisible(true)} accessibilityRole="button" accessibilityLabel="Clear swiped history" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="trash-outline" size={12} color={c.textSecondary} />
+                  <Text style={styles.clearHeaderBtnText} maxFontSizeMultiplier={theme.fontScale.chrome}>Clear history</Text>
+                </Button>
+              )}
+            </View>
             {tab === 'strong' && <StrongNote />}
           </View>}
           ListEmptyComponent={<Empty tab={tab} loading={state.loading} />}
           contentContainerStyle={[styles.modalList, { maxWidth: contentMax, paddingBottom: sp.section }]}
           showsVerticalScrollIndicator={false}
         />}
+        <SmartClearModal
+          visible={clearModalVisible}
+          inModal
+          passedCount={passedCount}
+          likedCount={likedCount}
+          totalCount={swipedTotalCount}
+          busy={clearBusy}
+          onClearPassed={handleClearPassed}
+          onClearAll={handleClearAll}
+          onCancel={() => setClearModalVisible(false)}
+        />
       </SafeAreaView>
     </Modal>
+    {!open && (
+      <SmartClearModal
+        visible={clearModalVisible}
+        passedCount={passedCount}
+        likedCount={likedCount}
+        totalCount={swipedTotalCount}
+        busy={clearBusy}
+        onClearPassed={handleClearPassed}
+        onClearAll={handleClearAll}
+        onCancel={() => setClearModalVisible(false)}
+      />
+    )}
   </View>;
 }
 
@@ -790,8 +1595,11 @@ const styles = createStyles(() => ({
   // tabTextActive: { color: c.text },
 
   content: { gap: sp.md },
-  listHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: sp.md },
+  listHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: sp.md },
   listHeaderTitle: { flex: 1, minWidth: 0 },
+  listHeaderMeta: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
+  clearHeaderBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: sp.sm + 2, borderRadius: r.full || 999, backgroundColor: alpha(c.surface, 0.9), borderWidth: 1, borderColor: c.borderSubtle },
+  clearHeaderBtnText: { ...t.caption, fontFamily: theme.fonts.label, color: c.textSecondary },
   note: { flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm, padding: sp.md, borderRadius: r.md, backgroundColor: c.infoSoft, borderWidth: 1, borderColor: c.infoBorder },
   noteText: { ...t.footnote, color: c.textSecondary, flex: 1, minWidth: 0 },
 
@@ -901,7 +1709,7 @@ const styles = createStyles(() => ({
   syncText: { ...t.caption, color: c.muted },
 
   // Full-screen list / detail modal
-  modal: { flex: 1, backgroundColor: c.background },
+  modal: { flex: 1, backgroundColor: c.background, position: 'relative' },
   modalHeader: { width: '100%', maxWidth: theme.layout.readableMax, alignSelf: 'center', minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingHorizontal: sp.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.divider },
   modalHeading: { flex: 1, minWidth: 0 },
   modalIcon: { marginRight: sp.xs },
@@ -909,6 +1717,7 @@ const styles = createStyles(() => ({
   // useResponsive().contentMax so tablets use the wider column.
   modalList: { width: '100%', maxWidth: theme.layout.readableMax, alignSelf: 'center', padding: sp.lg },
   modalListHeader: { gap: sp.sm, marginBottom: sp.md },
+  modalListHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
   separator: { height: sp.sm },
   // Multi-column full list (tablets).
   listRow: { gap: sp.sm },
@@ -922,7 +1731,324 @@ const styles = createStyles(() => ({
   detailHeroText: { flex: 1, minWidth: 0, gap: sp.xs },
   detailName: { minWidth: 0 },
   // hero: { alignItems: 'center', paddingTop: sp.section - 4, paddingBottom: sp.xl, borderRadius: r.xl },
-  // bio: { marginTop: sp.md },
+  // Shared Sparks & Common Ground Card
+  sparksCard: {
+    borderRadius: r.xl,
+    padding: sp.lg,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: alpha(c.accent || '#FF5E7E', 0.28),
+    position: 'relative',
+    overflow: 'hidden',
+    gap: sp.md,
+  },
+  sparksWash: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sparksHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.sm,
+  },
+  sparksIconHalo: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: alpha(c.accent || '#FF5E7E', 0.15),
+    borderWidth: 1,
+    borderColor: alpha(c.accent || '#FF5E7E', 0.35),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sparksHeroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  sparksHeroInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  sparksTierTitle: {
+    fontFamily: theme.fonts.strong,
+    fontSize: 18,
+    color: c.text,
+    fontWeight: '700',
+  },
+  sparksTierBlurb: {
+    ...t.caption,
+    color: c.textSecondary,
+    lineHeight: 18,
+  },
+  sparksMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 3,
+  },
+  synergyGrid: {
+    gap: sp.sm,
+    marginTop: sp.xs,
+  },
+  synergySectionTitle: {
+    ...t.overline,
+    color: c.secondary,
+    letterSpacing: 0.8,
+  },
+  synergyCard: {
+    padding: sp.md,
+    borderRadius: r.lg,
+    backgroundColor: alpha(c.elevatedHigh, 0.5),
+    borderWidth: 1,
+    borderColor: c.borderSubtle,
+    gap: 6,
+  },
+  synergyCardIntent: {
+    backgroundColor: alpha('#10B981', 0.08),
+    borderColor: alpha('#10B981', 0.25),
+  },
+  synergyCardPassions: {
+    backgroundColor: alpha(c.accent || '#FF5E7E', 0.08),
+    borderColor: alpha(c.accent || '#FF5E7E', 0.25),
+  },
+  synergyCardLifestyle: {
+    backgroundColor: alpha('#34D399', 0.08),
+    borderColor: alpha('#34D399', 0.25),
+  },
+  synergyCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  synergyCardCategory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  synergyCategoryText: {
+    ...t.overline,
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
+  synergyMainText: {
+    ...t.subhead,
+    fontFamily: theme.fonts.strong,
+    color: c.text,
+    fontWeight: '600',
+  },
+  synergySubText: {
+    ...t.caption,
+    color: c.textSecondary,
+  },
+  sparksBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: sp.xs + 2,
+  },
+  sparkHighlightBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: r.pill,
+    backgroundColor: alpha('#10B981', 0.12),
+    borderWidth: 1,
+    borderColor: alpha('#10B981', 0.3),
+  },
+  sparkHighlightText: {
+    ...t.caption,
+    fontFamily: theme.fonts.strong,
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  sparkInterestBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: r.pill,
+    backgroundColor: alpha(c.accent || '#FF5E7E', 0.12),
+    borderWidth: 1,
+    borderColor: alpha(c.accent || '#FF5E7E', 0.3),
+  },
+  sparkInterestText: {
+    ...t.caption,
+    fontFamily: theme.fonts.strong,
+    color: c.accent || '#FF5E7E',
+    fontWeight: '600',
+  },
+  sparkDescBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: r.pill,
+    backgroundColor: alpha(c.elevatedHigh, 0.6),
+    borderWidth: 1,
+    borderColor: c.borderSubtle,
+  },
+  sparkDescText: {
+    ...t.caption,
+    color: c.textSecondary,
+  },
+  icebreakerContainer: {
+    padding: sp.md,
+    borderRadius: r.lg,
+    backgroundColor: alpha(c.elevatedHigh, 0.65),
+    borderWidth: 1,
+    borderColor: alpha(c.accent || '#FF5E7E', 0.18),
+    gap: 8,
+  },
+  icebreakerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  icebreakerModeTabs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  icebreakerModeTab: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: r.pill,
+    backgroundColor: alpha(c.white, 0.06),
+    borderWidth: 1,
+    borderColor: c.borderSubtle,
+  },
+  icebreakerModeTabActive: {
+    backgroundColor: alpha(c.accent || '#FF5E7E', 0.15),
+    borderColor: alpha(c.accent || '#FF5E7E', 0.4),
+  },
+  icebreakerModeTabText: {
+    ...t.caption,
+    fontSize: 11,
+    color: c.textSecondary,
+  },
+  icebreakerModeTabTextActive: {
+    color: c.accent || '#FF5E7E',
+    fontWeight: '600',
+  },
+  icebreakerQuoteBox: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderLeftWidth: 3,
+    borderLeftColor: alpha(c.accent || '#FF5E7E', 0.6),
+    paddingLeft: 10,
+    backgroundColor: alpha(c.surface, 0.4),
+    borderRadius: r.sm,
+  },
+  icebreakerQuoteText: {
+    ...t.callout,
+    color: c.text,
+    fontStyle: 'italic',
+    lineHeight: 21,
+    fontWeight: '500',
+  },
+  icebreakerActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  copyOpenerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: r.pill,
+    backgroundColor: alpha(c.accent || '#FF5E7E', 0.12),
+    borderWidth: 1,
+    borderColor: alpha(c.accent || '#FF5E7E', 0.3),
+  },
+  copyOpenerBtnSuccess: {
+    backgroundColor: alpha('#10B981', 0.14),
+    borderColor: alpha('#10B981', 0.4),
+  },
+  copyOpenerText: {
+    ...t.caption,
+    fontFamily: theme.fonts.strong,
+    color: c.accent || '#FF5E7E',
+    fontWeight: '600',
+  },
+  copyOpenerTextSuccess: {
+    ...t.caption,
+    fontFamily: theme.fonts.strong,
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  technicalBreakdownToggle: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: r.pill,
+    backgroundColor: alpha(c.white, 0.05),
+    borderWidth: 1,
+    borderColor: c.borderSubtle,
+    marginTop: 4,
+  },
+  technicalBreakdownToggleText: {
+    ...t.caption,
+    color: c.secondary,
+    fontWeight: '600',
+  },
+  interestShared: {
+    backgroundColor: alpha(c.accent || '#FF5E7E', 0.14),
+    borderWidth: 1.5,
+    borderColor: alpha(c.accent || '#FF5E7E', 0.5),
+  },
+  interestTextShared: {
+    color: c.text,
+    fontWeight: '600',
+  },
+  sharedTagPill: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: r.pill,
+    backgroundColor: alpha(c.accent || '#FF5E7E', 0.25),
+  },
+  sharedTagText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: c.accent || '#FF5E7E',
+    letterSpacing: 0.5,
+  },
+  descriptorShared: {
+    backgroundColor: alpha('#10B981', 0.12),
+    borderWidth: 1.5,
+    borderColor: alpha('#10B981', 0.45),
+  },
+  descriptorTextShared: {
+    color: c.text,
+    fontWeight: '600',
+  },
+  sharedDescTagPill: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: r.pill,
+    backgroundColor: alpha('#10B981', 0.22),
+  },
+  sharedDescTagText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#10B981',
+    letterSpacing: 0.5,
+  },
   detailCard: { gap: sp.md, padding: sp.lg, borderRadius: r.card, backgroundColor: c.surface, borderWidth: 1, borderColor: c.borderSubtle },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm },
   reason: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: sp.sm, paddingHorizontal: sp.md, borderRadius: r.pill, backgroundColor: c.secondarySoft, borderWidth: 1, borderColor: c.secondaryBorder, maxWidth: '100%' },
@@ -930,6 +2056,7 @@ const styles = createStyles(() => ({
   interest: { paddingVertical: sp.sm, paddingHorizontal: sp.md, borderRadius: r.pill, backgroundColor: c.elevated, borderWidth: 1, borderColor: c.borderSubtle, maxWidth: '100%' },
   interestText: { ...t.subhead, color: c.textSecondary },
   actionDetail: { flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg, borderRadius: r.card, backgroundColor: c.surface, borderWidth: 1, borderColor: c.borderSubtle },
+  removeHistoryItemBtn: { padding: sp.sm, borderRadius: r.md, backgroundColor: alpha(c.error || '#EF4444', 0.1), borderWidth: 1, borderColor: alpha(c.error || '#EF4444', 0.25), alignItems: 'center', justifyContent: 'center' },
   actionCopy: { flex: 1, minWidth: 0 },
   bubbleWrap: { alignSelf: 'flex-start', maxWidth: '84%', gap: sp.xxs },
   bubbleWrapMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },

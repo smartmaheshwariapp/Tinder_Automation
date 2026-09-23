@@ -9,3 +9,4 @@ export { default as SettingsPanel } from './SettingsPanel';
 export { default as FloatingSaveBar } from './FloatingSaveBar';
 export { default as TinderProfileCard } from './TinderProfileCard';
 export { default as MasterControlOrb } from './MasterControlOrb';
+export { default as SmartClearModal } from './SmartClearModal';

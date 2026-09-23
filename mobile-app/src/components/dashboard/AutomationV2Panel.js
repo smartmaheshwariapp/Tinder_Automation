@@ -831,7 +831,7 @@ function ContactHandleRow({ icon, tone, title, switchLabel, enabled, onToggle, s
   );
 }
 
-export default function AutomationV2Panel({ settings, loading, saving, saveSuccess, error, onSave, onDirtyChange, onNavigateToSettings }) {
+export default function AutomationV2Panel({ settings, loading, saving, saveSuccess, error, onSave, onNavigateToSettings }) {
   const [form, setForm] = useState(null);
   const formRef = useRef(null);
 
@@ -860,6 +860,8 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
   const [inlineSaved, setInlineSaved] = useState(false);
   const [simLangModalOpen, setSimLangModalOpen] = useState(false);
   const [tooltipModal, setTooltipModal] = useState(null);
+  const [syncGateModalOpen, setSyncGateModalOpen] = useState(false);
+  const [syncWarningVisible, setSyncWarningVisible] = useState(false);
   const reduceMotion = useMotionReduced();
 
   // ─── Responsive layout (phones stay single column; tablets get 2–3 across) ───
@@ -876,60 +878,8 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
 
 
 
-  // Desktop V2 Animated Save Bar & Change Tracking Controller
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [saveBarVisible, setSaveBarVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
-
-  const saveBarAnim = useRef(new Animated.Value(0)).current; // 0 = hidden off-screen, 1 = shown
-  const progressAnim = useRef(new Animated.Value(1)).current; // 1 = 100%, 0 = 0%
-  const saveBarTimer = useRef(null);
-
-  const showSaveBar = useCallback(() => {
-    setSaveBarVisible(true);
-    setHasUnsavedChanges(true);
-
-    if (saveBarTimer.current) clearTimeout(saveBarTimer.current);
-    progressAnim.setValue(1);
-
-    // Spring slide-up animation matching Desktop V2 cubic-bezier
-    Animated.spring(saveBarAnim, {
-      toValue: 1,
-      friction: 8,
-      tension: 60,
-      useNativeDriver: true,
-    }).start();
-
-    // 5-second progress shrink line
-    Animated.timing(progressAnim, {
-      toValue: 0,
-      duration: 5000,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    }).start();
-
-    // Auto-dismiss after 5s if idle
-    saveBarTimer.current = setTimeout(() => {
-      Animated.timing(saveBarAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        setSaveBarVisible(false);
-      });
-    }, 5000);
-  }, [saveBarAnim, progressAnim]);
-
-  const hideSaveBar = useCallback(() => {
-    if (saveBarTimer.current) clearTimeout(saveBarTimer.current);
-    Animated.timing(saveBarAnim, {
-      toValue: 0,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      setSaveBarVisible(false);
-    });
-  }, [saveBarAnim]);
+  // ─── Auto-Save Debounce & Lifecycle Persistence ───
+  const autoSaveDebounceTimer = useRef(null);
 
   useEffect(() => {
     if (settings) {
@@ -974,39 +924,24 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
 
       setForm(cloned);
       formRef.current = cloned;
-      setHasUnsavedChanges(false);
-      hideSaveBar();
-      if (onDirtyChange) onDirtyChange(false, null, null);
 
       if (settings.conversationLanguage) {
         setTrainingLang(settings.conversationLanguage);
         setViewingLang(settings.conversationLanguage);
       }
     }
-  }, [settings, hideSaveBar, onDirtyChange]);
-
-  useEffect(() => {
-    if (saveSuccess) {
-      setHasUnsavedChanges(false);
-      hideSaveBar();
-      if (onDirtyChange) onDirtyChange(false, null, null);
-      setToastMessage('Settings saved successfully!');
-      const timer = setTimeout(() => {
-        setToastMessage(null);
-      }, 2500);
-      return () => clearTimeout(timer);
-    } else {
-      setToastMessage(null);
-    }
-  }, [saveSuccess, hideSaveBar, onDirtyChange]);
+  }, [settings]);
 
   useEffect(() => {
     return () => {
-      if (formRef.current && hasUnsavedChanges) {
-        handleSavePress(formRef.current);
+      if (autoSaveDebounceTimer.current) {
+        clearTimeout(autoSaveDebounceTimer.current);
+        if (formRef.current) {
+          handleSavePress(formRef.current);
+        }
       }
     };
-  }, [hasUnsavedChanges, handleSavePress]);
+  }, [handleSavePress]);
 
   const toggleCard = (cardKey) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1020,44 +955,6 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setContactDetailsOpen(prev => !prev);
   };
-
-  const handleDiscard = useCallback(() => {
-    if (settings) {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      const cloned = JSON.parse(JSON.stringify(settings));
-      let initialGoals = [];
-      if (Array.isArray(cloned.selectedGoals) && cloned.selectedGoals.length > 0) {
-        initialGoals = cloned.selectedGoals;
-      } else if (Array.isArray(cloned.stopConditions) && cloned.stopConditions.length > 0) {
-        initialGoals = cloned.stopConditions;
-      } else if (cloned.goal) {
-        initialGoals = [cloned.goal];
-      } else {
-        initialGoals = ['never'];
-      }
-      initialGoals = initialGoals.map(g => g === 'never_stop' ? 'never' : g);
-      if (initialGoals.includes('never') || initialGoals.length === 0) {
-        initialGoals = ['never'];
-      }
-      cloned.selectedGoals = initialGoals;
-      cloned.goal = initialGoals[0] || 'never';
-      cloned.stopConditions = initialGoals.includes('never') ? [] : initialGoals;
-      if (cloned.stopAfterGoal === undefined && cloned.stopAfterGoalEnabled !== undefined) {
-        cloned.stopAfterGoal = cloned.stopAfterGoalEnabled;
-      }
-      if (cloned.goal === 'never') {
-        cloned.stopAfterGoal = false;
-        cloned.stopAfterGoalEnabled = false;
-      }
-      setForm(cloned);
-      formRef.current = cloned;
-      setHasUnsavedChanges(false);
-      hideSaveBar();
-      if (onDirtyChange) onDirtyChange(false, null, null);
-      setToastMessage('Changes discarded');
-      setTimeout(() => setToastMessage(null), 2500);
-    }
-  }, [settings, hideSaveBar, onDirtyChange]);
 
   const handleSavePress = useCallback((overrideForm) => {
     const targetForm = overrideForm || formRef.current || form;
@@ -1138,7 +1035,17 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
       formRef.current = next;
       return next;
     });
-    showSaveBar();
+
+    const isTextTyping = path.includes('contactDetails.') || path.includes('moveOffApp');
+    if (isTextTyping) {
+      if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+      autoSaveDebounceTimer.current = setTimeout(() => {
+        handleSavePress(nextState);
+      }, 600);
+    } else {
+      if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+      handleSavePress(nextState);
+    }
   };
 
   const updateFields = (updates) => {
@@ -1158,10 +1065,9 @@ export default function AutomationV2Panel({ settings, loading, saving, saveSucce
       formRef.current = next;
       return next;
     });
-    showSaveBar();
-    if (onDirtyChange) {
-      onDirtyChange(true, () => handleSavePress(nextState), handleDiscard);
-    }
+
+    if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+    handleSavePress(nextState);
   };
 
 
@@ -2013,10 +1919,10 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
         <View style={styles.pageSection}>
           <FadeIn delay={50}>
             <SectionHeader
-              title="Dating goal"
+              title="Conversation Goal"
               description={isNeverActive
                 ? "Keep Engaging is active — continuous natural AI conversation on-app with no rush."
-                : "Select up to 3 goals. Choose Keep Engaging anytime to clear all and chat non-stop."}
+                : "What your AI wingman aims for in chat (Date, WhatsApp, or Socials). Choose Keep Engaging to chat naturally without asking to meet."}
             />
           </FadeIn>
           <View style={[styles.goalList, optionCols > 1 && styles.goalGrid]} accessibilityRole="group" accessibilityLabel="Dating Goals">
@@ -2134,16 +2040,17 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           const isSmartMatchOn = form?.aiMatchEnabled === true;
           const currentThreshold = typeof form?.aiMatchThreshold === 'number' ? form.aiMatchThreshold : 60;
           const maxDistance = typeof form?.aiMatchMaxDistance === 'number' ? form.aiMatchMaxDistance : 0;
+          const showSyncWarning = !isProfileValid && (syncWarningVisible || isSmartMatchOn);
 
           return (
             <FadeIn delay={460} style={styles.pageSection}>
               <SectionHeader
-                title="Smart Match Intelligence"
-                description="AI analyzes compatibility against your profile to like the right matches."
+                title="AI Smart Compatibility"
+                description="Use AI to score and make smarter swipe decisions based on your preferences and profile data."
               />
               <Card padding="none" style={styles.groupCard}>
-                {/* Master Toggle Row */}
-                <View style={styles.settingRow}>
+                {/* Master Toggle Row (Screen 1 & 8) */}
+                <View style={[styles.settingRow, { marginTop: 4, paddingVertical: 14 }]}>
                   <IconWell
                     icon="sparkles"
                     tone={isSmartMatchOn ? "primary" : "neutral"}
@@ -2151,11 +2058,11 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   />
                   <View style={styles.settingRowCopy}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <AppText variant="bodyStrong" numberOfLines={1}>Smart Match Mode</AppText>
+                      <AppText variant="bodyStrong" numberOfLines={1}>Smart Match</AppText>
                       {isSmartMatchOn && (
                         <Badge
                           tone={isProfileValid ? "primary" : "warning"}
-                          label={isProfileValid ? "Active" : "Ready"}
+                          label={isProfileValid ? "Active" : "Pending"}
                           style={{ paddingHorizontal: 6, paddingVertical: 1 }}
                         />
                       )}
@@ -2163,44 +2070,106 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     <AppText variant="footnote" numberOfLines={2} style={styles.settingRowSub}>
                       {isSmartMatchOn
                         ? (isProfileValid
-                            ? `Only auto-likes profiles with ≥ ${currentThreshold}% compatibility`
-                            : 'Smart Match is ON. Will start scoring as soon as Tinder loads your profile.')
-                        : 'Score profiles before swiping (currently OFF)'}
+                            ? `Auto-likes profiles with ${currentThreshold}%+ compatibility`
+                            : 'Smart Match is ON · Connect your profile to start matching')
+                        : 'Score and filter candidates automatically (OFF)'}
                     </AppText>
                   </View>
                   <Switch
                     accessibilityLabel="Smart Match Mode"
                     value={isSmartMatchOn}
                     onValueChange={v => {
+                      if (v && !isProfileValid) {
+                        setSyncWarningVisible(true);
+                        setSyncGateModalOpen(true);
+                        return;
+                      }
+                      if (v && isProfileValid) {
+                        setSyncWarningVisible(false);
+                      }
                       updateField('aiMatchEnabled', v);
                       handleSavePress({ ...(formRef.current || form || {}), aiMatchEnabled: v });
                     }}
                     trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
-                    thumbColor={uiTheme.colors.white}
+                    thumbColor={(!isProfileValid && !isSmartMatchOn) ? uiTheme.colors.textTertiary : uiTheme.colors.white}
                     ios_backgroundColor={uiTheme.colors.elevatedHigh}
                   />
                 </View>
 
-                {!isProfileValid && isSmartMatchOn && (
-                  <View style={{ padding: 12, backgroundColor: alpha(uiTheme.colors.warning, 0.08), borderTopWidth: 1, borderColor: alpha(uiTheme.colors.warning, 0.2), flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name="information-circle-outline" size={16} color={uiTheme.colors.warning} />
-                    <AppText variant="footnote" style={{ color: uiTheme.colors.warning, flex: 1 }}>
-                      {!isProfileSynced
-                        ? 'Profile sync pending. Smart Match is armed and will evaluate profiles as soon as Tinder loads.'
-                        : 'Profile data is over 7 days old. Smart Match will refresh your profile automatically.'}
-                    </AppText>
+                {/* Inline Profile Sync Warning Note: Only shows when profile is not synced or >7 days old, if user tries to enable or is pending */}
+                {showSyncWarning && (
+                  <View
+                    style={{
+                      marginHorizontal: 16,
+                      marginTop: 2,
+                      marginBottom: 14,
+                      padding: 12,
+                      borderRadius: r.lg,
+                      backgroundColor: alpha('#F59E0B', 0.08),
+                      borderWidth: 1,
+                      borderColor: alpha('#F59E0B', 0.25),
+                      gap: 8,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                      <Ionicons
+                        name={!isProfileSynced ? "alert-circle" : "time-outline"}
+                        size={18}
+                        color="#F59E0B"
+                        style={{ marginTop: 1 }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <AppText variant="subhead" style={{ color: '#F59E0B', fontWeight: '600' }}>
+                          {!isProfileSynced ? 'Connect Tinder Profile' : 'Profile Sync Expired'}
+                        </AppText>
+                        <AppText variant="caption" style={{ color: alpha(uiTheme.colors.text, 0.75), marginTop: 2, lineHeight: 16 }}>
+                          {!isProfileSynced
+                            ? 'Connect your Tinder profile so Smart Match can learn your preferences and score compatibility.'
+                            : `Your profile was last synced ${Math.floor(syncAgeDays)} days ago. Refresh your profile data to keep compatibility scoring accurate.`}
+                        </AppText>
+                      </View>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Dismiss sync note"
+                        onPress={() => setSyncWarningVisible(false)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="close" size={16} color={alpha(uiTheme.colors.textSecondary, 0.6)} />
+                      </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={!isProfileSynced ? "Connect Tinder profile now" : "Refresh Tinder profile now"}
+                      onPress={() => setSyncGateModalOpen(true)}
+                      style={{
+                        alignSelf: 'flex-start',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingVertical: 6,
+                        paddingHorizontal: 12,
+                        borderRadius: r.sm,
+                        backgroundColor: alpha('#F59E0B', 0.15),
+                        marginTop: 2,
+                      }}
+                    >
+                      <Ionicons name="sync" size={13} color="#F59E0B" />
+                      <AppText variant="caption" style={{ color: '#F59E0B', fontWeight: '700' }}>
+                        {!isProfileSynced ? 'Connect Profile Now' : 'Refresh Profile Now'}
+                      </AppText>
+                    </TouchableOpacity>
                   </View>
                 )}
 
-                {/* Sub-controls when Smart Match is ON */}
+                {/* ── SCREEN 8: Full View Sub-controls ── */}
                 {isSmartMatchOn && (
                   <View style={{ padding: 16, borderTopWidth: 1, borderColor: uiTheme.colors.border }}>
-                    {/* Minimum Compatibility Threshold Slider */}
+                    {/* Minimum Compatibility Threshold */}
                     <View style={{ marginBottom: 18 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <AppText variant="bodyStrong">Minimum Compatibility</AppText>
+                        <AppText variant="bodyStrong">Minimum Match Score</AppText>
                         <View style={styles.v2ValueBadge}>
-                          <Text style={styles.v2ValueBadgeText}>{currentThreshold}%</Text>
+                          <Text style={styles.v2ValueBadgeText}>{currentThreshold}% &gt;</Text>
                         </View>
                       </View>
                       <RangeSlider
@@ -2215,20 +2184,20 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         }}
                       />
                       <AppText variant="footnote" color="textSecondary" style={{ marginTop: 6 }}>
-                        Profiles scoring below {currentThreshold}% will be passed automatically.
+                        Only like profiles scoring at least {currentThreshold}% compatibility.
                       </AppText>
                     </View>
 
-                    {/* Strict Relationship Goals Filter */}
+                    {/* Strict Goal Filter */}
                     <View style={[styles.rowBetween, { paddingVertical: 12, borderTopWidth: 1, borderColor: uiTheme.colors.border }]}>
                       <View style={{ flex: 1, paddingRight: 12 }}>
-                        <AppText variant="bodyStrong">Filter by Relationship Goal</AppText>
+                        <AppText variant="bodyStrong">Strict Goal Filter</AppText>
                         <AppText variant="footnote" color="textSecondary" style={{ marginTop: 2 }}>
-                          Automatically pass profiles whose dating intent conflicts with yours
+                          Pass anyone whose dating goals clash with yours.
                         </AppText>
                       </View>
                       <Switch
-                        accessibilityLabel="Filter by Relationship Goal"
+                        accessibilityLabel="Strict Goal Filter"
                         value={form?.aiMatchStrictGoals !== false}
                         onValueChange={v => {
                           updateField('aiMatchStrictGoals', v);
@@ -2246,7 +2215,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         <AppText variant="bodyStrong">Maximum Distance</AppText>
                         <View style={styles.v2ValueBadge}>
                           <Text style={styles.v2ValueBadgeText}>
-                            {maxDistance > 0 ? `${maxDistance} mi` : 'No Limit (Off)'}
+                            {maxDistance > 0 ? `${maxDistance} mi (${Math.round(maxDistance * 1.60934)} km)` : 'No limit'}
                           </Text>
                         </View>
                       </View>
@@ -2257,23 +2226,32 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         value={maxDistance}
                         unit=" mi"
                         onValueChange={val => {
+                          const valKm = Math.round(val * 1.60934);
                           updateField('aiMatchMaxDistance', val);
-                          handleSavePress({ ...(formRef.current || form || {}), aiMatchMaxDistance: val });
+                          updateField('distanceFilter.maxDistance', valKm);
+                          handleSavePress({
+                            ...(formRef.current || form || {}),
+                            aiMatchMaxDistance: val,
+                            distanceFilter: {
+                              ...(formRef.current?.distanceFilter || form?.distanceFilter || {}),
+                              maxDistance: valKm,
+                            },
+                          });
                         }}
                       />
                       <AppText variant="footnote" color="textSecondary" style={{ marginTop: 6 }}>
                         {maxDistance > 0
-                          ? `Pass profiles farther than ${maxDistance} miles.`
-                          : 'No distance dealbreaker. Distance is only scored for proximity bonus.'}
+                          ? `Only consider profiles within ${maxDistance} miles (${Math.round(maxDistance * 1.60934)} km). Synced with swiping radius.`
+                          : 'Open to any distance · Closer matches receive a bonus.'}
                       </AppText>
                     </View>
 
-                    {/* Deep AI Analysis Toggle */}
+                    {/* Use LLM for Refinement */}
                     <View style={[styles.rowBetween, { paddingVertical: 12, borderTopWidth: 1, borderColor: uiTheme.colors.border }]}>
                       <View style={{ flex: 1, paddingRight: 12 }}>
                         <AppText variant="bodyStrong">Deep AI Analysis</AppText>
                         <AppText variant="footnote" color="textSecondary" style={{ marginTop: 2 }}>
-                          Use advanced AI to evaluate profiles that are close to your match threshold.
+                          Uses advanced AI to double-check borderline profiles before swiping
                         </AppText>
                       </View>
                       <Switch
@@ -2294,7 +2272,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       <View style={{ flex: 1, paddingRight: 12 }}>
                         <AppText variant="bodyStrong">Show Compatibility Scores</AppText>
                         <AppText variant="footnote" color="textSecondary" style={{ marginTop: 2 }}>
-                          Display compatibility badges and breakdown chips on cards
+                          Display match badges and compatibility highlights on cards
                         </AppText>
                       </View>
                       <Switch
@@ -2309,9 +2287,71 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         ios_backgroundColor={uiTheme.colors.elevatedHigh}
                       />
                     </View>
+
+                    {/* Brand tagline (Screen 8 Parity) */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderColor: uiTheme.colors.border }}>
+                      <Ionicons name="sparkles" size={14} color={uiTheme.colors.primary} />
+                      <AppText variant="caption" style={{ color: uiTheme.colors.textSecondary, fontWeight: '500' }}>
+                        Smart swipes. Better matches. Same Tinder, Smarter you.
+                      </AppText>
+                    </View>
                   </View>
                 )}
               </Card>
+
+              {/* ── SCREEN 7: Profile Sync Gate Modal ── */}
+              <Modal visible={syncGateModalOpen} transparent animationType="fade" onRequestClose={() => setSyncGateModalOpen(false)}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.65)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                  <View style={{ width: '100%', maxWidth: 360, borderRadius: 20, backgroundColor: uiTheme.colors.surface, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: uiTheme.colors.border }}>
+                    {/* Top right close button */}
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      style={{ position: 'absolute', top: 16, right: 16, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: uiTheme.colors.elevated }}
+                      onPress={() => setSyncGateModalOpen(false)}
+                    >
+                      <Ionicons name="close" size={18} color={uiTheme.colors.textSecondary} />
+                    </TouchableOpacity>
+
+                    {/* Profile sync circular icon */}
+                    <View style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: alpha(uiTheme.colors.primary, 0.14), alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                      <Ionicons name="sync" size={32} color={uiTheme.colors.primary} />
+                    </View>
+
+                    {/* Title */}
+                    <Text style={{ ...uiTheme.type.title2, fontFamily: uiTheme.fonts.heading, color: uiTheme.colors.text, textAlign: 'center', marginBottom: 8, fontWeight: '700' }}>
+                      Connect Your Tinder Profile
+                    </Text>
+
+                    {/* Subtitle */}
+                    <Text style={{ ...uiTheme.type.callout, color: uiTheme.colors.textSecondary, textAlign: 'center', marginBottom: 24, lineHeight: 20 }}>
+                      FlirtEasy learns your bio, interests, and preferences so it can find and like the people you'll actually click with.
+                    </Text>
+
+                    {/* Go to Sync primary action */}
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      style={{ width: '100%', height: 48, borderRadius: 24, backgroundColor: uiTheme.colors.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}
+                      onPress={() => {
+                        setSyncGateModalOpen(false);
+                        if (typeof onNavigateToSettings === 'function') {
+                          onNavigateToSettings();
+                        }
+                      }}
+                    >
+                      <Text style={{ ...uiTheme.type.headline, color: '#FFFFFF', fontWeight: '700' }}>Open Tinder & Sync</Text>
+                    </TouchableOpacity>
+
+                    {/* Cancel secondary action */}
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      style={{ width: '100%', height: 40, alignItems: 'center', justifyContent: 'center' }}
+                      onPress={() => setSyncGateModalOpen(false)}
+                    >
+                      <Text style={{ ...uiTheme.type.subhead, color: uiTheme.colors.textTertiary }}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Modal>
             </FadeIn>
           );
         })()}
@@ -2800,6 +2840,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       onValuesChange={(newMin, newMax) => {
                         updateField('ageFilter.min', newMin);
                         updateField('ageFilter.max', newMax);
+                        updateField('ageFilter.minAge', newMin);
+                        updateField('ageFilter.maxAge', newMax);
                       }}
                     />
 
@@ -2822,6 +2864,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                             onPress={() => {
                               updateField('ageFilter.min', b.min);
                               updateField('ageFilter.max', b.max);
+                              updateField('ageFilter.minAge', b.min);
+                              updateField('ageFilter.maxAge', b.max);
                             }}
                             activeOpacity={0.8}
                           >
@@ -2841,19 +2885,28 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                 <View style={styles.rowBetween}>
                   <View style={{ flex: 1, paddingRight: 10 }}>
                     <Text style={styles.toggleTitle}>Distance Range</Text>
-                    <Text style={styles.labelMuted}>Maximum location distance radius</Text>
+                    <Text style={styles.labelMuted}>Maximum location distance radius (Independent from Smart Match)</Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <View style={styles.v2ValueBadge}>
                       <Text style={styles.v2ValueBadgeText}>
                         {form.distanceFilter?.enabled
-                          ? `Up to ${form.distanceFilter?.maxDistance ?? 50} km`
+                          ? `Up to ${form.distanceFilter?.maxDistance ?? 50} km (${Math.round((form.distanceFilter?.maxDistance ?? 50) / 1.60934)} mi)`
                           : 'No Limit (Off)'}
                       </Text>
                     </View>
                     <Switch
                       value={form.distanceFilter?.enabled === true}
-                      onValueChange={v => updateField('distanceFilter.enabled', v)}
+                      onValueChange={v => {
+                        updateField('distanceFilter.enabled', v);
+                        handleSavePress({
+                          ...(formRef.current || form || {}),
+                          distanceFilter: {
+                            ...(formRef.current?.distanceFilter || form?.distanceFilter || {}),
+                            enabled: v,
+                          },
+                        });
+                      }}
                       trackColor={{ false: uiTheme.colors.elevatedHigh, true: uiTheme.colors.primary }}
                       thumbColor={uiTheme.colors.white}
                       ios_backgroundColor={uiTheme.colors.elevatedHigh}
@@ -2870,7 +2923,19 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       value={form.distanceFilter?.maxDistance ?? 50}
                       unit="km"
                       prefix="Up to "
-                      onValueChange={(val) => updateField('distanceFilter.maxDistance', val)}
+                      onValueChange={(val) => {
+                        const valMi = Math.round(val / 1.60934);
+                        updateField('distanceFilter.maxDistance', val);
+                        updateField('aiMatchMaxDistance', valMi);
+                        handleSavePress({
+                          ...(formRef.current || form || {}),
+                          distanceFilter: {
+                            ...(formRef.current?.distanceFilter || form?.distanceFilter || {}),
+                            maxDistance: val,
+                          },
+                          aiMatchMaxDistance: valMi,
+                        });
+                      }}
                     />
 
                     <Text style={[styles.inputLabel, { marginTop: 6, marginBottom: 6 }]}>Radius Presets</Text>
@@ -2887,7 +2952,19 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                           <TouchableOpacity accessibilityRole="button"
                             key={d.label}
                             style={[styles.chip, isActive && styles.chipActive]}
-                            onPress={() => updateField('distanceFilter.maxDistance', d.dist)}
+                            onPress={() => {
+                              const valMi = Math.round(d.dist / 1.60934);
+                              updateField('distanceFilter.maxDistance', d.dist);
+                              updateField('aiMatchMaxDistance', valMi);
+                              handleSavePress({
+                                ...(formRef.current || form || {}),
+                                distanceFilter: {
+                                  ...(formRef.current?.distanceFilter || form?.distanceFilter || {}),
+                                  maxDistance: d.dist,
+                                },
+                                aiMatchMaxDistance: valMi,
+                              });
+                            }}
                             activeOpacity={0.8}
                           >
                             <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
@@ -5524,113 +5601,6 @@ const styles = createStyles(() => ({
     flexShrink: 1,
   },
 
-  // ─── Desktop V2 Sticky Save Bar ───
-  saveBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: c.elevated,
-    borderTopWidth: 1,
-    borderColor: c.hairline,
-    paddingHorizontal: sp.lg,
-    paddingVertical: sp.md,
-    ...uiTheme.shadows.lg,
-  },
-  saveBarProgress: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    height: 3,
-    backgroundColor: c.primary,
-    borderTopLeftRadius: r.md,
-    borderTopRightRadius: r.md,
-  },
-  saveBarContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  saveBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.sm,
-    flex: 1,
-    minWidth: 0,
-    marginRight: sp.md,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  unsavedDot: {
-    backgroundColor: c.warning,
-  },
-  savedDot: {
-    backgroundColor: c.success,
-  },
-  saveBarText: {
-    ...ty.footnote,
-    fontFamily: uiTheme.fonts.label,
-    color: c.muted,
-  },
-  saveBarTextUnsaved: {
-    fontFamily: uiTheme.fonts.strong,
-    color: c.accent,
-  },
-  saveBarActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.sm,
-  },
-  discardBtn: {
-    minHeight: uiTheme.layout.touchTarget,
-    justifyContent: 'center',
-    paddingVertical: sp.sm,
-    paddingHorizontal: sp.md,
-    borderRadius: r.sm,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: 'transparent',
-  },
-  discardBtnText: {
-    ...ty.buttonSmall,
-    color: c.textSecondary,
-  },
-  saveChangesBtn: {
-    minHeight: uiTheme.layout.touchTarget,
-    backgroundColor: c.primary,
-    paddingVertical: sp.sm,
-    paddingHorizontal: sp.lg,
-    borderRadius: r.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...uiTheme.shadows.glow,
-  },
-  saveChangesBtnIdle: {
-    backgroundColor: c.primary,
-    opacity: 0.95,
-  },
-  saveChangesBtnSuccess: {
-    backgroundColor: c.success,
-    shadowColor: c.success,
-  },
-  saveChangesBtnText: {
-    ...ty.buttonSmall,
-    color: c.onPrimary,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.xs,
-  },
-  errorText: {
-    ...ty.footnote,
-    color: c.error,
-    textAlign: 'center',
-    marginBottom: sp.xs,
-  },
 
   // ─── Swiping Location Capsule ───
   swipingLocationCapsule: {

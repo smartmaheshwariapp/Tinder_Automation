@@ -101,7 +101,6 @@ export default function SettingsPanel({
   saveSuccess,
   error,
   onSave,
-  onDirtyChange,
   onLogout,
   onConnect,
   isLoggedIn: propIsLoggedIn,
@@ -240,57 +239,8 @@ export default function SettingsPanel({
   // Raw keypad drawer
   const [showRawControls, setShowRawControls] = useState(false);
 
-  // Desktop V2 Animated Save Bar & Change Tracking Controller
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [saveBarVisible, setSaveBarVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
-
-  const saveBarAnim = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef(new Animated.Value(1)).current;
-  const saveBarTimer = useRef(null);
-
-  const showSaveBar = useCallback(() => {
-    setSaveBarVisible(true);
-    setHasUnsavedChanges(true);
-
-    if (saveBarTimer.current) clearTimeout(saveBarTimer.current);
-    progressAnim.setValue(1);
-
-    Animated.spring(saveBarAnim, {
-      toValue: 1,
-      friction: 8,
-      tension: 60,
-      useNativeDriver: true,
-    }).start();
-
-    Animated.timing(progressAnim, {
-      toValue: 0,
-      duration: 5000,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    }).start();
-
-    saveBarTimer.current = setTimeout(() => {
-      Animated.timing(saveBarAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        setSaveBarVisible(false);
-      });
-    }, 5000);
-  }, [saveBarAnim, progressAnim]);
-
-  const hideSaveBar = useCallback(() => {
-    if (saveBarTimer.current) clearTimeout(saveBarTimer.current);
-    Animated.timing(saveBarAnim, {
-      toValue: 0,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      setSaveBarVisible(false);
-    });
-  }, [saveBarAnim]);
+  // ─── Auto-Save Debounce & Lifecycle Persistence ───
+  const autoSaveDebounceTimer = useRef(null);
 
   const hasInitializedBioMode = useRef(false);
 
@@ -299,9 +249,6 @@ export default function SettingsPanel({
       const cloned = JSON.parse(JSON.stringify(settings));
       setForm(cloned);
       formRef.current = cloned;
-      setHasUnsavedChanges(false);
-      hideSaveBar();
-      if (onDirtyChange) onDirtyChange(false, null, null);
       if (!hasInitializedBioMode.current && settings.aboutSource) {
         setBioMode(settings.aboutSource);
         hasInitializedBioMode.current = true;
@@ -310,36 +257,7 @@ export default function SettingsPanel({
         setLastSyncTime('just now');
       }
     }
-  }, [settings, hideSaveBar, onDirtyChange]);
-
-  useEffect(() => {
-    if (saveSuccess) {
-      setHasUnsavedChanges(false);
-      hideSaveBar();
-      if (onDirtyChange) onDirtyChange(false, null, null);
-      setToastMessage('Settings saved successfully!');
-      const timer = setTimeout(() => {
-        setToastMessage(null);
-      }, 2500);
-      return () => clearTimeout(timer);
-    } else {
-      setToastMessage(null);
-    }
-  }, [saveSuccess, hideSaveBar, onDirtyChange]);
-
-  const handleDiscard = useCallback(() => {
-    if (settings) {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      const cloned = JSON.parse(JSON.stringify(settings));
-      setForm(cloned);
-      formRef.current = cloned;
-      setHasUnsavedChanges(false);
-      hideSaveBar();
-      if (onDirtyChange) onDirtyChange(false, null, null);
-      setToastMessage('Changes discarded');
-      setTimeout(() => setToastMessage(null), 2500);
-    }
-  }, [settings, hideSaveBar, onDirtyChange]);
+  }, [settings]);
 
   const handleSavePress = useCallback((overrideForm) => {
     const targetForm = overrideForm || formRef.current || form;
@@ -350,6 +268,17 @@ export default function SettingsPanel({
       });
     }
   }, [onSave, form, bioMode]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveDebounceTimer.current) {
+        clearTimeout(autoSaveDebounceTimer.current);
+        if (formRef.current) {
+          handleSavePress(formRef.current);
+        }
+      }
+    };
+  }, [handleSavePress]);
 
   const updateField = (path, value) => {
     let nextState = null;
@@ -366,9 +295,16 @@ export default function SettingsPanel({
       formRef.current = next;
       return next;
     });
-    showSaveBar();
-    if (onDirtyChange) {
-      onDirtyChange(true, () => handleSavePress(nextState), handleDiscard);
+
+    const isTextTyping = path === 'manualBio';
+    if (isTextTyping) {
+      if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+      autoSaveDebounceTimer.current = setTimeout(() => {
+        handleSavePress(nextState);
+      }, 600);
+    } else {
+      if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+      handleSavePress(nextState);
     }
   };
 
@@ -387,11 +323,9 @@ export default function SettingsPanel({
       formRef.current = next;
       return next;
     });
-    showSaveBar();
-    if (onDirtyChange) {
-      onDirtyChange(true, () => handleSavePress(nextState), handleDiscard);
-    }
-  }, [handleSavePress, onDirtyChange]);
+    if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+    handleSavePress(nextState);
+  }, [handleSavePress]);
 
   const handleChooseCityManually = useCallback(() => {
     setLocationNoticeModal(null);
@@ -472,11 +406,9 @@ export default function SettingsPanel({
       formRef.current = next;
       return next;
     });
-    showSaveBar();
-    if (onDirtyChange) {
-      onDirtyChange(true, () => handleSavePress(nextState), handleDiscard);
-    }
-  }, [showSaveBar, onDirtyChange, handleSavePress, handleDiscard]);
+    if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+    handleSavePress(nextState);
+  }, [handleSavePress]);
 
   // ── Logout Handler with Custom Glass Modal ──
   const handleLogoutPress = () => {
@@ -569,10 +501,8 @@ export default function SettingsPanel({
       setSyncSuccess(true);
       setSyncError(null);
       setLastSyncTime('just now');
-      showSaveBar();
-      if (onDirtyChange) {
-        onDirtyChange(true, () => handleSavePress(nextState), handleDiscard);
-      }
+      if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+      handleSavePress(nextState);
       setTimeout(() => setSyncSuccess(false), 4000);
     } else {
       if (!syncError) {
@@ -626,8 +556,6 @@ export default function SettingsPanel({
       if (onSave) {
         onSave({ ...(formRef.current || form), manualBio: bioText, aboutSource: activeMode });
       }
-      hideSaveBar();
-      if (onDirtyChange) onDirtyChange(false, null, null);
       setPushSuccess(true);
       setPushing(false);
       setTimeout(() => setPushSuccess(false), 3500);
@@ -2770,113 +2698,6 @@ const styles = createStyles(() => ({
     flexShrink: 1,
   },
 
-  // ─── Desktop V2 Sticky Save Bar ───
-  saveBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: c.elevated,
-    borderTopWidth: 1,
-    borderColor: c.hairline,
-    paddingHorizontal: sp.lg,
-    paddingVertical: sp.md,
-    ...uiTheme.shadows.lg,
-  },
-  saveBarProgress: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    height: 3,
-    backgroundColor: c.primary,
-    borderTopLeftRadius: r.md,
-    borderTopRightRadius: r.md,
-  },
-  saveBarContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  saveBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.sm,
-    flex: 1,
-    minWidth: 0,
-    marginRight: sp.md,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  unsavedDot: {
-    backgroundColor: c.warning,
-  },
-  savedDot: {
-    backgroundColor: c.success,
-  },
-  saveBarText: {
-    ...ty.footnote,
-    fontFamily: uiTheme.fonts.label,
-    color: c.muted,
-  },
-  saveBarTextUnsaved: {
-    fontFamily: uiTheme.fonts.strong,
-    color: c.accent,
-  },
-  saveBarActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.sm,
-  },
-  discardBtn: {
-    minHeight: L.touchTarget,
-    justifyContent: 'center',
-    paddingVertical: sp.sm,
-    paddingHorizontal: sp.md,
-    borderRadius: r.sm,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: 'transparent',
-  },
-  discardBtnText: {
-    ...ty.buttonSmall,
-    color: c.textSecondary,
-  },
-  saveChangesBtn: {
-    minHeight: L.touchTarget,
-    backgroundColor: c.primary,
-    paddingVertical: sp.sm,
-    paddingHorizontal: sp.lg,
-    borderRadius: r.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...uiTheme.shadows.glow,
-  },
-  saveChangesBtnIdle: {
-    backgroundColor: c.primary,
-    opacity: 0.95,
-  },
-  saveChangesBtnSuccess: {
-    backgroundColor: c.success,
-    shadowColor: c.success,
-  },
-  saveChangesBtnText: {
-    ...ty.buttonSmall,
-    color: c.onPrimary,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.xs,
-  },
-  errorText: {
-    ...ty.footnote,
-    color: c.error,
-    textAlign: 'center',
-    marginBottom: sp.xs,
-  },
 
   // ── Modal Styles ──
   modalBackdrop: {

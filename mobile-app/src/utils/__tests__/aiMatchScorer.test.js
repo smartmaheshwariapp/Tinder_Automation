@@ -10,6 +10,7 @@ import {
   setCachedScore,
   clearScoreCache,
   computeLabel,
+  validateLLMResponse,
 } from '../aiMatchScorer';
 
 // Mock global fetch for LLM tests
@@ -105,6 +106,120 @@ describe('aiMatchScorer', () => {
     });
   });
 
+  // ── Individual Axis Isolation Tests ──
+  // Each test populates ONLY the data for a single axis plus Completeness (never skipped).
+  // Verifies the axis appears in breakdown with correct name and bounded score.
+
+  describe('scoreCandidateLocal — Individual Axis Isolation', () => {
+    it('Axis 1: Shared Interests only', () => {
+      const user = { interests: ['Hiking', 'Coffee', 'Photography', 'Travel'] };
+      const cand = { interests: ['Coffee', 'Photography'] };
+      const result = scoreCandidateLocal(cand, user);
+      const interestAxis = result.breakdown.find(b => b.axis === 'Shared Interests');
+      expect(interestAxis).toBeDefined();
+      expect(interestAxis.earned).toBeGreaterThan(0);
+      expect(interestAxis.earned).toBeLessThanOrEqual(25);
+      expect(interestAxis.max).toBe(25);
+      // Only Shared Interests + Completeness
+      expect(result.breakdown.length).toBe(2);
+    });
+
+    it('Axis 2: Lifestyle Descriptors only', () => {
+      const user = { descriptors: ['Active', 'Non-smoker', 'Dog lover'] };
+      const cand = { descriptors: ['Active', 'Dog lover'] };
+      const result = scoreCandidateLocal(cand, user);
+      const lifestyleAxis = result.breakdown.find(b => b.axis === 'Lifestyle');
+      expect(lifestyleAxis).toBeDefined();
+      expect(lifestyleAxis.earned).toBeGreaterThan(0);
+      expect(lifestyleAxis.earned).toBeLessThanOrEqual(15);
+      expect(lifestyleAxis.max).toBe(15);
+      expect(result.breakdown.length).toBe(2);
+    });
+
+    it('Axis 3: Bio Keywords only', () => {
+      const user = { bio: 'Software engineer who loves hiking mountains and reading sci-fi novels' };
+      const cand = { bio: 'Engineer working in software development who enjoys hiking and reading' };
+      const result = scoreCandidateLocal(cand, user);
+      const bioAxis = result.breakdown.find(b => b.axis === 'Bio Keywords');
+      expect(bioAxis).toBeDefined();
+      expect(bioAxis.earned).toBeGreaterThan(0);
+      expect(bioAxis.earned).toBeLessThanOrEqual(15);
+      expect(bioAxis.max).toBe(15);
+      expect(result.breakdown.length).toBe(2);
+    });
+
+    it('Axis 4: Career & Education only (both have career)', () => {
+      const user = { job: 'Software Engineer', school: 'MIT' };
+      const cand = { job: 'Software Developer', school: 'Stanford' };
+      const result = scoreCandidateLocal(cand, user);
+      const careerAxis = result.breakdown.find(b => b.axis === 'Career & Education');
+      expect(careerAxis).toBeDefined();
+      expect(careerAxis.earned).toBeGreaterThan(0);
+      expect(careerAxis.earned).toBeLessThanOrEqual(10);
+      expect(careerAxis.max).toBe(10);
+      expect(result.breakdown.length).toBe(2);
+    });
+
+    it('Axis 4: Career fallback — candidate has career, user does not', () => {
+      const user = {};
+      const cand = { job: 'Manager at Boarding', school: 'Pitman' };
+      const result = scoreCandidateLocal(cand, user);
+      const careerAxis = result.breakdown.find(b => b.axis === 'Career & Education');
+      expect(careerAxis).toBeDefined();
+      // 5 for job + 3 for school = 8
+      expect(careerAxis.earned).toBe(8);
+    });
+
+    it('Axis 5: Location Proximity only (distance in miles)', () => {
+      const user = {};
+      const cand = { distanceMi: 3 };
+      const result = scoreCandidateLocal(cand, user);
+      const locationAxis = result.breakdown.find(b => b.axis === 'Location');
+      expect(locationAxis).toBeDefined();
+      expect(locationAxis.earned).toBe(10); // < 5 miles = 10
+      expect(locationAxis.max).toBe(10);
+      expect(result.breakdown.length).toBe(2);
+    });
+
+    it('Axis 5: Location fallback — city match when no distance data', () => {
+      const user = { city: 'San Francisco' };
+      const cand = { city: 'San Francisco' };
+      const result = scoreCandidateLocal(cand, user);
+      const locationAxis = result.breakdown.find(b => b.axis === 'Location');
+      expect(locationAxis).toBeDefined();
+      expect(locationAxis.earned).toBe(10); // Exact city match
+    });
+
+    it('Axis 6: Goal Harmony only', () => {
+      const user = { lookingFor: 'long_term' };
+      const cand = { lookingFor: 'long_term' };
+      const result = scoreCandidateLocal(cand, user);
+      const goalAxis = result.breakdown.find(b => b.axis === 'Goal Harmony');
+      expect(goalAxis).toBeDefined();
+      expect(goalAxis.earned).toBe(15); // Exact match
+      expect(goalAxis.max).toBe(15);
+    });
+
+    it('Axis 7: Completeness — maximally complete candidate', () => {
+      const user = {};
+      const cand = {
+        bio: 'I love adventures and exploring new places',
+        interests: ['Travel'],
+        descriptors: ['Active'],
+        photos: ['p1', 'p2', 'p3'],
+        questionAnswers: [{ q: 'Fav trip?', a: 'Japan' }],
+        verified: true,
+      };
+      const result = scoreCandidateLocal(cand, user);
+      const completenessAxis = result.breakdown.find(b => b.axis === 'Completeness');
+      expect(completenessAxis).toBeDefined();
+      // bio >= 5 (3) + interests (2) + QA (2) + descriptors (1) + photos >= 3 (2) + verified (1) = 11 → capped at 10
+      expect(completenessAxis.earned).toBe(10);
+      // With only completeness axis populated, only 1 axis total
+      expect(result.breakdown.length).toBe(1);
+    });
+  });
+
   describe('scoreCandidateLocal — Adaptive Scoring', () => {
     it('scores sparse candidate based on available axes without penalizing for missing data', () => {
       const user = {
@@ -116,11 +231,6 @@ describe('aiMatchScorer', () => {
       };
 
       const result = scoreCandidateLocal(cand, user);
-      // Interests: 2 overlap / 4 max = 0.5 * 25 = 12.5
-      // Completeness: interests (2) + photos>=3 (2) = 4
-      // Available weight: 25 (interests) + 10 (completeness) = 35
-      // Earned: 12.5 + 4 = 16.5
-      // Normalized: (16.5 / 35) * 100 = 47%
       expect(result.score).toBeGreaterThan(40);
       expect(result.confidence).toBeCloseTo(2 / 7, 1);
       expect(result.breakdown.length).toBe(2);
@@ -163,6 +273,17 @@ describe('aiMatchScorer', () => {
       expect(result.confidence).toBeLessThan(0.3);
       expect(result.label).toBe('Low Info');
     });
+
+    it('all-null candidate: only Completeness axis, Low Info label, confidence ≈ 0.14', () => {
+      const result = scoreCandidateLocal({}, {});
+      expect(result.breakdown.length).toBe(1);
+      expect(result.breakdown[0].axis).toBe('Completeness');
+      expect(result.confidence).toBeCloseTo(1 / 7, 2); // 0.14
+      expect(result.label).toBe('Low Info');
+      // With only completeness earned = 0 out of 10, score = 0
+      // or if score falls back to 50 when availableWeight > 0 but earned is 0
+      expect(result.score).toBeLessThanOrEqual(50);
+    });
   });
 
   describe('computeLabel', () => {
@@ -172,6 +293,74 @@ describe('aiMatchScorer', () => {
       expect(computeLabel(65, 0.7)).toBe('Good Potential');
       expect(computeLabel(40, 0.5)).toBe('Moderate');
       expect(computeLabel(20, 0.5)).toBe('Low Compatibility');
+    });
+  });
+
+  // ── LLM Response Validation ──
+
+  describe('validateLLMResponse', () => {
+    it('accepts valid response with score number and string reasons', () => {
+      const result = validateLLMResponse({ score: 75, reasons: ['Good match', 'Similar values'] });
+      expect(result).toEqual({ score: 75, reasons: ['Good match', 'Similar values'] });
+    });
+
+    it('rejects null score (Number(null) === 0 would pass old check)', () => {
+      expect(validateLLMResponse({ score: null, reasons: [] })).toBeNull();
+    });
+
+    it('rejects boolean score (Number(true) === 1 would pass old check)', () => {
+      expect(validateLLMResponse({ score: true, reasons: [] })).toBeNull();
+    });
+
+    it('rejects array score (Number([50]) === 50 would pass old check)', () => {
+      expect(validateLLMResponse({ score: [50], reasons: [] })).toBeNull();
+    });
+
+    it('rejects string score', () => {
+      expect(validateLLMResponse({ score: 'high', reasons: [] })).toBeNull();
+    });
+
+    it('clamps negative scores to 0', () => {
+      const result = validateLLMResponse({ score: -50, reasons: [] });
+      expect(result.score).toBe(0);
+    });
+
+    it('clamps scores above 100', () => {
+      const result = validateLLMResponse({ score: 200, reasons: [] });
+      expect(result.score).toBe(100);
+    });
+
+    it('filters non-string reasons (nested objects)', () => {
+      const result = validateLLMResponse({
+        score: 75,
+        reasons: [{ nested: 'object' }, 'Valid reason', 42, null],
+      });
+      expect(result.reasons).toEqual(['Valid reason']);
+    });
+
+    it('strips HTML tags from reasons', () => {
+      const result = validateLLMResponse({
+        score: 60,
+        reasons: ['<script>alert("xss")</script>Compatible values'],
+      });
+      expect(result.reasons).toEqual(['alert("xss")Compatible values']);
+    });
+
+    it('logs warning for unexpected keys (prompt injection signal)', () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      validateLLMResponse({ score: 50, reasons: [], injected: true, extra_data: 'malicious' });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('unexpected fields'),
+        expect.stringContaining('injected'),
+        expect.any(String),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('rejects non-object inputs (array, string, null)', () => {
+      expect(validateLLMResponse(null)).toBeNull();
+      expect(validateLLMResponse([75])).toBeNull();
+      expect(validateLLMResponse('score:75')).toBeNull();
     });
   });
 
@@ -236,6 +425,143 @@ describe('aiMatchScorer', () => {
       const result = await scoreCandidateLLM({}, {}, { apiKey: 'sk-test' });
       expect(result).toBeNull();
     });
+
+    it('returns null when LLM returns non-number score type', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '{"score": "high", "reasons": ["good vibes"]}' } }],
+        }),
+      });
+
+      const result = await scoreCandidateLLM({}, {}, { apiKey: 'sk-test' });
+      expect(result).toBeNull();
+    });
+
+    it('returns null on HTTP error (non-ok response)', async () => {
+      global.fetch.mockResolvedValueOnce({ ok: false, status: 500 });
+      const result = await scoreCandidateLLM({}, {}, { apiKey: 'sk-test' });
+      expect(result).toBeNull();
+    });
+  });
+
+  // ── Confidence Gate Tests ──
+
+  describe('scoreCandidate — Confidence Gate', () => {
+    it('low-confidence candidate always gets shouldLike=false regardless of threshold', async () => {
+      // Candidate with very sparse data → confidence < 0.3
+      const cand = { id: 'sparse_1', name: 'Ghost' };
+      const user = {};
+
+      // Threshold at 0 — would normally like everything
+      const result = await scoreCandidate(cand, user, { aiMatchThreshold: 0 });
+      expect(result.shouldLike).toBe(false);
+      expect(result.lowConfidence).toBe(true);
+      expect(result.label).toBe('Low Info');
+    });
+
+    it('low-confidence candidate gets shouldLike=false even with threshold at 1', async () => {
+      const cand = { id: 'sparse_2' };
+      const user = { interests: ['Coding'] };
+
+      const result = await scoreCandidate(cand, user, { aiMatchThreshold: 1 });
+      expect(result.shouldLike).toBe(false);
+      expect(result.lowConfidence).toBe(true);
+    });
+
+    it('candidate with sufficient confidence above threshold gets shouldLike=true', async () => {
+      const user = {
+        interests: ['Tech', 'Hiking'],
+        lookingFor: 'long_term',
+        job: 'Engineer',
+      };
+      const cand = {
+        id: 'rich_1',
+        interests: ['Tech', 'Hiking'],
+        lookingFor: 'long_term',
+        job: 'Developer',
+        distanceMi: 5,
+        bio: 'I love technology and hiking in nature regularly',
+        photos: ['p1', 'p2', 'p3'],
+      };
+
+      const result = await scoreCandidate(cand, user, { aiMatchThreshold: 30 });
+      expect(result.confidence).toBeGreaterThanOrEqual(0.3);
+      expect(result.shouldLike).toBe(true);
+      expect(result.lowConfidence).toBeUndefined();
+    });
+  });
+
+  // ── Boundary Threshold Tests ──
+
+  describe('scoreCandidate — Boundary Thresholds', () => {
+    const richUser = {
+      interests: ['Tech', 'Hiking', 'Reading'],
+      descriptors: ['Active', 'Non-smoker'],
+      bio: 'Software engineer who loves hiking in nature and reading sci-fi books.',
+      job: 'Software Engineer',
+      school: 'MIT',
+      lookingFor: 'long_term',
+    };
+    const perfectCand = {
+      id: 'perfect_cand',
+      interests: ['Tech', 'Hiking', 'Reading'],
+      descriptors: ['Active', 'Non-smoker'],
+      bio: 'Software engineer and tech enthusiast who loves hiking and reading books.',
+      job: 'Software Engineer',
+      school: 'Stanford',
+      lookingFor: 'long_term',
+      distanceMi: 3,
+      photos: ['p1', 'p2', 'p3'],
+      questionAnswers: [{ q: 'Fav?', a: 'Japan' }],
+    };
+
+    it('threshold at 0 — everything with sufficient confidence passes', async () => {
+      const result = await scoreCandidate(perfectCand, richUser, { aiMatchThreshold: 0 });
+      expect(result.shouldLike).toBe(true);
+    });
+
+    it('threshold at 100 — only perfect score passes', async () => {
+      const result = await scoreCandidate(
+        { ...perfectCand, id: 'threshold_100_cand' },
+        richUser,
+        { aiMatchThreshold: 100 },
+      );
+      // A near-perfect candidate might score ~90-95, not 100
+      // So this should fail unless score is exactly 100
+      if (result.score < 100) {
+        expect(result.shouldLike).toBe(false);
+      } else {
+        expect(result.shouldLike).toBe(true);
+      }
+    });
+
+    it('score exactly at threshold results in shouldLike=true', async () => {
+      // Two-pass test: first discover the actual score, then use it as threshold
+      const cand = { ...perfectCand, id: 'exact_threshold_cand' };
+      clearScoreCache();
+      const first = await scoreCandidate(cand, richUser, { aiMatchThreshold: 0 });
+      clearScoreCache();
+      const atThreshold = await scoreCandidate(
+        { ...cand, id: 'exact_threshold_cand_2' },
+        richUser,
+        { aiMatchThreshold: first.score },
+      );
+      expect(atThreshold.shouldLike).toBe(true);
+    });
+
+    it('score one below threshold results in shouldLike=false', async () => {
+      const cand = { ...perfectCand, id: 'below_threshold_cand' };
+      clearScoreCache();
+      const first = await scoreCandidate(cand, richUser, { aiMatchThreshold: 0 });
+      clearScoreCache();
+      const belowThreshold = await scoreCandidate(
+        { ...cand, id: 'below_threshold_cand_2' },
+        richUser,
+        { aiMatchThreshold: first.score + 1 },
+      );
+      expect(belowThreshold.shouldLike).toBe(false);
+    });
   });
 
   describe('scoreCandidate (Main Orchestrator & Blending)', () => {
@@ -251,9 +577,6 @@ describe('aiMatchScorer', () => {
     });
 
     it('blends local and LLM score bounded within ±15', async () => {
-      // Local score around 50, candidate in uncertain zone (50 is within 60 ± 15)
-      // LLM returns 90, which should be clamped to 50 + 15 = 65
-      // Blended = 0.4 * 50 + 0.6 * 65 = 20 + 39 = 59
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -284,20 +607,32 @@ describe('aiMatchScorer', () => {
 
       expect(result.tier).toBe('blended');
       expect(result.passed).toBe(true);
-      // Ensure score is bounded and blended properly
       expect(result.score).toBeLessThanOrEqual(65);
     });
 
-    it('caches candidate results for 24h', async () => {
+    it('caches candidate results keyed by user profile version', async () => {
       const cand = { id: 'cand_cache_test', name: 'Alex' };
-      const user = {};
+      const user = { tinderUserId: 'user_ver', bio: 'Original bio' };
 
       const first = await scoreCandidate(cand, user);
-      expect(getCachedScore('cand_cache_test')).toEqual(first);
+      expect(getCachedScore('cand_cache_test', 'user_ver', user)).toEqual(first);
 
-      // Mutate candidate to prove it uses cache
+      // Same candidate + user → cache hit
       const second = await scoreCandidate({ id: 'cand_cache_test', name: 'Alex Changed' }, user);
       expect(second).toBe(first);
+    });
+
+    it('invalidates cache when user profile changes', async () => {
+      const cand = { id: 'cand_ver_test' };
+      const userV1 = { tinderUserId: 'user_ver2', bio: 'Version one bio text here' };
+      const userV2 = { tinderUserId: 'user_ver2', bio: 'Completely different bio now' };
+
+      const resultV1 = await scoreCandidate(cand, userV1);
+      // Changed bio → different profile version hash → cache miss → fresh score
+      const resultV2 = await scoreCandidate(cand, userV2);
+      // They may have same or different scores, but the cache should be separate
+      expect(getCachedScore('cand_ver_test', 'user_ver2', userV1)).toEqual(resultV1);
+      expect(getCachedScore('cand_ver_test', 'user_ver2', userV2)).toEqual(resultV2);
     });
 
     it('isolates candidate score cache across different user accounts', async () => {
@@ -320,16 +655,13 @@ describe('aiMatchScorer', () => {
       const resultA = await scoreCandidate(cand, userA);
       const resultB = await scoreCandidate(cand, userB);
 
-      // User A and User B should receive distinct scores based on their own profiles
       expect(resultA.score).toBeGreaterThan(resultB.score);
-      expect(getCachedScore('cand_multi_user', 'user_alice')).toEqual(resultA);
-      expect(getCachedScore('cand_multi_user', 'user_bob')).toEqual(resultB);
-      expect(getCachedScore('cand_multi_user', 'user_alice')).not.toEqual(resultB);
+      expect(getCachedScore('cand_multi_user', 'user_alice', userA)).toEqual(resultA);
+      expect(getCachedScore('cand_multi_user', 'user_bob', userB)).toEqual(resultB);
 
-      // Clearing cache flushes all
       clearScoreCache();
-      expect(getCachedScore('cand_multi_user', 'user_alice')).toBeNull();
-      expect(getCachedScore('cand_multi_user', 'user_bob')).toBeNull();
+      expect(getCachedScore('cand_multi_user', 'user_alice', userA)).toBeNull();
+      expect(getCachedScore('cand_multi_user', 'user_bob', userB)).toBeNull();
     });
 
     it('safely handles prompt injection attempts in bio', async () => {

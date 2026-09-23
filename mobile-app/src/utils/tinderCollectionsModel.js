@@ -71,10 +71,170 @@ export function compatibility(profile, own, preferences = {}) {
       ...(sameGoal ? ['Same relationship intention'] : []),
       ...sharedDescriptors.slice(0, 1).map(d => `Lifestyle match: ${d}`)
     ],
+    sharedInterests: shared,
+    commonLanguages,
+    sameGoal,
+    sharedDescriptors,
     strong: score >= 60,
     estimated: true
   };
 }
+
+export function getCommonGround(profile, own, prefs = {}) {
+  if (!profile) return null;
+  const p = profile;
+  const userInterests = (own?.interests || prefs.interests || []).map(i => (typeof i === 'string' ? i.trim() : (i?.name || '')).toLowerCase()).filter(Boolean);
+  const candInterests = (p.interests || []).map(i => typeof i === 'string' ? i.trim() : (i?.name || '')).filter(Boolean);
+  const sharedInterests = candInterests.filter(ci => userInterests.includes(ci.toLowerCase()));
+
+  const userGoal = (own?.lookingFor || prefs.lookingFor || '').trim();
+  const candGoal = (p.lookingFor || '').trim();
+  const matchingGoal = Boolean(userGoal && candGoal && (
+    userGoal.toLowerCase() === candGoal.toLowerCase() ||
+    candGoal.toLowerCase().includes(userGoal.toLowerCase()) ||
+    userGoal.toLowerCase().includes(candGoal.toLowerCase())
+  ));
+
+  const userDesc = (own?.descriptors || []).map(d => typeof d === 'string' ? d.trim().toLowerCase() : '');
+  const candDesc = (p.descriptors || []).map(d => typeof d === 'string' ? d.trim() : '');
+  const sharedDesc = candDesc.filter(cd => userDesc.includes(cd.toLowerCase()));
+
+  const userLangs = (own?.languages || []).map(l => typeof l === 'string' ? l.trim().toLowerCase() : '');
+  const candLangs = (p.languages || []).map(l => typeof l === 'string' ? l.trim() : '');
+  const sharedLangs = candLangs.filter(cl => userLangs.includes(cl.toLowerCase()));
+
+  const firstName = (p.name || 'there').split(' ')[0];
+  let primaryOpener = '';
+  let funOpener = '';
+  let deepOpener = '';
+
+  if (sharedInterests.length > 0) {
+    const topInterest = sharedInterests[0];
+    primaryOpener = `Hey ${firstName}, love that you're into ${topInterest}! What's the best ${topInterest.toLowerCase()} spot or experience you've had recently?`;
+    funOpener = sharedInterests.length > 1
+      ? `Hey ${firstName}! Quick debate: between ${sharedInterests[0]} and ${sharedInterests[1]}, which one wins your Sunday afternoon?`
+      : `Hey ${firstName}! Fellow ${topInterest.toLowerCase()} enthusiast spotted. What got you into ${topInterest.toLowerCase()} in the first place?`;
+    deepOpener = `Hey ${firstName}! If you could plan an unforgettable weekend centered around ${topInterest.toLowerCase()}, what would it look like?`;
+  } else if (matchingGoal) {
+    primaryOpener = `Hey ${firstName}! Refreshing to meet someone else looking for ${candGoal.toLowerCase()}. What does your ideal weekend look like?`;
+    funOpener = `Hey ${firstName}! Since we're both on the same page about ${candGoal.toLowerCase()}, what's the best date experience you've ever had?`;
+    deepOpener = `Hey ${firstName}! It's rare to find someone with aligned dating goals. What does meaningful connection look like to you?`;
+  } else if (Array.isArray(p.questionAnswers) && p.questionAnswers.length > 0 && p.questionAnswers[0]?.answer) {
+    const qa = p.questionAnswers[0];
+    primaryOpener = `Hey ${firstName}, saw your prompt about "${qa.answer}" — had to ask what the story is behind that!`;
+    funOpener = `Hey ${firstName}! Your prompt about "${qa.answer}" definitely stopped my scroll. What's the backstory?`;
+    deepOpener = `Hey ${firstName}! What's something that made you genuinely happy this week?`;
+  } else if (sharedDesc.length > 0) {
+    primaryOpener = `Hey ${firstName}! Fellow ${sharedDesc[0].toLowerCase()} here. How is your week going?`;
+    funOpener = `Hey ${firstName}! Noticed we share that ${sharedDesc[0].toLowerCase()} energy. What's your favorite way to unwind?`;
+    deepOpener = `Hey ${firstName}! What's a passion project or hobby you've been excited about lately?`;
+  } else if (candInterests.length > 0) {
+    primaryOpener = `Hey ${firstName}, noticed you're into ${candInterests[0]}! What got you started with that?`;
+    funOpener = `Hey ${firstName}! Your photo vibe and love for ${candInterests[0]} is infectious. What are you up to this weekend?`;
+    deepOpener = `Hey ${firstName}! What's an adventure or trip at the very top of your bucket list right now?`;
+  } else {
+    primaryOpener = `Hey ${firstName}! Love the vibe of your profile. How has your week been treating you?`;
+    funOpener = `Hey ${firstName}! If you could teleport anywhere this evening for great food and drinks, where are we going?`;
+    deepOpener = `Hey ${firstName}! What's something you're really looking forward to this month?`;
+  }
+
+  const chemistryTier =
+    matchingGoal && sharedInterests.length >= 2 ? 'Electric Connection' :
+    sharedInterests.length >= 1 || matchingGoal ? 'Strong Chemistry' :
+    sharedDesc.length >= 1 ? 'Lifestyle Harmony' : 'Good Potential';
+
+  const chemistryDetails = {
+    tier: chemistryTier,
+    emoji: chemistryTier === 'Electric Connection' ? '⚡' : chemistryTier === 'Strong Chemistry' ? '🔥' : chemistryTier === 'Lifestyle Harmony' ? '🌱' : '✨',
+    label: chemistryTier === 'Electric Connection' ? 'Electric Connection ⚡' : chemistryTier === 'Strong Chemistry' ? 'Strong Chemistry 🔥' : chemistryTier === 'Lifestyle Harmony' ? 'Lifestyle Harmony 🌱' : 'Good Potential ✨',
+    blurb: chemistryTier === 'Electric Connection'
+      ? 'Rare alignment across dating intentions and shared passions.'
+      : chemistryTier === 'Strong Chemistry'
+        ? 'High natural resonance with immediate common ground.'
+        : chemistryTier === 'Lifestyle Harmony'
+          ? 'Complementary lifestyle rhythms and shared everyday habits.'
+          : 'Contrasting styles with unique opportunities to connect.',
+  };
+
+  const synergyPoints = [];
+  if (matchingGoal) {
+    synergyPoints.push({
+      id: 'intent',
+      category: 'Relationship Intent',
+      title: 'Intent Aligned',
+      detail: `Both want ${candGoal}`,
+      icon: 'heart',
+      color: '#10B981',
+      badge: 'Match',
+    });
+  }
+  if (sharedInterests.length > 0) {
+    synergyPoints.push({
+      id: 'passions',
+      category: 'Shared Passions',
+      title: `${sharedInterests.length} ${sharedInterests.length === 1 ? 'Mutual Interest' : 'Mutual Interests'}`,
+      detail: sharedInterests.join(', '),
+      items: sharedInterests,
+      icon: 'flame',
+      color: '#FF5E7E',
+      badge: `+${sharedInterests.length * 10} pts`,
+    });
+  }
+  if (sharedDesc.length > 0) {
+    synergyPoints.push({
+      id: 'lifestyle',
+      category: 'Lifestyle Sync',
+      title: `${sharedDesc.length} Shared ${sharedDesc.length === 1 ? 'Habit' : 'Habits'}`,
+      detail: sharedDesc.join(' · '),
+      items: sharedDesc,
+      icon: 'leaf',
+      color: '#34D399',
+      badge: 'In Sync',
+    });
+  }
+  if (typeof p.distanceMi === 'number') {
+    synergyPoints.push({
+      id: 'proximity',
+      category: 'Proximity',
+      title: `${p.distanceMi} mi away`,
+      detail: p.distanceMi <= 5 ? 'Close neighborhood' : p.distanceMi <= 15 ? 'Local driving radius' : 'Within search area',
+      icon: 'navigate',
+      color: '#60A5FA',
+      badge: 'Nearby',
+    });
+  }
+  if (sharedLangs.length > 0) {
+    synergyPoints.push({
+      id: 'languages',
+      category: 'Languages',
+      title: `Shared ${sharedLangs.length === 1 ? 'Language' : 'Languages'}`,
+      detail: sharedLangs.join(', '),
+      icon: 'chatbubbles',
+      color: '#A78BFA',
+      badge: 'Fluent',
+    });
+  }
+
+  return {
+    sharedInterests,
+    matchingGoal,
+    candGoal,
+    userGoal,
+    sharedDesc,
+    sharedLangs,
+    icebreaker: primaryOpener,
+    openers: {
+      primary: primaryOpener,
+      fun: funOpener,
+      deep: deepOpener,
+    },
+    chemistryTier,
+    chemistryDetails,
+    synergyPoints,
+    totalSharedCount: sharedInterests.length + (matchingGoal ? 1 : 0) + sharedDesc.length + sharedLangs.length,
+  };
+}
+
 
 export const emptyCollections = ownerId => ({ version: 1, ownerId, profiles: {}, swipes: {}, conversations: {}, updatedAt: 0 });
 const bound = (map, key) => Object.fromEntries(Object.entries(map).sort((a, b) => (b[1][key] || 0) - (a[1][key] || 0)).slice(0, COLLECTION_LIMIT));
@@ -111,7 +271,13 @@ export function mergeCollectionEvent(state, event, now = Date.now()) {
 
   if (event.kind === 'swipe' && ['like', 'pass'].includes(event.action)) {
     const profile = addProfile(event.profile || { _id: event.profileId });
-    if (profile) next.swipes[profile.id] = { profileId: profile.id, action: event.action, swipedAt: event.timestamp || now, matched: Boolean(event.matched) || Boolean(next.swipes[profile.id]?.matched) };
+    if (profile) next.swipes[profile.id] = {
+      profileId: profile.id,
+      action: event.action,
+      swipedAt: event.timestamp || now,
+      matched: Boolean(event.matched) || Boolean(next.swipes[profile.id]?.matched),
+      detail: event.detail || next.swipes[profile.id]?.detail || null,
+    };
   }
   if (event.kind === 'matches') for (const match of (event.matches || []).slice(0, 100)) {
     const profile = addProfile(match.person || match.user);
@@ -144,13 +310,14 @@ export function mergeCollectionEvent(state, event, now = Date.now()) {
 
 export function collectionLists(state, own, preferences) {
   const profiles = state?.profiles || {};
+  const isSmartMatchOn = Boolean(preferences?.aiMatchEnabled);
+  const showScores = preferences?.aiMatchShowScores !== false;
+
   const enrichProfile = rawProfile => {
     if (!rawProfile) return rawProfile;
     if (
       rawProfile.matchScore != null &&
-      rawProfile.matchScore > 0 &&
-      Array.isArray(rawProfile.matchBreakdown) &&
-      rawProfile.matchBreakdown.length > 0
+      (rawProfile.matchScore > 0 || rawProfile.matchLabel === 'Dealbreaker' || rawProfile.matchLabel === 'Filtered Out')
     ) {
       return rawProfile;
     }
@@ -166,11 +333,34 @@ export function collectionLists(state, own, preferences) {
 
   const swiped = Object.values(state?.swipes || {})
     .sort((a, b) => b.swipedAt - a.swipedAt)
-    .map(item => ({ ...item, profile: enrichProfile(profiles[item.profileId]) }));
+    .map(item => {
+      const baseProfile = profiles[item.profileId] || null;
+      // For liked profiles and matches: always enrich if showScores is true.
+      // For passed profiles: enrich if Smart Match was active OR if the swipe was an explicit dealbreaker from the session.
+      const hasSessionDealbreaker = baseProfile?.matchScore != null && (baseProfile.matchLabel === 'Dealbreaker' || baseProfile.matchLabel === 'Filtered Out');
+      const shouldEnrich = showScores && (item.action === 'like' || isSmartMatchOn || hasSessionDealbreaker);
+      let profile = baseProfile;
+      if (shouldEnrich) {
+        profile = enrichProfile(baseProfile);
+      } else if (baseProfile) {
+        profile = {
+          ...baseProfile,
+          matchScore: null,
+          matchConfidence: null,
+          matchLabel: null,
+          matchBreakdown: [],
+        };
+      }
+      return {
+        ...item,
+        detail: item.detail || null,
+        profile,
+      };
+    });
   const chatting = Object.values(state?.conversations || {})
     .filter(item => !item.archived && item.messages?.length)
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
-    .map(item => ({ ...item, profile: enrichProfile(profiles[item.profileId]) }));
+    .map(item => ({ ...item, profile: showScores ? enrichProfile(profiles[item.profileId]) : (profiles[item.profileId] || null) }));
   const rejected = new Set(swiped.filter(item => item.action === 'pass').map(item => item.profileId));
   const strong = Object.values(profiles)
     .filter(profile => !rejected.has(profile.id))
@@ -187,7 +377,7 @@ export function mergeProgressFeedSwipes(state, feed) {
     const timestamp = Number(event.timestamp) || Date.now(), normalized = event.name.trim().toLowerCase();
     const action = event.type === 'profile_passed' ? 'pass' : 'like';
     const duplicate = Object.values(next.swipes || {}).some(swipe => next.profiles?.[swipe.profileId]?.name?.trim().toLowerCase() === normalized && Math.abs((swipe.swipedAt || 0) - timestamp) < 20000);
-    if (!duplicate) next = mergeCollectionEvent(next, { kind: 'swipe', action, timestamp, profile: { _id: `feed_${event.id || timestamp}`, name: event.name.trim(), bio: event.detail || '', photos: event.photoUrl ? [{ url: event.photoUrl }] : [] } }, timestamp);
+    if (!duplicate) next = mergeCollectionEvent(next, { kind: 'swipe', action, timestamp, detail: event.detail || null, profile: { _id: `feed_${event.id || timestamp}`, name: event.name.trim(), bio: event.detail || '', photos: event.photoUrl ? [{ url: event.photoUrl }] : [] } }, timestamp);
   }
   return next;
 }

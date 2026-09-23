@@ -2050,14 +2050,14 @@ function checkHardFilters(candidate, ownProfile, preferences = {}) {
     const userGoal = ownProfile?.lookingFor;
     const candGoal = candidate?.lookingFor;
     if (userGoal && candGoal && !areGoalsCompatible(userGoal, candGoal)) {
-      return { passed: false, reason: 'Relationship goal mismatch' };
+      return { passed: false, reason: 'Goal mismatch' };
     }
   }
   const maxDist = preferences.aiMatchMaxDistance;
   if (typeof maxDist === 'number' && maxDist > 0) {
     const candDist = candidate?.distanceMi;
     if (typeof candDist === 'number' && candDist > maxDist) {
-      return { passed: false, reason: `Distance exceeds limit (${candDist} mi > ${maxDist} mi)` };
+      return { passed: false, reason: 'Distance exceeds limit' };
     }
   }
   return { passed: true };

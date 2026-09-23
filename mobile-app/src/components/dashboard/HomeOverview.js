@@ -577,10 +577,10 @@ function SmartMatchRateCard({ settings, stats, onAutomation }) {
           </View>
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.smartMatchTitle}>Compatibility Filter</Text>
+              <Text style={styles.smartMatchTitle}>Smart Match</Text>
               <Badge tone="primary" label="ACTIVE" size="sm" />
             </View>
-            <Text style={styles.smartMatchSub}>Threshold: ≥ {currentThreshold}% compatibility</Text>
+            <Text style={styles.smartMatchSub}>Auto-likes matches with {currentThreshold}%+ compatibility</Text>
           </View>
         </View>
         {onAutomation && (

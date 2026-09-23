@@ -4,19 +4,39 @@
 
 import { API_CONFIG } from '../config/api';
 
-// ── Cache Layer (24-hour TTL, Isolated per User) ──
+// ── Cache Layer (24-hour TTL, Isolated per User + Profile Version) ──
 const scoreCache = new Map();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-function buildScoreCacheKey(candidateId, userId = 'default') {
-  const cleanUser = String(userId || 'default').trim() || 'default';
-  const cleanCand = String(candidateId || '').trim();
-  return `${cleanUser}_${cleanCand}`;
+// Simple hash of profile fields that affect scoring — ensures cache invalidation
+// when the user edits their profile or preferences change.
+function profileVersionHash(profile) {
+  if (!profile) return '0';
+  const fields = [
+    String(profile.bio || '').slice(0, 50),
+    String(profile.lookingFor || ''),
+    String(profile.job || ''),
+    String(profile.school || ''),
+    String(profile.city || ''),
+    Array.isArray(profile.interests) ? profile.interests.length : '0',
+    Array.isArray(profile.descriptors) ? profile.descriptors.length : '0',
+  ].join('|');
+  // djb2-style hash — fast, deterministic, no crypto dependency
+  let h = 5381;
+  for (let i = 0; i < fields.length; i++) h = ((h << 5) + h + fields.charCodeAt(i)) | 0;
+  return String(Math.abs(h));
 }
 
-export function getCachedScore(candidateId, userId = 'default') {
+function buildScoreCacheKey(candidateId, userId = 'default', userProfile = null) {
+  const cleanUser = String(userId || 'default').trim() || 'default';
+  const cleanCand = String(candidateId || '').trim();
+  const ver = profileVersionHash(userProfile);
+  return `${cleanUser}_${cleanCand}_${ver}`;
+}
+
+export function getCachedScore(candidateId, userId = 'default', userProfile = null) {
   if (!candidateId) return null;
-  const key = buildScoreCacheKey(candidateId, userId);
+  const key = buildScoreCacheKey(candidateId, userId, userProfile);
   const entry = scoreCache.get(key);
   if (!entry) return null;
   if (Date.now() > entry.expiresAt) {
@@ -26,9 +46,9 @@ export function getCachedScore(candidateId, userId = 'default') {
   return entry.result;
 }
 
-export function setCachedScore(candidateId, result, userId = 'default') {
+export function setCachedScore(candidateId, result, userId = 'default', userProfile = null) {
   if (!candidateId || !result) return;
-  const key = buildScoreCacheKey(candidateId, userId);
+  const key = buildScoreCacheKey(candidateId, userId, userProfile);
   scoreCache.set(key, {
     result,
     expiresAt: Date.now() + CACHE_TTL_MS,
@@ -136,6 +156,22 @@ export function checkHardFilters(candidate, ownProfile, preferences = {}) {
 }
 
 // ── Soft Scorer (Adaptive, 7 Axes) ──
+//
+// Design Decision: 7 axes, not 8.
+//
+// The original spec mentioned 8 axes (including Age compatibility and Prompt resonance).
+// Both were deliberately dropped:
+//
+// 1. Age axis: Tinder's discovery settings already bound the age range shown to the user.
+//    Every candidate visible has already passed the user's own age filter. Re-scoring age
+//    would duplicate Tinder's filter and penalize matches the user already accepted into
+//    their radius. If age is ever a dealbreaker, it belongs as a hard filter, not a soft
+//    scoring axis.
+//
+// 2. Prompt resonance: Merged into Bio Keywords (Axis 3). Tinder Q&A answers contribute
+//    to the Completeness axis (Axis 7), and bio keyword overlap already captures semantic
+//    similarity. A separate axis would double-count bio content against itself.
+//
 
 const STOPWORDS = new Set([
   'this', 'that', 'with', 'from', 'have', 'here', 'what', 'when', 'where',
@@ -370,32 +406,91 @@ export function scoreCandidateLocal(candidate, ownProfile, preferences = {}) {
 
 // ── LLM Refinement Tier (Optional) ──
 
-function sanitizeForPrompt(text, maxLen = 200) {
+// PII Stripping — removes phone numbers (with dashes/spaces/dots/parens), emails,
+// social handles, and URLs. Does NOT attempt name-stripping — that's an NER problem
+// requiring a model, not a regex. This is a documented known limitation.
+function sanitizePII(text, maxLen = 150) {
   if (!text || typeof text !== 'string') return '';
   return text
+    // Phone numbers: handles (123) 456-7890, 123.456.7890, +1-234-567-8900, etc.
+    .replace(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{2,4}[-.\s]?\d{2,9}/g, '[REDACTED]')
+    // Email addresses
+    .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[REDACTED]')
+    // Social handles (@username)
+    .replace(/@[a-zA-Z0-9_]{2,30}/g, '[REDACTED]')
+    // URLs
+    .replace(/https?:\/\/[^\s]+/gi, '[REDACTED]')
+    // Collapse whitespace and strip prompt-injection characters
     .replace(/[\r\n\t]+/g, ' ')
     .replace(/["'{}\\]/g, '')
     .trim()
     .slice(0, maxLen);
 }
 
+// Convert exact age to a demographic bucket — prevents re-identification
+function ageBucket(age) {
+  const n = Number(age);
+  if (!Number.isFinite(n) || n < 18) return 'Unknown';
+  if (n <= 22) return 'Early 20s';
+  if (n <= 26) return 'Mid 20s';
+  if (n <= 29) return 'Late 20s';
+  if (n <= 34) return 'Early 30s';
+  if (n <= 39) return 'Late 30s';
+  if (n <= 44) return 'Early 40s';
+  if (n <= 49) return 'Late 40s';
+  return '50+';
+}
+
+// ── LLM Response Validation ──
+// Strict type checking — Number(null)===0, Number(true)===1, Number([50])===50
+// all pass Number.isFinite, so we gate on typeof first.
+const EXPECTED_LLM_KEYS = new Set(['score', 'reasons']);
+
+export function validateLLMResponse(parsed) {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+
+  // Warn on unexpected keys — potential signal of prompt injection or schema drift
+  const unexpected = Object.keys(parsed).filter(k => !EXPECTED_LLM_KEYS.has(k));
+  if (unexpected.length > 0) {
+    console.warn('[aiMatchScorer] LLM returned unexpected fields:', unexpected.join(', '),
+      '— possible prompt injection or schema change');
+  }
+
+  // Strict type guard: reject null, boolean, array, string that coerce to numbers
+  if (typeof parsed.score !== 'number' || !Number.isFinite(parsed.score)) return null;
+
+  const score = Math.min(100, Math.max(0, Math.round(parsed.score)));
+  const reasons = Array.isArray(parsed.reasons)
+    ? parsed.reasons
+        .filter(r => typeof r === 'string')
+        .slice(0, 3)
+        // Tag stripping: nice-to-have since RN <Text> renders plain text,
+        // but keeps the data clean if reasons are ever logged or displayed elsewhere.
+        .map(r => r.replace(/<[^>]*>/g, '').replace(/[{}\\]/g, '').trim().slice(0, 80))
+        .filter(Boolean)
+    : [];
+
+  return { score, reasons };
+}
+
 export async function scoreCandidateLLM(candidate, ownProfile, apiConfig = {}) {
   const own = ownProfile || {};
   const cand = candidate || {};
 
-  const ownAge = Number(own.age) || 'Unknown';
-  const candAge = Number(cand.age) || 'Unknown';
-  const ownBio = sanitizeForPrompt(own.bio, 200);
-  const candBio = sanitizeForPrompt(cand.bio, 200);
+  // PII-safe: age buckets instead of exact ages, bio stripped of phone/email/handles
+  const ownAgeBucket = ageBucket(own.age);
+  const candAgeBucket = ageBucket(cand.age);
+  const ownBio = sanitizePII(own.bio, 150);
+  const candBio = sanitizePII(cand.bio, 150);
   const ownInterests = extractList(own.interests).slice(0, 8).join(', ');
   const candInterests = extractList(cand.interests).slice(0, 8).join(', ');
-  const ownGoal = sanitizeForPrompt(own.lookingFor, 50) || 'Not specified';
-  const candGoal = sanitizeForPrompt(cand.lookingFor, 50) || 'Not specified';
+  const ownGoal = sanitizePII(own.lookingFor, 50) || 'Not specified';
+  const candGoal = sanitizePII(cand.lookingFor, 50) || 'Not specified';
   const ownDesc = extractList(own.descriptors).slice(0, 6).join(', ');
   const candDesc = extractList(cand.descriptors).slice(0, 6).join(', ');
 
   const systemPrompt = 'You are a dating compatibility analyst. Given two dating profiles, rate their compatibility from 0-100. Respond ONLY with valid JSON: {"score":NUMBER,"reasons":["reason1","reason2"]}';
-  const userPrompt = `PROFILE A (User): Age ${ownAge}. Bio: ${ownBio || 'None'}. Interests: ${ownInterests || 'None'}. Looking for: ${ownGoal}. Lifestyle: ${ownDesc || 'None'}.\nPROFILE B (Candidate): Age ${candAge}. Bio: ${candBio || 'None'}. Interests: ${candInterests || 'None'}. Looking for: ${candGoal}. Lifestyle: ${candDesc || 'None'}.\nRate compatibility 0-100 with 2 specific reasons.`;
+  const userPrompt = `PROFILE A (User): Age range ${ownAgeBucket}. Bio: ${ownBio || 'None'}. Interests: ${ownInterests || 'None'}. Looking for: ${ownGoal}. Lifestyle: ${ownDesc || 'None'}.\nPROFILE B (Candidate): Age range ${candAgeBucket}. Bio: ${candBio || 'None'}. Interests: ${candInterests || 'None'}. Looking for: ${candGoal}. Lifestyle: ${candDesc || 'None'}.\nRate compatibility 0-100 with 2 specific reasons.`;
 
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), 4000) : null;
@@ -453,20 +548,12 @@ export async function scoreCandidateLLM(candidate, ownProfile, apiConfig = {}) {
     const cleaned = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     const parsed = JSON.parse(cleaned);
 
-    const rawScore = Number(parsed.score);
-    if (!Number.isFinite(rawScore)) return null;
-
-    const score = Math.min(100, Math.max(0, Math.round(rawScore)));
-    const reasons = Array.isArray(parsed.reasons)
-      ? parsed.reasons
-          .slice(0, 2)
-          .map(r => String(r).replace(/<[^>]*>/g, '').trim().slice(0, 80))
-          .filter(Boolean)
-      : [];
+    const validated = validateLLMResponse(parsed);
+    if (!validated) return null;
 
     return {
-      score,
-      reasons,
+      score: validated.score,
+      reasons: validated.reasons,
       tier: 'llm',
     };
   } catch (_) {
@@ -481,8 +568,8 @@ export async function scoreCandidate(candidate, ownProfile, preferences = {}, op
   const candidateId = candidate?.id || candidate?._id;
   const userId = ownProfile?.tinderUserId || ownProfile?._id || ownProfile?.id || ownProfile?.name || 'default';
 
-  // Check 24h cache first (isolated per user)
-  const cached = getCachedScore(candidateId, userId);
+  // Check 24h cache first (isolated per user + profile version)
+  const cached = getCachedScore(candidateId, userId, ownProfile);
   if (cached) return cached;
 
   // 1. Dealbreaker Hard Filters
@@ -498,13 +585,35 @@ export async function scoreCandidate(candidate, ownProfile, preferences = {}, op
       breakdown: [],
       tier: 'filter',
     };
-    setCachedScore(candidateId, result, userId);
+    setCachedScore(candidateId, result, userId, ownProfile);
     return result;
   }
 
   // 2. Local Deterministic Scorer
   const localResult = scoreCandidateLocal(candidate, ownProfile, preferences);
   const threshold = typeof preferences.aiMatchThreshold === 'number' ? preferences.aiMatchThreshold : 60;
+
+  // ── Confidence Gate ──
+  // A profile with near-zero information (confidence < 0.3) should NEVER be auto-liked
+  // regardless of how the adaptive normalization inflates its score. Without this gate,
+  // a completely blank profile scores 50 (completeness-only fallback) and would be liked
+  // at any threshold below 50. That's a real bug, not a feature.
+  const LOW_CONFIDENCE_THRESHOLD = 0.3;
+  if (localResult.confidence < LOW_CONFIDENCE_THRESHOLD) {
+    const result = {
+      score: localResult.score,
+      confidence: localResult.confidence,
+      label: 'Low Info',
+      breakdown: localResult.breakdown,
+      tier: 'local',
+      shouldLike: false,
+      passed: true,
+      reasons: [],
+      lowConfidence: true,
+    };
+    setCachedScore(candidateId, result, userId, ownProfile);
+    return result;
+  }
 
   let finalScore = localResult.score;
   let tier = 'local';
@@ -516,7 +625,7 @@ export async function scoreCandidate(candidate, ownProfile, preferences = {}, op
 
   if (canUseLLM) {
     const llmResult = await scoreCandidateLLM(candidate, ownProfile, options.apiConfig);
-    if (llmResult && Number.isFinite(llmResult.score)) {
+    if (llmResult && typeof llmResult.score === 'number') {
       // Bound LLM score to local ± 15
       const clampedLLM = Math.max(localResult.score - 15, Math.min(localResult.score + 15, llmResult.score));
       finalScore = Math.round(0.4 * localResult.score + 0.6 * clampedLLM);
@@ -539,6 +648,6 @@ export async function scoreCandidate(candidate, ownProfile, preferences = {}, op
     reasons: llmReasons,
   };
 
-  setCachedScore(candidateId, result, userId);
+  setCachedScore(candidateId, result, userId, ownProfile);
   return result;
 }

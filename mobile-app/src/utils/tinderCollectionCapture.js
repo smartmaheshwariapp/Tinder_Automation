@@ -38,19 +38,38 @@ export function createSwipeEventFromDomMessage(message, timestamp = Date.now(), 
       }))
     : [];
 
+  const isDealbreaker =
+    message?.matchLabel === 'Dealbreaker' ||
+    message?.matchLabel === 'Filtered Out' ||
+    (typeof message?.detail === 'string' && (
+      message.detail.includes('Dealbreaker') ||
+      message.detail.includes('outside preference') ||
+      message.detail.includes('outside target range')
+    ));
+
   if (matchScore == null) {
-    const scored = scoreCandidateLocal(candidateProfile, ownProfile, preferences);
-    matchScore = scored.score;
-    matchConfidence = scored.confidence;
-    matchLabel = scored.label;
-    matchBreakdown = scored.breakdown;
+    if (isDealbreaker) {
+      matchScore = 0;
+      matchConfidence = 1.0;
+      matchLabel = 'Dealbreaker';
+      matchBreakdown = [];
+    } else {
+      const scored = scoreCandidateLocal(candidateProfile, ownProfile, preferences);
+      matchScore = scored.score;
+      matchConfidence = scored.confidence;
+      matchLabel = scored.label;
+      matchBreakdown = scored.breakdown;
+    }
   }
+
+  const detail = typeof message?.detail === 'string' && message.detail.trim() ? message.detail.trim() : null;
 
   return {
     kind: 'swipe',
     action: message?.action === 'pass' ? 'pass' : 'like',
     timestamp,
     matched: Boolean(message?.matched),
+    detail,
     profile: {
       ...candidateProfile,
       matchScore,

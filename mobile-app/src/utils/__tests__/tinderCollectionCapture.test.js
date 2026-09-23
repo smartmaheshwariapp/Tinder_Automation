@@ -1,5 +1,5 @@
 import { createSwipeEventFromDomMessage } from '../tinderCollectionCapture';
-import { collectionLists, emptyCollections, mergeCollectionEvent, mergeProgressFeedSwipes, normalizeProfile } from '../tinderCollectionsModel';
+import { collectionLists, emptyCollections, getCommonGround, mergeCollectionEvent, mergeProgressFeedSwipes, normalizeProfile } from '../tinderCollectionsModel';
 
 describe('local Tinder collection bridge', () => {
   it('turns a confirmed swipe into a homepage row', () => {
@@ -258,6 +258,124 @@ describe('local Tinder collection bridge', () => {
     expect(enriched.swiped[0].profile.matchScore).toBeGreaterThan(0);
     expect(enriched.swiped[0].profile.matchBreakdown.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('strictly preserves dealbreaker score (0) and does not re-score dealbreaker candidates', () => {
+    const dealbreakerMsg = {
+      name: 'Victoria',
+      age: 52,
+      action: 'pass',
+      detail: 'Dealbreaker: Age outside preference',
+      matchScore: 0,
+      matchConfidence: 1.0,
+      matchLabel: 'Dealbreaker',
+      matchBreakdown: [],
+      photoUrl: 'https://images-ssl.gotinder.com/u/victoria/1.jpg',
+    };
+
+    const swipeEvent = createSwipeEventFromDomMessage(dealbreakerMsg, 4000);
+    expect(swipeEvent.profile.matchScore).toBe(0);
+    expect(swipeEvent.profile.matchLabel).toBe('Dealbreaker');
+    expect(swipeEvent.detail).toBe('Dealbreaker: Age outside preference');
+
+    const state = mergeCollectionEvent(emptyCollections('owner'), swipeEvent, 4000);
+    const enriched = collectionLists(state, {}, {});
+    const victoria = enriched.swiped.find(s => s.profile.name === 'Victoria');
+
+    expect(victoria).toBeDefined();
+    expect(victoria.action).toBe('pass');
+    expect(victoria.profile.matchScore).toBe(0);
+    expect(victoria.profile.matchLabel).toBe('Dealbreaker');
+    expect(victoria.detail).toBe('Dealbreaker: Age outside preference');
+  });
+
+  it('preserves detail field from DOM message through to collection swipe entries', () => {
+    const swipeMsg = {
+      name: 'Clara',
+      action: 'like',
+      detail: 'Matched: High compatibility & shared interests',
+      photoUrl: 'https://images-ssl.gotinder.com/u/clara/1.jpg',
+    };
+
+    const swipeEvent = createSwipeEventFromDomMessage(swipeMsg, 5000);
+    expect(swipeEvent.detail).toBe('Matched: High compatibility & shared interests');
+
+    const state = mergeCollectionEvent(emptyCollections('owner'), swipeEvent, 5000);
+    const lists = collectionLists(state, {}, {});
+    expect(lists.swiped[0].detail).toBe('Matched: High compatibility & shared interests');
+  });
+
+  it('keeps passed profiles free of artificial scores when aiMatchEnabled is false while enriching liked profiles', () => {
+    const likeEvent = createSwipeEventFromDomMessage({
+      name: 'Maya',
+      action: 'like',
+      detail: 'Liked profile',
+    }, 6000);
+    const passEvent = createSwipeEventFromDomMessage({
+      name: 'Jared',
+      action: 'pass',
+      detail: 'Passed profile',
+    }, 6001);
+
+    let state = emptyCollections('owner');
+    state = mergeCollectionEvent(state, likeEvent, 6000);
+    state = mergeCollectionEvent(state, passEvent, 6001);
+
+    // Smart Match is OFF
+    const lists = collectionLists(state, { interests: ['Art', 'Coffee'] }, { aiMatchEnabled: false, aiMatchShowScores: true });
+
+    const maya = lists.swiped.find(s => s.profile.name === 'Maya');
+    const jared = lists.swiped.find(s => s.profile.name === 'Jared');
+
+    // Liked profile MUST be enriched with compatibility score for user insights
+    expect(maya).toBeDefined();
+    expect(typeof maya.profile.matchScore).toBe('number');
+
+    // Passed profile when Smart Match is OFF MUST NOT have artificial compatibility scores
+    expect(jared).toBeDefined();
+    expect(jared.profile.matchScore).toBeNull();
+  });
+
+  it('extracts common ground, shared sparks, and tailored icebreaker hooks correctly', () => {
+    const own = {
+      name: 'Alex',
+      interests: ['Photography', 'Coffee', 'Hiking'],
+      lookingFor: 'Long-term',
+      descriptors: ['Dog lover', 'Social drinker'],
+      languages: ['English', 'Spanish'],
+    };
+
+    const candidate = {
+      name: 'Elena',
+      interests: ['Coffee', 'Photography', 'Painting'],
+      lookingFor: 'Long-term relationship',
+      descriptors: ['Dog lover', 'Non-smoker'],
+      languages: ['Spanish', 'French'],
+    };
+
+    const common = getCommonGround(candidate, own);
+
+    expect(common).toBeDefined();
+    expect(common.sharedInterests).toEqual(['Coffee', 'Photography']);
+    expect(common.matchingGoal).toBe(true);
+    expect(common.sharedDesc).toEqual(['Dog lover']);
+    expect(common.sharedLangs).toEqual(['Spanish']);
+    expect(common.chemistryTier).toBe('Electric Connection');
+    expect(common.totalSharedCount).toBe(5); // 2 interests + 1 goal + 1 desc + 1 lang
+    expect(common.icebreaker).toContain('Elena');
+    expect(common.icebreaker).toContain('Coffee');
+    expect(common.openers.primary).toBe(common.icebreaker);
+    expect(common.openers.fun).toContain('Elena');
+    expect(common.openers.deep).toContain('Elena');
+    expect(common.chemistryDetails.tier).toBe('Electric Connection');
+    expect(common.chemistryDetails.emoji).toBe('⚡');
+    expect(common.synergyPoints.length).toBeGreaterThanOrEqual(4);
+    expect(common.synergyPoints.some(p => p.id === 'intent')).toBe(true);
+    expect(common.synergyPoints.some(p => p.id === 'passions')).toBe(true);
+    expect(common.synergyPoints.some(p => p.id === 'lifestyle')).toBe(true);
+    expect(common.synergyPoints.some(p => p.id === 'languages')).toBe(true);
+  });
 });
+
+
 
 

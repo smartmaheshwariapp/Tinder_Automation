@@ -1348,6 +1348,29 @@ export const clearProgressFeed = async () => {
   notifyAgentListeners();
 };
 
+export const purgeProgressFeedSwipes = async ({ passedOnly = false, profileName = null, profileId = null } = {}) => {
+  const normName = profileName ? profileName.trim().toLowerCase() : null;
+  progressFeedEvents = progressFeedEvents.filter(ev => {
+    const isPass = ev.type === 'profile_passed';
+    const isLike = ev.type === 'profile_liked';
+    if (!isPass && !isLike) return true;
+    if (passedOnly && !isPass) return true;
+    if (profileId && (ev.id === profileId || ev.profileId === profileId)) return false;
+    if (normName && ev.name && ev.name.trim().toLowerCase() === normName) return false;
+    if (!profileId && !normName) return false;
+    return true;
+  });
+  sharedAgentState = {
+    ...sharedAgentState,
+    progressFeed: [...progressFeedEvents],
+  };
+  try {
+    const key = getScopedKey(STORAGE_KEY_PROGRESS_FEED, activeUserId);
+    await AsyncStorage.setItem(key, JSON.stringify(progressFeedEvents));
+  } catch (_) {}
+  notifyAgentListeners();
+};
+
 export const getSharedAgentState = () => sharedAgentState;
 
 export const updateSharedAgentState = (updater) => {
@@ -1431,6 +1454,7 @@ export const DEFAULT_SHARED_SETTINGS = {
   aiMatchStrictGoals: true,        // Hard filter on goal mismatch
   aiMatchMaxDistance: 0,           // 0 = no limit, else miles
   aiMatchShowScores: true,         // Show scores on dashboard cards
+  distanceFilter: { enabled: false, maxDistance: 50 }, // km radius filter
 };
 
 export const isAutoSwipeEnabled = (settings) => {
