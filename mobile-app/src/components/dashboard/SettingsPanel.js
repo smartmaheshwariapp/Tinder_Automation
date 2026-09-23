@@ -61,6 +61,14 @@ const BIO_MODES = [
 // Tab icons for the bio mode switcher (display only).
 const BIO_MODE_ICONS = { tinder: 'sync-outline', manual: 'create-outline', ai: 'sparkles-outline' };
 
+// Tinder plan → badge tone/label (single source of truth, mirrors HomeOverview).
+const PLAN_BADGES = {
+  platinum: { tone: 'platinum', label: 'Platinum ✦' },
+  gold:     { tone: 'gold',     label: 'Gold ✦' },
+  plus:     { tone: 'plus',     label: 'Plus ✦' },
+};
+const FREE_PLAN_BADGE = { tone: 'neutral', label: 'Free' };
+
 import {
   generateBioWithAI,
   generateSmartBioFallback,
@@ -132,6 +140,12 @@ export default function SettingsPanel({
       ? propIsLoggedIn
       : (stats?.tinderAccount?.isLoggedIn ?? tinderAuth?.isLoggedIn ?? false)
   );
+
+  // Derive Tinder plan badge from the same source as HomeOverview.
+  const tinderPlanKey = settings?.userProfile?.tinderPlan || settings?.tinderPlan;
+  const planBadge = (isTinderLoggedIn && tinderPlanKey && PLAN_BADGES[tinderPlanKey])
+    ? PLAN_BADGES[tinderPlanKey]
+    : (isTinderLoggedIn ? FREE_PLAN_BADGE : null);
 
   const reducedMotion = useMotionReduced();
   const { width: windowWidth } = useWindowDimensions();
@@ -1556,8 +1570,8 @@ export default function SettingsPanel({
                     {accountName}
                   </Text>
                   <Badge
-                    label={isTinderLoggedIn ? 'PRO PLAN ✦' : 'NOT CONNECTED'}
-                    tone={isTinderLoggedIn ? 'primary' : 'neutral'}
+                    label={isTinderLoggedIn ? (planBadge?.label || 'Free') : 'NOT CONNECTED'}
+                    tone={isTinderLoggedIn ? (planBadge?.tone || 'neutral') : 'neutral'}
                     size="sm"
                   />
                 </View>
@@ -1592,8 +1606,8 @@ export default function SettingsPanel({
           </Card>
         </FadeIn>
 
-        {/* ════════════════════ CATEGORY 4: DIRECT KEYPAD ════════════════════ */}
-        {rawControlsContent && (
+        {/* ════════════════════ CATEGORY 4: DIRECT KEYPAD (Hidden — internal dev tool, not user-facing) ════════════════════ */}
+        {false && rawControlsContent && (
           <FadeIn delay={250}>
             <SectionHeader title="Virtual container controls" description="Manual OTP and keypad input." style={styles.sectionHeader} />
             <Card padding="none" style={styles.groupCard}>
