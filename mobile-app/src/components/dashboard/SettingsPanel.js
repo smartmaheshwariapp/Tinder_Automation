@@ -48,7 +48,7 @@ import { REGION_FILTERS, CITY_PRESETS } from '../../utils/locationHubs';
 import LocationService from '../../services/locationService';
 import LocationNoticeModal from '../common/LocationNoticeModal';
 import { getRateLimitStatus, subscribeRateLimit, resetRateLimits } from '../../utils/rateLimiter';
-import { saveOnDeviceSessionState } from '../../utils/sessionManager';
+import { saveOnDeviceSessionState, pushTinderBioDirect } from '../../utils/sessionManager';
 // ─── Feature Flags (Hidden in On-Device mode for clean UX, preserved for future cloud mode) ───
 const SHOW_LOCATION_FEATURE = false;
 
@@ -257,16 +257,29 @@ export default function SettingsPanel({
 
   // ─── Auto-Save Debounce & Lifecycle Persistence ───
   const autoSaveDebounceTimer = useRef(null);
-
   const hasInitializedBioMode = useRef(false);
+  const lastSettingsStrRef = useRef('');
+  const bioModeRef = useRef(bioMode);
+  bioModeRef.current = bioMode;
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
 
   useEffect(() => {
     if (settings) {
-      const cloned = JSON.parse(JSON.stringify(settings));
+      const settingsStr = JSON.stringify(settings);
+      // Skip if settings haven't changed from what is already loaded
+      if (settingsStr === lastSettingsStrRef.current) return;
+      lastSettingsStrRef.current = settingsStr;
+
+      // Do not overwrite user's actively typing input
+      if (autoSaveDebounceTimer.current) return;
+
+      const cloned = JSON.parse(settingsStr);
       setForm(cloned);
       formRef.current = cloned;
       if (!hasInitializedBioMode.current && settings.aboutSource) {
         setBioMode(settings.aboutSource);
+        bioModeRef.current = settings.aboutSource;
         hasInitializedBioMode.current = true;
       }
       if (settings.userProfile) {
@@ -276,34 +289,48 @@ export default function SettingsPanel({
   }, [settings]);
 
   const handleSavePress = useCallback((overrideForm) => {
-    const targetForm = overrideForm || formRef.current || form;
-    if (onSave && targetForm) {
-      onSave({
+    const targetForm = overrideForm || formRef.current;
+    if (onSaveRef.current && targetForm) {
+      const currentBioMode = bioModeRef.current;
+      const effectiveForm = {
         ...targetForm,
-        aboutSource: bioMode,
-      });
+        aboutSource: currentBioMode,
+      };
+      if (currentBioMode === 'manual' && targetForm.manualBio !== undefined) {
+        effectiveForm.userProfile = {
+          ...(targetForm.userProfile || {}),
+          bio: targetForm.manualBio,
+        };
+      }
+      onSaveRef.current(effectiveForm);
     }
-  }, [onSave, form, bioMode]);
+  }, []);
 
+  const handleSavePressRef = useRef(handleSavePress);
+  handleSavePressRef.current = handleSavePress;
+
+  // Flush pending auto-save on UNMOUNT only (empty dependency array prevents render cascades)
   useEffect(() => {
     return () => {
       if (autoSaveDebounceTimer.current) {
         clearTimeout(autoSaveDebounceTimer.current);
+        autoSaveDebounceTimer.current = null;
         if (formRef.current) {
-          handleSavePress(formRef.current);
+          handleSavePressRef.current?.(formRef.current);
         }
       }
     };
-  }, [handleSavePress]);
+  }, []);
 
   const updateField = (path, value) => {
     let nextState = null;
     setForm(prev => {
-      const next = { ...prev };
+      const base = prev || formRef.current || {};
+      const next = JSON.parse(JSON.stringify(base));
       const keys = path.split('.');
       let current = next;
       for (let i = 0; i < keys.length - 1; i++) {
-        if (!current[keys[i]]) current[keys[i]] = {};
+        if (!current[keys[i]] || typeof current[keys[i]] !== 'object') current[keys[i]] = {};
         current = current[keys[i]];
       }
       current[keys[keys.length - 1]] = value;
@@ -314,13 +341,20 @@ export default function SettingsPanel({
 
     const isTextTyping = path === 'manualBio';
     if (isTextTyping) {
-      if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+      if (autoSaveDebounceTimer.current) {
+        clearTimeout(autoSaveDebounceTimer.current);
+        autoSaveDebounceTimer.current = null;
+      }
       autoSaveDebounceTimer.current = setTimeout(() => {
-        handleSavePress(nextState);
+        autoSaveDebounceTimer.current = null;
+        handleSavePress(formRef.current || nextState);
       }, 600);
     } else {
-      if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
-      handleSavePress(nextState);
+      if (autoSaveDebounceTimer.current) {
+        clearTimeout(autoSaveDebounceTimer.current);
+        autoSaveDebounceTimer.current = null;
+      }
+      handleSavePress(formRef.current || nextState);
     }
   };
 
@@ -329,7 +363,7 @@ export default function SettingsPanel({
     let nextState = null;
     setForm(prev => {
       const next = {
-        ...prev,
+        ...(prev || formRef.current || {}),
         useDeviceLocation: true,
         locationCity: res.cityName,
         locationLatitude: res.latitude,
@@ -339,7 +373,10 @@ export default function SettingsPanel({
       formRef.current = next;
       return next;
     });
-    if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+    if (autoSaveDebounceTimer.current) {
+      clearTimeout(autoSaveDebounceTimer.current);
+      autoSaveDebounceTimer.current = null;
+    }
     handleSavePress(nextState);
   }, [handleSavePress]);
 
@@ -422,7 +459,10 @@ export default function SettingsPanel({
       formRef.current = next;
       return next;
     });
-    if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+    if (autoSaveDebounceTimer.current) {
+      clearTimeout(autoSaveDebounceTimer.current);
+      autoSaveDebounceTimer.current = null;
+    }
     handleSavePress(nextState);
   }, [handleSavePress]);
 
@@ -517,7 +557,10 @@ export default function SettingsPanel({
       setSyncSuccess(true);
       setSyncError(null);
       setLastSyncTime('just now');
-      if (autoSaveDebounceTimer.current) clearTimeout(autoSaveDebounceTimer.current);
+      if (autoSaveDebounceTimer.current) {
+        clearTimeout(autoSaveDebounceTimer.current);
+        autoSaveDebounceTimer.current = null;
+      }
       handleSavePress(nextState);
       setTimeout(() => setSyncSuccess(false), 4000);
     } else {
@@ -554,9 +597,11 @@ export default function SettingsPanel({
   const handlePushBio = async (specificBio) => {
     setPushing(true);
     setPushError(null);
-    const bioText = (typeof specificBio === 'string' && specificBio) ? specificBio : (generatedBioData?.text || form?.manualBio);
+    const bioText = (typeof specificBio === 'string' && specificBio)
+      ? specificBio
+      : (bioMode === 'manual' ? form?.manualBio : (generatedBioData?.text || form?.manualBio));
 
-    if (!bioText) {
+    if (!bioText || !bioText.trim()) {
       setPushError('No bio text to push.');
       setPushing(false);
       return;
@@ -565,12 +610,28 @@ export default function SettingsPanel({
     const applyPushSuccess = () => {
       const activeMode = bioMode || 'ai';
       setForm(prev => {
-        const next = { ...prev, manualBio: bioText, aboutSource: activeMode };
+        const next = {
+          ...prev,
+          manualBio: bioText,
+          aboutSource: activeMode,
+          userProfile: {
+            ...(prev?.userProfile || {}),
+            bio: bioText,
+          },
+        };
         formRef.current = next;
         return next;
       });
       if (onSave) {
-        onSave({ ...(formRef.current || form), manualBio: bioText, aboutSource: activeMode });
+        onSave({
+          ...(formRef.current || form),
+          manualBio: bioText,
+          aboutSource: activeMode,
+          userProfile: {
+            ...(formRef.current?.userProfile || form?.userProfile || {}),
+            bio: bioText,
+          },
+        });
       }
       setPushSuccess(true);
       setPushing(false);
@@ -584,27 +645,45 @@ export default function SettingsPanel({
         if (res && res.success) {
           applyPushSuccess();
           return;
-        } else {
-          setPushError(res?.error || 'Failed to push bio to Tinder.');
+        } else if (res?.error) {
+          setPushError(res.error);
           setPushing(false);
           return;
         }
       } catch (err) {
-        setPushError(err.message || 'On-device push bio failed.');
-        setPushing(false);
-        return;
+        console.warn('[SettingsPanel] onPushBio bridge error:', err?.message);
       }
     }
 
-    // 2. Second priority: Backend orchestrator POST /push-bio
-    const effectiveOrchUrl = orchestratorUrl || resolveLocalUrl('http://localhost:3001');
-    if (effectiveOrchUrl) {
+    // 2. Direct on-device Tinder API push using active Tinder auth token
+    try {
+      const directRes = await pushTinderBioDirect(bioText);
+      if (directRes && directRes.success) {
+        applyPushSuccess();
+        return;
+      }
+      if (directRes?.error) {
+        setPushError(directRes.error);
+        setPushing(false);
+        return;
+      }
+    } catch (directErr) {
+      console.warn('[SettingsPanel] pushTinderBioDirect error:', directErr?.message);
+    }
+
+    // 3. Fallback: Backend orchestrator POST /push-bio (only for remote/VPS environments, not dead localhost)
+    const isLocalhost = !orchestratorUrl || orchestratorUrl.includes('localhost') || orchestratorUrl.includes('127.0.0.1');
+    if (!isLocalhost) {
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
       try {
-        const res = await fetch(`${effectiveOrchUrl}/push-bio`, {
+        const res = await fetch(`${orchestratorUrl}/push-bio`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ platform: 'tinder', bio: bioText }),
+          signal: controller ? controller.signal : undefined,
         });
+        if (timeoutId) clearTimeout(timeoutId);
         const data = await res.json();
         if (data && data.success) {
           applyPushSuccess();
@@ -615,13 +694,11 @@ export default function SettingsPanel({
           return;
         }
       } catch (e) {
-        setPushError(e.message || 'Push request failed. Please ensure you are logged into Tinder.');
-        setPushing(false);
-        return;
+        if (timeoutId) clearTimeout(timeoutId);
       }
     }
 
-    setPushError('Tinder session is not connected. Please log in to Tinder first.');
+    setPushError('Tinder session is not connected. Please connect to Tinder in Browser to sync.');
     setPushing(false);
   };
 
@@ -1363,6 +1440,8 @@ export default function SettingsPanel({
                       onPress={() => {
                         animateLayout();
                         setBioMode(bm.id);
+                        bioModeRef.current = bm.id;
+                        updateField('aboutSource', bm.id);
                         if (bioCollapsed) setBioCollapsed(false);
                       }}
                     >
@@ -1437,7 +1516,7 @@ export default function SettingsPanel({
                         multiline={true}
                         placeholder="Enter your text here"
                         accessibilityLabel="Custom bio"
-                        value={form.manualBio || ''}
+                        value={form?.manualBio || ''}
                         onChangeText={v => updateField('manualBio', v)}
                       />
                       <View style={styles.customBioFooter}>
@@ -1445,9 +1524,42 @@ export default function SettingsPanel({
                           AI only uses this description
                         </Text>
                         <Text style={styles.charCountText}>
-                          {(form.manualBio || '').length} chars
+                          {(form?.manualBio || '').length} chars
                         </Text>
                       </View>
+
+                      {pushError && (
+                        <View style={styles.syncErrorCard}>
+                          <Ionicons name="alert-circle" size={16} color={uiTheme.colors.error} />
+                          <Text style={styles.syncErrorText}>{pushError}</Text>
+                        </View>
+                      )}
+
+                      <AppButton
+                        title={pushSuccess ? '✓ Pushed to Tinder' : 'Push Bio to Tinder'}
+                        icon={pushSuccess ? undefined : 'arrow-down-circle-outline'}
+                        variant={pushSuccess ? 'secondary' : 'primary'}
+                        style={pushSuccess ? styles.pushSuccessBtn : undefined}
+                        textStyle={pushSuccess ? styles.pushSuccessText : undefined}
+                        loading={pushing}
+                        disabled={!form?.manualBio || !form.manualBio.trim()}
+                        onPress={() => handlePushBio(form?.manualBio)}
+                      />
+
+                      <MotionTouchable accessibilityRole="button"
+                        accessibilityLabel="How AI Sees You"
+                        pressScale={0.985}
+                        activeOpacity={0.75}
+                        style={styles.insetRow}
+                        onPress={() => setPreviewVisible(true)}
+                      >
+                        <IconWell icon="eye-outline" tone="primary" size={32} />
+                        <View style={styles.rowCopy}>
+                          <AppText variant="bodyStrong" numberOfLines={1}>How AI Sees You</AppText>
+                          <AppText variant="footnote" numberOfLines={2} style={styles.rowHelper}>Preview the profile context it writes from</AppText>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color={c.muted} />
+                      </MotionTouchable>
                     </View>
                   )}
 
@@ -1656,10 +1768,14 @@ export default function SettingsPanel({
         maxHeightRatio={0.88}
       >
         <TinderProfileCard
-          profile={form?.userProfile}
+          profile={
+            bioMode === 'manual' && form?.manualBio !== undefined
+              ? { ...(form?.userProfile || {}), bio: form.manualBio }
+              : form?.userProfile
+          }
           settings={form}
           stats={stats}
-          isLoggedIn={Boolean(form?.userProfile?.name || form?.userProfile?.bio)}
+          isLoggedIn={Boolean(form?.userProfile?.name || form?.userProfile?.bio || form?.manualBio)}
           syncing={syncing}
           onSync={handleSyncNow}
           compact
