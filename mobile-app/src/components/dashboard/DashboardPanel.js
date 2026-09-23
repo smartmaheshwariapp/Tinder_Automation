@@ -168,6 +168,8 @@ export default function DashboardPanel({
   const [localSettings, setLocalSettings] = useState(null);
 
   const effectiveSettings = localSettings || propSettings || v2Settings || liveSettings;
+  const effectiveSettingsRef = useRef(effectiveSettings);
+  effectiveSettingsRef.current = effectiveSettings;
 
   const handleSave = useCallback(async (updated) => {
     if (onSaveSettings) {
@@ -176,7 +178,7 @@ export default function DashboardPanel({
       try {
         const success = await onSaveSettings(updated);
         if (success !== false) {
-          setLocalSettings(prev => ({ ...(prev || effectiveSettings || {}), ...updated }));
+          setLocalSettings(prev => ({ ...(prev || effectiveSettingsRef.current || {}), ...updated }));
           setLocalSaveSuccess(true);
           setTimeout(() => setLocalSaveSuccess(false), 2000);
           return true;
@@ -193,7 +195,7 @@ export default function DashboardPanel({
       }
     }
     return await handleSaveV2Settings(updated);
-  }, [onSaveSettings, effectiveSettings, handleSaveV2Settings]);
+  }, [onSaveSettings, handleSaveV2Settings]);
 
   return (
     <View style={styles.panel}>

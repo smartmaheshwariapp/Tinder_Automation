@@ -1192,8 +1192,11 @@ export class OnDeviceBackgroundWorker {
       }
 
       // Add user context (sender's profile if available)
-      if (settings.userProfile && (settings.userProfile.bio || settings.userProfile.name)) {
-        historyText += `\n### YOUR PROFILE (SENDER) ###\nName: ${settings.userProfile.name || ''}\nBio: ${settings.userProfile.bio || ''}\n`;
+      const senderBio = (settings.aboutSource === 'manual' || !settings.userProfile?.bio)
+        ? (settings.manualBio || settings.userProfile?.bio || '')
+        : (settings.userProfile?.bio || settings.manualBio || '');
+      if ((settings.userProfile && settings.userProfile.name) || senderBio) {
+        historyText += `\n### YOUR PROFILE (SENDER) ###\nName: ${settings.userProfile?.name || ''}\nBio: ${senderBio}\n`;
       }
 
       historyText += `\nRespond naturally to ${_displayName}'s last message. Keep it conversational and human-like. Write ONLY your response text - do NOT include any name prefixes or "You:" in your response.`;
@@ -1232,8 +1235,11 @@ export class OnDeviceBackgroundWorker {
     }
 
     // Add user context
-    if (settings.userProfile && (settings.userProfile.bio || settings.userProfile.name)) {
-      profileText += `\n### YOUR PROFILE (SENDER) ###\nNAME: ${settings.userProfile.name || ''}\nBIO: ${settings.userProfile.bio || ''}\n`;
+    const senderBio = (settings.aboutSource === 'manual' || !settings.userProfile?.bio)
+      ? (settings.manualBio || settings.userProfile?.bio || '')
+      : (settings.userProfile?.bio || settings.manualBio || '');
+    if ((settings.userProfile && settings.userProfile.name) || senderBio) {
+      profileText += `\n### YOUR PROFILE (SENDER) ###\nNAME: ${settings.userProfile?.name || ''}\nBIO: ${senderBio}\n`;
     }
 
     if (_suppressName) {

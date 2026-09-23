@@ -48,6 +48,7 @@ import {
   getPendingWebViewPurge,
   setPendingWebViewPurge,
   probeTinderSession,
+  pushTinderBioDirect,
   parseTinderUserProfile,
   saveOnDeviceSessionState,
   pushProgressFeedEvent,
@@ -524,6 +525,35 @@ export default function PlatformSelectScreen({ navigation, route }) {
       error: "Could not sync profile. Please open the Tinder browser session.",
     };
   }, [handleSaveSettings]);
+
+  const handlePushBioFromHome = useCallback(async (newBio) => {
+    let auth = getTinderAuthState();
+    if (!auth?.token) {
+      try {
+        auth = await ensureTinderAuthHydrated();
+      } catch (_) {}
+    }
+
+    if (!auth?.token) {
+      return {
+        success: false,
+        error: "Please connect your Tinder account first.",
+      };
+    }
+
+    const res = await pushTinderBioDirect(newBio, auth.token);
+    if (res?.success) {
+      await handleSaveSettings({
+        manualBio: newBio,
+        userProfile: {
+          ...(localSettings?.userProfile || {}),
+          bio: newBio,
+        },
+      });
+      return { success: true };
+    }
+    return res;
+  }, [handleSaveSettings, localSettings]);
 
   // ── Notification Center State ──
   const [showNotifModal, setShowNotifModal] = useState(false);
@@ -1482,6 +1512,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                   ? handleSyncProfileFromHome
                   : undefined
               }
+              onPushBio={handlePushBioFromHome}
               controlsContent={
                 <View style={homeStyles.extraActions}>
                   {environment === "on_device" && (

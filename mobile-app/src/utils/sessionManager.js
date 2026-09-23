@@ -1513,6 +1513,97 @@ export const subscribeSharedExtensionSettings = (listener) => {
   return () => settingsListeners.delete(listener);
 };
 
+/**
+ * Direct Tinder Bio Push (Native on-device API)
+ * Pushes updated bio text directly to Tinder via official Tinder web API endpoints with active token.
+ */
+export const pushTinderBioDirect = async (bioText, tokenToUse) => {
+  if (typeof bioText !== 'string' || !bioText.trim()) {
+    return { success: false, error: 'No bio text provided to push.' };
+  }
+
+  let token = tokenToUse || tinderAuthState?.token;
+  if (!token) {
+    try {
+      const hydrated = await ensureTinderAuthHydrated();
+      token = hydrated?.token;
+    } catch (_) {}
+  }
+
+  if (!token) {
+    return { success: false, error: 'Please connect your Tinder account first to update your bio.' };
+  }
+
+  const cleanToken = String(token).replace(/^["'](.*)["']$/, '$1').trim();
+  const trimmedBio = bioText.trim();
+
+  const payloads = [
+    { url: 'https://api.gotinder.com/v2/profile?locale=en', body: JSON.stringify({ user: { bio: trimmedBio } }) },
+    { url: 'https://api.gotinder.com/v2/profile?locale=en', body: JSON.stringify({ bio: trimmedBio }) },
+    { url: 'https://api.gotinder.com/v2/profile', body: JSON.stringify({ user: { bio: trimmedBio } }) },
+    { url: 'https://api.gotinder.com/v2/profile', body: JSON.stringify({ bio: trimmedBio }) },
+    { url: 'https://api.gotinder.com/profile', body: JSON.stringify({ bio: trimmedBio }) },
+  ];
+
+  let lastStatus = 0;
+  let lastErrorMsg = '';
+
+  for (const p of payloads) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 10000) : null;
+
+    try {
+      const res = await fetch(p.url, {
+        method: 'POST',
+        headers: {
+          'x-auth-token': cleanToken,
+          'platform': 'web',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: p.body,
+        signal: controller ? controller.signal : undefined,
+      });
+
+      if (timeoutId) clearTimeout(timeoutId);
+      lastStatus = res.status;
+
+      if (res.ok || res.status === 200) {
+        // Update local shared state
+        setSharedExtensionSettings({
+          manualBio: trimmedBio,
+          userProfile: {
+            ...(sharedExtensionSettings?.userProfile || {}),
+            bio: trimmedBio,
+          },
+        });
+        return { success: true };
+      }
+
+      if (res.status === 401 || res.status === 403) {
+        return { success: false, error: 'Your Tinder session has expired. Please log in to Tinder again.' };
+      }
+
+      try {
+        const errText = await res.text();
+        if (errText) lastErrorMsg = errText.slice(0, 100);
+      } catch (_) {}
+    } catch (err) {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        lastErrorMsg = 'Connection timed out. Please check your internet and Tinder connection.';
+      } else {
+        lastErrorMsg = err.message || '';
+      }
+    }
+  }
+
+  return {
+    success: false,
+    error: lastErrorMsg || (lastStatus ? `Tinder returned status ${lastStatus}` : 'Could not push bio to Tinder. Please ensure your Tinder session is connected.'),
+  };
+};
+
 // ── Shared Selected Environment (Defaults to 'on_device') ──
 let currentEnvironment = 'on_device';
 
