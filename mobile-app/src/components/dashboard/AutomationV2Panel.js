@@ -1653,14 +1653,14 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
   const isAutoMessagingOn = form?.autoMessage !== false && (form?.messagesPerCycle ?? 50) > 0;
 
   const getSwipingSummary = () => {
-    const likes = !isAutoSwipeOn ? 'Auto Swipe Off' : (isSafetyOn ? 'Auto Swipe (Safe)' : 'Auto Swipe On');
-    const pacing = (form?.scheduleInterval === 120) ? 'Every 2 Hours' : ((form?.scheduleInterval === 60) ? 'Every Hour' : 'Every 30 min');
+    const likes = !isAutoSwipeOn ? 'Auto-swipe off' : (isSafetyOn ? 'Auto-swipe (safe)' : 'Auto-swipe on');
+    const pacing = (form?.scheduleInterval === 120) ? 'Every 2 hours' : ((form?.scheduleInterval === 60) ? 'Every hour' : 'Every 30 min');
     const age = form?.ageFilter?.enabled ? `Age: ${form?.ageFilter?.min ?? 20}-${form?.ageFilter?.max ?? 35}` : 'Age: All';
     return { likes, pacing, age };
   };
 
   const getMessagingSummary = () => {
-    const messaging = !isAutoMessagingOn ? 'Messaging Off' : (isSafetyOn ? 'Auto Messaging (Safe)' : 'Auto Messaging On');
+    const messaging = !isAutoMessagingOn ? 'Messaging off' : (isSafetyOn ? 'Auto-messaging (safe)' : 'Auto-messaging on');
     const toneVal = form?.tone || form?.chattingStyle || 'Freestyle';
     const tone = `${toneVal.charAt(0).toUpperCase() + toneVal.slice(1)}`;
     const intentionObj = INTENTIONS_OPTIONS.find(i => i.id === form?.intentions) || { label: 'Short term dating' };
@@ -1669,7 +1669,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
     const lang = `${langObj.flag} ${langObj.label}`;
     const priorityVal = form?.prioritySlider ?? form?.minReplySlots ?? 50;
     const priority = priorityVal === 30 ? '70 : 30' : (priorityVal === 70 ? '30 : 70' : '50 : 50');
-    const emojis = form?.useEmojis !== false ? 'Emojis On' : 'No Emojis';
+    const emojis = form?.useEmojis !== false ? 'Emojis on' : 'No emojis';
     const consecutive = form?.consecutiveMessagesEnabled ? 'Multi-text' : null;
     return { messaging, tone, intention, lang, priority, emojis, consecutive };
   };
@@ -2044,13 +2044,11 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
 
           return (
             <FadeIn delay={460} style={styles.pageSection}>
-              <SectionHeader
-                title="AI Smart Compatibility"
-                description="Use AI to score and make smarter swipe decisions based on your preferences and profile data."
-              />
+              {/* Self-contained card, like Swiping and Messaging: the explanation lives on
+                  the row itself rather than as a separate heading and paragraph above it. */}
               <Card padding="none" style={styles.groupCard}>
-                {/* Master Toggle Row (Screen 1 & 8) */}
-                <View style={[styles.settingRow, { marginTop: 4, paddingVertical: 14 }]}>
+                {/* Same header metrics as the Swiping and Messaging cards. */}
+                <View style={styles.settingRow}>
                   <IconWell
                     icon="sparkles"
                     tone={isSmartMatchOn ? "primary" : "neutral"}
@@ -2071,8 +2069,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       {isSmartMatchOn
                         ? (isProfileValid
                             ? `Auto-likes profiles with ${currentThreshold}%+ compatibility`
-                            : 'Smart Match is ON · Connect your profile to start matching')
-                        : 'Score and filter candidates automatically (OFF)'}
+                            : 'Connect your profile to start matching')
+                        : 'Scores each profile against your preferences before swiping'}
                     </AppText>
                   </View>
                   <Switch
@@ -2105,9 +2103,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       marginBottom: 14,
                       padding: 12,
                       borderRadius: r.lg,
-                      backgroundColor: alpha('#F59E0B', 0.08),
+                      backgroundColor: alpha(uiTheme.colors.warning, 0.08),
                       borderWidth: 1,
-                      borderColor: alpha('#F59E0B', 0.25),
+                      borderColor: alpha(uiTheme.colors.warning, 0.25),
                       gap: 8,
                     }}
                   >
@@ -2115,12 +2113,12 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                       <Ionicons
                         name={!isProfileSynced ? "alert-circle" : "time-outline"}
                         size={18}
-                        color="#F59E0B"
+                        color={uiTheme.colors.warning}
                         style={{ marginTop: 1 }}
                       />
                       <View style={{ flex: 1 }}>
-                        <AppText variant="subhead" style={{ color: '#F59E0B', fontWeight: '600' }}>
-                          {!isProfileSynced ? 'Connect Tinder Profile' : 'Profile Sync Expired'}
+                        <AppText variant="subhead" style={{ color: uiTheme.colors.warning, fontWeight: '600' }}>
+                          {!isProfileSynced ? 'Connect Tinder profile' : 'Profile sync expired'}
                         </AppText>
                         <AppText variant="caption" style={{ color: alpha(uiTheme.colors.text, 0.75), marginTop: 2, lineHeight: 16 }}>
                           {!isProfileSynced
@@ -2149,13 +2147,13 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                         paddingVertical: 6,
                         paddingHorizontal: 12,
                         borderRadius: r.sm,
-                        backgroundColor: alpha('#F59E0B', 0.15),
+                        backgroundColor: alpha(uiTheme.colors.warning, 0.15),
                         marginTop: 2,
                       }}
                     >
-                      <Ionicons name="sync" size={13} color="#F59E0B" />
-                      <AppText variant="caption" style={{ color: '#F59E0B', fontWeight: '700' }}>
-                        {!isProfileSynced ? 'Connect Profile Now' : 'Refresh Profile Now'}
+                      <Ionicons name="sync" size={13} color={uiTheme.colors.warning} />
+                      <AppText variant="caption" style={{ color: uiTheme.colors.warning, fontWeight: '700' }}>
+                        {!isProfileSynced ? 'Connect profile' : 'Refresh profile'}
                       </AppText>
                     </TouchableOpacity>
                   </View>
@@ -2167,9 +2165,9 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     {/* Minimum Compatibility Threshold */}
                     <View style={{ marginBottom: 18 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <AppText variant="bodyStrong">Minimum Match Score</AppText>
+                        <AppText variant="bodyStrong">Minimum match score</AppText>
                         <View style={styles.v2ValueBadge}>
-                          <Text style={styles.v2ValueBadgeText}>{currentThreshold}% &gt;</Text>
+                          <Text style={styles.v2ValueBadgeText}>{currentThreshold}%</Text>
                         </View>
                       </View>
                       <RangeSlider
@@ -2191,13 +2189,13 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                     {/* Strict Goal Filter */}
                     <View style={[styles.rowBetween, { paddingVertical: 12, borderTopWidth: 1, borderColor: uiTheme.colors.border }]}>
                       <View style={{ flex: 1, paddingRight: 12 }}>
-                        <AppText variant="bodyStrong">Strict Goal Filter</AppText>
+                        <AppText variant="bodyStrong">Strict goal filter</AppText>
                         <AppText variant="footnote" color="textSecondary" style={{ marginTop: 2 }}>
                           Pass anyone whose dating goals clash with yours.
                         </AppText>
                       </View>
                       <Switch
-                        accessibilityLabel="Strict Goal Filter"
+                        accessibilityLabel="Strict goal filter"
                         value={form?.aiMatchStrictGoals !== false}
                         onValueChange={v => {
                           updateField('aiMatchStrictGoals', v);
@@ -2368,7 +2366,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
           >
             <View style={styles.cardTitleWrap}>
               <IconWell icon="flag-outline" tone="primary" size={36} />
-              <Text style={styles.v2CardTitle} numberOfLines={2} accessibilityRole="header">Your Dating Goal</Text>
+              <Text style={styles.v2CardTitle} numberOfLines={2} accessibilityRole="header">Your dating goal</Text>
             </View>
             <Ionicons
               name={openCards.goal ? "chevron-up" : "chevron-down"}
@@ -2702,7 +2700,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             activeOpacity={0.85}
           >
             <View style={styles.cardTitleWrap}>
-              <Ionicons name="heart-outline" size={17} color={uiTheme.colors.primary} />
+              <IconWell icon="heart" tone="primary" size={36} iconSize={17} />
               <Text style={styles.v2CardTitle}>Swiping</Text>
             </View>
             <Ionicons
@@ -2786,8 +2784,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
                   disabled={isSafetyOn}
                   options={[
                     { value: 30, label: 'Every 30 min', desc: 'Active cadence (Safe limit)' },
-                    { value: 60, label: 'Every Hour', desc: 'Balanced background pacing' },
-                    { value: 120, label: 'Every 2 Hours', desc: 'Relaxed slow pacing' },
+                    { value: 60, label: 'Every hour', desc: 'Balanced background pacing' },
+                    { value: 120, label: 'Every 2 hours', desc: 'Relaxed slow pacing' },
                   ]}
                   selectedValue={form.scheduleInterval ?? 30}
                   onSelect={val => updateField('scheduleInterval', val)}
@@ -3043,7 +3041,7 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             activeOpacity={0.85}
           >
             <View style={styles.cardTitleWrap}>
-              <Ionicons name="chatbubbles-outline" size={17} color={uiTheme.colors.accent} />
+              <IconWell icon="chatbubbles" tone="secondary" size={36} iconSize={17} />
               <Text style={styles.v2CardTitle}>Messaging</Text>
             </View>
             <Ionicons
@@ -3283,8 +3281,8 @@ NEVER mention you are an AI or a simulation. Sound like a real attractive person
             activeOpacity={0.85}
           >
             <View style={styles.cardTitleWrap}>
-              <Ionicons name="sparkles-outline" size={17} color={uiTheme.colors.info} />
-              <Text style={styles.v2CardTitle}>Your Chat Style</Text>
+              <IconWell icon="sparkles" tone="info" size={36} iconSize={17} />
+              <Text style={styles.v2CardTitle}>Your chat style</Text>
             </View>
             <Ionicons
               name={openCards.style ? "chevron-up" : "chevron-down"}
@@ -4472,10 +4470,14 @@ const styles = createStyles(() => ({
   },
 
   // ─── Collapsed Summary Chips ───
+  // Chips wrap so every summary stays visible; a tighter row gap keeps the
+  // second line reading as part of the same group.
   collapsedRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     flexWrap: 'wrap',
-    gap: sp.sm,
+    columnGap: sp.sm,
+    rowGap: sp.sm - 2,
     paddingHorizontal: sp.lg,
     paddingBottom: sp.lg,
   },

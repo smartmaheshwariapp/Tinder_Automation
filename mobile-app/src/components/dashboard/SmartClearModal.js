@@ -133,10 +133,10 @@ export default function SmartClearModal({
             </View>
           </View>
           <Text style={styles.title} accessibilityRole="header" maxFontSizeMultiplier={theme.fontScale.chrome}>
-            Clear Swiped History
+            Clear swiped history
           </Text>
           <Text style={styles.message} maxFontSizeMultiplier={theme.fontScale.body}>
-            Choose what to clear from this device. High-value liked profiles can be kept intact.
+            Choose what to remove from this device. You can keep your likes.
           </Text>
         </View>
 
@@ -146,61 +146,67 @@ export default function SmartClearModal({
           <TouchableOpacity
             style={[
               styles.optionCard,
-              !hasPassed && styles.optionCardDisabled,
+              (!hasPassed || busy) && styles.optionCardDisabled,
             ]}
             onPress={hasPassed && !busy ? onClearPassed : undefined}
             activeOpacity={0.75}
             accessibilityRole="button"
-            accessibilityLabel="Clear passed profiles only"
+            accessibilityLabel={hasPassed
+              ? `Clear ${passedCount} passed ${passedCount === 1 ? 'profile' : 'profiles'}, keeping ${likedCount} liked`
+              : 'Clear passed profiles. None to clear'}
             disabled={!hasPassed || busy}
           >
             <View style={styles.optionHeader}>
               <View style={[styles.optionIconWell, { backgroundColor: alpha('#10B981', 0.14) }]}>
-                <Ionicons name="sparkles" size={18} color="#10B981" />
+                <Ionicons name="close-circle-outline" size={18} color="#10B981" />
               </View>
               <View style={styles.optionCopy}>
                 <View style={styles.optionTitleRow}>
-                  <Text style={styles.optionTitle} maxFontSizeMultiplier={theme.fontScale.chrome}>
-                    Clear Passed Only
+                  <Text style={styles.optionTitle} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                    Clear passed only
                   </Text>
-                  {hasPassed ? (
-                    <Badge label="RECOMMENDED" tone="success" size="sm" />
-                  ) : (
-                    <Badge label="0 PASSED" tone="neutral" size="sm" />
-                  )}
+                  {hasPassed ? <Badge label="RECOMMENDED" tone="success" size="sm" /> : null}
                 </View>
                 <Text style={styles.optionDesc} maxFontSizeMultiplier={theme.fontScale.body}>
                   {hasPassed
-                    ? `Removes ${passedCount} dealbreakers & passes. Keeps your ${likedCount} liked ${likedCount === 1 ? 'profile' : 'profiles'} safe.`
-                    : 'No passed profiles in history. All recorded profiles are likes.'}
+                    ? `Removes ${passedCount} passed ${passedCount === 1 ? 'profile' : 'profiles'}. Keeps your ${likedCount} ${likedCount === 1 ? 'like' : 'likes'}.`
+                    : 'Nothing to remove — every profile here is a like.'}
                 </Text>
               </View>
+              {hasPassed && !busy ? <Ionicons name="chevron-forward" size={16} color={c.muted} style={styles.optionChevron} /> : null}
             </View>
           </TouchableOpacity>
 
           {/* Option 2: Clear All History */}
           <TouchableOpacity
-            style={[styles.optionCard, styles.optionCardDestructive]}
+            style={[
+              styles.optionCard,
+              styles.optionCardDestructive,
+              (!hasHistory || busy) && styles.optionCardDisabled,
+            ]}
             onPress={hasHistory && !busy ? onClearAll : undefined}
             activeOpacity={0.75}
             accessibilityRole="button"
-            accessibilityLabel="Clear all swiped history"
+            accessibilityLabel={hasHistory
+              ? `Clear all ${totalCount} swiped ${totalCount === 1 ? 'profile' : 'profiles'}, likes included`
+              : 'Clear all swiped history. Already empty'}
             disabled={!hasHistory || busy}
           >
             <View style={styles.optionHeader}>
               <View style={[styles.optionIconWell, { backgroundColor: alpha(c.error || '#EF4444', 0.14) }]}>
-                <Ionicons name="trash" size={18} color={c.error || '#EF4444'} />
+                <Ionicons name="trash-outline" size={18} color={c.error || '#EF4444'} />
               </View>
               <View style={styles.optionCopy}>
-                <Text style={[styles.optionTitle, { color: c.error || '#EF4444' }]} maxFontSizeMultiplier={theme.fontScale.chrome}>
-                  Clear All Swiped History
+                <Text style={[styles.optionTitle, { color: c.error || '#EF4444' }]} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
+                  Clear everything
                 </Text>
                 <Text style={styles.optionDesc} maxFontSizeMultiplier={theme.fontScale.body}>
                   {hasHistory
-                    ? `Wipes all ${totalCount} recorded profiles (both likes and passes) for a complete fresh start.`
-                    : 'Swiped history is already empty.'}
+                    ? `Removes all ${totalCount} ${totalCount === 1 ? 'profile' : 'profiles'}, likes included. This cannot be undone.`
+                    : 'Your swiped history is already empty.'}
                 </Text>
               </View>
+              {hasHistory && !busy ? <Ionicons name="chevron-forward" size={16} color={alpha(c.error || '#EF4444', 0.7)} style={styles.optionChevron} /> : null}
             </View>
           </TouchableOpacity>
         </View>
@@ -371,7 +377,12 @@ const styles = createStyles(() => ({
   },
   optionCopy: {
     flex: 1,
+    minWidth: 0,
     gap: 3,
+  },
+  // Keeps the chevron level with the option's title rather than its whole block.
+  optionChevron: {
+    marginTop: 9,
   },
   optionTitleRow: {
     flexDirection: 'row',
@@ -383,6 +394,8 @@ const styles = createStyles(() => ({
     ...t.headline,
     fontFamily: theme.fonts.strong,
     color: c.text,
+    flexShrink: 1,
+    minWidth: 0,
   },
   optionDesc: {
     ...t.caption,

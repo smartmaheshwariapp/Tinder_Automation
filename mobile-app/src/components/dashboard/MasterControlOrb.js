@@ -703,23 +703,37 @@ export default function MasterControlOrb({
 
         {/* Floating Start Wingman Pill when paused/stopped during likes refill period */}
         {!isRunning && !isSafetyLocked && orbState === 'exhausted' && (
-          <View style={styles.stopPillWrapper}>
+          <View style={[styles.startPillWrapper, { shadowColor: config.gradient?.[0] || c.primary }]}>
+            {/* Takes the orb's own gradient, so the control matches the active theme and
+                whatever state the orb is showing instead of a fixed brand pink. */}
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Start Wingman"
+              accessibilityLabel="Start wingman"
               onPress={handlePress}
-              activeOpacity={0.82}
+              activeOpacity={0.85}
               hitSlop={PILL_HIT_SLOP}
-              style={styles.stopPill}
+              style={styles.startPill}
             >
               <LinearGradient
-                colors={[c.warning, c.secondary]}
+                colors={config.gradient || uiTheme.gradients.brand}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.stopPillGradient}
+                end={{ x: 1, y: 1 }}
+                style={styles.startPillGradient}
               >
-                <Ionicons name="play" size={13} color={c.background} />
-                <Text style={[styles.stopPillText, styles.startPillText]} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>START WINGMAN</Text>
+                {/* Gloss pass: a soft highlight across the top half gives the pill depth
+                    instead of reading as a flat block of colour. */}
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={[alpha(c.white, 0.34), alpha(c.white, 0.06), 'transparent']}
+                  locations={[0, 0.5, 1]}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={styles.startPillGloss}
+                />
+                <View style={styles.startPillIcon}>
+                  <Ionicons name="play" size={14} color={c.onPrimary} />
+                </View>
+                <Text style={styles.startPillLabel} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Start wingman</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -937,36 +951,95 @@ const styles = createStyles(() => ({
     paddingHorizontal: uiTheme.spacing.md + 2,
     gap: uiTheme.spacing.sm - 2,
   },
+  // Stop control: reads as a deliberate action over the hero gradient, so it carries a
+  // solid backdrop, a full-height touch target and a clear stop glyph.
   stopIconSquare: {
-    width: 9,
-    height: 9,
+    width: 11,
+    height: 11,
     backgroundColor: c.error,
-    borderRadius: 2,
+    borderRadius: 3,
   },
   stopButton: {
     borderRadius: uiTheme.radius.pill,
-    borderWidth: 1,
-    borderColor: alpha(c.error, 0.45),
-    backgroundColor: alpha(c.error, 0.12),
+    borderWidth: 1.5,
+    borderColor: alpha(c.error, 0.65),
+    backgroundColor: alpha(c.background, 0.55),
+    ...uiTheme.shadows.sm,
   },
   stopButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: uiTheme.spacing.sm,
-    minHeight: 40,
-    paddingHorizontal: uiTheme.spacing.xl,
+    minHeight: uiTheme.layout.touchTarget,
+    paddingHorizontal: uiTheme.spacing.xxl,
   },
   stopButtonText: {
-    ...t.buttonSmall,
+    ...t.button,
+    fontFamily: uiTheme.fonts.strong,
     color: c.error,
+    letterSpacing: 0.2,
   },
   stopPillText: {
     ...t.overline,
     letterSpacing: 0.8,
     color: c.onPrimary,
   },
-  startPillText: {
-    color: c.background,
+  // Start control: brand gradient, full touch target and a brand-tinted glow — the
+  // previous pill was a 30pt amber chip carrying a red "danger" shadow.
+  startPillWrapper: {
+    marginTop: uiTheme.spacing.lg,
+    zIndex: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: c.primary,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.5,
+        shadowRadius: 18,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
+  },
+  startPill: {
+    borderRadius: uiTheme.radius.pill,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: alpha(c.white, 0.22),
+  },
+  startPillGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingLeft: uiTheme.spacing.sm + 2,
+    paddingRight: uiTheme.spacing.xl + 2,
+    gap: uiTheme.spacing.sm + 2,
+  },
+  startPillGloss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '62%',
+  },
+  // Raised disc holding the glyph, so the icon sits on its own layer.
+  startPillIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 2,
+    backgroundColor: alpha(c.white, 0.22),
+    borderWidth: 1,
+    borderColor: alpha(c.white, 0.3),
+  },
+  startPillLabel: {
+    ...t.button,
+    fontFamily: uiTheme.fonts.strong,
+    color: c.onPrimary,
+    letterSpacing: 0.2,
   },
 }));

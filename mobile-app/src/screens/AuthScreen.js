@@ -812,8 +812,8 @@ export default function AuthScreen({ navigation, route }) {
     setResendActive(false);
     setSuccessNotice(
       authMode === 'signup'
-        ? `Welcome ${name.trim()}! Code sent to ${cleanEmail}`
-        : `Verification code sent to ${cleanEmail}`
+        ? `Welcome ${name.trim()}! Your code is on its way.`
+        : 'Verification code sent.'
     );
     goToOtp();
     setTimeout(() => otpInputs.current[0]?.focus(), 300);
@@ -937,7 +937,7 @@ export default function AuthScreen({ navigation, route }) {
     setCountdown(45);
     setResendActive(false);
     setErrorMessage('');
-    setSuccessNotice('A fresh verification code has been dispatched to your email!');
+    setSuccessNotice('A new code is on its way.');
     try {
       await sendEmailOtp(email.trim().toLowerCase(), name.trim());
     } catch (_) { }
@@ -1684,6 +1684,8 @@ export default function AuthScreen({ navigation, route }) {
           </View>
         </View>
 
+        {/* Card keeps the code entry legible over the photo behind it, matching the sign-in form. */}
+        <View style={[styles.glassCard, styles.otpCard, { padding: cardPadding }]}>
         {/* Success Notice */}
         {Boolean(successNotice) && (
           <View style={styles.successRow} accessibilityLiveRegion="polite">
@@ -1787,6 +1789,7 @@ export default function AuthScreen({ navigation, route }) {
           disabled={otp.some((d) => !d)}
           haptic={false}
         />
+        </View>
 
         {/* Need Help Signing In */}
         <MotionTouchable
@@ -2530,6 +2533,12 @@ const styles = createStyles(() => ({
     marginBottom: SPACE.lg,
     backgroundColor: alpha(COLORS.surface, 0.9),
     ...uiTheme.shadows.lg,
+  },
+  // Code-entry card: a touch more opaque than the form card, since the digits and
+  // the disabled CTA sit directly over the photography.
+  otpCard: {
+    backgroundColor: alpha(COLORS.surface, 0.96),
+    marginBottom: SPACE.sm,
   },
 
   // ── Input Fields ──

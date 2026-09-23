@@ -194,26 +194,26 @@ export default function HomeOverview({
   const stateTitle = busy
     ? "Connecting"
     : !isLoggedIn
-      ? "Not Connected"
+      ? "Not connected"
       : state?.waitingReason === "safety_lock"
-        ? "Safety Pause"
+        ? "Safety pause"
         : state?.waitingReason === "likes_exhausted"
-          ? (running ? "Wingman Chatting" : "Daily Likes Refill")
+          ? (running ? "Wingman chatting" : "Daily likes refill")
         : running
           ? (state?.currentPhase === "messaging"
-              ? "Wingman Messaging"
+              ? "Wingman messaging"
               : state?.currentPhase === "transitioning"
-                ? "Wingman Resting"
+                ? "Wingman resting"
                 : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
-                  ? "Awaiting Replies"
-                  : "Wingman Active")
-          : "Wingman Standby";
+                  ? "Awaiting replies"
+                  : "Wingman active")
+          : "Wingman standby";
   const statusLabel = busy
     ? "Starting"
     : !isLoggedIn
-      ? "Connect to Start"
+      ? "Connect to start"
       : state?.waitingReason === "safety_lock"
-        ? "Safety Pause"
+        ? "Safety pause"
         : state?.waitingReason === "likes_exhausted"
           ? (running ? "Messaging" : "Refilling")
         : running
@@ -224,7 +224,7 @@ export default function HomeOverview({
                 : state?.currentPhase === "waiting" || state?.currentPhase === "polling"
                   ? "Checking"
                   : (settings?.autoSwipe === false || settings?.likesPerCycle <= 0 ? "Messaging" : "Swiping"))
-          : (settings?.autoSwipe === false || settings?.likesPerCycle <= 0 ? "Ready to Chat" : "Ready to Swipe");
+          : (settings?.autoSwipe === false || settings?.likesPerCycle <= 0 ? "Ready to chat" : "Ready to swipe");
   // Status tone mirrors the previous dot colours: live → success, offline → neutral,
   // likes refill → info, otherwise brand.
   const statusTone = running
@@ -375,9 +375,15 @@ export default function HomeOverview({
               <LiveDot style={styles.onlineDot} size={10} active={isLoggedIn} color={isLoggedIn ? c.success : c.textTertiary} ringColor={c.elevated} />
             </View>
             <View style={styles.connectionCopy}>
-              <Text style={styles.connectionTitle} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                {isLoggedIn ? "Tinder connected" : "Connect Tinder"}
-              </Text>
+              {/* Plan badge sits with the title, not pushed to the far edge of the row. */}
+              <View style={styles.connectionTitleRow}>
+                <Text style={styles.connectionTitle} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                  {isLoggedIn ? "Tinder connected" : "Connect Tinder"}
+                </Text>
+                {isLoggedIn && !isCompact ? (
+                  <Badge label={planBadge.label} tone={planBadge.tone} icon={planBadge.icon} size="sm" />
+                ) : null}
+              </View>
               <View style={styles.connectionMeta}>
                 <Ionicons name="location-outline" size={12} color={c.muted} />
                 <Text style={styles.metaText} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
@@ -391,9 +397,6 @@ export default function HomeOverview({
                 ) : null}
               </View>
             </View>
-            {isLoggedIn && !isCompact ? (
-              <Badge label={planBadge.label} tone={planBadge.tone} icon={planBadge.icon} size="sm" />
-            ) : null}
             {starting ? (
               <ActivityIndicator size="small" color={c.primary} />
             ) : (
@@ -437,26 +440,18 @@ export default function HomeOverview({
 
           {/* Live status */}
           <View style={[styles.statusBlock, isLandscape && styles.statusBlockTight]} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${stateTitle}. ${statusLabel}`}>
-            <View style={styles.statusRow}>
+            {/* One capsule: live dot, the state, and what it is doing right now. */}
+            <View style={[styles.statusCapsule, { borderColor: alpha(statusColor, 0.4), backgroundColor: alpha(statusColor, 0.12) }]}>
               <LiveDot size={8} active={running || busy} color={statusColor} />
               <Text style={styles.statusTitle} numberOfLines={1} accessibilityRole="header" maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
                 {stateTitle}
               </Text>
-              <View style={[styles.statusChip, { backgroundColor: alpha(statusColor, 0.14), borderColor: alpha(statusColor, 0.34) }]}>
-                <Text style={[styles.statusChipText, { color: statusColor }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                  {statusLabel}
-                </Text>
-              </View>
+              <View style={[styles.statusCapsuleDivider, { backgroundColor: alpha(statusColor, 0.35) }]} />
+              <Text style={[styles.statusCapsuleLabel, { color: statusColor }]} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+                {statusLabel}
+              </Text>
             </View>
-            {isLoggedIn && likesStatus.isExhausted && !isPaidPlan && (!checking || !likesStatus.isFallback) ? (
-              <Badge
-                label={`Refills in ${likesStatus.formattedCountdown}`}
-                tone="warning"
-                icon="time"
-                size="sm"
-                style={styles.refillBadge}
-              />
-            ) : null}
+            {/* Refill countdown lives on the orb and its hint line, so it is not repeated here. */}
           </View>
 
           <MasterControlOrb
@@ -562,57 +557,56 @@ function SmartMatchRateCard({ settings, stats, onAutomation }) {
   const strictGoals = settings?.aiMatchStrictGoals !== false;
   const useLLM = Boolean(settings?.aiMatchUseLLM);
 
+  // Summary chips follow the pattern used by the Automation cards.
+  const chips = [
+    { icon: 'speedometer-outline', label: `Min score ${currentThreshold}%` },
+    { icon: 'flag-outline', label: strictGoals ? 'Strict goals' : 'Flexible goals' },
+    { icon: useLLM ? 'sparkles-outline' : 'flash-outline', label: useLLM ? 'Deep AI' : 'Fast match' },
+  ];
+
   return (
-    <View style={styles.smartMatchCard}>
+    <TouchableOpacity
+      style={styles.smartMatchCard}
+      onPress={onAutomation}
+      disabled={!onAutomation}
+      activeOpacity={0.85}
+      pressScale={0.99}
+      accessibilityRole="button"
+      accessibilityLabel={`Smart Match is active. Minimum score ${currentThreshold} percent, ${strictGoals ? 'strict' : 'flexible'} goals filter, ${useLLM ? 'deep AI' : 'fast match'} scoring. Open automation settings`}
+    >
       <LinearGradient
         colors={[alpha(c.primary, 0.12), alpha(c.secondary, 0.04), c.surface]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      {/* The whole card opens automation, so the row carries a chevron instead of a
+          separate button that competed with the title for width. */}
       <View style={styles.smartMatchHeader}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={styles.smartMatchIconWrap}>
-            <Ionicons name="sparkles" size={16} color={c.accent} />
-          </View>
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.smartMatchTitle}>Smart Match</Text>
-              <Badge tone="primary" label="ACTIVE" size="sm" />
-            </View>
-            <Text style={styles.smartMatchSub}>Auto-likes matches with {currentThreshold}%+ compatibility</Text>
-          </View>
+        <View style={styles.smartMatchIconWrap}>
+          <Ionicons name="sparkles" size={16} color={c.accent} />
         </View>
-        {onAutomation && (
-          <TouchableOpacity
-            onPress={onAutomation}
-            style={styles.smartMatchAdjustBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Adjust Smart Match settings"
-          >
-            <Ionicons name="options-outline" size={14} color={c.accent} />
-            <Text style={styles.smartMatchAdjustText}>Adjust</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.smartMatchHeaderCopy}>
+          <View style={styles.smartMatchTitleRow}>
+            <Text style={styles.smartMatchTitle} numberOfLines={1}>Smart Match</Text>
+            <Badge tone="primary" label="ACTIVE" size="sm" />
+          </View>
+          <Text style={styles.smartMatchSub} numberOfLines={2}>
+            Auto-likes matches with {currentThreshold}%+ compatibility
+          </Text>
+        </View>
+        {onAutomation ? <Ionicons name="chevron-forward" size={18} color={c.muted} /> : null}
       </View>
 
-      <View style={styles.smartMatchStatsRow}>
-        <View style={styles.smartMatchStat}>
-          <Text style={styles.smartMatchStatVal}>{currentThreshold}%</Text>
-          <Text style={styles.smartMatchStatLabel}>Min Score</Text>
-        </View>
-        <View style={styles.smartMatchStatDivider} />
-        <View style={styles.smartMatchStat}>
-          <Text style={styles.smartMatchStatVal}>{strictGoals ? 'Strict' : 'Flexible'}</Text>
-          <Text style={styles.smartMatchStatLabel}>Goals Filter</Text>
-        </View>
-        <View style={styles.smartMatchStatDivider} />
-        <View style={styles.smartMatchStat}>
-          <Text style={styles.smartMatchStatVal}>{useLLM ? 'Deep AI' : 'Fast Match'}</Text>
-          <Text style={styles.smartMatchStatLabel}>Scoring Mode</Text>
-        </View>
+      <View style={styles.smartMatchChips}>
+        {chips.map(chip => (
+          <View key={chip.label} style={styles.smartMatchChip}>
+            <Ionicons name={chip.icon} size={12} color={c.accent} />
+            <Text style={styles.smartMatchChipText} numberOfLines={1}>{chip.label}</Text>
+          </View>
+        ))}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -956,10 +950,18 @@ const styles = createStyles(() => ({
     right: -3,
   },
   connectionCopy: { flex: 1, minWidth: 0 },
+  connectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: sp.sm,
+    minWidth: 0,
+  },
   connectionTitle: {
     ...t.headline,
     fontSize: 15,
     color: c.text,
+    flexShrink: 1,
+    minWidth: 0,
   },
   connectionMeta: {
     flexDirection: "row",
@@ -1025,31 +1027,38 @@ const styles = createStyles(() => ({
     ...t.footnote,
     color: c.muted,
   },
-  statusRow: {
+  // Dot, state and activity read as one capsule instead of elements pushed to
+  // opposite edges of the hero.
+  statusCapsule: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "stretch",
+    alignSelf: "center",
+    maxWidth: "100%",
     gap: sp.sm,
-    paddingHorizontal: sp.xs,
+    paddingLeft: sp.md,
+    paddingRight: sp.md + 2,
+    paddingVertical: 9,
+    borderRadius: r.pill,
+    borderWidth: 1,
+  },
+  statusCapsuleDivider: {
+    width: 1,
+    height: 14,
+    borderRadius: 1,
+  },
+  statusCapsuleLabel: {
+    ...t.footnote,
+    fontFamily: uiTheme.fonts.strong,
+    flexShrink: 1,
+    minWidth: 0,
   },
   statusTitle: {
     ...t.headline,
     fontFamily: uiTheme.fonts.heading,
-    fontSize: 17,
+    fontSize: 15,
     color: c.text,
-    flex: 1,
+    flexShrink: 1,
     minWidth: 0,
-  },
-  statusChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: r.pill,
-    borderWidth: 1,
-    flexShrink: 0,
-  },
-  statusChipText: {
-    ...t.footnote,
-    fontFamily: uiTheme.fonts.label,
   },
   statusBlock: {
     alignItems: "center",
@@ -1073,7 +1082,6 @@ const styles = createStyles(() => ({
     color: c.text,
     textAlign: "center",
   },
-  refillBadge: { alignSelf: "center", marginTop: sp.xs },
 
   cycle: {
     marginTop: sp.lg,
@@ -1356,13 +1364,52 @@ const styles = createStyles(() => ({
     borderColor: c.borderSubtle,
     overflow: 'hidden',
     padding: sp.lg,
-    marginBottom: sp.md,
+    marginBottom: sp.xl,
   },
   smartMatchHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: sp.md,
+    gap: sp.md,
+  },
+  smartMatchHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  smartMatchTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  // Summary chips: same language as the Automation page's collapsed cards.
+  smartMatchChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: sp.sm,
+    rowGap: sp.sm - 2,
+    marginTop: sp.md,
+    paddingTop: sp.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: alpha(c.white, 0.1),
+  },
+  smartMatchChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: sp.md - 2,
+    paddingVertical: 6,
+    borderRadius: r.pill,
+    backgroundColor: alpha(c.background, 0.45),
+    borderWidth: 1,
+    borderColor: c.hairline,
+  },
+  smartMatchChipText: {
+    ...t.caption,
+    fontFamily: uiTheme.fonts.label,
+    color: c.text,
+    flexShrink: 1,
+    minWidth: 0,
   },
   smartMatchIconWrap: {
     width: 36,
@@ -1377,53 +1424,11 @@ const styles = createStyles(() => ({
   smartMatchTitle: {
     ...t.bodyStrong,
     color: c.text,
+    flexShrink: 1,
+    minWidth: 0,
   },
   smartMatchSub: {
     ...t.caption,
     color: c.textSecondary,
-    marginTop: 1,
-  },
-  smartMatchAdjustBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: r.pill,
-    backgroundColor: c.primarySoft,
-    borderWidth: 1,
-    borderColor: c.primaryBorder,
-  },
-  smartMatchAdjustText: {
-    ...t.caption,
-    fontFamily: uiTheme.fonts.strong,
-    color: c.accent,
-  },
-  smartMatchStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingTop: sp.sm,
-    borderTopWidth: 1,
-    borderColor: alpha(c.white, 0.08),
-  },
-  smartMatchStat: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  smartMatchStatVal: {
-    ...t.bodyStrong,
-    fontFamily: uiTheme.fonts.strong,
-    color: c.text,
-  },
-  smartMatchStatLabel: {
-    ...t.caption,
-    color: c.muted,
-    marginTop: 2,
-  },
-  smartMatchStatDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 24,
-    backgroundColor: c.divider,
-  },
+  },
 }));

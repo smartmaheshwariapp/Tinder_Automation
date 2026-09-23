@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ContentTransition, FadeIn, MotionTouchable as Button, useMotionReduced } from '../common/Motion';
 import FeedbackState from '../common/FeedbackState';
-import { AppButton, AppText, Badge, CountUp, IconButton, IconWell, LiveDot } from '../ui';
+import { AppButton, AppText, Badge, CountUp, IconButton, IconWell } from '../ui';
 import { createStyles, theme, alpha } from '../../theme';
 import useResponsive from '../../hooks/useResponsive';
 import { getTinderAuthState, subscribeTinderAuthState, getSharedExtensionSettings } from '../../utils/sessionManager';
@@ -307,6 +307,12 @@ function ProfileRow({ item, tab, ownerId, onPress, showScores = true }) {
   const topTrait = showScores && Array.isArray(profile?.matchBreakdown) && profile.matchBreakdown.length > 0
     ? profile.matchBreakdown[0]?.axis
     : null;
+  // Quality and strongest signal read as one quiet line, so the row keeps its
+  // detail without adding more tinted chips.
+  const qualityLine = [
+    isLowInfo ? 'Brief bio' : profile?.matchLabel,
+    topTrait ? axisDisplayName(topTrait) : null,
+  ].filter(Boolean).join(' · ');
 
   const subtitle = tab === 'swiped'
     ? (profile?.bio ? profile.bio.slice(0, 56).trim() : ([profile?.job, profile?.school, profile?.city].filter(Boolean).join(' · ') || swipeSubtitle(item)))
@@ -345,23 +351,17 @@ function ProfileRow({ item, tab, ownerId, onPress, showScores = true }) {
         <Text style={styles.subtitle} numberOfLines={2} maxFontSizeMultiplier={theme.fontScale.body}>{subtitle}</Text>
         <View style={styles.meta}>
           {tab === 'swiped' && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-              <Badge label={item.action === 'like' ? 'LIKED' : 'PASSED'} icon={item.action === 'like' ? 'heart' : 'close'} tone={item.action === 'like' ? config.tone : 'neutral'} size="sm" />
-              {hasScore && (
-                <Badge
-                  label={isLowInfo ? 'Brief Bio' : `${profile.matchLabel ? `${profile.matchLabel} · ` : ''}${profile.matchScore}%`}
-                  tone={profile.matchScore >= 70 ? 'success' : profile.matchScore >= 40 ? 'warning' : 'neutral'}
-                  icon="sparkles"
-                  size="sm"
-                />
-              )}
-              {topTrait && (
-                <Badge
-                  label={axisDisplayName(topTrait)}
-                  tone="secondary"
-                  size="sm"
-                  style={{ opacity: 0.9 }}
-                />
+            <View style={styles.swipedMeta}>
+              {/* Status is the row's only tinted element; the ring carries the number and
+                  the quality line gets its own full-width line so it is never clipped. */}
+              <View style={styles.rowBadges}>
+                <Badge label={item.action === 'like' ? 'LIKED' : 'PASSED'} icon={item.action === 'like' ? 'heart' : 'close'} tone={item.action === 'like' ? config.tone : 'neutral'} size="sm" />
+              </View>
+              {hasScore && !!qualityLine && (
+                <View style={styles.qualityLine}>
+                  <Ionicons name="sparkles-outline" size={12} color={c.muted} />
+                  <Text style={styles.qualityText} numberOfLines={2} maxFontSizeMultiplier={theme.fontScale.chrome}>{qualityLine}</Text>
+                </View>
               )}
             </View>
           )}
@@ -550,6 +550,14 @@ export default function TinderCollections({ settings, onConnect }) {
   const passedCount = useMemo(() => swipedList.filter(isPassed).length, [swipedList]);
   const likedCount = useMemo(() => swipedList.filter(item => !isPassed(item)).length, [swipedList]);
   const swipedTotalCount = swipedList.length;
+  // Average of the estimated match scores present in the open list (display only).
+  const listAvgScore = useMemo(() => {
+    const scores = (entries || [])
+      .map(entry => entry?.profile?.matchScore)
+      .filter(score => typeof score === 'number');
+    if (!scores.length) return null;
+    return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
+  }, [entries]);
 
   const handleClearPassed = async () => {
     setClearBusy(true);
@@ -691,10 +699,6 @@ export default function TinderCollections({ settings, onConnect }) {
     <View style={styles.header}>
       {/* <IconWell icon="people" tone="primary" size={44} iconSize={20} /> */}
       <View style={styles.headerCopy}>
-        <View style={styles.eyebrow}>
-          {state.data && <LiveDot size={7} />}
-          <AppText variant="overline" color="secondary" numberOfLines={1} style={styles.eyebrowText}>CONNECTION INTELLIGENCE</AppText>
-        </View>
         <AppText variant="title2" numberOfLines={1}>Your connections</AppText>
       </View>
       {/* {state.data && <Badge label="LIVE" tone="success" dot />} */}
@@ -1285,42 +1289,46 @@ export default function TinderCollections({ settings, onConnect }) {
             return (
               <>
                 <View style={styles.detailCard}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <AppText variant="overline" color="secondary" accessibilityRole="header">COMPATIBILITY BREAKDOWN</AppText>
-                    <Badge
-                      label={sd.label || (sd.score >= 75 ? 'Strong Match' : sd.score >= 50 ? 'Good Potential' : 'Moderate')}
-                      tone={sd.score >= 75 ? 'secondary' : sd.score >= 50 ? 'primary' : 'neutral'}
-                      size="sm"
-                    />
-                  </View>
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 12, marginBottom: 4 }}>
+                  {/* Ring, title, tier and confidence read as one block: the eyebrow and the
+                      repeated confidence line were saying the same thing three times. */}
+                  <View style={styles.scoreHead}>
                     <ScoreRing value={sd.score} size={76} big />
-                    <View style={{ flex: 1, gap: 4 }}>
-                      <AppText variant="title2" style={{ fontWeight: '700' }}>Compatibility Score</AppText>
-                      <Badge
-                        label={confidenceLabel}
-                        tone={sd.confidence >= 0.7 ? 'success' : sd.confidence >= 0.4 ? 'primary' : 'warning'}
-                        size="sm"
-                        style={{ alignSelf: 'flex-start' }}
-                      />
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                        <Ionicons name="analytics-outline" size={14} color={c.info || '#60A5FA'} />
-                        <AppText variant="footnote" color="textSecondary">
-                          {confidenceLabel} · {axesCount} profile areas compared
-                        </AppText>
+                    <View style={styles.scoreHeadCopy}>
+                      <AppText variant="title2" accessibilityRole="header">Compatibility score</AppText>
+                      <View style={styles.scoreHeadBadges}>
+                        <Badge
+                          label={sd.label || (sd.score >= 75 ? 'Strong Match' : sd.score >= 50 ? 'Good Potential' : 'Moderate')}
+                          tone={sd.score >= 75 ? 'secondary' : sd.score >= 50 ? 'primary' : 'neutral'}
+                          size="sm"
+                        />
+                        <Badge
+                          label={confidenceLabel}
+                          tone={sd.confidence >= 0.7 ? 'success' : sd.confidence >= 0.4 ? 'primary' : 'warning'}
+                          size="sm"
+                        />
                       </View>
+                      <AppText variant="footnote" color="textSecondary">
+                        Estimated from {axesCount} profile {axesCount === 1 ? 'area' : 'areas'}
+                      </AppText>
                     </View>
                   </View>
 
                   {axesCount > 0 && (
                     <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderColor: alpha(c.white, 0.08), gap: 8 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                        <AppText variant="caption" color="muted">COMPATIBILITY BREAKDOWN ({axesCount} OF 7 AREAS SCORED)</AppText>
-                        <TouchableOpacity accessibilityRole="button" onPress={() => setBreakdownExpanded(v => !v)}>
-                          <AppText variant="caption" color="secondary">
-                            {breakdownExpanded ? 'Compact ∧' : 'Details ∨'}
-                          </AppText>
+                      <View style={styles.breakdownHead}>
+                        <AppText variant="overline" color="muted" numberOfLines={1} style={styles.breakdownHeadTitle}>
+                          AREA SCORES · {axesCount} OF 7
+                        </AppText>
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel={breakdownExpanded ? 'Hide area scores' : 'Show area scores'}
+                          accessibilityState={{ expanded: breakdownExpanded }}
+                          onPress={() => setBreakdownExpanded(v => !v)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          style={styles.breakdownToggle}
+                        >
+                          <AppText variant="caption" color="secondary">{breakdownExpanded ? 'Hide' : 'Show'}</AppText>
+                          <Ionicons name={breakdownExpanded ? 'chevron-up' : 'chevron-down'} size={13} color={c.secondary} />
                         </TouchableOpacity>
                       </View>
 
@@ -1331,17 +1339,19 @@ export default function TinderCollections({ settings, onConnect }) {
                           const barColor = axisPct >= 70 ? '#10B981' : axisPct >= 40 ? '#F59E0B' : '#EF4444';
                           return (
                             <View key={idx}>
+                              {/* Neutral icon wells: the progress bar is the only colour that
+                                  carries meaning, so seven tinted circles do not compete with it. */}
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: alpha(icon.color, 0.14), alignItems: 'center', justifyContent: 'center' }}>
-                                  <Ionicons name={icon.name} size={14} color={icon.color} />
+                                <View style={styles.axisIconWell}>
+                                  <Ionicons name={icon.name} size={14} color={c.textSecondary} />
                                 </View>
                                 <AppText variant="subhead" color="text" style={{ flex: 1 }}>{axisDisplayName(b.axis)}</AppText>
                                 <AppText variant="subhead" style={{ fontVariant: ['tabular-nums'], fontFamily: theme.fonts.strong, color: c.text }}>
                                   {b.earned} / {b.max}
                                 </AppText>
                               </View>
-                              <View style={{ height: 3.5, borderRadius: 2, backgroundColor: alpha(c.white, 0.06), marginTop: 4, marginLeft: 36 }}>
-                                <View style={{ width: `${Math.min(100, axisPct)}%`, height: '100%', borderRadius: 2, backgroundColor: barColor }} />
+                              <View style={styles.axisTrack}>
+                                <View style={{ width: `${Math.min(100, axisPct)}%`, height: '100%', borderRadius: 3, backgroundColor: barColor }} />
                               </View>
                             </View>
                           );
@@ -1365,13 +1375,8 @@ export default function TinderCollections({ settings, onConnect }) {
                     </View>
                   )}
 
+                  {/* The ring at the top already states the score; this footer only explains it. */}
                   <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderColor: alpha(c.white, 0.08), gap: 4 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <AppText variant="bodyStrong" color="text">Overall Compatibility</AppText>
-                      <AppText variant="title" style={{ fontVariant: ['tabular-nums'], color: sc, fontWeight: '700' }}>
-                        {sd.score}%
-                      </AppText>
-                    </View>
                     <AppText variant="caption" color="muted">
                       {missingAxesCount > 0
                         ? `Score calculated from ${axesCount} profile areas they shared. Missing bio details do not lower their rating.`
@@ -1496,6 +1501,24 @@ export default function TinderCollections({ settings, onConnect }) {
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListHeaderComponent={<View style={styles.modalListHeader}>
+            {tab === 'swiped' && !!entries.length && (
+              <View style={styles.listSummary}>
+                <View style={styles.listSummaryCell}>
+                  <Text style={styles.listSummaryValue} maxFontSizeMultiplier={theme.fontScale.chrome}>{likedCount}</Text>
+                  <Text style={styles.listSummaryLabel} maxFontSizeMultiplier={theme.fontScale.chrome}>Liked</Text>
+                </View>
+                <View style={styles.listSummaryDivider} />
+                <View style={styles.listSummaryCell}>
+                  <Text style={styles.listSummaryValue} maxFontSizeMultiplier={theme.fontScale.chrome}>{passedCount}</Text>
+                  <Text style={styles.listSummaryLabel} maxFontSizeMultiplier={theme.fontScale.chrome}>Passed</Text>
+                </View>
+                <View style={styles.listSummaryDivider} />
+                <View style={styles.listSummaryCell}>
+                  <Text style={styles.listSummaryValue} maxFontSizeMultiplier={theme.fontScale.chrome}>{listAvgScore != null ? `${listAvgScore}%` : '—'}</Text>
+                  <Text style={styles.listSummaryLabel} maxFontSizeMultiplier={theme.fontScale.chrome}>Avg match</Text>
+                </View>
+              </View>
+            )}
             <View style={styles.modalListHeaderRow}>
               <AppText variant="footnote">{entries.length} {entries.length === 1 ? 'profile' : 'profiles'}</AppText>
               {tab === 'swiped' && !!entries.length && (
@@ -1548,10 +1571,10 @@ const styles = createStyles(() => ({
   nameInitialText: { ...t.headline, fontFamily: theme.fonts.heading, color: c.onPrimary },
   nameText: { ...t.bodyStrong, color: c.text, flex: 1, minWidth: 0 },
   section: { gap: sp.lg },
-  header: { flexDirection: 'row', alignItems: 'flex-end', gap: sp.md },
+  // Title and "See all" centre on each other: the button keeps its 44pt touch target
+  // without pushing its label off the single-line title's optical centre.
+  header: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
   headerCopy: { flex: 1, minWidth: 0 },
-  eyebrow: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
-  eyebrowText: { flexShrink: 1, minWidth: 0 },
   seeAll: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, paddingLeft: sp.sm, flexShrink: 0 },
   seeAllText: { ...t.buttonSmall, color: c.accent },
 
@@ -1659,6 +1682,25 @@ const styles = createStyles(() => ({
   time: { ...t.caption, color: c.muted, fontVariant: ['tabular-nums'] },
   subtitle: { ...t.footnote, color: c.textSecondary },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: sp.xxs },
+  rowBadges: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  // Compatibility card head and the expandable area-score header.
+  scoreHead: { flexDirection: 'row', alignItems: 'center', gap: sp.lg, marginBottom: sp.xs },
+  scoreHeadCopy: { flex: 1, minWidth: 0, gap: 6 },
+  scoreHeadBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  breakdownHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: sp.md, marginBottom: sp.xs },
+  breakdownHeadTitle: { flexShrink: 1, minWidth: 0 },
+  breakdownToggle: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 0 },
+  axisIconWell: { width: 28, height: 28, borderRadius: 14, backgroundColor: alpha(c.white, 0.06), alignItems: 'center', justifyContent: 'center' },
+  axisTrack: { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: alpha(c.white, 0.06), marginTop: 6, marginLeft: 36 },
+  swipedMeta: { gap: 4, marginTop: 4, minWidth: 0 },
+  qualityLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 4, minWidth: 0 },
+  qualityText: { ...t.caption, color: c.muted, flex: 1, minWidth: 0, lineHeight: 16 },
+  // Summary strip above the list: liked / passed / average match.
+  listSummary: { flexDirection: 'row', alignItems: 'center', paddingVertical: sp.md, paddingHorizontal: sp.sm, borderRadius: r.lg, backgroundColor: c.surface, borderWidth: 1, borderColor: c.borderSubtle, marginBottom: sp.md },
+  listSummaryCell: { flex: 1, alignItems: 'center', gap: 2, minWidth: 0 },
+  listSummaryValue: { ...t.title2, fontFamily: theme.fonts.heading, color: c.text, fontVariant: ['tabular-nums'] },
+  listSummaryLabel: { ...t.caption, color: c.muted },
+  listSummaryDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: c.divider },
   metaText: { ...t.caption, color: c.muted, flexShrink: 1, minWidth: 0 },
   // score: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', backgroundColor: c.background },
   // scoreValue: { ...t.label, fontFamily: theme.fonts.strong, fontVariant: ['tabular-nums'] },
