@@ -1388,7 +1388,6 @@ export default function PlatformSelectScreen({ navigation, route }) {
             onSync={handleSyncProfileFromHome}
             onSave={handleSaveSettings}
             onLogout={handleFlintLogout}
-            onDeleteData={handleDeleteAccountData}
           />
         ) : homeTab === "appSettings" ? (
           <AppSettings

@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { createStyles, theme, alpha } from '../../theme';
 import AppConfirmModal from '../common/AppConfirmModal';
 import { FadeIn, FocusInput, MotionTouchable } from '../common/Motion';
-import { AppButton, AppText, Badge, Card, CountUp, IconButton, ListRow, SectionHeader } from '../ui';
+import { AppButton, AppText, Badge, CountUp, IconButton, SectionHeader } from '../ui';
 import useResponsive from '../../hooks/useResponsive';
 import TinderProfileCard from './TinderProfileCard';
 import appConfig from '../../../app.json';
@@ -83,7 +83,6 @@ export default function ProfileDetails({
   onSync,
   onSave,
   onLogout,
-  onDeleteData,
 }) {
   const { gutter, contentMax, formMax, isTablet } = useResponsive();
 
@@ -254,25 +253,6 @@ export default function ProfileDetails({
     });
   };
 
-  const confirmDeleteData = () => {
-    setConfirmModal({
-      visible: true,
-      icon: 'trash-outline',
-      iconColor: c.error,
-      iconBg: c.errorSoft,
-      iconBorder: c.errorBorder,
-      title: 'Delete your account?',
-      message: 'This will permanently delete your Flirteasy account, history, and preferences. This action cannot be undone.',
-      confirmText: 'Delete Account',
-      cancelText: 'Cancel',
-      confirmVariant: 'destructive',
-      onConfirm: () => {
-        closeConfirmModal();
-        onDeleteData();
-      },
-    });
-  };
-
   const feedbackIsError = /could not/i.test(feedback);
 
   return (
@@ -378,27 +358,16 @@ export default function ProfileDetails({
         </FadeIn>
 
         {/* ── 4. Account Actions ── */}
+        {/* Delete Account lives in App settings → Legal & support. */}
         <FadeIn delay={180} style={[styles.group, isTablet && styles.groupColumn]}>
-          <SectionHeader title="Account & privacy" style={styles.sectionHeader} />
-          <Card padding="none" style={styles.list}>
-            <ListRow
-              icon="log-out-outline"
-              iconTone="neutral"
-              title="Log out"
-              subtitle="Sign out of your Flirteasy account"
-              onPress={confirmLogout}
-              divider
-              accessibilityLabel="Log out of Flirteasy"
-            />
-            <ListRow
-              icon="trash-outline"
-              title="Delete account"
-              subtitle="Permanently erase your account and data"
-              onPress={confirmDeleteData}
-              destructive
-              accessibilityLabel="Delete account"
-            />
-          </Card>
+          <AppButton
+            title="Log out"
+            icon="log-out-outline"
+            variant="dangerSoft"
+            onPress={confirmLogout}
+            accessibilityLabel="Log out of Flirteasy"
+            accessibilityHint="Asks you to confirm before signing out"
+          />
         </FadeIn>
         </View>
 
