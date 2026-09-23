@@ -144,7 +144,7 @@ export default function App() {
         <LinearGradient colors={theme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.splashMark}>
           <Ionicons name="flame" size={34} color={theme.colors.onPrimary} />
         </LinearGradient>
-        <Text style={styles.splashTitle} accessibilityRole="header">Flint</Text>
+        <Text style={styles.splashTitle} accessibilityRole="header">Flirteasy</Text>
         <Text style={styles.splashStatus} accessibilityLiveRegion="polite">{updateStatus}</Text>
         <SafeActivityIndicator size={20} color={theme.colors.accent} style={styles.splashSpinner} />
       </View>

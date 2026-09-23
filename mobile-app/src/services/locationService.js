@@ -123,7 +123,7 @@ export class LocationService {
       const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`;
       const res = await fetch(url, {
         signal: controller.signal,
-        headers: { 'User-Agent': 'LinksyDatingApp/1.0' },
+        headers: { 'User-Agent': 'FlirteasyDatingApp/1.0' },
       });
       clearTimeout(timeoutId);
       if (res.ok) {

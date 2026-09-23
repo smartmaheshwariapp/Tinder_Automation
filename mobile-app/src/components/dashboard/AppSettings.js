@@ -56,7 +56,7 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
   const plan = PLANS[settings?.userProfile?.tinderPlan] || { label: 'Free', icon: 'heart-outline', color: theme.colors.textSecondary };
   const openSystemSettings = async () => {
     try { await Linking.openSettings(); }
-    catch { Alert.alert('Unable to open settings', 'Open your phone’s Settings app and select Flint to manage permissions.'); }
+    catch { Alert.alert('Unable to open settings', 'Open your phone’s Settings app and select Flirteasy to manage permissions.'); }
   };
 
   return (
@@ -64,7 +64,7 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
       contentContainerStyle={[styles.content, { paddingHorizontal: gutter, maxWidth: contentMax, paddingBottom: theme.layout.navHeight + theme.spacing.hero + theme.spacing.sm }]}>
       <ScreenHeader
         title="App settings"
-        subtitle="Make Flint work for you."
+        subtitle="Make Flirteasy work for you."
         onBack={onBack}
         backLabel="Back to home"
       />
@@ -184,7 +184,7 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
           onPress={onPreferences} />
       </Section>
       </View>
-      <AppText variant="caption" align="center" style={styles.footer}>Flint · Version {appConfig.expo.version}</AppText>
+      <AppText variant="caption" align="center" style={styles.footer}>Flirteasy · Version {appConfig.expo.version}</AppText>
       <ThemePickerSheet visible={showThemes} onClose={() => setShowThemes(false)} />
     </ScrollView>
   );

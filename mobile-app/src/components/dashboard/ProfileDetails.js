@@ -93,13 +93,13 @@ export default function ProfileDetails({
     user?.full_name ||
     user?.name ||
     settings?.accountProfile?.name ||
-    'Flint Member'
+    'Flirteasy Member'
   ).trim();
 
   const flintEmail = (
     user?.email ||
     settings?.accountProfile?.email ||
-    'Your Flint account'
+    'Your Flirteasy account'
   ).trim();
 
   const flintInitial = (flintName || 'F').slice(0, 1).toUpperCase();
@@ -241,7 +241,7 @@ export default function ProfileDetails({
       iconColor: c.accent,
       iconBg: c.primarySoft,
       iconBorder: c.primaryBorder,
-      title: 'Log out of Flint?',
+      title: 'Log out of Flirteasy?',
       message: 'This will disconnect your Tinder session and return you to the login screen.',
       detail: { title: flintName, subtitle: flintEmail, initial: flintInitial },
       confirmText: 'Log out',
@@ -262,7 +262,7 @@ export default function ProfileDetails({
       iconBg: c.errorSoft,
       iconBorder: c.errorBorder,
       title: 'Delete your account?',
-      message: 'This will permanently delete your Flint account, history, and preferences. This action cannot be undone.',
+      message: 'This will permanently delete your Flirteasy account, history, and preferences. This action cannot be undone.',
       confirmText: 'Delete Account',
       cancelText: 'Cancel',
       confirmVariant: 'destructive',
@@ -385,10 +385,10 @@ export default function ProfileDetails({
               icon="log-out-outline"
               iconTone="neutral"
               title="Log out"
-              subtitle="Sign out of your Flint account"
+              subtitle="Sign out of your Flirteasy account"
               onPress={confirmLogout}
               divider
-              accessibilityLabel="Log out of Flint"
+              accessibilityLabel="Log out of Flirteasy"
             />
             <ListRow
               icon="trash-outline"
@@ -404,11 +404,11 @@ export default function ProfileDetails({
 
         {/* ── 5. App Version Footer ── */}
         <AppText variant="caption" align="center" style={styles.versionFooter}>
-          Flint · Version {appConfig.expo.version}
+          Flirteasy · Version {appConfig.expo.version}
         </AppText>
       </ScrollView>
 
-      {/* ── Edit Flint Profile Modal ── */}
+      {/* ── Edit Flirteasy Profile Modal ── */}
       <Modal visible={editing} animationType="slide" onRequestClose={closeEditor}>
         <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.modal}>
         <KeyboardAvoidingView
@@ -436,7 +436,7 @@ export default function ProfileDetails({
               />
             </View>
             <AppText variant="callout" color="muted">
-              Update how your name appears in Flint. Your email and
+              Update how your name appears in Flirteasy. Your email and
               connected Tinder account stay unchanged.
             </AppText>
 

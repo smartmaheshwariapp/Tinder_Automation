@@ -819,7 +819,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
     {
       id: "log_init_1",
       time: new Date().toLocaleTimeString(),
-      text: "Flint Automation Engine initialized.",
+      text: "Flirteasy Automation Engine initialized.",
       type: "info",
     },
     {
@@ -1381,7 +1381,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
           })();
           true;
         `);
-          addLog("⏸️ FlirtEasy AI Automation paused", "info");
+          addLog("⏸️ Flirteasy AI Automation paused", "info");
         } else {
           if (worker) worker.handleMessage({ action: "startAgent" });
           dispatchStartToDOM();
@@ -1394,7 +1394,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                 ? extensionSettings.likesPerCycle
                 : 50;
             addLog(
-              `🚀 FlirtEasy AI Automation started (${count} profiles target · Full Auto)`,
+              `🚀 Flirteasy AI Automation started (${count} profiles target · Full Auto)`,
               "success",
             );
           } else if (swipingEnabled) {
@@ -1404,12 +1404,12 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                 ? extensionSettings.likesPerCycle
                 : 50;
             addLog(
-              `🚀 FlirtEasy AI Swiper started (${count} profiles target · Swiping Only)`,
+              `🚀 Flirteasy AI Swiper started (${count} profiles target · Swiping Only)`,
               "success",
             );
           } else if (messagingEnabled) {
             addLog(
-              "💬 FlirtEasy AI Wingman started (Messaging Only)",
+              "💬 Flirteasy AI Wingman started (Messaging Only)",
               "success",
             );
           } else {
@@ -1480,7 +1480,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
             "success",
           );
         } else {
-          addLog("⚙️ FlirtEasy settings saved and applied", "success");
+          addLog("⚙️ Flirteasy settings saved and applied", "success");
         }
         trackingService.trackEvent("settings_change", updatedSettings);
         return true;
@@ -3521,7 +3521,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                   numberOfLines={1}
                   style={styles.modalTitle}
                 >
-                  Flint Dashboard
+                  Flirteasy Dashboard
                 </AppText>
               </View>
               <View style={styles.headerRightActions}>

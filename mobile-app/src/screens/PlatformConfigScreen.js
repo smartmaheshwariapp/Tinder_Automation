@@ -499,7 +499,7 @@ export default function PlatformConfigScreen({ route, navigation }) {
 
           {/* Section 5: External App Redirects */}
           <FadeIn delay={120}>
-            <SectionHeader title="Leaving Flint" description="Ask before a tap opens another app." style={styles.sectionHeaderGap} />
+            <SectionHeader title="Leaving Flirteasy" description="Ask before a tap opens another app." style={styles.sectionHeaderGap} />
             <Card padding="none" style={styles.groupCard}>
               {/* Toggle 1: Tinder Confirmation */}
               <ListRow

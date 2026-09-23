@@ -211,7 +211,7 @@ export default function TinderProfileCard({
               <View style={styles.benefitTextWrap}>
                 <Text style={styles.benefitTitle}>Profile Sync & Preview</Text>
                 <Text style={styles.benefitDesc}>
-                  Imports your photos, bio, interests, and Tinder tier into Flint
+                  Imports your photos, bio, interests, and Tinder tier into Flirteasy
                 </Text>
               </View>
             </View>
@@ -324,7 +324,7 @@ export default function TinderProfileCard({
               </View>
             </View>
 
-            {/* Telemetry Strip: Flint Automation Likes & Messages Remaining */}
+            {/* Telemetry Strip: Flirteasy Automation Likes & Messages Remaining */}
             <View style={styles.telemetryDivider} />
             <View style={styles.telemetryStrip}>
               {renderTelemetry('Likes:', 'Messages:')}
@@ -379,7 +379,7 @@ export default function TinderProfileCard({
           </View>
         </TouchableOpacity>
 
-        {/* Telemetry Strip: Flint Automation Likes & Messages Remaining */}
+        {/* Telemetry Strip: Flirteasy Automation Likes & Messages Remaining */}
         <View style={styles.telemetryStrip}>
           {renderTelemetry('AI Likes:', 'AI Messages:')}
         </View>

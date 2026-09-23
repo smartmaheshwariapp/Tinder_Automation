@@ -687,18 +687,18 @@ export default function AuthScreen({ navigation, route }) {
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#0d0b14;margin:0;padding:24px;">
   <div style="max-width:480px;margin:0 auto;background:#161324;border-radius:16px;border:1px solid rgba(255,255,255,0.1);overflow:hidden;">
     <div style="background:linear-gradient(135deg,#FE3C72,#FF655B);padding:28px;text-align:center;">
-      <h1 style="color:#FFFFFF;font-size:24px;font-weight:800;margin:0;letter-spacing:-0.5px;">Flint</h1>
+      <h1 style="color:#FFFFFF;font-size:24px;font-weight:800;margin:0;letter-spacing:-0.5px;">Flirteasy</h1>
     </div>
     <div style="padding:32px 24px;text-align:center;color:#D8D6E8;">
       <div style="font-size:18px;font-weight:600;color:#FFFFFF;margin-bottom:12px;">Hey ${targetName || 'there'},</div>
-      <div style="font-size:14px;line-height:22px;color:#8E8DA3;margin-bottom:24px;">Here is your 6-digit verification code to sign in to Flint. This code expires in 10 minutes.</div>
+      <div style="font-size:14px;line-height:22px;color:#8E8DA3;margin-bottom:24px;">Here is your 6-digit verification code to sign in to Flirteasy. This code expires in 10 minutes.</div>
       <div style="background:#1E1A30;border:1.5px solid #FE3C72;border-radius:12px;padding:18px 24px;display:inline-block;margin-bottom:24px;">
         <span style="font-size:32px;font-weight:800;letter-spacing:8px;color:#FFFFFF;font-family:monospace;">${generatedCode}</span>
       </div>
       <div style="font-size:13px;color:#8E8DA3;">If you didn't request this code, you can safely ignore this email.</div>
     </div>
     <div style="border-top:1px solid rgba(255,255,255,0.06);padding:16px;font-size:11px;color:#5A586E;text-align:center;">
-      Secured by Flint Chemistry Copilot • 256-Bit Encryption
+      Secured by Flirteasy Chemistry Copilot • 256-Bit Encryption
     </div>
   </div>
 </body>
@@ -738,10 +738,10 @@ export default function AuthScreen({ navigation, route }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: targetEmail,
-          subject: `${generatedCode} is your Flint verification code`,
+          subject: `${generatedCode} is your Flirteasy verification code`,
           html: emailHtml,
           name: targetName || '',
-          from_name: 'Flint Dating',
+          from_name: 'Flirteasy Dating',
           from_email: 'aura.dating.app@gmail.com',
         }),
       });
@@ -1008,7 +1008,7 @@ export default function AuthScreen({ navigation, route }) {
           maxFontSizeMultiplier={uiTheme.fontScale.chrome}
           accessibilityRole="header"
         >
-          I'm FlintAI
+          I'm Flirteasy AI
         </Text>
 
         {/* Short, Warm Companion Subtitle */}
@@ -1019,7 +1019,7 @@ export default function AuthScreen({ navigation, route }) {
 
       {/* Bottom Authentication & Action Zone */}
       <View style={[styles.actionZone, columnStyle]}>
-        {/* Primary Action: HI, FlintAI! with Tactile Press Feedback & Shimmer */}
+        {/* Primary Action: HI, Flirteasy AI! with Tactile Press Feedback & Shimmer */}
         <MotionTouchable
           style={styles.btnCreateAccount}
           onPress={() => {
@@ -1029,8 +1029,8 @@ export default function AuthScreen({ navigation, route }) {
           }}
           activeOpacity={0.88}
           accessibilityRole="button"
-          accessibilityLabel="Hi, FlintAI!"
-          accessibilityHint="Start your onboarding journey with FlintAI"
+          accessibilityLabel="Hi, Flirteasy AI!"
+          accessibilityHint="Start your onboarding journey with Flirteasy AI"
         >
           <LinearGradient
             colors={uiTheme.gradients.brand}
@@ -1067,7 +1067,7 @@ export default function AuthScreen({ navigation, route }) {
             )}
 
             <Text style={styles.btnCreateAccountText} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-              HI, FlintAI!
+              HI, Flirteasy AI!
             </Text>
             <Animated.View style={{ transform: [{ translateX: arrowFloat }] }}>
               <Ionicons name="arrow-forward" size={19} color={COLORS.onPrimary} style={styles.btnArrowIcon} />
@@ -1094,7 +1094,7 @@ export default function AuthScreen({ navigation, route }) {
 
         {/* Legal & 18+ Disclaimer with Working Interactive Sheets */}
         <Text style={styles.legalDisclaimerText}>
-          By continuing, you confirm you are 18+ and agree to Flint's{' '}
+          By continuing, you confirm you are 18+ and agree to Flirteasy's{' '}
           <Text
             style={styles.legalLink}
             onPress={() => openLegalModal('terms')}
@@ -1132,7 +1132,7 @@ export default function AuthScreen({ navigation, route }) {
           hitSlop={{ top: 6, bottom: 12, left: 24, right: 24 }}
           accessibilityRole="button"
           accessibilityLabel="Continue as Guest"
-          accessibilityHint="Browse Flint without logging in"
+          accessibilityHint="Browse Flirteasy without logging in"
         >
           <Text style={styles.guestLinkText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Continue as Guest</Text>
         </MotionTouchable>
@@ -1261,7 +1261,7 @@ export default function AuthScreen({ navigation, route }) {
                   <View style={styles.fieldHintRow}>
                     <Ionicons name="lock-closed-outline" size={12} color={COLORS.muted} />
                     <Text style={styles.fieldHintText}>
-                      Visible on your Flint profile
+                      Visible on your Flirteasy profile
                     </Text>
                   </View>
                 </View>
@@ -1492,7 +1492,7 @@ export default function AuthScreen({ navigation, route }) {
                   activeOpacity={0.8}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: isAgreed }}
-                  accessibilityLabel="I confirm I am 18+ and agree to Flint's Terms of Service and Privacy Policy"
+                  accessibilityLabel="I confirm I am 18+ and agree to Flirteasy's Terms of Service and Privacy Policy"
                 >
                   <View
                     style={[
@@ -1504,7 +1504,7 @@ export default function AuthScreen({ navigation, route }) {
                     {isAgreed && <Ionicons name="checkmark" size={15} color={COLORS.onPrimary} />}
                   </View>
                   <Text style={styles.consentText}>
-                    I confirm I am 18+ and agree to Flint's{' '}
+                    I confirm I am 18+ and agree to Flirteasy's{' '}
                     <Text
                       style={styles.legalLink}
                       onPress={(e) => {
@@ -1560,10 +1560,10 @@ export default function AuthScreen({ navigation, route }) {
               onPress={() => handleSwitchMode(authMode === 'signup' ? 'login' : 'signup')}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel={authMode === 'signup' ? 'Already have an account? Sign In' : 'New to Flint? Create Account'}
+              accessibilityLabel={authMode === 'signup' ? 'Already have an account? Sign In' : 'New to Flirteasy? Create Account'}
             >
               <Text style={styles.modeToggleText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                {authMode === 'signup' ? 'Already have an account?' : 'New to Flint?'}{' '}
+                {authMode === 'signup' ? 'Already have an account?' : 'New to Flirteasy?'}{' '}
                 <Text style={styles.modeToggleLink}>{authMode === 'signup' ? 'Sign In' : 'Create Account'}</Text>
               </Text>
             </MotionTouchable>
@@ -1633,7 +1633,7 @@ export default function AuthScreen({ navigation, route }) {
             pointerEvents={authMode === 'login' ? 'auto' : 'none'}
           >
             <Text style={styles.termsText}>
-              By continuing, you agree to Flint's{' '}
+              By continuing, you agree to Flirteasy's{' '}
               <Text
                 style={styles.termsLink}
                 onPress={() => openLegalModal('terms')}
@@ -2003,7 +2003,7 @@ export default function AuthScreen({ navigation, route }) {
         onClose={() => setLegalModalVisible(false)}
         closeLabel="Close legal document"
         title="Legal & Privacy"
-        subtitle="Flint Trust, Safety & Compliance"
+        subtitle="Flirteasy Trust, Safety & Compliance"
         maxHeightRatio={0.86}
         footer={
           <AppButton
@@ -2087,22 +2087,22 @@ export default function AuthScreen({ navigation, route }) {
 
               <Text style={styles.legalParagraphHead} accessibilityRole="header">1. Eligibility & Age Restriction</Text>
               <Text style={styles.legalParagraph}>
-                You must be at least 18 years of age to create an account on Flint and use our service. By creating an account or signing in, you affirm, represent, and warrant that you are at least 18 years old and are legally capable of entering into this binding agreement. Any account found to be operated by a minor will be immediately and permanently terminated.
+                You must be at least 18 years of age to create an account on Flirteasy and use our service. By creating an account or signing in, you affirm, represent, and warrant that you are at least 18 years old and are legally capable of entering into this binding agreement. Any account found to be operated by a minor will be immediately and permanently terminated.
               </Text>
 
               <Text style={styles.legalParagraphHead} accessibilityRole="header">2. Member Conduct & Mutual Respect</Text>
               <Text style={styles.legalParagraph}>
-                Flint is a community dedicated to real romantic chemistry, dignity, and authentic connections. We enforce a zero-tolerance policy against hate speech, harassment, impersonation, commercial solicitation, unsolicited explicit media, and scamming. Every profile is subject to automated and human trust screening.
+                Flirteasy is a community dedicated to real romantic chemistry, dignity, and authentic connections. We enforce a zero-tolerance policy against hate speech, harassment, impersonation, commercial solicitation, unsolicited explicit media, and scamming. Every profile is subject to automated and human trust screening.
               </Text>
 
               <Text style={styles.legalParagraphHead} accessibilityRole="header">3. Safety & Profile Authenticity</Text>
               <Text style={styles.legalParagraph}>
-                To maintain an authentic network, Flint may require live biometric liveness selfie checks to verify your identity. You agree to upload only your own authentic, recent photos and to represent yourself truthfully.
+                To maintain an authentic network, Flirteasy may require live biometric liveness selfie checks to verify your identity. You agree to upload only your own authentic, recent photos and to represent yourself truthfully.
               </Text>
 
               <Text style={styles.legalParagraphHead} accessibilityRole="header">4. Subscriptions & Account Termination</Text>
               <Text style={styles.legalParagraph}>
-                You retain the right to delete your Flint account at any time in App Settings. Any premium subscriptions or boosts are managed through Apple App Store or Google Play Store billing terms.
+                You retain the right to delete your Flirteasy account at any time in App Settings. Any premium subscriptions or boosts are managed through Apple App Store or Google Play Store billing terms.
               </Text>
             </View>
           ) : (
@@ -2119,12 +2119,12 @@ export default function AuthScreen({ navigation, route }) {
 
               <Text style={styles.legalParagraphHead} accessibilityRole="header">2. Zero Third-Party Data Brokers</Text>
               <Text style={styles.legalParagraph}>
-                Flint does not sell, rent, or trade your personal data to advertisers or third-party data brokers. Your private chat messages are encrypted and only accessible to you and your match.
+                Flirteasy does not sell, rent, or trade your personal data to advertisers or third-party data brokers. Your private chat messages are encrypted and only accessible to you and your match.
               </Text>
 
               <Text style={styles.legalParagraphHead} accessibilityRole="header">3. Data Ownership & Deletion Rights</Text>
               <Text style={styles.legalParagraph}>
-                Under GDPR, CCPA, and global privacy standards, you maintain total ownership over your data. You may request a complete export of your account data or trigger immediate permanent erasure by tapping "Delete Account" in Flint Settings.
+                Under GDPR, CCPA, and global privacy standards, you maintain total ownership over your data. You may request a complete export of your account data or trigger immediate permanent erasure by tapping "Delete Account" in Flirteasy Settings.
               </Text>
 
               <Text style={styles.legalParagraphHead} accessibilityRole="header">4. Data Protection Contact</Text>
@@ -2144,7 +2144,7 @@ export default function AuthScreen({ navigation, route }) {
         onClose={() => setSupportModalVisible(false)}
         closeLabel="Close support"
         title="Sign-In Concierge"
-        subtitle="Fast assistance with your Flint account"
+        subtitle="Fast assistance with your Flirteasy account"
         maxHeightRatio={0.8}
         footer={
           <AppButton
@@ -2189,7 +2189,7 @@ export default function AuthScreen({ navigation, route }) {
 
         {/* Direct Concierge Contact Button */}
         <AppButton
-          title="Contact Flint Concierge"
+          title="Contact Flirteasy Concierge"
           variant="secondary"
           icon="chatbubbles"
           iconRight="open-outline"
@@ -2199,7 +2199,7 @@ export default function AuthScreen({ navigation, route }) {
             safeHaptic('medium');
             Linking.openURL('mailto:support@flint.dating?subject=Flint%20Login%20Assistance').catch(() => { });
           }}
-          accessibilityLabel="Email Flint Concierge Support"
+          accessibilityLabel="Email Flirteasy Concierge Support"
         />
       </BottomSheet>
     </View>

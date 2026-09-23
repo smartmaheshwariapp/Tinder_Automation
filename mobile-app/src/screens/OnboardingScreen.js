@@ -576,37 +576,37 @@ const GOALS = [
 
 const getStrategySummary = (goals) => {
   if (!goals || goals.length === 0) {
-    return 'Pick at least one goal so Flint knows how to guide your chats.';
+    return 'Pick at least one goal so Flirteasy knows how to guide your chats.';
   }
   if (goals.includes('never_stop')) {
-    return 'Flint will keep the banter fun and relaxed, letting the conversation flow with zero rush.';
+    return 'Flirteasy will keep the banter fun and relaxed, letting the conversation flow with zero rush.';
   }
   const hasDate = goals.includes('date');
   const hasPhone = goals.includes('phone');
   const hasSocial = goals.includes('social');
 
   if (hasDate && hasPhone && hasSocial) {
-    return 'Flint will break the ice, swap Instagram or numbers, and help you set up an in-person date.';
+    return 'Flirteasy will break the ice, swap Instagram or numbers, and help you set up an in-person date.';
   }
   if (hasDate && hasPhone) {
-    return 'Flint will build a fun connection, get her number, and find a great time to grab drinks or coffee.';
+    return 'Flirteasy will build a fun connection, get her number, and find a great time to grab drinks or coffee.';
   }
   if (hasDate && hasSocial) {
-    return 'Flint will keep the vibe fun, swap Instagrams, and suggest meeting up when she is interested.';
+    return 'Flirteasy will keep the vibe fun, swap Instagrams, and suggest meeting up when she is interested.';
   }
   if (hasPhone && hasSocial) {
-    return 'Flint will focus on moving the chat from Tinder over to text, WhatsApp, or Instagram.';
+    return 'Flirteasy will focus on moving the chat from Tinder over to text, WhatsApp, or Instagram.';
   }
   if (hasDate) {
-    return 'Flint will focus on turning great chats into real-world dates.';
+    return 'Flirteasy will focus on turning great chats into real-world dates.';
   }
   if (hasPhone) {
-    return 'Flint will find the right moment to ask for her number so you can text directly.';
+    return 'Flirteasy will find the right moment to ask for her number so you can text directly.';
   }
   if (hasSocial) {
-    return 'Flint will naturally trade Instagram or Snapchat handles with her.';
+    return 'Flirteasy will naturally trade Instagram or Snapchat handles with her.';
   }
-  return 'Flint will keep things natural and charming while getting to know her.';
+  return 'Flirteasy will keep things natural and charming while getting to know her.';
 };
 
 // Apple-calibrated UI spring physics: damping ~0.86, response ~0.35s
@@ -945,7 +945,7 @@ export default function OnboardingScreen({ navigation }) {
       if (hasDate) {
         return {
           title: 'Setting Up Real Dates',
-          detail: 'Flint effortlessly turns mutual attraction into memorable real-life dates',
+          detail: 'Flirteasy effortlessly turns mutual attraction into memorable real-life dates',
         };
       }
       if (hasPhone) {
@@ -2611,7 +2611,7 @@ export default function OnboardingScreen({ navigation }) {
                   <StepHeader
                     eyebrow={STEP_EYEBROWS[0]}
                     title="Better Dates, Less Effort"
-                    subtitle="Flint finds people you'll actually like, sparks natural conversations, and helps you meet up in real life."
+                    subtitle="Flirteasy finds people you'll actually like, sparks natural conversations, and helps you meet up in real life."
                   />
 
                   {/* Non-Stop Smooth Sliding Cards Showcase */}
@@ -2752,7 +2752,7 @@ export default function OnboardingScreen({ navigation }) {
                   <StepHeader
                     eyebrow={STEP_EYEBROWS[1]}
                     title="About you"
-                    subtitle="Flint adapts your conversation tone and references so chats feel completely natural in your area."
+                    subtitle="Flirteasy adapts your conversation tone and references so chats feel completely natural in your area."
                   />
 
                   {/* Regional Dating Context Card */}
@@ -2794,7 +2794,7 @@ export default function OnboardingScreen({ navigation }) {
                       icon="chatbubbles"
                       tone="info"
                       title="Languages you speak"
-                      subtitle="Flint crafts native openers in these languages"
+                      subtitle="Flirteasy crafts native openers in these languages"
                       right={<Badge label={`${selectedLanguages.length} selected`} tone="info" />}
                     />
 
@@ -3020,7 +3020,7 @@ export default function OnboardingScreen({ navigation }) {
                   <View style={[styles.card, styles.strategyCard]}>
                     <View style={styles.strategyHeaderRow}>
                       <IconWell icon="sparkles" tone="secondary" size={28} iconSize={14} />
-                      <Text style={styles.strategyHeaderTitle} numberOfLines={1}>How Flint will help you</Text>
+                      <Text style={styles.strategyHeaderTitle} numberOfLines={1}>How Flirteasy will help you</Text>
                       <Badge label="Your Game Plan" tone="secondary" />
                     </View>
                     <Animated.Text style={[styles.strategySummaryText, { opacity: strategyFadeAnim }]}>
@@ -3053,7 +3053,7 @@ export default function OnboardingScreen({ navigation }) {
                   <StepHeader
                     eyebrow={STEP_EYEBROWS[3]}
                     title="Behavior & Style"
-                    subtitle="Fine-tune how Flint talks and how actively he replies for you."
+                    subtitle="Fine-tune how Flirteasy talks and how actively he replies for you."
                   />
 
                   {/* Unified Settings Card */}
@@ -3063,7 +3063,7 @@ export default function OnboardingScreen({ navigation }) {
                       icon="sparkles"
                       tone="info"
                       title="Conversation Tone"
-                      subtitle="Tap any tone to hear Flint's opening style"
+                      subtitle="Tap any tone to hear Flirteasy's opening style"
                     />
 
                     {/* Smooth Horizontal Smart Tone Rail (All 10 Personalities, Zero Clutter) */}
@@ -3086,7 +3086,7 @@ export default function OnboardingScreen({ navigation }) {
                       ))}
                     </ScrollView>
 
-                    {/* Live "Voice of Flint" Preview with Real-Time Typing Animation */}
+                    {/* Live "Voice of Flirteasy" Preview with Real-Time Typing Animation */}
                     <TouchableOpacity
                       activeOpacity={0.95}
                       onPress={() => {
@@ -3101,14 +3101,14 @@ export default function OnboardingScreen({ navigation }) {
                       }}
                       style={styles.voicePreview}
                       accessibilityRole="button"
-                      accessibilityLabel="Voice of Flint preview. Tap to reveal full message"
+                      accessibilityLabel="Voice of Flirteasy preview. Tap to reveal full message"
                     >
                       <View style={styles.voiceHeaderRow}>
                         <View style={styles.voiceHeaderLeft}>
                           <View style={[styles.voiceIconDisk, { backgroundColor: alpha(currentPersonalityObj.accentColor, 0.16), borderColor: alpha(currentPersonalityObj.accentColor, 0.34) }]}>
                             <Ionicons name="chatbubble-ellipses" size={12} color={currentPersonalityObj.accentColor} />
                           </View>
-                          <Text style={styles.voiceHeaderTitle} numberOfLines={1}>Voice of Flint</Text>
+                          <Text style={styles.voiceHeaderTitle} numberOfLines={1}>Voice of Flirteasy</Text>
                           <View style={styles.voiceLiveBeaconRow}>
                             <View style={[styles.voiceLiveDot, { backgroundColor: currentPersonalityObj.accentColor }]} />
                             <Text style={[styles.voiceLiveText, { color: currentPersonalityObj.accentColor }]} numberOfLines={1}>
@@ -3124,7 +3124,7 @@ export default function OnboardingScreen({ navigation }) {
                         </View>
                       </View>
 
-                      {/* Outgoing chat bubble (Flint's message) */}
+                      {/* Outgoing chat bubble (Flirteasy's message) */}
                       <View style={styles.voiceBubble}>
                         <LinearGradient
                           colors={uiTheme.gradients.brandShort}
@@ -3139,7 +3139,7 @@ export default function OnboardingScreen({ navigation }) {
                               <Animated.View style={[styles.typingDot, { transform: [{ translateY: typingDot2 }] }]} />
                               <Animated.View style={[styles.typingDot, { transform: [{ translateY: typingDot3 }] }]} />
                             </View>
-                            <Text style={styles.voiceDraftingText}>Flint is tailoring an opener...</Text>
+                            <Text style={styles.voiceDraftingText}>Flirteasy is tailoring an opener...</Text>
                           </View>
                         ) : (
                           <Text style={styles.voiceOpenerText}>
@@ -3174,7 +3174,7 @@ export default function OnboardingScreen({ navigation }) {
                       icon="timer"
                       tone="primary"
                       title="Reply Speed"
-                      subtitle="How often Flint checks for new matches and replies"
+                      subtitle="How often Flirteasy checks for new matches and replies"
                     />
 
                     {/* Segmented Cadence Track with Smooth Animated Slider */}
@@ -3317,7 +3317,7 @@ export default function OnboardingScreen({ navigation }) {
                   <StepHeader
                     eyebrow={STEP_EYEBROWS[4]}
                     title="Ready to Match"
-                    subtitle={`${currentMatch.name.split(',')[0]} is waiting in your deck · Flint is live & drafting`}
+                    subtitle={`${currentMatch.name.split(',')[0]} is waiting in your deck · Flirteasy is live & drafting`}
                     subtitleLines={2}
                   />
 
@@ -3441,7 +3441,7 @@ export default function OnboardingScreen({ navigation }) {
                               <View style={styles.icebreakerHeaderRow}>
                                 <Ionicons name="sparkles" size={12} color={currentPersonalityObj.accentColor} />
                                 <Text style={[styles.icebreakerTag, { color: currentPersonalityObj.accentColor }]} numberOfLines={1}>
-                                  Flint Icebreaker · {currentPersonalityObj.label}
+                                  Flirteasy Icebreaker · {currentPersonalityObj.label}
                                 </Text>
                               </View>
                               <Text style={styles.icebreakerQuoteText} numberOfLines={2}>

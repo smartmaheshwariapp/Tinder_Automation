@@ -49,7 +49,7 @@ export default function CloudDashboardScreen({ route, navigation }) {
           <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" accessibilityIgnoresInvertColors />
           <View style={styles.headerCopy}>
             <View style={styles.headerTitleRow}>
-              <AppText variant="headline" numberOfLines={1} style={styles.headerTitle} accessibilityRole="header">Flint Assistant</AppText>
+              <AppText variant="headline" numberOfLines={1} style={styles.headerTitle} accessibilityRole="header">Flirteasy Assistant</AppText>
               <Badge label="LIVE" tone="primary" size="sm" dot />
             </View>
             {!isCompact ? (
@@ -91,7 +91,7 @@ export default function CloudDashboardScreen({ route, navigation }) {
               <AppText variant="section" style={styles.infoTitle} numberOfLines={2}>Tinder Assistant Active</AppText>
             </View>
             <AppText variant="callout" color="textSecondary">
-              Flint is actively finding compatible matches and chatting in your unique personal style.
+              Flirteasy is actively finding compatible matches and chatting in your unique personal style.
             </AppText>
             {vpsUrl && (
               <AppButton
