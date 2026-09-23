@@ -6,9 +6,13 @@ import { createStyles, theme, alpha, getActiveTheme, THEME_OPTIONS } from '../..
 import ThemePickerSheet from './ThemePickerSheet';
 import SafeActivityIndicator from '../common/SafeActivityIndicator';
 import { FadeIn } from '../common/Motion';
-import { AppText, Badge, Card, ListRow, LiveDot, ScreenHeader, SectionHeader } from '../ui';
+import { AppText, Badge, BottomSheet, Card, ListRow, LiveDot, ScreenHeader, SectionHeader } from '../ui';
+import AppConfirmModal from '../common/AppConfirmModal';
+import LegalDocument from '../legal/LegalDocument';
 import useResponsive from '../../hooks/useResponsive';
 import appConfig from '../../../app.json';
+import policies from '../../legal/policies.json';
+import { SUPPORT_EMAIL, SUPPORT_SUBJECT } from '../../config/contact';
 
 // Grouped settings row (iOS-settings style) built on ListRow. `busy` swaps the chevron for a spinner.
 function SettingsRow({ icon, tone = 'primary', title, description, onPress, busy = false, divider = false }) {
@@ -39,9 +43,23 @@ function Section({ title, children, delay = 0, style }) {
 
 export default function AppSettings({ settings, isLoggedIn, environment, unreadCount,
   updatingLocation, onRefreshLocation, onNotifications, onPreferences, onSession,
-  onAutomation, onConnect, onBack }) {
+  onAutomation, onConnect, onBack, onDeleteAccount }) {
   const { gutter, contentMax, isTablet } = useResponsive();
   const [showThemes, setShowThemes] = useState(false);
+  // 'privacy' | 'terms' | 'about' | null — which information sheet is open.
+  const [sheet, setSheet] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const appName = appConfig.expo.name;
+  const appVersion = appConfig.expo.version;
+
+  const openSupportMail = async () => {
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(SUPPORT_SUBJECT)}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('No email app found', `Write to us at ${SUPPORT_EMAIL} and we will get back to you.`);
+    }
+  };
   const activeTheme = THEME_OPTIONS.find((option) => option.id === getActiveTheme()) || THEME_OPTIONS[0];
   const profileName = settings?.userProfile?.name;
   // Tinder account details for the connection card (display only).
@@ -183,9 +201,71 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
           description={`Connection: ${{ on_device: 'On-device', hyperbeam: 'Cloud', vps: 'VPS', local: 'Local' }[environment] || 'Not configured'}. Manage your environment and server.`}
           onPress={onPreferences} />
       </Section>
+      <Section title="Legal & support" delay={300} style={isTablet && styles.sectionColumn}>
+        <SettingsRow icon="lock-closed-outline" tone="info" divider title="Privacy Policy"
+          description="What the app collects, who receives it and your choices" onPress={() => setSheet('privacy')} />
+        <SettingsRow icon="document-text-outline" tone="secondary" divider title="Terms & Conditions"
+          description="The rules for using the app and your connected account" onPress={() => setSheet('terms')} />
+        <SettingsRow icon="information-circle-outline" tone="neutral" divider title="About App"
+          description={`${appName} · Version ${appVersion}`} onPress={() => setSheet('about')} />
+        <SettingsRow icon="mail-outline" tone="success" divider title="Contact us"
+          description="Get help or ask a privacy question by email" onPress={openSupportMail} />
+        <ListRow icon="trash-outline" destructive title="Delete Account"
+          subtitle="Erase your data from this phone and sign out"
+          onPress={() => setConfirmDelete(true)}
+          chevron
+          accessibilityLabel="Delete Account. Erase your data from this phone and sign out"
+          accessibilityHint="Opens a confirmation dialog" />
+      </Section>
       </View>
-      <AppText variant="caption" align="center" style={styles.footer}>Flirteasy · Version {appConfig.expo.version}</AppText>
+      <AppText variant="caption" align="center" style={styles.footer}>{appName} · Version {appVersion}</AppText>
       <ThemePickerSheet visible={showThemes} onClose={() => setShowThemes(false)} />
+
+      {/* Privacy Policy and Terms, read from src/legal/policies.json (same text as the published documents). */}
+      <BottomSheet
+        visible={sheet === 'privacy' || sheet === 'terms'}
+        onClose={() => setSheet(null)}
+        title={sheet === 'privacy' ? policies.privacy.title : policies.terms.title}
+        subtitle={`Effective ${policies.effectiveDate}`}
+      >
+        {sheet === 'privacy' || sheet === 'terms' ? <LegalDocument type={sheet} /> : null}
+      </BottomSheet>
+
+      <BottomSheet visible={sheet === 'about'} onClose={() => setSheet(null)} title="About App" subtitle={`${appName} · Version ${appVersion}`}>
+        <View style={styles.about}>
+          <AppText variant="body">
+            {appName} is a dating assistant for Tinder. It shows your profiles, matches and conversations, and can swipe,
+            write openers and replies, and send messages through your connected account using AI.
+          </AppText>
+          <AppText variant="body">
+            AI suggestions and match labels are not facts, and actions the app takes are treated by Tinder and other people as
+            coming from you. Review your settings and activity regularly.
+          </AppText>
+          <View style={styles.aboutMeta}>
+            <AppText variant="footnote">Operator: {policies.operator}</AppText>
+            <AppText variant="footnote">Support: {SUPPORT_EMAIL}</AppText>
+            <AppText variant="footnote">Legal documents effective {policies.effectiveDate}</AppText>
+          </View>
+        </View>
+      </BottomSheet>
+
+      <AppConfirmModal
+        visible={confirmDelete}
+        icon="trash-outline"
+        iconColor={theme.colors.error}
+        iconBg={theme.colors.errorSoft}
+        iconBorder={theme.colors.errorBorder}
+        title="Delete Account"
+        message={`This erases this app's data on this phone — your settings, swipe and match history, conversations and activity — and signs you out. It does not delete your Tinder account. To delete the records held in our cloud, email ${SUPPORT_EMAIL} from your sign-up address.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="destructive"
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          onDeleteAccount?.();
+        }}
+      />
     </ScrollView>
   );
 }
@@ -220,4 +300,6 @@ const styles = createStyles(() => ({
   sectionHeader: { marginBottom: theme.spacing.sm },
   card: { overflow: 'hidden' },
   footer: { paddingVertical: theme.spacing.sm },
+  about: { gap: theme.spacing.lg, paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.lg },
+  aboutMeta: { gap: theme.spacing.xs, paddingTop: theme.spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.divider },
 }));

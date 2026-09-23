@@ -1106,6 +1106,21 @@ export default function PlatformSelectScreen({ navigation, route }) {
     setShowLogoutConfirm(true);
   }, []);
 
+  // Shared by the profile screen and App settings → Delete Account. Signs out of
+  // Tinder, clears this app's local storage and returns to the auth screen.
+  // Cloud records are deleted on request by email; see the Privacy Policy.
+  const handleDeleteAccountData = useCallback(async () => {
+    await handleLogout();
+    await SupabaseService.logoutUser();
+    try {
+      const AsyncStorage = (
+        await import("@react-native-async-storage/async-storage")
+      ).default;
+      await AsyncStorage.clear();
+    } catch (_) {}
+    navigation.replace("Auth", { logout: true });
+  }, [handleLogout, navigation]);
+
   // BrowserScreen hands off `justSignedOut` when a logout closed the session.
   // The param is cleared immediately so returning to this screen later, or any
   // re-render, does not replay the toast.
@@ -1359,17 +1374,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
             onSync={handleSyncProfileFromHome}
             onSave={handleSaveSettings}
             onLogout={handleFlintLogout}
-            onDeleteData={async () => {
-              await handleLogout();
-              await SupabaseService.logoutUser();
-              try {
-                const AsyncStorage = (
-                  await import("@react-native-async-storage/async-storage")
-                ).default;
-                await AsyncStorage.clear();
-              } catch (_) {}
-              navigation.replace("Auth", { logout: true });
-            }}
+            onDeleteData={handleDeleteAccountData}
           />
         ) : homeTab === "appSettings" ? (
           <AppSettings
@@ -1385,6 +1390,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
             onAutomation={() => setHomeTab("automation")}
             onConnect={() => handleOpenLiveFeed("Tinder")}
             onBack={() => setHomeTab("home")}
+            onDeleteAccount={handleDeleteAccountData}
           />
         ) : (
           <View style={homeStyles.dashboard}>
