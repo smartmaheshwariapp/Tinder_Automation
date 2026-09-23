@@ -30,7 +30,7 @@ import SupabaseService from '../services/supabase';
 import { API_CONFIG } from '../config/api';
 import trackingService from '../services/trackingService';
 import { switchUserSession } from '../utils/sessionManager';
-import { AppButton, IconButton, IconWell, Chip, BottomSheet, MotionTouchable, ContentTransition, FadeIn } from '../components/ui';
+import { AppLogo, AppButton, IconButton, IconWell, Chip, BottomSheet, MotionTouchable, ContentTransition, FadeIn } from '../components/ui';
 import { useMotionReduced } from '../components/common/Motion';
 import useResponsive from '../hooks/useResponsive';
 
@@ -59,7 +59,6 @@ const safeHaptic = (type) => {
 
 // Module-load window size removed: it never updates on rotation. Use useResponsive() at render time.
 // const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const FALLBACK_LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 const DOMAIN_SUGGESTIONS = ['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'];
 
 // 6 High-Res Romantic Editorial Couple Photography Slides from Stitch MCP
@@ -96,8 +95,6 @@ const CAROUSEL_SLIDES = [
   },
 ];
 
-const AURA_EMBLEM_URI =
-  'https://lh3.googleusercontent.com/aida/AEtjO1XBLBCvT6YG6NjEQtmsjtWA5j_uCps04hYP22UuacAxVsDbTJ-8aEt7FTCHe54G4532OO4W9mUziOo89_l3f1s4bw-AKSf13KLGKYwV1JM7egtBa0zRtTlt6WR24SfQmVAI4KU4-pfv8GOxG7PNQAIU6vvTe82hpcB8hAGX_4vQVn3Yns7nE5T3vr7KmRLK5K2FWS_pPKMg3gmSBbNJvIWyqdTTRyPdOnrkGYitlXO70H45WmmZI8svYw';
 
 export default function AuthScreen({ navigation, route }) {
   const initialMode = route?.params?.initialMode;
@@ -120,7 +117,6 @@ export default function AuthScreen({ navigation, route }) {
   const [successNotice, setSuccessNotice] = useState('');
   const [countdown, setCountdown] = useState(45);
   const [resendActive, setResendActive] = useState(false);
-  const [emblemFailed, setEmblemFailed] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
   // ── Layout & motion preferences (UI only) ──
@@ -983,22 +979,8 @@ export default function AuthScreen({ navigation, route }) {
             },
           ]}
         >
-          <LinearGradient
-            colors={[COLORS.primary, COLORS.secondary, COLORS.warning]}
-            start={{ x: 0, y: 1 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.auraFrame, { width: emblemSize, height: emblemSize, borderRadius: emblemRadius }]}
-          >
-            <View style={[styles.auraInner, { borderRadius: emblemRadius - 3 }]}>
-              <Image
-                source={emblemFailed ? FALLBACK_LOGO_IMG : { uri: AURA_EMBLEM_URI }}
-                onError={() => setEmblemFailed(true)}
-                style={styles.auraImage}
-                resizeMode="cover"
-                accessibilityIgnoresInvertColors
-              />
-            </View>
-          </LinearGradient>
+          {/* The app mark, shared with the splash screen and the dock's centre button. */}
+          <AppLogo size={emblemSize} accessibilityLabel="Flirteasy" />
         </Animated.View>
 
         {/* Reflectly-Style Companion Greeting */}
@@ -2313,27 +2295,7 @@ const styles = createStyles(() => ({
   },
   emblemContainerTight: {
     marginBottom: SPACE.md,
-  },
-  auraFrame: {
-    padding: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...uiTheme.shadows.md,
-  },
-  auraInner: {
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: alpha(COLORS.white, 0.22),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  auraImage: {
-    width: '100%',
-    height: '100%',
-  },
+  },
 
   // ── Companion Greeting Typography ──
   greetingSalutation: {

@@ -20,7 +20,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import SupabaseService from '../services/supabase';
-import { AppButton, IconWell, Chip, BottomSheet, MotionTouchable, ContentTransition, FadeIn } from '../components/ui';
+import { AppLogo, AppButton, IconWell, Chip, BottomSheet, MotionTouchable, ContentTransition, FadeIn } from '../components/ui';
 import useResponsive from '../hooks/useResponsive';
 
 const COLORS = uiTheme.colors;
@@ -48,7 +48,6 @@ const safeHaptic = (type) => {
 
 // Module-load window size removed: it never updates on rotation. Use useResponsive() at render time.
 // const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const FALLBACK_LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
 const DOMAIN_SUGGESTIONS = ['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'];
 const isValidEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
 
@@ -79,8 +78,6 @@ const CAROUSEL_SLIDES = [
   },
 ];
 
-const FLINT_EMBLEM_URI =
-  'https://lh3.googleusercontent.com/aida/AEtjO1XBLBCvT6YG6NjEQtmsjtWA5j_uCps04hYP22UuacAxVsDbTJ-8aEt7FTCHe54G4532OO4W9mUziOo89_l3f1s4bw-AKSf13KLGKYwV1JM7egtBa0zRtTlt6WR24SfQmVAI4KU4-pfv8GOxG7PNQAIU6vvTe82hpcB8hAGX_4vQVn3Yns7nE5T3vr7KmRLK5K2FWS_pPKMg3gmSBbNJvIWyqdTTRyPdOnrkGYitlXO70H45WmmZI8svYw';
 
 export default function LoginScreen({ navigation, route }) {
   const { gutter, isCompact, isShort, isLandscape, isTablet, formMax, pick } = useResponsive();
@@ -91,7 +88,6 @@ export default function LoginScreen({ navigation, route }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isFocusedEmail, setIsFocusedEmail] = useState(false);
   const [isFocusedPassword, setIsFocusedPassword] = useState(false);
-  const [emblemFailed, setEmblemFailed] = useState(false);
 
   // ── Auto-resolve authenticated Flint session ──
   useEffect(() => {
@@ -365,22 +361,8 @@ export default function LoginScreen({ navigation, route }) {
           {/* Hero Branding */}
           <FadeIn style={[styles.brandContainer, heroSpacing]}>
             <View style={[styles.emblemWrapper, compactHero && styles.emblemWrapperTight]}>
-              <LinearGradient
-                colors={[COLORS.primary, COLORS.secondary, COLORS.warning]}
-                start={{ x: 0, y: 1 }}
-                end={{ x: 1, y: 0 }}
-                style={[styles.emblemFrame, { width: emblemSize, height: emblemSize, borderRadius: emblemRadius }]}
-              >
-                <View style={[styles.emblemInner, { borderRadius: emblemRadius - 3 }]}>
-                  <Image
-                    source={emblemFailed ? FALLBACK_LOGO_IMG : { uri: FLINT_EMBLEM_URI }}
-                    onError={() => setEmblemFailed(true)}
-                    style={styles.emblemImg}
-                    resizeMode="cover"
-                    accessibilityIgnoresInvertColors
-                  />
-                </View>
-              </LinearGradient>
+              {/* The app mark, shared with the splash screen and the dock's centre button. */}
+              <AppLogo size={emblemSize} accessibilityLabel="Flirteasy" />
             </View>
 
             <Text style={styles.brandTitle} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Flirteasy</Text>
@@ -1004,27 +986,7 @@ const styles = createStyles(() => ({
   },
   emblemWrapperTight: {
     marginBottom: SPACE.sm,
-  },
-  emblemFrame: {
-    padding: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...uiTheme.shadows.md,
-  },
-  emblemInner: {
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: alpha(COLORS.white, 0.2),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emblemImg: {
-    width: '100%',
-    height: '100%',
-  },
+  },
   brandTitle: {
     ...TYPE.largeTitle,
     color: COLORS.text,

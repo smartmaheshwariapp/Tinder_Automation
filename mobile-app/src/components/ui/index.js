@@ -2,6 +2,7 @@
 import React from 'react';
 import FeedbackState from '../common/FeedbackState';
 
+export { default as AppLogo } from './AppLogo';
 export { default as AppText } from './AppText';
 export { default as AppButton } from './AppButton';
 export { default as IconButton } from './IconButton';

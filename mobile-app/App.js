@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
 import AppNavigator from './src/navigation/AppNavigator';
+import AppLogo from './src/components/ui/AppLogo';
 import InAppNotificationBanner from './src/components/InAppNotificationBanner';
 import ExternalRedirectModal from './src/components/ExternalRedirectModal';
 import NotificationService from './src/services/notifications';
@@ -141,9 +142,7 @@ export default function App() {
       <AppShell>
       <View style={styles.splashContainer}>
         <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
-        <LinearGradient colors={theme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.splashMark}>
-          <Ionicons name="flame" size={34} color={theme.colors.onPrimary} />
-        </LinearGradient>
+        <AppLogo size={88} accessibilityLabel="Flirteasy" />
         <Text style={styles.splashTitle} accessibilityRole="header">Flirteasy</Text>
         <Text style={styles.splashStatus} accessibilityLiveRegion="polite">{updateStatus}</Text>
         <SafeActivityIndicator size={20} color={theme.colors.accent} style={styles.splashSpinner} />
