@@ -55,6 +55,7 @@ import {
   switchUserSession,
   handleFlintUserLogout,
   getActiveUserId,
+  isAutoSwipeEnabled,
 } from "../utils/sessionManager";
 import useExtensionStats from "../hooks/useExtensionStats";
 import useResponsive from "../hooks/useResponsive";
@@ -936,7 +937,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
       const nextRunning = !isCurrentlyRunning;
 
       const auth = getTinderAuthState();
-      const isAuthenticated = Boolean(auth?.isLoggedIn && auth?.token);
+      const isAuthenticated = Boolean(auth?.isLoggedIn || isLoggedIn);
 
       if (nextRunning) {
         // If the user is NOT authenticated, user intervention is required (login)
@@ -951,27 +952,36 @@ export default function PlatformSelectScreen({ navigation, route }) {
           return;
         }
 
-        const isExhausted =
-          currentState?.agentState?.waitingReason === "likes_exhausted";
+        const swipingEnabled = isAutoSwipeEnabled(localSettings);
+        const initialPhase = swipingEnabled ? "liking" : "messaging";
 
         // Authenticated! Stay on Home Screen and start automation silently in background
         updateSharedAgentState({
           agentState: {
             isRunning: true,
             isPaused: false,
-            currentPhase: isExhausted ? "messaging" : "liking",
+            waitingReason: null,
+            currentPhase: initialPhase,
             source: "home_screen",
           },
         });
-        saveOnDeviceSessionState({ isRunning: true });
+        saveOnDeviceSessionState({
+          isRunning: true,
+          waitingReason: null,
+          currentPhase: initialPhase,
+        });
         pushProgressFeedEvent(
           "persona_update",
-          isExhausted
+          !swipingEnabled
             ? "AI Wingman Activated — Messaging Active Matches"
             : "AI Wingman Activated — Swiping & Chatting",
           null,
           0,
         );
+
+        if (browserScreenRef.current?.toggleOnDeviceSwiping) {
+          browserScreenRef.current.toggleOnDeviceSwiping(true);
+        }
       } else {
         updateSharedAgentState({
           agentState: {
@@ -988,6 +998,10 @@ export default function PlatformSelectScreen({ navigation, route }) {
           null,
           0,
         );
+
+        if (browserScreenRef.current?.toggleOnDeviceSwiping) {
+          browserScreenRef.current.toggleOnDeviceSwiping(false);
+        }
       }
       return;
     }

@@ -1,12 +1,15 @@
-import { createStyles, theme as uiTheme } from '../../theme';
 // src/components/dashboard/DashboardPanel.js — Apple iOS-Grade Root Dashboard Panel
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  Animated,
+  Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { createStyles, theme as uiTheme } from '../../theme';
 import Skeleton, { SkeletonRow } from '../ui/Skeleton';
 import useResponsive from '../../hooks/useResponsive';
 
@@ -16,11 +19,59 @@ import SegmentedTabControl from './SegmentedTabControl';
 import ActivityTimeline from './ActivityTimeline';
 import AutomationV2Panel from './AutomationV2Panel';
 import SettingsPanel from './SettingsPanel';
-import FloatingSaveBar from './FloatingSaveBar';
 import useExtensionSettings from '../../hooks/useExtensionSettings';
 import { resolveLocalUrl } from '../../utils/network';
 import { getProgressFeed } from '../../utils/sessionManager';
 import FeedbackState from '../common/FeedbackState';
+
+// Subtle Non-Blocking Auto-Save Status HUD (Floating Micro-Capsule)
+function SaveStatusHUD({ saving, saveSuccess, error }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  const isVisible = Boolean(saving || saveSuccess || error);
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: isVisible ? 1 : 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [isVisible, anim]);
+
+  if (!isVisible) return null;
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.hudContainer,
+        {
+          opacity: anim,
+          transform: [{
+            translateY: anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [-10, 0],
+            }),
+          }],
+        },
+      ]}
+    >
+      <View style={[
+        styles.hudPill,
+        saveSuccess && styles.hudPillSuccess,
+        error && styles.hudPillError,
+      ]}>
+        <Ionicons
+          name={saveSuccess ? 'checkmark-circle' : error ? 'alert-circle' : 'cloud-upload-outline'}
+          size={13}
+          color={saveSuccess ? uiTheme.colors.success : error ? uiTheme.colors.error : uiTheme.colors.primary}
+        />
+        <Text style={styles.hudText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
+          {saving ? 'Saving changes…' : saveSuccess ? 'Saved' : 'Save failed'}
+        </Text>
+      </View>
+    </Animated.View>
+  );
+}
 
 // List-shaped loading placeholder that mirrors the activity timeline (summary + event rows).
 function LoadingState() {
@@ -127,13 +178,15 @@ export default function DashboardPanel({
         if (success !== false) {
           setLocalSettings(prev => ({ ...(prev || effectiveSettings || {}), ...updated }));
           setLocalSaveSuccess(true);
-          setTimeout(() => setLocalSaveSuccess(false), 3000);
+          setTimeout(() => setLocalSaveSuccess(false), 2000);
           return true;
         }
         setLocalError('Your settings could not be saved. Please try again.');
+        setTimeout(() => setLocalError(null), 3000);
         return false;
       } catch (_) {
         setLocalError('Your settings could not be saved. Please try again.');
+        setTimeout(() => setLocalError(null), 3000);
         return false;
       } finally {
         setLocalSaving(false);
@@ -142,36 +195,15 @@ export default function DashboardPanel({
     return await handleSaveV2Settings(updated);
   }, [onSaveSettings, effectiveSettings, handleSaveV2Settings]);
 
-  // ─── Global Dynamic Floating Save Bar Controller ───
-  const [dirtyState, setDirtyState] = useState({
-    isDirty: false,
-    saveFn: null,
-    discardFn: null,
-  });
-
-  const handleDirtyChange = useCallback((isDirty, saveFn, discardFn) => {
-    setDirtyState({
-      isDirty: Boolean(isDirty),
-      saveFn: saveFn || null,
-      discardFn: discardFn || null,
-    });
-  }, []);
-
-  const handleGlobalSave = useCallback(() => {
-    if (dirtyState.saveFn) {
-      dirtyState.saveFn();
-    }
-  }, [dirtyState]);
-
-  const handleGlobalDiscard = useCallback(() => {
-    if (dirtyState.discardFn) {
-      dirtyState.discardFn();
-    }
-    setDirtyState({ isDirty: false, saveFn: null, discardFn: null });
-  }, [dirtyState]);
-
   return (
     <View style={styles.panel}>
+      {/* ─── Subtle Non-Blocking Auto-Save Status HUD ─── */}
+      <SaveStatusHUD
+        saving={onSaveSettings ? localSaving : v2Saving}
+        saveSuccess={onSaveSettings ? localSaveSuccess : v2SaveSuccess}
+        error={onSaveSettings ? localError : v2Error}
+      />
+
       {/* ── Scrollable Dashboard Content ── */}
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -226,7 +258,6 @@ export default function DashboardPanel({
             saveSuccess={onSaveSettings ? localSaveSuccess : v2SaveSuccess}
             error={onSaveSettings ? localError : v2Error}
             onSave={handleSave}
-            onDirtyChange={handleDirtyChange}
             onNavigateToSettings={handleNavigateToSettings}
           />
         )}
@@ -239,7 +270,6 @@ export default function DashboardPanel({
             saveSuccess={onSaveSettings ? localSaveSuccess : v2SaveSuccess}
             error={onSaveSettings ? localError : v2Error}
             onSave={handleSave}
-            onDirtyChange={handleDirtyChange}
             onLogout={onLogout}
             onConnect={onConnect}
             isLoggedIn={isLoggedIn}
@@ -252,16 +282,6 @@ export default function DashboardPanel({
           />
         )}
       </ScrollView>
-
-      {/* ─── 5. Global Floating Save Bar (Always Fixed at Viewport Bottom) ─── */}
-      <FloatingSaveBar
-        visible={dirtyState.isDirty}
-        saving={onSaveSettings ? localSaving : v2Saving}
-        saveSuccess={onSaveSettings ? localSaveSuccess : v2SaveSuccess}
-        error={onSaveSettings ? localError : v2Error}
-        onSave={handleGlobalSave}
-        onDiscard={handleGlobalDiscard}
-      />
     </View>
   );
 }
@@ -272,6 +292,43 @@ const styles = createStyles(() => ({
     backgroundColor: uiTheme.colors.background,
     position: 'relative',
   },
+  hudContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 12 : 8,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  hudPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: 'rgba(18, 24, 38, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  hudPillSuccess: {
+    borderColor: 'rgba(52, 211, 153, 0.45)',
+    backgroundColor: 'rgba(6, 78, 59, 0.92)',
+  },
+  hudPillError: {
+    borderColor: 'rgba(239, 68, 68, 0.45)',
+    backgroundColor: 'rgba(127, 29, 29, 0.92)',
+  },
+  hudText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
   scrollContent: {
     width: '100%',
     // Baseline; DashboardPanel overrides maxWidth with useResponsive().contentMax so phones keep
@@ -279,7 +336,7 @@ const styles = createStyles(() => ({
     maxWidth: uiTheme.layout.contentMax,
     alignSelf: 'center',
     paddingTop: uiTheme.spacing.md,
-    paddingBottom: 90, // Extra breathing space so content isn't covered by floating save bar
+    paddingBottom: uiTheme.spacing.xl,
   },
   loadingWrap: {
     gap: uiTheme.spacing.lg,

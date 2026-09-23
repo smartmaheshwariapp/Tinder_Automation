@@ -5,23 +5,43 @@
 export const SELECTORS_JSON = {
   "buttons": {
     "like": [
+      "[data-testid='gamepad-like']",
+      "button[data-testid='gamepad-like']",
+      "button[data-testid*='like' i]",
       "button:text-equals('Like')",
       "button[aria-label='Like']",
-      "button[aria-label='like']"
+      "button[aria-label='like']",
+      "button[aria-label*='Like' i]",
+      "button[aria-label*='Me gusta' i]",
+      "button[aria-label*='J\\'aime' i]",
+      "button[aria-label*='Curtir' i]",
+      "button[aria-label*='Gefällt mir' i]",
+      "div[role='button'][data-testid='gamepad-like']"
     ],
     "pass": [
+      "[data-testid='gamepad-pass']",
+      "button[data-testid='gamepad-pass']",
+      "button[data-testid*='pass' i]",
+      "button[data-testid*='nope' i]",
       "button:text-equals('Nope')",
       "button:text-equals('Pass')",
       "button[aria-label='Pass']",
-      "button[aria-label='Nope']"
+      "button[aria-label='Nope']",
+      "button[aria-label*='Pass' i]",
+      "button[aria-label*='Nope' i]",
+      "div[role='button'][data-testid='gamepad-pass']"
     ],
     "superLike": [
+      "[data-testid='gamepad-superlike']",
+      "button[data-testid='gamepad-superlike']",
       "button:text-equals('Super Like')",
-      "button[aria-label='Super Like']"
+      "button[aria-label='Super Like']",
+      "button[aria-label*='Super Like' i]"
     ],
     "closePopup": [
       "button[aria-label*='Close']",
       "button[aria-label='Close']",
+      "button[data-testid*='close' i]",
       "button:contains('×')",
       "button:contains('X')"
     ]
@@ -119,14 +139,18 @@ export const SELECTORS_JSON = {
       "div.C\\(\\$c-ds-text-primary\\).Typs\\(display-2-strong\\)"
     ],
     "card": [
-      ".recsCardboard__cards .Bxsh\\(\\$bxsh-card\\)",
-      ".recsCardboard__cardsContainer [data-keyboard-gamepad='true']",
+      "[data-keyboard-gamepad='true']",
       "div[data-testid='recsCard']",
       "div[data-testid='recCard']",
+      "div[data-testid='gamepad-card']",
+      ".recsCardboard__cardsContainer [data-keyboard-gamepad='true']",
+      ".recsCardboard__cards .Bxsh\\(\\$bxsh-card\\)",
+      ".recsCardboard__cards",
       "div.recCard",
       "div.profileCard",
-      ".keen-slider__slide[aria-hidden='false']",
       "[class*='profileCard' i]",
+      "[class*='recCard' i]",
+      ".keen-slider__slide[aria-hidden='false']",
       "div[aria-label='Profile Card']",
       ".recCard__card"
     ],

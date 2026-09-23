@@ -224,6 +224,15 @@ function stopAllAutomation() {
 window.__flirteasyStopAutomation = stopAllAutomation;
 window.__linksyStopSwiping = stopAllAutomation;
 window.__flirteasyStartAutomation = function(count, initialProgress) {
+  try {
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'FE_LOG',
+        text: '🚀 Auto-swiping engine engaged in DOM (Target: ' + (count || 50) + ')',
+        logType: 'success'
+      }));
+    }
+  } catch (_) {}
   try { chrome.runtime.sendMessage({ action: 'startAgent', platform: 'tinder' }, () => {}); } catch (_) {}
   window.__flirteasyAutoStartCount = count || 50;
   if (initialProgress !== undefined) window.__flirteasyAutoStartProgress = initialProgress;
@@ -1132,7 +1141,12 @@ async function autoLike(count = 50, initialProgress = undefined) {
       });
     });
 
-    const ageFilter = settings.ageFilter || { enabled: false, minAge: 18, maxAge: 99 };
+    const rawAgeFilter = settings.ageFilter || {};
+    const ageFilter = {
+      enabled: Boolean(rawAgeFilter.enabled),
+      minAge: rawAgeFilter.minAge ?? rawAgeFilter.min ?? 18,
+      maxAge: rawAgeFilter.maxAge ?? rawAgeFilter.max ?? 99,
+    };
     const _ah = settings.activeHours || {};
     const _vp = settings.visualPreferences || {};
     const _sc = settings.stopConditions || [];
@@ -1168,6 +1182,12 @@ async function autoLike(count = 50, initialProgress = undefined) {
     console.log(`[FlirtEasy]   About Myself         : ${settings.aboutMyself ? `"${settings.aboutMyself.substring(0, 60)}${settings.aboutMyself.length > 60 ? '...' : ''}"` : 'Not set'}`);
     console.log(`[FlirtEasy]   Custom Prompt        : ${settings.customPrompt ? `"${settings.customPrompt.substring(0, 60)}${settings.customPrompt.length > 60 ? '...' : ''}"` : 'Not set'}`);
 
+    console.log('%c[FlirtEasy] ── SMART MATCH SCORER ──', 'color:#667085;font-weight:bold;');
+    console.log(`[FlirtEasy]   Smart Match Enabled  : ${settings.aiMatchEnabled ? 'YES' : 'NO'}`);
+    console.log(`[FlirtEasy]   Match Threshold      : ${settings.aiMatchThreshold ?? 60}%`);
+    console.log(`[FlirtEasy]   Max Distance (mi)    : ${settings.aiMatchMaxDistance ? `${settings.aiMatchMaxDistance} mi` : 'No Limit'}`);
+    console.log(`[FlirtEasy]   Strict Goals Filter  : ${settings.aiMatchStrictGoals !== false ? 'YES' : 'NO'}`);
+
     console.log('%c[FlirtEasy] ════════════════════════════════════', 'color:#e91e8c;font-weight:bold;');
 
     // 1. Wait for Tinder DOM to be hydrated and user logged in (up to 15s)
@@ -1186,6 +1206,15 @@ async function autoLike(count = 50, initialProgress = undefined) {
 
     if (!isLoggedIn()) {
       console.warn('[FlirtEasy] Timed out waiting for Tinder session to hydrate.');
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'FE_ERROR',
+            message: 'Tinder session not ready: please ensure you are logged into Tinder',
+            errors: ['Tinder session not ready']
+          }));
+        }
+      } catch (_) {}
       return { success: false, likesCompleted: 0, errors: ['Tinder session not ready'] };
     }
 
@@ -1346,13 +1375,13 @@ async function autoLike(count = 50, initialProgress = undefined) {
           break;
         }
 
-        if (isStackEmpty()) {
+        let profileVisible = isProfileVisible();
+        console.log(`[FlirtEasy] Profile visible: ${profileVisible}`);
+
+        if (!profileVisible && isStackEmpty()) {
           console.log('[FlirtEasy] Stack is empty (no more matches), stopping cycle');
           break;
         }
-
-        let profileVisible = isProfileVisible();
-        console.log(`[FlirtEasy] Profile visible: ${profileVisible}`);
 
         if (!profileVisible) {
           console.warn(`[FlirtEasy] No profile card loaded at check ${profilesChecked} — Tinder is searching/loading recs`);
@@ -1435,7 +1464,12 @@ async function autoLike(count = 50, initialProgress = undefined) {
                     descriptors: passCandidate.descriptors,
                     questionAnswers: passCandidate.questionAnswers,
                     verified: passCandidate.verified,
-                    detail: `Age ${age} outside target range`,
+                    detail: `Passed · Dealbreaker: Age outside preference (${age})`,
+                    matchScore: 0,
+                    matchConfidence: 1.0,
+                    matchLabel: 'Dealbreaker',
+                    matchBreakdown: [],
+                    tier: 'filter',
                   }));
                 }
               } catch (_) {}
@@ -1445,6 +1479,51 @@ async function autoLike(count = 50, initialProgress = undefined) {
           }
 
           console.log(`[FlirtEasy] Age ${age} WITHIN range ${ageFilter.minAge}-${ageFilter.maxAge}, proceeding to like`);
+        }
+
+        // Check standalone distance filter BEFORE liking (when distanceFilter is enabled and Smart Match is OFF)
+        if (settings.distanceFilter?.enabled && !settings.aiMatchEnabled) {
+          const maxDistanceKm = settings.distanceFilter.maxDistance || 50;
+          const candDistKm = typeof getMatchDistanceKm === 'function'
+            ? getMatchDistanceKm()
+            : null;
+
+          if (candDistKm !== null && candDistKm > maxDistanceKm) {
+            console.log(`[FlirtEasy] Distance ${candDistKm} km OUTSIDE range (max ${maxDistanceKm} km), PASSING`);
+            const passCandidate = typeof extractCandidateProfile === 'function'
+              ? extractCandidateProfile()
+              : { name: 'Someone', photoUrl: null, photos: [] };
+            const passed = clickPassButton();
+            if (passed) {
+              console.log(`[FlirtEasy] Successfully passed profile (distance ${candDistKm} km exceeds ${maxDistanceKm} km)`);
+              try {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'FE_SWIPE',
+                    action: 'pass',
+                    profileId: passCandidate.id,
+                    name: passCandidate.name,
+                    age: passCandidate.age,
+                    bio: passCandidate.bio,
+                    photos: passCandidate.photos,
+                    photoUrl: passCandidate.photoUrl || passCandidate.photos?.[0] || null,
+                    interests: passCandidate.interests,
+                    job: passCandidate.job,
+                    school: passCandidate.school,
+                    city: passCandidate.city,
+                    distanceMi: passCandidate.distanceMi,
+                    lookingFor: passCandidate.lookingFor,
+                    descriptors: passCandidate.descriptors,
+                    questionAnswers: passCandidate.questionAnswers,
+                    verified: passCandidate.verified,
+                    detail: `Distance ${candDistKm} km exceeds limit (${maxDistanceKm} km)`,
+                  }));
+                }
+              } catch (_) {}
+            }
+            await getSwipeDelay();
+            continue;
+          }
         }
 
         // Check visual preferences BEFORE liking
@@ -1536,9 +1615,212 @@ async function autoLike(count = 50, initialProgress = undefined) {
             };
 
         const currentPhotoUrl = candidate.photoUrl || candidate.photos?.[0] || (typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl(currentName) : null);
-        const profileDetail = candidate.age
-          ? `Age ${candidate.age} · Verified Profile`
-          : (candidate.bio ? candidate.bio.slice(0, 42).trim() : 'AI Target Match · Safe Paced');
+
+        // Smart AI Compatibility Scorer Gate (Smart Match Mode)
+        let aiScore = null;
+        if (typeof scoreCandidateLocal === 'function') {
+          try {
+            aiScore = scoreCandidateLocal(candidate, settings.userProfile, settings);
+          } catch (err) {
+            console.warn('[FlirtEasy] scoreCandidateLocal error:', err);
+          }
+        }
+
+        // Smart Match Mode Gate: enforce hard filters, confidence gate & minimum compatibility threshold
+        let finalScore = aiScore?.score ?? null;
+        let finalLabel = aiScore?.label ?? null;
+        let finalConfidence = aiScore?.confidence ?? null;
+        let finalBreakdown = aiScore?.breakdown ?? [];
+        let isBlended = false;
+        let llmReasons = [];
+
+        if (settings.aiMatchEnabled) {
+          console.log(`[FlirtEasy] Smart Match Mode active: evaluating candidate "${candidate.name}"...`);
+
+          // 1. Hard filters check (relationship goal alignment & max distance dealbreaker)
+          const hardFilterCheck = typeof checkHardFilters === 'function'
+            ? checkHardFilters(candidate, settings.userProfile, settings)
+            : { passed: true };
+
+          if (!hardFilterCheck.passed) {
+            console.log(`[FlirtEasy] Hard filter rejected candidate "${candidate.name}": ${hardFilterCheck.reason}, PASSING`);
+            const passed = clickPassButton();
+            if (passed) {
+              console.log(`[FlirtEasy] Successfully passed profile (${hardFilterCheck.reason})`);
+              try {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'FE_SWIPE',
+                    action: 'pass',
+                    profileId: candidate.id,
+                    name: candidate.name,
+                    age: candidate.age,
+                    bio: candidate.bio,
+                    photos: candidate.photos,
+                    photoUrl: currentPhotoUrl,
+                    interests: candidate.interests,
+                    job: candidate.job,
+                    school: candidate.school,
+                    city: candidate.city,
+                    distanceMi: candidate.distanceMi,
+                    lookingFor: candidate.lookingFor,
+                    descriptors: candidate.descriptors,
+                    questionAnswers: candidate.questionAnswers,
+                    verified: candidate.verified,
+                    detail: `Passed · Dealbreaker: ${hardFilterCheck.reason}`,
+                    matchScore: 0,
+                    matchConfidence: 1.0,
+                    matchLabel: 'Dealbreaker',
+                    matchBreakdown: [],
+                    tier: 'filter',
+                    reason: hardFilterCheck.reason,
+                  }));
+                }
+              } catch (_) {}
+            }
+            await getSwipeDelay();
+            continue;
+          }
+
+          // 2. Confidence gate — profiles with near-zero data should never be auto-liked
+          // Without this, a blank profile scores ~50 via completeness-only normalization
+          // and would be liked at any threshold below 50.
+          if (aiScore && typeof aiScore.confidence === 'number' && aiScore.confidence < 0.3) {
+            console.log(`[FlirtEasy] Low confidence ${(aiScore.confidence * 100).toFixed(0)}% for "${candidate.name}" — insufficient data to score, PASSING`);
+            const passed = clickPassButton();
+            if (passed) {
+              try {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'FE_SWIPE',
+                    action: 'pass',
+                    profileId: candidate.id,
+                    name: candidate.name,
+                    age: candidate.age,
+                    bio: candidate.bio,
+                    photos: candidate.photos,
+                    photoUrl: currentPhotoUrl,
+                    interests: candidate.interests,
+                    job: candidate.job,
+                    school: candidate.school,
+                    city: candidate.city,
+                    distanceMi: candidate.distanceMi,
+                    lookingFor: candidate.lookingFor,
+                    descriptors: candidate.descriptors,
+                    questionAnswers: candidate.questionAnswers,
+                    verified: candidate.verified,
+                    detail: `Passed · Minimal Bio (${(aiScore.confidence * 100).toFixed(0)}% confidence)`,
+                    matchScore: aiScore.score,
+                    matchConfidence: aiScore.confidence,
+                    matchLabel: 'Low Info',
+                    matchBreakdown: aiScore.breakdown || [],
+                    tier: 'local',
+                  }));
+                }
+              } catch (_) {}
+            }
+            await getSwipeDelay();
+            continue;
+          }
+
+          // 3. Deep AI Refinement (Optional)
+          // If enabled, candidate has enough data, and local score is close to the threshold (±15%)
+          const threshold = typeof settings.aiMatchThreshold === 'number' ? settings.aiMatchThreshold : 60;
+          const isBorderline =
+            settings.aiMatchUseLLM &&
+            typeof finalScore === 'number' &&
+            Math.abs(finalScore - threshold) <= 15 &&
+            typeof finalConfidence === 'number' &&
+            finalConfidence >= 0.3;
+
+          if (isBorderline && window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+            try {
+              console.log(`[FlirtEasy] Requesting Deep AI Refinement for borderline score ${finalScore}% (threshold ${threshold}%)...`);
+              const requestId = `fe_req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+              const llmPromise = new Promise((resolve) => {
+                const handler = (evt) => {
+                  if (evt.detail && evt.detail.requestId === requestId) {
+                    window.removeEventListener('FE_MATCH_SCORE_RESPONSE', handler);
+                    resolve(evt.detail);
+                  }
+                };
+                window.addEventListener('FE_MATCH_SCORE_RESPONSE', handler);
+                setTimeout(() => {
+                  window.removeEventListener('FE_MATCH_SCORE_RESPONSE', handler);
+                  resolve(null);
+                }, 3500); // 3.5s strict timeout fallback
+              });
+
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_MATCH_SCORE_REQUEST',
+                requestId,
+                candidate,
+              }));
+
+              const llmResp = await llmPromise;
+              if (llmResp && llmResp.success && typeof llmResp.score === 'number') {
+                const localWeight = 0.4;
+                const llmWeight = 0.6;
+                const blended = Math.round(finalScore * localWeight + llmResp.score * llmWeight);
+                console.log(`[FlirtEasy] Deep AI refined score: ${finalScore}% -> ${blended}% (LLM: ${llmResp.score}%)`);
+                finalScore = blended;
+                finalLabel = typeof computeLabel === 'function' ? computeLabel(finalScore, finalConfidence) : (finalScore >= 75 ? 'Strong Match' : finalScore >= 50 ? 'Good Potential' : 'Moderate');
+                isBlended = true;
+                llmReasons = Array.isArray(llmResp.reasons) ? llmResp.reasons : [];
+              }
+            } catch (llmErr) {
+              console.warn('[FlirtEasy] Deep AI Refinement error, falling back to local score:', llmErr);
+            }
+          }
+
+          // 4. Compatibility threshold check
+          if (typeof finalScore === 'number' && finalScore < threshold) {
+            console.log(`[FlirtEasy] Compatibility score ${finalScore}% is below threshold ${threshold}% (${finalLabel}), PASSING "${candidate.name}"`);
+            const passed = clickPassButton();
+            if (passed) {
+              console.log(`[FlirtEasy] Successfully passed profile (score ${finalScore}% < ${threshold}%)`);
+              try {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'FE_SWIPE',
+                    action: 'pass',
+                    profileId: candidate.id,
+                    name: candidate.name,
+                    age: candidate.age,
+                    bio: candidate.bio,
+                    photos: candidate.photos,
+                    photoUrl: currentPhotoUrl,
+                    interests: candidate.interests,
+                    job: candidate.job,
+                    school: candidate.school,
+                    city: candidate.city,
+                    distanceMi: candidate.distanceMi,
+                    lookingFor: candidate.lookingFor,
+                    descriptors: candidate.descriptors,
+                    questionAnswers: candidate.questionAnswers,
+                    verified: candidate.verified,
+                    detail: `Passed · Compatibility ${finalScore}% (${finalLabel})`,
+                    matchScore: finalScore,
+                    matchConfidence: finalConfidence,
+                    matchLabel: finalLabel,
+                    matchBreakdown: finalBreakdown,
+                    tier: isBlended ? 'blended' : 'local',
+                    localScore: isBlended ? aiScore.score : undefined,
+                    reasons: llmReasons,
+                  }));
+                }
+              } catch (_) {}
+            }
+            await getSwipeDelay();
+            continue;
+          }
+
+          console.log(`[FlirtEasy] Smart Match approved candidate "${candidate.name}" (score ${finalScore != null ? finalScore + '%' : 'N/A'} >= ${threshold}%), proceeding to like`);
+        }
+
+        const profileDetail = (typeof finalScore === 'number')
+          ? (candidate.age ? `Age ${candidate.age} · ${finalLabel} (${finalScore}%)` : `${finalLabel} · ${finalScore}%`)
+          : (candidate.age ? `Age ${candidate.age} · Verified Profile` : (candidate.bio ? candidate.bio.slice(0, 42).trim() : 'AI Target Match · Safe Paced'));
 
         const clicked = clickLikeButton();
         console.log(`[FlirtEasy] Click result: ${clicked}`);
@@ -1571,6 +1853,13 @@ async function autoLike(count = 50, initialProgress = undefined) {
                 questionAnswers: candidate.questionAnswers,
                 verified: candidate.verified,
                 detail: profileDetail,
+                matchScore: finalScore,
+                matchConfidence: finalConfidence,
+                matchLabel: finalLabel,
+                matchBreakdown: finalBreakdown,
+                tier: isBlended ? 'blended' : (aiScore ? 'local' : undefined),
+                localScore: isBlended ? aiScore.score : undefined,
+                reasons: llmReasons,
               }));
             }
           } catch (_) {}
@@ -1583,6 +1872,8 @@ async function autoLike(count = 50, initialProgress = undefined) {
               age: candidate.age,
               detail: profileDetail,
               photoUrl: currentPhotoUrl,
+              matchScore: aiScore?.score ?? null,
+              matchLabel: aiScore?.label ?? null,
             }
           }, (response) => {
             if (chrome.runtime.lastError) {

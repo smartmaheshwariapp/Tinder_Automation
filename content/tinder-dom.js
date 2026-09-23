@@ -100,48 +100,301 @@ function findElements(selectorArray, parent = document) {
   console.log('[FlirtEasy] Selectors loaded');
 })();
 
+function _triggerElementClick(element) {
+  if (!element) return false;
+  const target = element.closest('button, [role="button"]') || element;
+  try { if (typeof target.focus === 'function') target.focus(); } catch (_) {}
+  try { target.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
+  const rect = target.getBoundingClientRect();
+  const clientX = rect.left + (rect.width > 0 ? rect.width / 2 : 10);
+  const clientY = rect.top + (rect.height > 0 ? rect.height / 2 : 10);
+  const downInit = {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+    clientX,
+    clientY,
+    screenX: clientX,
+    screenY: clientY,
+    button: 0,
+    buttons: 1,
+    pointerId: 1,
+    pointerType: 'touch',
+    isPrimary: true,
+  };
+  const upInit = {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+    clientX,
+    clientY,
+    screenX: clientX,
+    screenY: clientY,
+    button: 0,
+    buttons: 0,
+    pointerId: 1,
+    pointerType: 'touch',
+    isPrimary: true,
+  };
+
+  // 1. Pointer down & up for gesture tracking
+  try { target.dispatchEvent(new PointerEvent('pointerdown', downInit)); } catch (_) {}
+  try { target.dispatchEvent(new PointerEvent('pointerup', upInit)); } catch (_) {}
+
+  // 2. Single authoritative click
+  try {
+    if (typeof target.click === 'function') {
+      target.click();
+    } else {
+      target.dispatchEvent(new MouseEvent('click', downInit));
+    }
+  } catch (_) {
+    try { target.dispatchEvent(new MouseEvent('click', downInit)); } catch (_) {}
+  }
+
+  return true;
+}
+
+function _dispatchKeyboardSwipe(keyName, keyCode) {
+  try {
+    const eventOpts = {
+      key: keyName,
+      code: keyName,
+      keyCode: keyCode,
+      which: keyCode,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+    };
+    const targets = [
+      document.querySelector('[data-keyboard-gamepad="true"]'),
+      document.querySelector('.recsCardboard, [data-testid="recsCardboard"]'),
+      document.querySelector('[data-testid*="Card" i], [class*="Card" i]'),
+      document.activeElement,
+      document.body,
+      document,
+      window
+    ].filter(Boolean);
+
+    for (const t of targets) {
+      try { t.dispatchEvent(new KeyboardEvent('keydown', eventOpts)); } catch (_) {}
+      try { t.dispatchEvent(new KeyboardEvent('keyup', eventOpts)); } catch (_) {}
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// Geometric Tinder Gamepad Row Identifier:
+// On Tinder Web (mobile & desktop), the action buttons (Rewind, Pass, Super Like, Like, Boost)
+// form a distinctive horizontal row of circular buttons in the lower portion of the screen.
+// Pass (X) and Like (Heart) are ALWAYS the two largest buttons in this row.
+// Pass is on the left, Like is on the right.
+function getTinderGamepadButtons() {
+  const allButtons = Array.from(document.querySelectorAll('button, [role="button"], div[role="button"]')).filter(b => {
+    if (b.closest('header, nav, aside, #nav, [role="navigation"]')) return false;
+    const r = b.getBoundingClientRect();
+    if (r.width < 28 || r.width > 120 || r.height < 28 || r.height > 120) return false;
+    // Circular / square aspect ratio (gamepad buttons are circles)
+    if (Math.abs(r.width - r.height) > 20) return false;
+    // Must be in the lower half of viewport, above bottom navigation bar
+    if (r.top < window.innerHeight * 0.35 || r.bottom > window.innerHeight + 15) return false;
+    return true;
+  });
+
+  if (allButtons.length === 0) return null;
+
+  // Group buttons into horizontal rows (buttons whose vertical centers are within 25px)
+  const rows = [];
+  for (const b of allButtons) {
+    const r = b.getBoundingClientRect();
+    const centerY = r.top + r.height / 2;
+    let foundRow = rows.find(row => Math.abs(row.centerY - centerY) < 25);
+    if (!foundRow) {
+      foundRow = { centerY, buttons: [] };
+      rows.push(foundRow);
+    }
+    foundRow.buttons.push({ element: b, rect: r });
+  }
+
+  // Find the row containing between 2 and 6 buttons (the gamepad row)
+  const gamepadRow = rows
+    .filter(row => row.buttons.length >= 2 && row.buttons.length <= 6)
+    .sort((a, b) => b.buttons.length - a.buttons.length)[0];
+
+  if (!gamepadRow) return null;
+
+  // Sort buttons horizontally from left to right
+  const sorted = gamepadRow.buttons.sort((a, b) => a.rect.left - b.rect.left);
+
+  // Layout 1: 5 buttons -> [Rewind, Pass (X), Super Like (Star), Like (Heart), Boost (Lightning)]
+  if (sorted.length === 5) {
+    return {
+      rewind: sorted[0].element,
+      pass: sorted[1].element,
+      superLike: sorted[2].element,
+      like: sorted[3].element,
+      boost: sorted[4].element,
+    };
+  }
+
+  // Layout 2: 2 buttons -> [Pass (X), Like (Heart)]
+  if (sorted.length === 2) {
+    return {
+      pass: sorted[0].element,
+      like: sorted[1].element,
+    };
+  }
+
+  // General Layout (3 or 4 buttons):
+  // On Tinder, Pass and Like are significantly LARGER in diameter than the ancillary buttons.
+  // The two largest buttons sorted left-to-right are Pass (left) and Like (right).
+  const bySize = [...sorted].sort((a, b) => (b.rect.width * b.rect.height) - (a.rect.width * a.rect.height));
+  if (bySize.length >= 2) {
+    const top2 = [bySize[0], bySize[1]].sort((a, b) => a.rect.left - b.rect.left);
+    return {
+      pass: top2[0].element,
+      like: top2[1].element,
+    };
+  }
+
+  return null;
+}
+
 function findLikeButton() {
-  if (!window.SELECTORS) return null;
-  const btn = findElement(window.SELECTORS.buttons.like);
-  if (btn) return btn;
-  // Fallback: identify by SVG path fingerprint (Tinder removed aria-labels)
+  // Layer 1: Geometric Gamepad Row identification (MOST ACCURATE on Tinder Web)
+  const gp = getTinderGamepadButtons();
+  if (gp && gp.like) {
+    return gp.like;
+  }
+
+  // Layer 2: Explicit aria-label / testid or Heart SVG fingerprint
+  const candidateButtons = Array.from(document.querySelectorAll('button, [role="button"], div[role="button"]')).filter(b => {
+    if (b.closest('header, nav, aside, #nav, [role="navigation"]')) return false;
+    const r = b.getBoundingClientRect();
+    return r.width >= 28 && r.width <= 110 && r.height >= 28 && r.height <= 110 && r.top > window.innerHeight * 0.35 && r.bottom <= window.innerHeight + 60;
+  });
+
+  for (const b of candidateButtons) {
+    const aria = (b.getAttribute('aria-label') || '').toLowerCase();
+    const testid = (b.getAttribute('data-testid') || '').toLowerCase();
+    if (aria === 'like' || (aria.includes('like') && !aria.includes('super') && !aria.includes('likes you'))) {
+      return b;
+    }
+    if (testid === 'gamepad-like' || (testid.includes('like') && !testid.includes('super') && !testid.includes('likes-you'))) {
+      return b;
+    }
+    const svg = b.querySelector('svg');
+    if (svg) {
+      const path = svg.querySelector('path');
+      const d = path?.getAttribute('d') || '';
+      if (
+        d.includes('M17.506') || d.includes('q-.834') ||
+        (d.includes('M12') && (d.includes('C12') || d.includes('c-') || d.includes('s-')))
+      ) {
+        return b;
+      }
+    }
+  }
+
+  // Layer 3: Selectors from selectors.json (only within main/recs, never header/nav)
+  if (window.SELECTORS?.buttons?.like) {
+    for (const sel of window.SELECTORS.buttons.like) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && !el.closest('header, nav, aside, #nav, [role="navigation"]')) {
+          const r = el.getBoundingClientRect();
+          if (r.width >= 24 && r.height >= 24 && r.top > window.innerHeight * 0.25) return el;
+        }
+      } catch (_) {}
+    }
+  }
+
+  // Layer 4: SVG path prefix fallback
   const svgBtn = _findActionButtonBySvgPath('M17.506 2q-.834 0-1.7.225');
-  if (svgBtn) return svgBtn;
-  // Both selector and SVG fallback failed — report so admin panel catches it
-  reportDomError('selector_miss', 'buttons.like', 'Like button not found via selectors or SVG fingerprint — Tinder may have changed the button markup');
+  if (svgBtn && !svgBtn.closest('header, nav, aside, #nav, [role="navigation"]')) return svgBtn;
+
   return null;
 }
 
 function findPassButton() {
-  if (!window.SELECTORS) return null;
-  const btn = findElement(window.SELECTORS.buttons.pass);
-  if (btn) return btn;
-  // Fallback: identify by SVG path fingerprint (Tinder removed aria-labels)
+  // Layer 1: Geometric Gamepad Row identification (MOST ACCURATE on Tinder Web)
+  const gp = getTinderGamepadButtons();
+  if (gp && gp.pass) {
+    return gp.pass;
+  }
+
+  // Layer 2: Explicit aria-label / testid or Pass/Nope SVG fingerprint
+  const candidateButtons = Array.from(document.querySelectorAll('button, [role="button"], div[role="button"]')).filter(b => {
+    if (b.closest('header, nav, aside, #nav, [role="navigation"]')) return false;
+    const r = b.getBoundingClientRect();
+    return r.width >= 28 && r.width <= 110 && r.height >= 28 && r.height <= 110 && r.top > window.innerHeight * 0.35 && r.bottom <= window.innerHeight + 60;
+  });
+
+  for (const b of candidateButtons) {
+    const aria = (b.getAttribute('aria-label') || '').toLowerCase();
+    const testid = (b.getAttribute('data-testid') || '').toLowerCase();
+    if (aria === 'pass' || aria === 'nope' || (aria.includes('pass') && !aria.includes('passport')) || aria.includes('nope')) {
+      return b;
+    }
+    if (testid === 'gamepad-pass' || (testid.includes('pass') && !testid.includes('passport')) || testid.includes('nope')) {
+      return b;
+    }
+    const svg = b.querySelector('svg');
+    if (svg) {
+      const path = svg.querySelector('path');
+      const d = path?.getAttribute('d') || '';
+      if (
+        d.includes('M21.974') || d.includes('19.97') || d.includes('4.171')
+      ) {
+        return b;
+      }
+    }
+  }
+
+  // Layer 3: Selectors from selectors.json (excluding header/nav)
+  if (window.SELECTORS?.buttons?.pass) {
+    for (const sel of window.SELECTORS.buttons.pass) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && !el.closest('header, nav, aside, #nav, [role="navigation"]')) {
+          const r = el.getBoundingClientRect();
+          if (r.width >= 24 && r.height >= 24 && r.top > window.innerHeight * 0.25) return el;
+        }
+      } catch (_) {}
+    }
+  }
+
+  // Layer 4: SVG path prefix fallback
   const svgBtn = _findActionButtonBySvgPath('M21.974 4.171 19.97 2.17');
-  if (svgBtn) return svgBtn;
-  // Both selector and SVG fallback failed — report so admin panel catches it
-  reportDomError('selector_miss', 'buttons.pass', 'Pass/Nope button not found via selectors or SVG fingerprint — Tinder may have changed the button markup');
+  if (svgBtn && !svgBtn.closest('header, nav, aside, #nav, [role="navigation"]')) return svgBtn;
+
   return null;
 }
 
 function findSuperLikeButton() {
-  if (!window.SELECTORS) return null;
-  const btn = findElement(window.SELECTORS.buttons.superLike);
-  if (btn) return btn;
-  // Fallback: identify by SVG path fingerprint (Tinder removed aria-labels)
+  const gp = getTinderGamepadButtons();
+  if (gp && gp.superLike) return gp.superLike;
+
+  if (window.SELECTORS?.buttons?.superLike) {
+    const btn = findElement(window.SELECTORS.buttons.superLike);
+    if (btn) return btn;
+  }
   return _findActionButtonBySvgPath('M16.296 8.04a1 1 0 0 1-.89-.65') || null;
 }
 
 // Find an action button by matching the start of its first SVG path's 'd' attribute.
-// Used as a resilient fallback when Tinder strips aria-labels from buttons.
 function _findActionButtonBySvgPath(pathPrefix) {
-  const candidates = [...document.querySelectorAll('button')].filter(btn => {
+  const candidates = [...document.querySelectorAll('button, div[role="button"]')].filter(btn => {
+    if (btn.closest('header, nav, aside, #nav, [role="navigation"]')) return false;
     const r = btn.getBoundingClientRect();
-    return r.width >= 48 && r.width <= 70 && r.height >= 48 && r.top > 200;
+    return r.width >= 28 && r.width <= 100 && r.height >= 28 && r.height <= 100;
   });
   return candidates.find(btn => {
     const d = btn.querySelector('path')?.getAttribute('d') || '';
-    return d.startsWith(pathPrefix);
+    return d.startsWith(pathPrefix) || d.includes(pathPrefix);
   }) || null;
 }
 
@@ -157,47 +410,52 @@ function closeSubscriptionPopup() {
 }
 
 function hasSubscriptionPopup() {
-  // Layer 1: Check text content across the document for unambiguous paywall signals
-  const text = (document.body.innerText || document.body.textContent || '').toLowerCase();
-  if (
-    text.includes('out of likes') ||
-    text.includes("you've run out of likes") ||
-    text.includes("you're out of likes") ||
-    text.includes('select a plan') ||
-    text.includes('unlimited likes') ||
-    text.includes('get more likes') ||
-    text.includes('likes reset in') ||
-    text.includes('unlock unlimited') ||
-    text.includes('no more likes') ||
-    text.includes('sin likes') ||
-    text.includes('plus de likes') ||
-    text.includes('keine likes') ||
-    text.includes('sem likes') ||
-    text.includes('geen likes')
-  ) {
-    return true;
-  }
-
-  // Layer 2: Check visible modal dialogs promoting Tinder Gold/Platinum/Plus upgrade
   try {
-    const dialogs = Array.from(document.querySelectorAll('[role="dialog"], div[aria-modal="true"]'));
+    const dialogs = Array.from(document.querySelectorAll(
+      'div[aria-modal="true"], [data-testid*="paywall" i], [data-testid*="upsell" i], .subscriptionPopup'
+    ));
+
     for (const d of dialogs) {
-      if (d.id === 'rebrand-mobile-menu') continue;
+      if (d.id === 'rebrand-mobile-menu' || d.id === 'onetrust-consent-sdk') continue;
+      // Exclude navigation drawers, side menus, and headers
+      if (d.closest('nav, aside, header, #nav') || d.querySelector('nav') || (d.getAttribute('aria-label') || '').toLowerCase().includes('navigation')) {
+        continue;
+      }
+
+      // Verify the dialog is actually rendered and visible in the viewport
+      const rect = d.getBoundingClientRect();
+      if (rect.width < 150 || rect.height < 150) continue;
+
       const dText = (d.innerText || d.textContent || '').toLowerCase();
-      const hasPaywallCTA =
+
+      // Check for explicit "out of likes" paywall in the dialog
+      const isOutOfLikesDialog =
+        dText.includes('out of likes') ||
+        dText.includes("run out of likes") ||
+        dText.includes('likes reset in') ||
+        dText.includes('no more likes') ||
+        dText.includes('sin likes') ||
+        dText.includes('plus de likes') ||
+        dText.includes('keine likes') ||
+        dText.includes('sem likes') ||
+        dText.includes('geen likes');
+
+      if (isOutOfLikesDialog) {
+        return true;
+      }
+
+      // Check for paid tier upsell modal dialog (Tinder Gold / Platinum / Plus) with purchase/plan CTA
+      const hasPaywallTitle =
         dText.includes('tinder gold') ||
         dText.includes('tinder platinum') ||
-        dText.includes('tinder plus') ||
-        dText.includes('super like') ||
-        dText.includes('boost');
-      const hasLikeContext =
-        dText.includes('like') ||
-        dText.includes('swipe') ||
-        dText.includes('plan') ||
-        dText.includes('unlock') ||
-        dText.includes('upgrade');
+        dText.includes('tinder plus');
+      const hasPaywallAction =
+        dText.includes('select a plan') ||
+        dText.includes('unlock unlimited') ||
+        dText.includes('get tinder') ||
+        dText.includes('upgrade to');
 
-      if (hasPaywallCTA && hasLikeContext) {
+      if (hasPaywallTitle && hasPaywallAction) {
         return true;
       }
     }
@@ -213,7 +471,7 @@ function extractTinderLikesResetTimestamp() {
   }
 
   try {
-    const dialogs = Array.from(document.querySelectorAll('[role="dialog"], div[aria-modal="true"]'));
+    const dialogs = Array.from(document.querySelectorAll('div[aria-modal="true"], [data-testid*="paywall" i]'));
     for (const d of dialogs) {
       if (d.id === 'rebrand-mobile-menu') continue;
       const text = d.innerText || d.textContent || '';
@@ -309,190 +567,233 @@ function detectTinderAccountTier() {
 }
 
 function isStackEmpty() {
-  const text = (document.body.innerText || document.body.textContent || '').toLowerCase();
-  return text.includes("unable to find any potential matches") ||
-    text.includes("checking out the profiles") ||
-    text.includes("try changing your preferences") ||
-    text.includes("people looking for") ||
+  // If a profile card or gamepad buttons are currently visible on screen, stack is NOT empty!
+  if (isProfileVisible()) return false;
+
+  const deckContainer = document.querySelector('.recsCardboard, [data-testid="recsCardboard"]');
+  const text = (deckContainer ? (deckContainer.innerText || '') : (document.body.innerText || '')).toLowerCase();
+  return (
+    text.includes("unable to find any potential matches") ||
     text.includes("we've run out of potential matches") ||
     text.includes("run out of potential matches") ||
     text.includes("there's no one new around you") ||
-    text.includes("no one new around you") ||
-    text.includes("go global");
+    text.includes("no one new around you")
+  );
 }
 
 function isProfileVisible() {
   if (!window.SELECTORS) return false;
 
-  // Layer 1: Check for "No matches" or "Searching" text
-  const bodyText = (document.body.innerText || document.body.textContent || '').toLowerCase();
-  if (
-    bodyText.includes("unable to find any potential matches") ||
-    bodyText.includes("people looking for") ||
-    bodyText.includes("out of likes") ||
-    bodyText.includes("checking out the profiles") ||
-    bodyText.includes("looking for people near you") ||
-    bodyText.includes("searching for people") ||
-    bodyText.includes("there's no one new around you") ||
-    bodyText.includes("no one new around you") ||
-    bodyText.includes("finding people near you") ||
-    bodyText.includes("looking for potential matches")
-  ) {
-    console.log('[FlirtEasy] No matches, searching, or out of likes screen detected in text');
-    return false;
+  // 1. Direct candidate card check: If a card element is present and visible in the viewport
+  const profileCard = findElement(window.SELECTORS.profile?.card);
+  if (profileCard) {
+    const rect = profileCard.getBoundingClientRect();
+    if (rect.width >= 60 && rect.height >= 60 && rect.top < window.innerHeight && rect.bottom > 0) {
+      return true;
+    }
   }
 
-  // Layer 2: A valid Tinder candidate card MUST have either a candidate name or a photo URL
+  // 2. Candidate card container inspection (React 18 / Tinder Web DOM)
+  const candidateCard = document.querySelector(
+    '[data-keyboard-gamepad="true"], [data-testid*="Card" i], [class*="Card" i], .keen-slider__slide[aria-hidden="false"], div.recCard, div.profileCard'
+  );
+  if (candidateCard) {
+    const r = candidateCard.getBoundingClientRect();
+    if (r.width >= 60 && r.height >= 60 && r.top < window.innerHeight && r.bottom > 0) {
+      return true;
+    }
+  }
+
+  // 3. Name or Photo element check
   const cardName = typeof getSwipeCardName === 'function' ? getSwipeCardName() : null;
   const photoUrl = typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl(cardName) : null;
-
-  if (!cardName && !photoUrl) {
-    console.log('[FlirtEasy] No candidate card name or photo found — Tinder is in searching/radar state');
-    return false;
-  }
-
-  // Layer 3: Ensure card element is actually rendered and visible in viewport
-  const profileCard = findElement(window.SELECTORS.profile.card);
-  if (!profileCard) return false;
-
-  const rect = profileCard.getBoundingClientRect();
-  return rect.width >= 100 && rect.height >= 100;
-}
-
-function clickLikeButton() {
-  const likeBtn = findLikeButton();
-
-  if (likeBtn) {
-    likeBtn.click();
-    console.log('[FlirtEasy] Like button clicked');
+  if (cardName || photoUrl) {
     return true;
   }
 
-  // Keyboard shortcut fallback (Tinder web standard: ArrowRight = Like)
-  try {
-    const keyEvent = new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39, which: 39, bubbles: true, cancelable: true });
-    window.dispatchEvent(keyEvent);
-    document.dispatchEvent(keyEvent);
-    console.log('[FlirtEasy] Dispatched ArrowRight keydown for Like');
-  } catch (_) {}
+  const nameEl = document.querySelector('span[itemprop="name"], span[itemprop="age"], div[role="img"][aria-label]');
+  if (nameEl) {
+    const r = nameEl.getBoundingClientRect();
+    if (r.width > 0 && r.top < window.innerHeight && r.bottom > 0) return true;
+  }
 
-  console.log('[FlirtEasy] Like button not found, attempting swipe right...');
-  return swipeRight();
+  // 4. Gamepad Like/Pass button is visible on screen
+  // On Tinder, the gamepad action bar is ONLY visible and active when a candidate card is ready in the deck!
+  const likeBtn = typeof findLikeButton === 'function' ? findLikeButton() : null;
+  if (likeBtn) {
+    const r = likeBtn.getBoundingClientRect();
+    if (r.width >= 24 && r.height >= 24 && r.top < window.innerHeight && r.bottom > 0) {
+      return true;
+    }
+  }
+
+  // 5. ONLY if NO card, NO name, NO photo, and NO gamepad buttons exist, check for radar/searching text
+  const deckContainer = document.querySelector('.recsCardboard, [data-testid="recsCardboard"]');
+  if (deckContainer) {
+    const checkContext = (deckContainer.innerText || '').toLowerCase();
+    if (
+      checkContext.includes("unable to find any potential matches") ||
+      checkContext.includes("we've run out of potential matches") ||
+      checkContext.includes("there's no one new around you") ||
+      checkContext.includes("no one new around you")
+    ) {
+      console.log('[FlirtEasy] No matches / searching radar screen confirmed in recs deck');
+      return false;
+    }
+  }
+
+  console.log('[FlirtEasy] No candidate card or active gamepad found — Tinder is in searching/radar state');
+  return false;
+}
+
+function _findCandidateCardElement() {
+  if (window.SELECTORS?.profile?.card) {
+    const el = findElement(window.SELECTORS.profile.card);
+    if (el) return el;
+  }
+  return document.querySelector(
+    '[data-keyboard-gamepad="true"], [data-testid*="Card" i], [class*="Card" i], .keen-slider__slide[aria-hidden="false"], div.recCard, div.profileCard, .recsCardboard'
+  );
+}
+
+function clickLikeButton() {
+  // Layer 1: Gamepad button click (Primary on Tinder Web)
+  const likeBtn = findLikeButton();
+  if (likeBtn) {
+    _triggerElementClick(likeBtn);
+    console.log('[FlirtEasy] Like button clicked with pointer/mouse/touch sequence');
+    return true;
+  }
+
+  // Layer 2: Native keyboard shortcut fallback (ONLY if button not found in DOM)
+  const keyDispatched = _dispatchKeyboardSwipe('ArrowRight', 39);
+  if (keyDispatched) {
+    console.log('[FlirtEasy] Dispatched native ArrowRight keyboard swipe fallback');
+    return true;
+  }
+
+  // Layer 3: Touch gesture swipe fallback (ONLY if button and keyboard both failed)
+  const cardSwiped = swipeRight();
+  if (cardSwiped) {
+    console.log('[FlirtEasy] Card swiped right via gesture fallback');
+    return true;
+  }
+
+  return false;
 }
 
 function swipeRight() {
-  if (!window.SELECTORS) return false;
-  const profileCard = findElement(window.SELECTORS.profile.card);
+  const profileCard = _findCandidateCardElement();
   if (!profileCard) {
     console.log('[FlirtEasy] Profile card not found for swipe');
-    reportDomError('selector_miss', 'profile.card', 'Profile card not found for swipe — Tinder may have changed the card container selector');
     return false;
   }
 
-  // Ensure card is visible
   const rect = profileCard.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) {
     console.log('[FlirtEasy] Profile card found but hidden (0 dimensions), aborting swipe');
-    reportDomError('selector_miss', 'profile.card', 'Profile card found but has zero dimensions (hidden) — card stack may not be loaded yet');
     return false;
   }
 
   const startX = rect.left + (rect.width / 2);
   const startY = rect.top + (rect.height / 2);
-  const endX = startX + 200; // Swipe right
+  const endX = startX + 220; // Swipe right
   const endY = startY;
 
-  // Create start touch
-  const touchStartObj = new Touch({
-    identifier: 0,
-    target: profileCard,
-    clientX: startX,
-    clientY: startY,
-    screenX: startX,
-    screenY: startY,
-    pageX: startX,
-    pageY: startY
-  });
+  // 1. Touch sequence
+  try {
+    if (typeof Touch !== 'undefined' && typeof TouchEvent !== 'undefined') {
+      const touchStartObj = new Touch({
+        identifier: 0,
+        target: profileCard,
+        clientX: startX,
+        clientY: startY,
+        screenX: startX,
+        screenY: startY,
+        pageX: startX,
+        pageY: startY
+      });
+      const touchEndObj = new Touch({
+        identifier: 0,
+        target: profileCard,
+        clientX: endX,
+        clientY: endY,
+        screenX: endX,
+        screenY: endY,
+        pageX: endX,
+        pageY: endY
+      });
 
-  const touchStart = new TouchEvent('touchstart', {
-    bubbles: true,
-    cancelable: true,
-    view: window,
-    touches: [touchStartObj],
-    targetTouches: [touchStartObj],
-    changedTouches: [touchStartObj]
-  });
+      profileCard.dispatchEvent(new TouchEvent('touchstart', {
+        bubbles: true, cancelable: true, view: window,
+        touches: [touchStartObj], targetTouches: [touchStartObj], changedTouches: [touchStartObj]
+      }));
 
-  // Create move/end touch
-  const touchEndObj = new Touch({
-    identifier: 0,
-    target: profileCard,
-    clientX: endX,
-    clientY: endY,
-    screenX: endX,
-    screenY: endY,
-    pageX: endX,
-    pageY: endY
-  });
+      setTimeout(() => {
+        profileCard.dispatchEvent(new TouchEvent('touchmove', {
+          bubbles: true, cancelable: true, view: window,
+          touches: [touchEndObj], targetTouches: [touchEndObj], changedTouches: [touchEndObj]
+        }));
+        setTimeout(() => {
+          profileCard.dispatchEvent(new TouchEvent('touchend', {
+            bubbles: true, cancelable: true, view: window,
+            touches: [], targetTouches: [], changedTouches: [touchEndObj]
+          }));
+        }, 60);
+      }, 60);
+    }
+  } catch (_) {}
 
-  const touchMove = new TouchEvent('touchmove', {
-    bubbles: true,
-    cancelable: true,
-    view: window,
-    touches: [touchEndObj],
-    targetTouches: [touchEndObj],
-    changedTouches: [touchEndObj]
-  });
+  // 2. Pointer/Mouse drag sequence
+  try {
+    const downInit = { bubbles: true, cancelable: true, view: window, clientX: startX, clientY: startY, screenX: startX, screenY: startY, button: 0, buttons: 1, pointerId: 1, pointerType: 'touch', isPrimary: true };
+    const moveInit = { bubbles: true, cancelable: true, view: window, clientX: endX, clientY: endY, screenX: endX, screenY: endY, button: 0, buttons: 1, pointerId: 1, pointerType: 'touch', isPrimary: true };
+    const upInit = { bubbles: true, cancelable: true, view: window, clientX: endX, clientY: endY, screenX: endX, screenY: endY, button: 0, buttons: 0, pointerId: 1, pointerType: 'touch', isPrimary: true };
 
-  const touchEnd = new TouchEvent('touchend', {
-    bubbles: true,
-    cancelable: true,
-    view: window,
-    touches: [],
-    targetTouches: [],
-    changedTouches: [touchEndObj]
-  });
-
-  console.log('[FlirtEasy] Dispatching swipe sequence...');
-  profileCard.dispatchEvent(touchStart);
-
-  setTimeout(() => {
-    profileCard.dispatchEvent(touchMove);
+    profileCard.dispatchEvent(new PointerEvent('pointerdown', downInit));
+    profileCard.dispatchEvent(new MouseEvent('mousedown', downInit));
     setTimeout(() => {
-      profileCard.dispatchEvent(touchEnd);
-    }, 50);
-  }, 50);
+      profileCard.dispatchEvent(new PointerEvent('pointermove', moveInit));
+      profileCard.dispatchEvent(new MouseEvent('mousemove', moveInit));
+      setTimeout(() => {
+        profileCard.dispatchEvent(new PointerEvent('pointerup', upInit));
+        profileCard.dispatchEvent(new MouseEvent('mouseup', upInit));
+      }, 60);
+    }, 60);
+  } catch (_) {}
 
   return true;
 }
 
-// findPassButton is defined above (with SVG fallback + reportDomError)
-
 function clickPassButton() {
+  // Layer 1: Gamepad button click (Primary on Tinder Web)
   const passBtn = findPassButton();
   if (passBtn) {
-    passBtn.click();
-    console.log('[FlirtEasy] Pass button clicked');
+    _triggerElementClick(passBtn);
+    console.log('[FlirtEasy] Pass button clicked with pointer/mouse/touch sequence');
     return true;
   }
 
-  // Keyboard shortcut fallback (Tinder web standard: ArrowLeft = Pass)
-  try {
-    const keyEvent = new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37, which: 37, bubbles: true, cancelable: true });
-    window.dispatchEvent(keyEvent);
-    document.dispatchEvent(keyEvent);
-    console.log('[FlirtEasy] Dispatched ArrowLeft keydown for Pass');
-  } catch (_) {}
+  // Layer 2: Native keyboard shortcut fallback (ONLY if button not found in DOM)
+  const keyDispatched = _dispatchKeyboardSwipe('ArrowLeft', 37);
+  if (keyDispatched) {
+    console.log('[FlirtEasy] Dispatched native ArrowLeft keyboard swipe fallback');
+    return true;
+  }
 
-  console.log('[FlirtEasy] Pass button not found, attempting swipe left...');
-  return swipeLeft();
+  // Layer 3: Touch gesture swipe fallback (ONLY if button and keyboard both failed)
+  const cardSwiped = swipeLeft();
+  if (cardSwiped) {
+    console.log('[FlirtEasy] Card swiped left via gesture fallback');
+    return true;
+  }
+
+  return false;
 }
 
 function swipeLeft() {
-  if (!window.SELECTORS) return false;
-  const profileCard = findElement(window.SELECTORS.profile.card);
+  const profileCard = _findCandidateCardElement();
   if (!profileCard) {
-    reportDomError('selector_miss', 'profile.card', 'Profile card not found for swipe left');
     return false;
   }
   const rect = profileCard.getBoundingClientRect();
@@ -500,17 +801,41 @@ function swipeLeft() {
 
   const startX = rect.left + (rect.width / 2);
   const startY = rect.top + (rect.height / 2);
-  const endX = startX - 200;
+  const endX = startX - 220; // Swipe left
+  const endY = startY;
 
-  const mkTouch = (x, y) => new Touch({ identifier: 1, target: profileCard, clientX: x, clientY: y, screenX: x, screenY: y, pageX: x, pageY: y });
+  // 1. Touch sequence
+  try {
+    if (typeof Touch !== 'undefined' && typeof TouchEvent !== 'undefined') {
+      const mkTouch = (x, y) => new Touch({ identifier: 1, target: profileCard, clientX: x, clientY: y, screenX: x, screenY: y, pageX: x, pageY: y });
+      profileCard.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, view: window, touches: [mkTouch(startX, startY)], targetTouches: [mkTouch(startX, startY)], changedTouches: [mkTouch(startX, startY)] }));
+      setTimeout(() => {
+        profileCard.dispatchEvent(new TouchEvent('touchmove', { bubbles: true, cancelable: true, view: window, touches: [mkTouch(endX, startY)], targetTouches: [mkTouch(endX, startY)], changedTouches: [mkTouch(endX, startY)] }));
+        setTimeout(() => {
+          profileCard.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, view: window, touches: [], targetTouches: [], changedTouches: [mkTouch(endX, startY)] }));
+        }, 60);
+      }, 60);
+    }
+  } catch (_) {}
 
-  profileCard.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, view: window, touches: [mkTouch(startX, startY)], targetTouches: [mkTouch(startX, startY)], changedTouches: [mkTouch(startX, startY)] }));
-  setTimeout(() => {
-    profileCard.dispatchEvent(new TouchEvent('touchmove', { bubbles: true, cancelable: true, view: window, touches: [mkTouch(endX, startY)], targetTouches: [mkTouch(endX, startY)], changedTouches: [mkTouch(endX, startY)] }));
+  // 2. Pointer/Mouse drag sequence
+  try {
+    const downInit = { bubbles: true, cancelable: true, view: window, clientX: startX, clientY: startY, screenX: startX, screenY: startY, button: 0, buttons: 1, pointerId: 1, pointerType: 'touch', isPrimary: true };
+    const moveInit = { bubbles: true, cancelable: true, view: window, clientX: endX, clientY: endY, screenX: endX, screenY: endY, button: 0, buttons: 1, pointerId: 1, pointerType: 'touch', isPrimary: true };
+    const upInit = { bubbles: true, cancelable: true, view: window, clientX: endX, clientY: endY, screenX: endX, screenY: endY, button: 0, buttons: 0, pointerId: 1, pointerType: 'touch', isPrimary: true };
+
+    profileCard.dispatchEvent(new PointerEvent('pointerdown', downInit));
+    profileCard.dispatchEvent(new MouseEvent('mousedown', downInit));
     setTimeout(() => {
-      profileCard.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, view: window, touches: [], targetTouches: [], changedTouches: [mkTouch(endX, startY)] }));
-    }, 50);
-  }, 50);
+      profileCard.dispatchEvent(new PointerEvent('pointermove', moveInit));
+      profileCard.dispatchEvent(new MouseEvent('mousemove', moveInit));
+      setTimeout(() => {
+        profileCard.dispatchEvent(new PointerEvent('pointerup', upInit));
+        profileCard.dispatchEvent(new MouseEvent('mouseup', upInit));
+      }, 60);
+    }, 60);
+  } catch (_) {}
+
   return true;
 }
 
@@ -518,10 +843,32 @@ function getProfileAge() {
   if (!window.SELECTORS) return null;
   const ageEl = findElement(window.SELECTORS.profile.age);
   if (ageEl) {
-    const age = parseInt(ageEl.textContent.trim());
-    console.log('[FlirtEasy] Profile age:', age);
-    return age;
+    const parsed = parseInt(ageEl.textContent.trim(), 10);
+    if (!isNaN(parsed) && parsed >= 18 && parsed <= 120) {
+      console.log('[FlirtEasy] Profile age (selector):', parsed);
+      return parsed;
+    }
   }
+
+  // Fallback: look for age in candidate card header or spans with 2 digits
+  try {
+    const card = document.querySelector('[data-keyboard-gamepad="true"], [data-testid*="Card" i], [class*="Card" i], div.recCard');
+    if (card) {
+      const spans = card.querySelectorAll('span, h1, div');
+      for (const s of spans) {
+        const text = s.textContent.trim();
+        const match = text.match(/\b(1[89]|[2-9]\d)\b/);
+        if (match) {
+          const ageVal = parseInt(match[1], 10);
+          if (ageVal >= 18 && ageVal <= 100) {
+            console.log('[FlirtEasy] Profile age (card scan):', ageVal);
+            return ageVal;
+          }
+        }
+      }
+    }
+  } catch (_) {}
+
   console.log('[FlirtEasy] Age not found');
   return null;
 }
@@ -598,43 +945,113 @@ function handleLocationModal() {
   return false;
 }
 
+function _extractTinderAuthToken() {
+  try {
+    if (window.__tinderAuthToken && typeof window.__tinderAuthToken === 'string' && window.__tinderAuthToken.length > 15) {
+      return window.__tinderAuthToken;
+    }
+    var t = localStorage.getItem('TinderWeb/APIToken');
+    if (t) return String(t).replace(/^["'](.*)["']$/, '$1').trim();
+
+    var s = localStorage.getItem('TinderWeb/APIStore');
+    if (s) {
+      try {
+        var p = JSON.parse(s);
+        var tok = p && (p.token || p.auth_token || (p.user && p.user.api_token));
+        if (tok) return String(tok).replace(/^["'](.*)["']$/, '$1').trim();
+      } catch (_) {}
+    }
+
+    var persistRoot = localStorage.getItem('persist:root');
+    if (persistRoot) {
+      try {
+        var rootObj = JSON.parse(persistRoot);
+        if (rootObj && rootObj.auth) {
+          var authObj = typeof rootObj.auth === 'string' ? JSON.parse(rootObj.auth) : rootObj.auth;
+          var rTok = authObj && (authObj.apiToken || authObj.token || authObj.authToken || authObj.api_token);
+          if (rTok) return String(rTok).replace(/^["'](.*)["']$/, '$1').trim();
+        }
+      } catch (_) {}
+    }
+
+    var persistAuth = localStorage.getItem('persist:auth');
+    if (persistAuth) {
+      try {
+        var authObj2 = typeof persistAuth === 'string' ? JSON.parse(persistAuth) : persistAuth;
+        var rTok2 = authObj2 && (authObj2.apiToken || authObj2.token || authObj2.authToken || authObj2.api_token);
+        if (rTok2) return String(rTok2).replace(/^["'](.*)["']$/, '$1').trim();
+      } catch (_) {}
+    }
+
+    var tokenKeyRegex = /(?:api|auth).*token/i;
+    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (!k || !tokenKeyRegex.test(k)) continue;
+      var val = localStorage.getItem(k);
+      if (!val) continue;
+      var cleanVal = val.replace(/^["'](.*)["']$/, '$1').trim();
+      if (uuidRegex.test(cleanVal)) {
+        return cleanVal;
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+if (typeof window !== 'undefined') {
+  window._extractTinderAuthToken = _extractTinderAuthToken;
+}
+
 function isLoggedIn() {
   // 0. If logout is actively underway, never report logged in
   if (window.__feLogoutInProgress) {
     return false;
   }
 
-  // 1. Never report logged in on marketing landing or login entry URLs
+  // 1. If a profile card or gamepad buttons are currently visible on screen, user is 100% authenticated!
+  if (typeof isProfileVisible === 'function' && isProfileVisible()) {
+    return true;
+  }
+
+  // 2. Never report logged in on marketing landing or login entry URLs
   const path = (window.location.pathname || '').toLowerCase();
-  if (!path.includes('/app') || path === '/app' || path === '/app/' || path.includes('/app/login')) {
+  if (!path.includes('/app') || path.includes('/app/login') || path.includes('/app/signup')) {
     return false;
   }
 
-  // 2. If an error boundary/toast ("Uh Oh! Something went wrong") is visible, user is in an unauthenticated/crashed state
+  // 3. If an error boundary/toast ("Uh Oh! Something went wrong") is visible, user is in an unauthenticated/crashed state
   const pageText = (document.body ? (document.body.innerText || '') : '');
   if (pageText.includes('Uh Oh! Something went wrong') || document.querySelector('.UhOh, [role="alert"][aria-live="assertive"]')) {
     return false;
   }
 
-  // 3. If login form inputs or login modal are visible, user is NOT logged in
+  // 4. If login form inputs or login modal are visible, user is NOT logged in
   if (
     document.querySelector('input[type="tel"], input[name="phone_number"], input[autocomplete="one-time-code"], input[name="code"]') ||
-    document.querySelector('div[role="dialog"] button[aria-label*="Log in" i]')
+    document.querySelector('div[role="dialog"] button[aria-label*="Log in" i]') ||
+    document.querySelector('[aria-labelledby="MODAL_LOGIN"]')
   ) {
     return false;
   }
 
-  // 4. Check for genuine active auth token
-  const rawTok = (typeof _extractTinderAuthToken === 'function' ? _extractTinderAuthToken() : null) ||
+  // 5. Check for genuine active auth token
+  const rawTok = _extractTinderAuthToken() ||
                  localStorage.getItem('TinderWeb/APIToken') ||
                  window.__tinderAuthToken;
   if (rawTok && typeof rawTok === 'string' && rawTok.replace(/['"]/g, '').trim().length >= 16) {
     return true;
   }
 
-  // 5. On any authenticated /app/* route without login inputs or error banners, user is logged in
-  if (path.includes('/app') && !path.includes('/app/login')) {
-    return true;
+  // 6. On authenticated /app/* routes: active recs deck, swipe buttons, or candidate cards mounted
+  if (path.includes('/app') && !path.includes('/app/login') && !path.includes('/app/signup')) {
+    const hasDeck = document.querySelector('[data-testid="gamepad-like"], button[aria-label*="Like" i], button[aria-label*="Nope" i], button[aria-label*="Pass" i], .recCard, [data-testid="recCard"]');
+    if (hasDeck) {
+      return true;
+    }
+    const hasLikeBtn = typeof findLikeButton === 'function' && findLikeButton();
+    if (hasLikeBtn) {
+      return true;
+    }
   }
 
   return false;
@@ -877,6 +1294,12 @@ function extractCandidateProfile(candidateName = null) {
     const domQA = getMatchQuestionAnswers();
     if (Array.isArray(domQA) && domQA.length > 0) {
       profile.questionAnswers = domQA;
+    }
+  }
+  if ((profile.distanceMi === null || profile.distanceMi === undefined) && typeof getMatchDistanceKm === 'function') {
+    const distKm = getMatchDistanceKm();
+    if (typeof distKm === 'number' && !isNaN(distKm)) {
+      profile.distanceMi = Math.round(distKm / 1.60934);
     }
   }
 
@@ -1582,15 +2005,313 @@ function getMatchDistanceKm() {
 }
 
 window.getMatchDistanceKm = getMatchDistanceKm;
+
+// ── Smart AI Compatibility Scorer Engine ──
+const SMART_AI_LONG_TERM_GOALS = new Set([
+  'long_term', 'long_term_partner', 'long_term_open_to_short',
+  'meaningful_relationship', 'meaningful_conversations', 'marriage', 'life_partner',
+]);
+
+const SMART_AI_SHORT_TERM_GOALS = new Set([
+  'short_term', 'short_term_open_to_long', 'short_term_fun',
+  'casual_connection', 'just_fun', 'new_friends', 'friends', 'casual',
+]);
+
+const SMART_AI_OPEN_GOALS = new Set([
+  'open_to_anything', 'figuring_out', 'figuring_out_my_dating_goals',
+  'everything', 'still_figuring_it_out', 'open',
+]);
+
+function normalizeGoal(goal) {
+  if (!goal || typeof goal !== 'string') return '';
+  return goal
+    .toLowerCase()
+    .trim()
+    .replace(/[\s-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
+}
+
+function areGoalsCompatible(goalA, goalB) {
+  const normA = normalizeGoal(goalA);
+  const normB = normalizeGoal(goalB);
+  if (!normA || !normB) return true;
+  if (normA === normB) return true;
+  if (SMART_AI_OPEN_GOALS.has(normA) || SMART_AI_OPEN_GOALS.has(normB)) return true;
+  const isFlexA = normA === 'long_term_open_to_short' || normA === 'short_term_open_to_long';
+  const isFlexB = normB === 'long_term_open_to_short' || normB === 'short_term_open_to_long';
+  if (isFlexA || isFlexB) return true;
+  if (SMART_AI_LONG_TERM_GOALS.has(normA) && SMART_AI_LONG_TERM_GOALS.has(normB)) return true;
+  if (SMART_AI_SHORT_TERM_GOALS.has(normA) && SMART_AI_SHORT_TERM_GOALS.has(normB)) return true;
+  return false;
+}
+
+function checkHardFilters(candidate, ownProfile, preferences = {}) {
+  if (preferences.aiMatchStrictGoals !== false) {
+    const userGoal = ownProfile?.lookingFor;
+    const candGoal = candidate?.lookingFor;
+    if (userGoal && candGoal && !areGoalsCompatible(userGoal, candGoal)) {
+      return { passed: false, reason: 'Goal mismatch' };
+    }
+  }
+  const maxDist = preferences.aiMatchMaxDistance;
+  if (typeof maxDist === 'number' && maxDist > 0) {
+    const candDist = candidate?.distanceMi;
+    if (typeof candDist === 'number' && candDist > maxDist) {
+      return { passed: false, reason: 'Distance exceeds limit' };
+    }
+  }
+  return { passed: true };
+}
+
+const SMART_AI_STOPWORDS = new Set([
+  'this', 'that', 'with', 'from', 'have', 'here', 'what', 'when', 'where',
+  'your', 'just', 'more', 'some', 'about', 'like', 'love', 'looking',
+  'will', 'been', 'would', 'there', 'their', 'them', 'they', 'than',
+  'then', 'also', 'into', 'only', 'very', 'much', 'know', 'want',
+]);
+
+const SMART_AI_CAREER_KEYWORDS = [
+  'engineer', 'developer', 'software', 'tech', 'coding', 'design', 'designer',
+  'art', 'artist', 'creative', 'student', 'university', 'college', 'marketing',
+  'finance', 'consulting', 'business', 'founder', 'entrepreneur', 'sales',
+  'doctor', 'nurse', 'medical', 'law', 'lawyer', 'legal', 'teacher', 'education',
+  'writer', 'music', 'musician', 'photographer', 'architect', 'research',
+];
+
+function extractList(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) {
+    return val
+      .map(item => (typeof item === 'string' ? item : item?.name || ''))
+      .map(s => s.trim().toLowerCase())
+      .filter(Boolean);
+  }
+  if (typeof val === 'string') {
+    return val.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  }
+  return [];
+}
+
+function tokenizeBio(bio) {
+  if (!bio || typeof bio !== 'string') return new Set();
+  const words = bio
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !SMART_AI_STOPWORDS.has(w));
+  return new Set(words);
+}
+
+function computeLabel(score, confidence) {
+  if (confidence < 0.3) return 'Low Info';
+  if (score >= 75 && confidence >= 0.5) return 'Strong Match';
+  if (score >= 50) return 'Good Potential';
+  if (score >= 30) return 'Moderate';
+  return 'Low Compatibility';
+}
+
+function scoreCandidateLocal(candidate, ownProfile, preferences = {}) {
+  const breakdown = [];
+  let availableWeight = 0;
+  let earnedPoints = 0;
+  let populatedAxesCount = 0;
+
+  const own = ownProfile || {};
+  const cand = candidate || {};
+
+  // ── Axis 1: Shared Interests (Max 25) ──
+  const userInterests = extractList(own.interests && own.interests.length ? own.interests : (preferences.interests || preferences.targetInterests));
+  const candInterests = extractList(cand.interests);
+  if (userInterests.length > 0 && candInterests.length > 0) {
+    const userIntSet = new Set(userInterests);
+    let overlap = 0;
+    for (const item of candInterests) {
+      if (userIntSet.has(item)) overlap++;
+    }
+    const maxPossible = Math.max(userInterests.length, candInterests.length);
+    const earned = Math.min(25, Math.round((overlap / maxPossible) * 25 * 10) / 10);
+    breakdown.push({ axis: 'Shared Interests', earned, max: 25 });
+    availableWeight += 25;
+    earnedPoints += earned;
+    populatedAxesCount++;
+  }
+
+  // ── Axis 2: Lifestyle Descriptors (Max 15) ──
+  const userDesc = extractList(own.descriptors && own.descriptors.length ? own.descriptors : (preferences.descriptors || preferences.lifestyle));
+  const candDesc = extractList(cand.descriptors);
+  if (userDesc.length > 0 && candDesc.length > 0) {
+    const userDescSet = new Set(userDesc);
+    let overlap = 0;
+    for (const item of candDesc) {
+      if (userDescSet.has(item)) overlap++;
+    }
+    const maxPossible = Math.max(userDesc.length, candDesc.length);
+    const earned = Math.min(15, Math.round((overlap / maxPossible) * 15 * 10) / 10);
+    breakdown.push({ axis: 'Lifestyle', earned, max: 15 });
+    availableWeight += 15;
+    earnedPoints += earned;
+    populatedAxesCount++;
+  }
+
+  // ── Axis 3: Bio Keyword Affinity (Max 15) ──
+  const userBio = typeof own.bio === 'string' && own.bio.trim()
+    ? own.bio.trim()
+    : (typeof own.manualBio === 'string' && own.manualBio.trim()
+      ? own.manualBio.trim()
+      : (typeof preferences.manualBio === 'string' ? preferences.manualBio.trim() : ''));
+  const candBio = typeof cand.bio === 'string' ? cand.bio.trim() : '';
+  if (userBio.length >= 10 && candBio.length >= 10) {
+    const userTokens = tokenizeBio(userBio);
+    const candTokens = tokenizeBio(candBio);
+    if (userTokens.size > 0 && candTokens.size > 0) {
+      let overlap = 0;
+      for (const token of candTokens) {
+        if (userTokens.has(token)) overlap++;
+      }
+      const maxPossible = Math.max(userTokens.size, candTokens.size);
+      const earned = Math.min(15, Math.round((overlap / maxPossible) * 15 * 10) / 10);
+      breakdown.push({ axis: 'Bio Keywords', earned, max: 15 });
+      availableWeight += 15;
+      earnedPoints += earned;
+      populatedAxesCount++;
+    }
+  }
+
+  // ── Axis 4: Career & Education (Max 10) ──
+  const userJob = (own.job || preferences.userJob || '').trim();
+  const userSchool = (own.school || preferences.userSchool || '').trim();
+  const candJob = (cand.job || '').trim();
+  const candSchool = (cand.school || '').trim();
+  const userHasCareer = Boolean(userJob || userSchool);
+  const candHasCareer = Boolean(candJob || candSchool);
+
+  if (userHasCareer && candHasCareer) {
+    let earned = 0;
+    if (userJob && candJob) earned += 4;
+    if (userSchool && candSchool) earned += 3;
+
+    const userCareerText = `${userJob} ${userSchool}`.toLowerCase();
+    const candCareerText = `${candJob} ${candSchool}`.toLowerCase();
+    const hasFieldMatch = SMART_AI_CAREER_KEYWORDS.some(
+      kw => userCareerText.includes(kw) && candCareerText.includes(kw)
+    );
+    if (hasFieldMatch) earned += 3;
+
+    earned = Math.min(10, earned);
+    breakdown.push({ axis: 'Career & Education', earned, max: 10 });
+    availableWeight += 10;
+    earnedPoints += earned;
+    populatedAxesCount++;
+  } else if (candHasCareer && !userHasCareer) {
+    let earned = 0;
+    if (candJob) earned += 5;
+    if (candSchool) earned += 3;
+    earned = Math.min(10, earned);
+    breakdown.push({ axis: 'Career & Education', earned, max: 10 });
+    availableWeight += 10;
+    earnedPoints += earned;
+    populatedAxesCount++;
+  }
+
+  // ── Axis 5: Location Proximity (Max 10) ──
+  const dist = cand.distanceMi;
+  if (typeof dist === 'number' && !isNaN(dist) && dist >= 0) {
+    let earned = 1;
+    if (dist < 5) earned = 10;
+    else if (dist < 15) earned = 8;
+    else if (dist < 30) earned = 5;
+    else if (dist < 50) earned = 3;
+
+    breakdown.push({ axis: 'Location', earned, max: 10 });
+    availableWeight += 10;
+    earnedPoints += earned;
+    populatedAxesCount++;
+  } else if (typeof cand.city === 'string' && cand.city.trim()) {
+    const candCity = cand.city.trim().toLowerCase();
+    const userCity = typeof own.city === 'string' ? own.city.trim().toLowerCase() : '';
+    let earned = 7;
+    if (userCity && (userCity === candCity || userCity.includes(candCity) || candCity.includes(userCity))) {
+      earned = 10;
+    }
+    breakdown.push({ axis: 'Location', earned, max: 10 });
+    availableWeight += 10;
+    earnedPoints += earned;
+    populatedAxesCount++;
+  }
+
+  // ── Axis 6: Relationship Goal Harmony (Max 15) ──
+  const userGoal = own.lookingFor || preferences.lookingFor || preferences.relationshipGoal;
+  const candGoal = cand.lookingFor;
+  if (userGoal && candGoal) {
+    let earned = 0;
+    const normU = normalizeGoal(userGoal);
+    const normC = normalizeGoal(candGoal);
+    if (normU && normC) {
+      if (normU === normC) {
+        earned = 15;
+      } else if (areGoalsCompatible(userGoal, candGoal)) {
+        earned = 10;
+      }
+    }
+    breakdown.push({ axis: 'Goal Harmony', earned, max: 15 });
+    availableWeight += 15;
+    earnedPoints += earned;
+    populatedAxesCount++;
+  }
+
+  // ── Axis 7: Profile Completeness Signal (Max 10 — NEVER SKIPPED) ──
+  let completenessEarned = 0;
+  if (candBio.length >= 5) completenessEarned += 3;
+  if (candInterests.length > 0) completenessEarned += 2;
+  const qa = cand.questionAnswers || cand.question_answers || [];
+  if (Array.isArray(qa) && qa.length > 0) completenessEarned += 2;
+  if (candDesc.length > 0) completenessEarned += 1;
+  const photosCount = Array.isArray(cand.photos) ? cand.photos.length : (cand.photoUrl ? 1 : 0);
+  if (photosCount >= 3) completenessEarned += 2;
+  else if (photosCount >= 1) completenessEarned += 1;
+  if (cand.verified) completenessEarned += 1;
+
+  completenessEarned = Math.min(10, completenessEarned);
+  breakdown.push({ axis: 'Completeness', earned: completenessEarned, max: 10 });
+  availableWeight += 10;
+  earnedPoints += completenessEarned;
+  populatedAxesCount++;
+
+  const score = availableWeight > 0
+    ? Math.min(100, Math.max(0, Math.round((earnedPoints / availableWeight) * 100)))
+    : 50;
+
+  const confidence = Number((populatedAxesCount / 7).toFixed(2));
+  const label = computeLabel(score, confidence);
+
+  return {
+    score,
+    confidence,
+    label,
+    breakdown,
+    tier: 'local',
+  };
+}
+
 if (typeof window !== 'undefined') {
   window.extractTinderLikesResetTimestamp = extractTinderLikesResetTimestamp;
   window.detectTinderAccountTier = detectTinderAccountTier;
   window.hasSubscriptionPopup = hasSubscriptionPopup;
+  window.normalizeGoal = normalizeGoal;
+  window.areGoalsCompatible = areGoalsCompatible;
+  window.checkHardFilters = checkHardFilters;
+  window.computeLabel = computeLabel;
+  window.scoreCandidateLocal = scoreCandidateLocal;
 }
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     extractTinderLikesResetTimestamp,
     detectTinderAccountTier,
     hasSubscriptionPopup,
+    normalizeGoal,
+    areGoalsCompatible,
+    checkHardFilters,
+    computeLabel,
+    scoreCandidateLocal,
   };
 }

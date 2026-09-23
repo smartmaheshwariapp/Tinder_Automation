@@ -189,10 +189,18 @@ describe('Multi-Account User Data Isolation', () => {
     });
     sessionManager.pushProgressFeedEvent('like', 'Liked Sarah', 'Sarah');
 
+    await sessionManager.setTinderAuthState({
+      isLoggedIn: true,
+      token: 'tinder_token_alice_123456789',
+      accountName: 'Alice Tinder',
+    });
+
     // Verify written to User A's scoped storage
     const aliceScopedKey = sessionManager.getScopedKey('@fe_on_device_session_state', 'usr_alice');
+    const aliceAuthKey = sessionManager.getScopedKey('@linksy_tinder_auth_state', 'usr_alice');
     expect(AsyncStorage._store[aliceScopedKey]).toBeDefined();
     expect(JSON.parse(AsyncStorage._store[aliceScopedKey]).cycleLikes).toBe(45);
+    expect(AsyncStorage._store[aliceAuthKey]).toBeDefined();
 
     // Explicit Flint logout
     await sessionManager.handleFlintUserLogout();
@@ -212,6 +220,10 @@ describe('Multi-Account User Data Isolation', () => {
     await sessionManager.switchUserSession('usr_alice');
     expect(sessionManager.getOnDeviceSessionState().cycleLikes).toBe(45);
     expect(sessionManager.getProgressFeed().length).toBeGreaterThan(0);
+    expect(sessionManager.getTinderAuthState().isLoggedIn).toBe(true);
+    expect(sessionManager.getTinderAuthState().token).toBe('tinder_token_alice_123456789');
+    // Pending purge MUST be disarmed because user has valid Tinder session
+    expect(sessionManager.getPendingWebViewPurge()).toBe(false);
   });
 
   it('automatically migrates un-scoped legacy data to user namespace on initial sign-in', async () => {

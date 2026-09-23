@@ -19,6 +19,12 @@ import {
   setRateLimitLockBroadcaster,
   setExternalSafetyLock,
 } from './rateLimiter';
+import { clearScoreCache } from './aiMatchScorer';
+
+let _disconnectCollectionsFn = null;
+export const registerCollectionsDisconnector = (fn) => {
+  _disconnectCollectionsFn = fn;
+};
 
 const HYPERBEAM_KEY = 'sk_test_fsuC8naqJLF2lGcL8Vak2ogGyhYFldLzqCEbX2zQYf0';
 
@@ -46,6 +52,12 @@ setRateLimitLockBroadcaster((lockInfo) => {
 export const getActiveUserId = () => activeUserId;
 
 export const setActiveUserId = (userId) => {
+  if (activeUserId !== (userId || null)) {
+    try { clearScoreCache(); } catch (_) {}
+    if (typeof _disconnectCollectionsFn === 'function') {
+      try { _disconnectCollectionsFn(); } catch (_) {}
+    }
+  }
   activeUserId = userId || null;
 };
 
@@ -562,10 +574,16 @@ try {
 export const setTinderAuthState = (data) => {
   if (data && data.isLoggedIn) {
     const hasValidToken = Boolean(
-      data.token &&
-      typeof data.token === 'string' &&
-      data.token.trim().length >= 16
+      (data.token && typeof data.token === 'string' && data.token.trim().length >= 16) ||
+      (tinderAuthState.token && typeof tinderAuthState.token === 'string' && tinderAuthState.token.trim().length >= 16)
     );
+
+    // Guard against phantom isLoggedIn: true states emitted by unauthenticated WebViews
+    if (!hasValidToken && (!data.accountName || data.accountName === 'Tinder Account')) {
+      console.warn('[SessionManager] Ignored phantom auth state without token: isLoggedIn=false');
+      data.isLoggedIn = false;
+      data.token = null;
+    }
 
     if (data.accountName === 'Swipe Right®') {
       if (hasValidToken) {
@@ -575,8 +593,10 @@ export const setTinderAuthState = (data) => {
         return;
       }
     }
-    pendingWebViewPurge = false;
-    AsyncStorage.removeItem(STORAGE_KEY_PENDING_PURGE).catch(() => {});
+    if (data.isLoggedIn) {
+      pendingWebViewPurge = false;
+      AsyncStorage.removeItem(STORAGE_KEY_PENDING_PURGE).catch(() => {});
+    }
   }
 
   // Guard: Deduplicate identical auth updates within 30 seconds to prevent re-render loops and terminal spam
@@ -697,6 +717,20 @@ export const clearTinderAuthState = async (options = {}) => {
   try {
     await AsyncStorage.setItem(authKey, JSON.stringify(tinderAuthState));
   } catch (_) {}
+  // Clear user profile & disable Smart Match to prevent cross-account profile leakage
+  sharedExtensionSettings = {
+    ...sharedExtensionSettings,
+    userProfile: null,
+    aiMatchEnabled: false,
+  };
+  try {
+    const settingsKey = getScopedKey(STORAGE_KEY_SETTINGS, activeUserId);
+    await AsyncStorage.setItem(settingsKey, JSON.stringify(sharedExtensionSettings));
+  } catch (_) {}
+  try { clearScoreCache(); } catch (_) {}
+  if (typeof _disconnectCollectionsFn === 'function') {
+    try { _disconnectCollectionsFn(); } catch (_) {}
+  }
   // Reset session counters so the next login starts at zero.
   // clearOnDeviceSessionState is defined later in this file but the call
   // happens at runtime, so the forward reference is safe in a module scope.
@@ -979,6 +1013,7 @@ export const parseTinderUserProfile = (user, planInfo = {}) => {
   }
 
   return {
+    tinderUserId: user._id || user.id || null,
     name,
     age,
     bio,
@@ -1004,6 +1039,7 @@ export const parseTinderUserProfile = (user, planInfo = {}) => {
     isTinderPro: typeof planInfo?.isPro === 'boolean' ? planInfo.isPro : Boolean(user.isTinderPro),
     likesRemaining: planInfo?.likesRemaining !== undefined ? planInfo.likesRemaining : user.likesRemaining,
     rateLimitedUntil: planInfo?.rateLimitedUntil !== undefined ? planInfo.rateLimitedUntil : user.rateLimitedUntil,
+    syncedAt: Date.now(),
     lastSyncedAt: Date.now(),
   };
 };
@@ -1312,6 +1348,29 @@ export const clearProgressFeed = async () => {
   notifyAgentListeners();
 };
 
+export const purgeProgressFeedSwipes = async ({ passedOnly = false, profileName = null, profileId = null } = {}) => {
+  const normName = profileName ? profileName.trim().toLowerCase() : null;
+  progressFeedEvents = progressFeedEvents.filter(ev => {
+    const isPass = ev.type === 'profile_passed';
+    const isLike = ev.type === 'profile_liked';
+    if (!isPass && !isLike) return true;
+    if (passedOnly && !isPass) return true;
+    if (profileId && (ev.id === profileId || ev.profileId === profileId)) return false;
+    if (normName && ev.name && ev.name.trim().toLowerCase() === normName) return false;
+    if (!profileId && !normName) return false;
+    return true;
+  });
+  sharedAgentState = {
+    ...sharedAgentState,
+    progressFeed: [...progressFeedEvents],
+  };
+  try {
+    const key = getScopedKey(STORAGE_KEY_PROGRESS_FEED, activeUserId);
+    await AsyncStorage.setItem(key, JSON.stringify(progressFeedEvents));
+  } catch (_) {}
+  notifyAgentListeners();
+};
+
 export const getSharedAgentState = () => sharedAgentState;
 
 export const updateSharedAgentState = (updater) => {
@@ -1389,6 +1448,13 @@ export const DEFAULT_SHARED_SETTINGS = {
   locationCity: 'New York, NY',
   useDeviceLocation: false,
   userProfile: null,
+  aiMatchEnabled: false,           // Master toggle (default OFF)
+  aiMatchThreshold: 60,            // Minimum score to auto-like (30–90 slider)
+  aiMatchUseLLM: false,            // Use LLM refinement (default OFF — opt-in)
+  aiMatchStrictGoals: true,        // Hard filter on goal mismatch
+  aiMatchMaxDistance: 0,           // 0 = no limit, else miles
+  aiMatchShowScores: true,         // Show scores on dashboard cards
+  distanceFilter: { enabled: false, maxDistance: 50 }, // km radius filter
 };
 
 export const isAutoSwipeEnabled = (settings) => {
@@ -1413,7 +1479,11 @@ export const getSharedExtensionSettings = () => sharedExtensionSettings;
 
 export const setSharedExtensionSettings = (newSettings) => {
   const mergedUserProfile = newSettings?.userProfile !== undefined
-    ? (newSettings.userProfile ? { ...(sharedExtensionSettings.userProfile || {}), ...newSettings.userProfile } : newSettings.userProfile)
+    ? (newSettings.userProfile ? {
+        ...(sharedExtensionSettings.userProfile || {}),
+        ...newSettings.userProfile,
+        syncedAt: newSettings.userProfile.syncedAt || sharedExtensionSettings.userProfile?.syncedAt || Date.now(),
+      } : newSettings.userProfile)
     : sharedExtensionSettings.userProfile;
 
   sharedExtensionSettings = {
@@ -2135,6 +2205,10 @@ export const switchUserSession = async (newUserId) => {
 
   // 4. In-memory state reset or hydration
   inMemoryPatchedKeys.clear();
+  try { clearScoreCache(); } catch (_) {}
+  if (typeof _disconnectCollectionsFn === 'function') {
+    try { _disconnectCollectionsFn(); } catch (_) {}
+  }
 
   if (!normalizedNewId) {
     // Unauthenticated / Explicit Logout State
@@ -2242,8 +2316,13 @@ export const switchUserSession = async (newUserId) => {
       sharedExtensionSettings = { ...DEFAULT_SHARED_SETTINGS };
     }
 
-    // e. WebView purge: arm purge if current user lacks a valid Tinder token to isolate browser cookies
-    if (!tinderAuthState.token) {
+    // e. WebView purge: disarm purge if current user has a valid Tinder token; arm if lacking token to isolate browser cookies
+    if (tinderAuthState.token && tinderAuthState.isLoggedIn) {
+      pendingWebViewPurge = false;
+      try {
+        await AsyncStorage.removeItem(STORAGE_KEY_PENDING_PURGE);
+      } catch (_) {}
+    } else if (!tinderAuthState.token) {
       pendingWebViewPurge = true;
       try {
         await AsyncStorage.setItem(STORAGE_KEY_PENDING_PURGE, 'true');

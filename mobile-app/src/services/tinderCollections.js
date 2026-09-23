@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { emptyCollections, mergeCollectionEvent, mergeProgressFeedSwipes, normalizeProfile } from '../utils/tinderCollectionsModel';
-import { getProgressFeed } from '../utils/sessionManager';
+import { getProgressFeed, purgeProgressFeedSwipes, registerCollectionsDisconnector } from '../utils/sessionManager';
 let current = { data: null, own: null, loading: false, error: null, conversationError: null };
 let token = null, generation = 0, serial = Promise.resolve(), activation = null;
 const listeners = new Set(), publish = patch => { current = { ...current, ...patch }; listeners.forEach(listener => listener(current)); };
@@ -9,6 +9,7 @@ async function request(url, sessionToken) { const controller = new AbortControll
 export const getCollections = () => current;
 export const subscribeCollections = listener => { listeners.add(listener); return () => listeners.delete(listener); };
 export function disconnectCollections() { generation++; token = null; activation = null; publish({ data: null, own: null, loading: false, error: null, conversationError: null }); }
+registerCollectionsDisconnector(disconnectCollections);
 export async function activateCollections(sessionToken) {
   if (!sessionToken) { disconnectCollections(); return; }
   if (token === sessionToken && activation) return activation; if (token === sessionToken && current.data) return;
@@ -32,3 +33,92 @@ export async function refreshConversations() {
     if (run === generation) publish({ conversationError: pageToken ? 'Showing the first 300 matches.' : null });
   } catch (_) { if (run === generation) publish({ conversationError: 'Could not refresh Tinder conversations. Saved data is still available.' }); } finally { if (run === generation) publish({ loading: false }); }
 }
+
+export async function clearSwipes({ passedOnly = false } = {}) {
+  if (!current.data) return;
+  const ownerId = current.data.ownerId;
+  const activeConversationProfileIds = new Set(
+    Object.values(current.data.conversations || {}).map(c => c.profileId).filter(Boolean)
+  );
+
+  let nextSwipes = {};
+  let nextProfiles = { ...current.data.profiles };
+
+  if (passedOnly) {
+    const passedProfileIds = new Set(
+      Object.values(current.data.swipes || {})
+        .filter(s => s.action === 'pass')
+        .map(s => s.profileId)
+    );
+    for (const [id, swipe] of Object.entries(current.data.swipes || {})) {
+      if (swipe.action === 'like') {
+        nextSwipes[id] = swipe;
+      }
+    }
+    for (const id of passedProfileIds) {
+      if (!activeConversationProfileIds.has(id)) {
+        delete nextProfiles[id];
+      }
+    }
+  } else {
+    for (const [id] of Object.entries(nextProfiles)) {
+      if (!activeConversationProfileIds.has(id)) {
+        delete nextProfiles[id];
+      }
+    }
+  }
+
+  const nextData = {
+    ...current.data,
+    swipes: nextSwipes,
+    profiles: nextProfiles,
+    updatedAt: Date.now(),
+  };
+
+  publish({ data: nextData });
+
+  try {
+    if (ownerId) {
+      await AsyncStorage.setItem(key(ownerId), JSON.stringify(nextData));
+    }
+    await purgeProgressFeedSwipes({ passedOnly });
+  } catch (_) {
+    publish({ error: 'Could not update saved collection on this device.' });
+  }
+}
+
+export async function removeSwipe(profileId) {
+  if (!current.data || !profileId) return;
+  const ownerId = current.data.ownerId;
+  const activeConversationProfileIds = new Set(
+    Object.values(current.data.conversations || {}).map(c => c.profileId).filter(Boolean)
+  );
+  const swipe = current.data.swipes?.[profileId];
+  const profileName = current.data.profiles?.[profileId]?.name;
+  const nextSwipes = { ...current.data.swipes };
+  delete nextSwipes[profileId];
+
+  const nextProfiles = { ...current.data.profiles };
+  if (!activeConversationProfileIds.has(profileId)) {
+    delete nextProfiles[profileId];
+  }
+
+  const nextData = {
+    ...current.data,
+    swipes: nextSwipes,
+    profiles: nextProfiles,
+    updatedAt: Date.now(),
+  };
+
+  publish({ data: nextData });
+
+  try {
+    if (ownerId) {
+      await AsyncStorage.setItem(key(ownerId), JSON.stringify(nextData));
+    }
+    await purgeProgressFeedSwipes({ profileName, profileId });
+  } catch (_) {
+    publish({ error: 'Could not update saved collection on this device.' });
+  }
+}
+

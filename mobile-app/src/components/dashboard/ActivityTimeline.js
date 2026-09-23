@@ -67,12 +67,27 @@ function dayLabel(value) {
 // One timeline entry: colour-coded icon well on a vertical rail, title + time, expandable detail.
 function EventRow({ event, last = false }) {
   const [expanded, setExpanded] = useState(false);
+  const [textOverflows, setTextOverflows] = useState(false);
   const reducedMotion = useMotionReduced();
   const meta = EVENT_CONFIG[event.type] || { icon: 'pulse-outline', label: 'Activity update', tone: 'neutral' };
   const detail = String(event.detail || event.message || event.text || '').trim();
   const title = meta.label + (event.name ? ' · ' + event.name : '');
   const toneColor = (TONES[meta.tone] || TONES.neutral).fg;
   const isMoment = event.type === 'handoff_detected';
+
+  // Build extra metadata lines for the expanded panel.
+  const extraMeta = [];
+  if (event.type) extraMeta.push({ label: 'Event', value: (EVENT_CONFIG[event.type]?.label || event.type) });
+  if (event.time) extraMeta.push({ label: 'Time', value: new Date(event.time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) });
+  if (event.count != null) extraMeta.push({ label: 'Count', value: String(event.count) });
+  if (event.matchName) extraMeta.push({ label: 'Match', value: event.matchName });
+  if (event.status) extraMeta.push({ label: 'Status', value: event.status });
+
+  // Show the expand button if text overflows OR there is detail text at all (so we can show meta).
+  const canExpand = !!detail;
+  const handleTextLayout = (e) => {
+    if (e?.nativeEvent?.lines?.length > 2) setTextOverflows(true);
+  };
   const toggleExpanded = () => {
     if (!reducedMotion) LayoutAnimation.configureNext(LayoutAnimation.create(uiTheme.motion.normal, 'easeInEaseOut', 'opacity'));
     setExpanded(!expanded);
@@ -90,8 +105,18 @@ function EventRow({ event, last = false }) {
         </Text>
         <Text style={styles.time} numberOfLines={1} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{timeLabel(event.time)}</Text>
       </View>
-      {!!detail && <MotionTouchable onPress={toggleExpanded} activeOpacity={0.75} pressScale={0.99} accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse event details' : 'Expand event details'} accessibilityState={{ expanded }} style={[styles.detailButton, expanded && styles.detailButtonOpen]}>
-        <Text style={styles.detail} numberOfLines={expanded ? undefined : 2}>{detail}</Text>
+      {canExpand && <MotionTouchable onPress={toggleExpanded} activeOpacity={0.75} pressScale={0.99} accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse event details' : 'Expand event details'} accessibilityState={{ expanded }} style={[styles.detailButton, expanded && styles.detailButtonOpen]}>
+        <Text style={styles.detail} numberOfLines={expanded ? undefined : 2} onTextLayout={handleTextLayout}>{detail}</Text>
+        {expanded && extraMeta.length > 0 && (
+          <View style={styles.expandedMeta}>
+            {extraMeta.map(m => (
+              <View key={m.label} style={styles.metaRow}>
+                <Text style={styles.metaLabel}>{m.label}</Text>
+                <Text style={styles.metaValue} numberOfLines={1}>{m.value}</Text>
+              </View>
+            ))}
+          </View>
+        )}
         <View style={styles.expandRow}>
           <Text style={styles.expand} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>{expanded ? 'Show less' : 'View details'}</Text>
           <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={uiTheme.colors.accent} />
@@ -246,6 +271,10 @@ const styles = createStyles(() => ({
   detail: { ...uiTheme.type.callout, color: uiTheme.colors.textSecondary },
   expandRow: { flexDirection: 'row', alignItems: 'center', gap: uiTheme.spacing.xs },
   expand: { ...uiTheme.type.buttonSmall, color: uiTheme.colors.accent },
+  expandedMeta: { gap: 6, paddingTop: uiTheme.spacing.sm, paddingBottom: uiTheme.spacing.xs, borderTopWidth: 1, borderTopColor: uiTheme.colors.divider, marginTop: uiTheme.spacing.sm },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: uiTheme.spacing.sm },
+  metaLabel: { ...uiTheme.type.footnote, color: uiTheme.colors.muted, width: 48 },
+  metaValue: { ...uiTheme.type.callout, color: uiTheme.colors.text, flex: 1, minWidth: 0 },
   milestone: { marginTop: uiTheme.spacing.xs },
   more: { marginTop: -uiTheme.spacing.xs },
   empty: { backgroundColor: uiTheme.colors.surface, borderRadius: uiTheme.radius.card, borderWidth: 1, borderColor: uiTheme.colors.borderSubtle },
