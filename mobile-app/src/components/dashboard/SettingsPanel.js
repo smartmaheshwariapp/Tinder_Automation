@@ -208,7 +208,9 @@ export default function SettingsPanel({
     return CITY_PRESETS.filter(p => p.popular).slice(0, 8);
   }, []);
   const [bioMode, setBioMode] = useState('tinder');
-  const [bioCollapsed, setBioCollapsed] = useState(true);
+  // Open by default: the Sync tab renders as the selected tab from the start, so its
+  // panel has to be visible too — otherwise the section looks empty until a tab is tapped.
+  const [bioCollapsed, setBioCollapsed] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
