@@ -3592,7 +3592,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                   numberOfLines={1}
                   style={styles.modalTitle}
                 >
-                  Flirteasy Dashboard
+                  Dashboard
                 </AppText>
               </View>
               <View style={styles.headerRightActions}>
@@ -3601,12 +3601,13 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                   : loginStep === "done" ||
                     sessionStatus === SESSION_SIGNED_IN) && (
                   <AppButton
-                    title="Log Out"
+                    title="Log out"
                     icon="log-out-outline"
                     variant="dangerSoft"
                     size="sm"
                     fullWidth={false}
                     onPress={confirmLogout}
+                    style={styles.modalLogoutBtn}
                     accessibilityLabel="Log out of Tinder"
                   />
                 )}
@@ -7139,6 +7140,12 @@ const styles = createStyles(() => ({
   },
   modalTitle: {
     flexShrink: 1,
+  },
+  // Quiet text-style logout: red label and icon, no pill outline competing with the title.
+  modalLogoutBtn: {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+    paddingHorizontal: sp.sm,
   },
   onDeviceControlsBox: {
     paddingVertical: sp.xs,

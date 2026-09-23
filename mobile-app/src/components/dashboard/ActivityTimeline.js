@@ -178,7 +178,7 @@ export default function ActivityTimeline({ progressFeed }) {
         <View style={[styles.summaryBody, isTablet && styles.summaryBodyRow]}>
           <View style={[styles.hero, isTablet && styles.heroRow]} accessible accessibilityLabel={`Events: ${events.length.toLocaleString()}`}>
             <CountUp value={events.length} style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} maxFontSizeMultiplier={uiTheme.fontScale.chrome} importantForAccessibility="no" />
-            <AppText variant="callout" color="textSecondary" style={styles.heroLabel}>{events.length === 1 ? 'update' : 'updates'} in your activity history</AppText>
+            <AppText variant="callout" color="textSecondary" style={styles.heroLabel}>{events.length === 1 ? 'update' : 'updates'}</AppText>
           </View>
           <View style={styles.statRow}>
             <StatPill icon="heart" tone="primary" count={matches} label="Matches" />
@@ -249,7 +249,8 @@ const styles = createStyles(() => ({
   statPillValue: { ...uiTheme.type.buttonSmall, fontFamily: uiTheme.fonts.strong, fontVariant: ['tabular-nums'] },
   statPillLabel: { ...uiTheme.type.subhead, color: uiTheme.colors.textSecondary, flexShrink: 1, minWidth: 0 },
   // Filters
-  filters: { flexDirection: 'row', gap: uiTheme.spacing.sm, paddingRight: uiTheme.spacing.xs },
+  // Trailing space so the last chip clears the screen edge when the row is scrolled to the end.
+  filters: { flexDirection: 'row', gap: uiTheme.spacing.sm, paddingRight: uiTheme.spacing.xl },
   filter: { minHeight: uiTheme.layout.touchTarget - 4 },
   // Day groups + timeline rows
   groups: { gap: uiTheme.spacing.xl },
