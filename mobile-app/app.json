@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Flint",
-    "slug": "flint",
+    "name": "Flirteasy",
+    "slug": "flirteasy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,8 +10,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.flirteasy.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Flint uses your location to discover local dating matches and automatically synchronize your recommendation deck.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Flint uses your location to optimize your dating matches.",
+        "NSLocationWhenInUseUsageDescription": "Flirteasy uses your location to discover local dating matches and automatically synchronize your recommendation deck.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Flirteasy uses your location to optimize your dating matches.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
