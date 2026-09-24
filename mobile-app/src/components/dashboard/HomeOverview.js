@@ -26,7 +26,6 @@ import IconButton from "../ui/IconButton";
 import useResponsive from "../../hooks/useResponsive";
 import useTinderLikesCount from "../../hooks/useTinderLikesCount";
 import CountUp from "../ui/CountUp";
-import AppLogo from "../ui/AppLogo";
 import { createStyles, theme as uiTheme, alpha } from "../../theme";
 
 const c = uiTheme.colors;
@@ -807,8 +806,17 @@ function CenterAction({ onPress }) {
         accessibilityHint="Opens your live Tinder session"
         style={styles.fabRing}
       >
-        {/* The dock mark and the app logo are the same component. */}
-        <AppLogo size={FAB_SIZE} glow={false} />
+        {/* The dock keeps its own flame button; the app logo is used elsewhere. */}
+        <LinearGradient colors={uiTheme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
+          <LinearGradient
+            pointerEvents="none"
+            colors={[alpha(c.white, 0.35), alpha(c.white, 0)]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 0.6 }}
+            style={styles.fabGloss}
+          />
+          <Ionicons name="flame" size={26} color={c.onPrimary} />
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
@@ -1423,5 +1431,5 @@ const styles = createStyles(() => ({
   smartMatchSub: {
     ...t.caption,
     color: c.textSecondary,
-  },
+  },
 }));
