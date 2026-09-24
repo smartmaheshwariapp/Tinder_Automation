@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 520">
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF7B73"/><stop offset=".48" stop-color="#F22983"/><stop offset="1" stop-color="#7B35DD"/>
+    </linearGradient>
+    <clipPath id="l"><circle cx="194" cy="209" r="98"/></clipPath>
+    <clipPath id="r"><circle cx="294" cy="209" r="98"/></clipPath>
+  </defs>
+  <rect x="48" y="48" width="392" height="392" rx="94" fill="url(#brand)"/>
+  <g clip-path="url(#l)" fill="#FFF5F5"><circle cx="194" cy="188" r="28"/><ellipse cx="194" cy="293" rx="79" ry="65"/></g>
+  <circle cx="194" cy="209" r="98" fill="none" stroke="#fff" stroke-width="14"/>
+  <g clip-path="url(#r)" fill="#F8F2FF"><circle cx="294" cy="188" r="28"/><ellipse cx="294" cy="293" rx="79" ry="65"/></g>
+  <circle cx="294" cy="209" r="98" fill="none" stroke="#fff" stroke-width="14"/>
+  <circle cx="244" cy="318" r="54" fill="#fff"/>
+  <path d="M244 356c-9-9-44-31-44-57 0-18 14-32 33-32 11 0 20 5 27 14 6-9 16-14 26-14 19 0 33 14 33 32 0 26-35 48-44 57l-15 14z" fill="#F22983" transform="translate(-16 0)"/>
+  <text x="520" y="315" font-family="Manrope, Inter, Arial, sans-serif" font-size="190" font-weight="750" letter-spacing="-8" fill="#160E1C">Flirt<tspan fill="#F22983">Easy</tspan></text>
+</svg>

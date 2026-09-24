@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1300">
+  <rect width="1800" height="1300" fill="#F6F2F5"/>
+  <text x="120" y="130" fill="#1A111B" font-family="Arial,sans-serif" font-size="64" font-weight="700">FlirtEasy — vector icon directions</text>
+  <text x="120" y="190" fill="#695C67" font-family="Arial,sans-serif" font-size="28">Purpose-built around smart messaging, flow and the letter F.</text>
+  <g transform="translate(120 270) scale(.52)">
+    <rect width="1024" height="1024" rx="224" fill="#0A050D"/>
+    <path fill="#FF3B68" d="M282 230c0-39 31-70 70-70h356c41 0 74 33 74 74s-33 74-74 74H446v132h208c40 0 72 32 72 72s-32 72-72 72H446v230c0 42-34 76-76 76h-12c-42 0-76-34-76-76V230z"/>
+    <path fill="#FFAA80" d="M782 234c0 45-31 84-76 94l-68 16 57-54c17-16 27-35 29-56h58z"/>
+    <circle cx="704" cy="512" r="34" fill="#EDDDF1"/>
+  </g>
+  <g transform="translate(690 270) scale(.52)">
+    <rect width="1024" height="1024" rx="224" fill="#0A050D"/>
+    <path fill="#FF3366" d="M238 264c0-52 42-94 94-94h402c35 0 64 29 64 64s-29 64-64 64H430c-42 0-76 34-76 76v422c0 42-34 76-76 76h-40V264z"/>
+    <path fill="#FF5E7E" d="M354 434h314c42 0 76 34 76 76s-34 76-76 76H506c-84 0-152 68-152 152V434z"/>
+    <path fill="#FFAA80" d="M744 510c0 42-34 76-76 76h-54l96 88v-102c21-14 34-37 34-62z"/>
+  </g>
+  <g transform="translate(1260 270) scale(.52)">
+    <rect width="1024" height="1024" rx="224" fill="#0A050D"/>
+    <path fill="#FF3366" d="M255 211c0-36 29-65 65-65h348c56 0 101 45 101 101s-45 101-101 101H429v134h182c48 0 87 39 87 87s-39 87-87 87H429v178c0 39-32 71-71 71h-103V211z"/>
+    <path fill="#0A050D" d="M366 274h302c15 0 27-12 27-27s-12-27-27-27H366v54zm0 309h245c8 0 14-6 14-14s-6-14-14-14H366v28z"/>
+    <path fill="#FFAA80" d="M769 247c0 56-45 101-101 101h-29l130 101V247z"/>
+    <path fill="#EDDDF1" d="M698 569c0 48-39 87-87 87h-24l111 86V569z"/>
+  </g>
+  <g transform="translate(120 890)">
+    <text x="0" y="0" fill="#1A111B" font-family="Arial,sans-serif" font-size="32" font-weight="700">01 Signal F</text>
+    <text x="570" y="0" fill="#1A111B" font-family="Arial,sans-serif" font-size="32" font-weight="700">02 Flow F</text>
+    <text x="1140" y="0" fill="#1A111B" font-family="Arial,sans-serif" font-size="32" font-weight="700">03 Paired F</text>
+    <text x="0" y="56" fill="#695C67" font-family="Arial,sans-serif" font-size="24">Fast reply signal</text>
+    <text x="570" y="56" fill="#695C67" font-family="Arial,sans-serif" font-size="24">Conversation momentum</text>
+    <text x="1140" y="56" fill="#695C67" font-family="Arial,sans-serif" font-size="24">Two-message system</text>
+  </g>
+  <g transform="translate(650 1010) scale(.22)">
+    <rect width="1024" height="1024" rx="224" fill="#0A050D"/>
+    <path fill="none" stroke="#FF3366" stroke-width="138" stroke-linecap="round" stroke-linejoin="round" d="M300 780V337c0-77 62-139 139-139h260"/>
+    <path fill="none" stroke="#FF5E7E" stroke-width="138" stroke-linecap="round" d="M369 517h266"/>
+    <path fill="#FFAA80" d="M753 198c0 64-52 116-116 116h-28l144 112V198z"/>
+    <circle cx="635" cy="517" r="54" fill="#EDDDF1"/>
+  </g>
+  <text x="905" y="1100" fill="#1A111B" font-family="Arial,sans-serif" font-size="32" font-weight="700">04 Easy Switch</text>
+  <text x="905" y="1145" fill="#695C67" font-family="Arial,sans-serif" font-size="24">Human control + smart automation</text>
+</svg>
