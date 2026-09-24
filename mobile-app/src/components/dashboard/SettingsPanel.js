@@ -49,6 +49,11 @@ import LocationService from '../../services/locationService';
 import LocationNoticeModal from '../common/LocationNoticeModal';
 import { getRateLimitStatus, subscribeRateLimit, resetRateLimits } from '../../utils/rateLimiter';
 import { saveOnDeviceSessionState, pushTinderBioDirect } from '../../utils/sessionManager';
+import {
+  resolveTinderPhoto,
+  formatRelativeSyncTime,
+  isTinderProfileStale,
+} from '../../utils/tinderProfileUtils';
 // ─── Feature Flags (Hidden in On-Device mode for clean UX, preserved for future cloud mode) ───
 const SHOW_LOCATION_FEATURE = false;
 
@@ -178,6 +183,17 @@ export default function SettingsPanel({
     }
   }, [initialOpenSection]);
 
+  const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
+  const accountPhotoUri = resolveTinderPhoto(
+    form?.userProfile ||
+    settings?.userProfile ||
+    tinderAuth?.accountPhoto ||
+    stats?.tinderAccount
+  );
+  useEffect(() => {
+    setPhotoLoadFailed(false);
+  }, [accountPhotoUri]);
+
   const [showCustomCoords, setShowCustomCoords] = useState(false);
   const [citySearchQuery, setCitySearchQuery] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('All');
@@ -218,7 +234,13 @@ export default function SettingsPanel({
   const [syncing, setSyncing] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState(false);
   const [syncError, setSyncError] = useState(null);
-  const [lastSyncTime, setLastSyncTime] = useState('not synced yet');
+  const [, setSyncTimeTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSyncTimeTick((t) => (t + 1) % 10000);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
   const [previewVisible, setPreviewVisible] = useState(false);
 
   const isSafetyOn = form ? form.safetyMode !== false : true;
@@ -281,9 +303,6 @@ export default function SettingsPanel({
         setBioMode(settings.aboutSource);
         bioModeRef.current = settings.aboutSource;
         hasInitializedBioMode.current = true;
-      }
-      if (settings.userProfile) {
-        setLastSyncTime('just now');
       }
     }
   }, [settings]);
@@ -543,6 +562,9 @@ export default function SettingsPanel({
     }
 
     if (syncedProfile) {
+      const now = Date.now();
+      syncedProfile.lastSyncedAt = now;
+      syncedProfile.syncedAt = now;
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       let nextState = null;
       setForm(prev => {
@@ -556,7 +578,6 @@ export default function SettingsPanel({
       });
       setSyncSuccess(true);
       setSyncError(null);
-      setLastSyncTime('just now');
       if (autoSaveDebounceTimer.current) {
         clearTimeout(autoSaveDebounceTimer.current);
         autoSaveDebounceTimer.current = null;
@@ -736,6 +757,12 @@ export default function SettingsPanel({
       ? `${form.userProfile.name} (Tinder)`
       : (stats?.tinderAccount?.name || tinderAuth?.accountName || 'Tinder Account'))
     : 'Tinder Account';
+
+  const syncTimestamp = form?.userProfile?.lastSyncedAt || form?.userProfile?.syncedAt || settings?.userProfile?.lastSyncedAt || settings?.userProfile?.syncedAt || null;
+  const isProfileStale = isTinderProfileStale(form?.userProfile || settings?.userProfile);
+  const relativeSyncTime = formatRelativeSyncTime(syncTimestamp);
+
+
 
   // Layout animation for disclosure toggles, skipped when the OS asks for reduced motion.
   const animateLayout = () => {
@@ -1473,10 +1500,10 @@ export default function SettingsPanel({
                           <Text style={styles.syncErrorText}>{syncError}</Text>
                         </View>
                       ) : (
-                        <View style={styles.syncStatusCard}>
-                          <View style={styles.syncStatusDot} />
-                          <Text style={styles.syncStatusText}>
-                            Synced from Tinder · {lastSyncTime}
+                        <View style={[styles.syncStatusCard, isProfileStale && styles.syncStatusCardStale]}>
+                          <View style={[styles.syncStatusDot, isProfileStale && styles.syncStatusDotStale]} />
+                          <Text style={[styles.syncStatusText, isProfileStale && styles.syncStatusTextStale]}>
+                            {syncTimestamp ? `Synced from Tinder · ${relativeSyncTime}` : 'Not synced with Tinder yet'}
                           </Text>
                         </View>
                       )}
@@ -1670,7 +1697,26 @@ export default function SettingsPanel({
           <Card padding="none" style={styles.groupCard}>
             <View style={styles.accountProfileRow}>
               <View style={styles.accountIconWrap}>
-                <Image source={TINDER_ICON} style={styles.accountLogo} />
+                {isTinderLoggedIn && accountPhotoUri && !photoLoadFailed ? (
+                  <Image
+                    source={{ uri: accountPhotoUri }}
+                    style={styles.accountLogo}
+                    onError={() => setPhotoLoadFailed(true)}
+                    accessibilityIgnoresInvertColors
+                  />
+                ) : (
+                  <Image source={TINDER_ICON} style={styles.accountLogo} />
+                )}
+                {isTinderLoggedIn && accountPhotoUri && !photoLoadFailed ? (
+                  <LinearGradient
+                    colors={uiTheme.gradients.brand}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.accountFlameBadge}
+                  >
+                    <Ionicons name="flame" size={10} color="#FFFFFF" />
+                  </LinearGradient>
+                ) : null}
                 <View
                   style={[
                     styles.accountActiveDot,
@@ -2481,6 +2527,16 @@ const styles = createStyles(() => ({
     color: c.muted,
     flexShrink: 1,
   },
+  syncStatusCardStale: {
+    borderColor: 'rgba(234, 179, 8, 0.4)',
+    backgroundColor: 'rgba(234, 179, 8, 0.08)',
+  },
+  syncStatusDotStale: {
+    backgroundColor: '#EAB308',
+  },
+  syncStatusTextStale: {
+    color: '#EAB308',
+  },
   bioTextArea: {
     ...ty.callout,
     backgroundColor: c.elevated,
@@ -2684,6 +2740,19 @@ const styles = createStyles(() => ({
     width: 48,
     height: 48,
     borderRadius: r.md,
+  },
+  accountFlameBadge: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: c.surface,
+    zIndex: 2,
   },
   accountActiveDot: {
     position: 'absolute',

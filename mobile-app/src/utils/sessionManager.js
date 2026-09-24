@@ -359,6 +359,23 @@ export const startHyperbeamCloudSession = async ({
   return { embedUrl, sessionId, profileId };
 };
 
+import {
+  resolveTinderPhoto,
+  resolveTinderPhotos,
+  resolveTinderDisplayName,
+  TINDER_PROFILE_SYNC_TTL_MS,
+  isTinderProfileStale,
+  formatRelativeSyncTime,
+} from './tinderProfileUtils';
+export {
+  resolveTinderPhoto,
+  resolveTinderPhotos,
+  resolveTinderDisplayName,
+  TINDER_PROFILE_SYNC_TTL_MS,
+  isTinderProfileStale,
+  formatRelativeSyncTime,
+};
+
 // ── Shared Tinder Auth State Cache with Persistent Storage ──
 export const STORAGE_KEY_AUTH = '@linksy_tinder_auth_state';
 const authListeners = new Set();
@@ -367,6 +384,7 @@ export const DEFAULT_AUTH_STATE = {
   isLoggedIn: false,
   accountName: null,
   accountEmail: null,
+  accountPhoto: null,
   token: null,
   tinderUserId: null,
   tinderPlan: 'free',
@@ -599,12 +617,17 @@ export const setTinderAuthState = (data) => {
     }
   }
 
+  const incomingPhoto = data?.accountPhoto !== undefined
+    ? data.accountPhoto
+    : (resolveTinderPhoto(data) || tinderAuthState.accountPhoto || null);
+
   // Guard: Deduplicate identical auth updates within 30 seconds to prevent re-render loops and terminal spam
   const isIdentical = data &&
     data.isLoggedIn === tinderAuthState.isLoggedIn &&
     data.token === tinderAuthState.token &&
     (data.tinderUserId === undefined || data.tinderUserId === tinderAuthState.tinderUserId) &&
     (data.accountName === undefined || data.accountName === tinderAuthState.accountName) &&
+    (incomingPhoto === tinderAuthState.accountPhoto) &&
     (data.tinderPlan === undefined || data.tinderPlan === tinderAuthState.tinderPlan) &&
     (data.likesRemaining === undefined || data.likesRemaining === tinderAuthState.likesRemaining) &&
     (data.rateLimitedUntil === undefined || data.rateLimitedUntil === tinderAuthState.rateLimitedUntil);
@@ -630,6 +653,7 @@ export const setTinderAuthState = (data) => {
   tinderAuthState = {
     ...tinderAuthState,
     ...data,
+    accountPhoto: incomingPhoto,
     tinderUserId: incomingTinderUserId,
     rateLimitedUntil: normalizedRateLimitedUntil,
     lastUpdated: Date.now()
@@ -761,24 +785,45 @@ export const getTinderAuthState = () => {
 export const isPurchaseActive = (item) => {
   if (!item || typeof item !== 'object') return false;
   if (item.is_active === false) return false;
+
+  // Check all known expiration date fields
+  const expRaw =
+    item.expire_date ||
+    item.expires_date ||
+    item.expires_at ||
+    item.expiry_date ||
+    item.expiration_date ||
+    item.ends_at;
+
+  let expTime = null;
+  if (expRaw) {
+    if (typeof expRaw === 'number') {
+      expTime = expRaw < 1e11 ? expRaw * 1000 : expRaw;
+    } else if (typeof expRaw === 'string') {
+      const parsed = Date.parse(expRaw);
+      if (!isNaN(parsed)) expTime = parsed;
+    }
+  }
+
+  // If a future expiration timestamp is confirmed, the subscription is active
+  // even if auto-renew status was marked canceled/cancelled
+  if (expTime !== null && expTime > Date.now()) {
+    return true;
+  }
+
+  // If expiration timestamp is in the past, it's expired
+  if (expTime !== null && expTime <= Date.now()) {
+    return false;
+  }
+
+  // If no expiration date is provided, check status string
   if (typeof item.status === 'string') {
     const s = item.status.toLowerCase();
     if (s === 'expired' || s === 'canceled' || s === 'cancelled' || s === 'inactive' || s === 'terminated') {
       return false;
     }
   }
-  if (item.expire_date) {
-    let expTime = null;
-    if (typeof item.expire_date === 'number') {
-      expTime = item.expire_date < 1e11 ? item.expire_date * 1000 : item.expire_date;
-    } else if (typeof item.expire_date === 'string') {
-      const parsed = Date.parse(item.expire_date);
-      if (!isNaN(parsed)) expTime = parsed;
-    }
-    if (expTime !== null && expTime < Date.now()) {
-      return false;
-    }
-  }
+
   return true;
 };
 
@@ -796,6 +841,11 @@ export const parseTinderPlan = (profileData) => {
   const purchases = [
     ...(Array.isArray(data?.purchases) ? data.purchases : []),
     ...(Array.isArray(data?.purchase?.purchases) ? data.purchase.purchases : []),
+    ...(Array.isArray(data?.purchase?.subscription_purchases) ? data.purchase.subscription_purchases : []),
+    ...(Array.isArray(data?.purchase?.active_purchases) ? data.purchase.active_purchases : []),
+    ...(data?.purchase?.subscription ? (Array.isArray(data.purchase.subscription) ? data.purchase.subscription : [data.purchase.subscription]) : []),
+    ...(data?.purchases?.subscription ? (Array.isArray(data.purchases.subscription) ? data.purchases.subscription : [data.purchases.subscription]) : []),
+    ...(data?.purchase?.active_subscription ? [data.purchase.active_subscription] : []),
     ...(Array.isArray(data?.account?.purchases) ? data.account.purchases : []),
     ...(Array.isArray(data?.user?.purchases) ? data.user.purchases : []),
   ];
@@ -805,7 +855,17 @@ export const parseTinderPlan = (profileData) => {
   // 1. Check purchases array for active subscriptions
   for (const item of purchases) {
     if (!isPurchaseActive(item)) continue;
-    const rawType = String(item?.product_type || item?.product_id || item?.product_name || item?.plan || item?.name || '').toLowerCase();
+    const rawType = String(
+      item?.product_type ||
+      item?.product_id ||
+      item?.product_name ||
+      item?.plan ||
+      item?.plan_type ||
+      item?.tier_name ||
+      item?.tier ||
+      item?.name ||
+      ''
+    ).toLowerCase();
     if (rawType.includes('platinum')) {
       detectedPlan = 'platinum';
       break;
@@ -816,31 +876,96 @@ export const parseTinderPlan = (profileData) => {
     }
   }
 
-  // 2. Check explicit flags on account
+  // 2. Check explicit flags on account, user, and root
   if (detectedPlan === 'free') {
-    if (data?.account?.is_platinum_subscriber) {
+    const acct = data?.account || {};
+    const usr = data?.user || {};
+    if (acct.is_platinum_subscriber || usr.is_platinum_subscriber || data?.is_platinum_subscriber) {
       detectedPlan = 'platinum';
-    } else if (data?.account?.is_gold_subscriber) {
+    } else if (acct.is_gold_subscriber || usr.is_gold_subscriber || data?.is_gold_subscriber) {
       detectedPlan = 'gold';
-    } else if (data?.account?.is_plus_subscriber) {
+    } else if (acct.is_plus_subscriber || usr.is_plus_subscriber || data?.is_plus_subscriber) {
       detectedPlan = 'plus';
     }
   }
 
-  // 3. Check account_type / membership_type / plan
+  // 3. Check plus_control (exclusive settings block for paid subscribers)
   if (detectedPlan === 'free') {
-    const acctType = String(
-      data?.account?.account_type ||
-      data?.account?.membership_type ||
-      data?.account?.plan ||
-      data?.purchase?.subscription?.plan ||
-      data?.purchases?.subscription?.plan ||
-      ''
-    ).toLowerCase();
+    const plusControl = data?.plus_control || data?.user?.plus_control || null;
+    if (plusControl && typeof plusControl === 'object') {
+      if (
+        plusControl.hide_ads === true ||
+        plusControl.discoverable_party ||
+        plusControl.blend ||
+        plusControl.hide_age !== undefined ||
+        plusControl.hide_distance !== undefined ||
+        Object.keys(plusControl).length > 0
+      ) {
+        detectedPlan = 'plus';
+      }
+    }
+  }
 
-    if (acctType.includes('platinum')) detectedPlan = 'platinum';
-    else if (acctType.includes('gold')) detectedPlan = 'gold';
-    else if (acctType.includes('plus')) detectedPlan = 'plus';
+  // 4. Check account_type / membership_type / plan / tier strings
+  if (detectedPlan === 'free') {
+    const candidateStrings = [
+      data?.account?.account_type,
+      data?.account?.membership_type,
+      data?.account?.plan,
+      data?.account?.subscription_plan,
+      data?.account?.tier,
+      data?.user?.account_type,
+      data?.user?.membership_type,
+      data?.user?.plan,
+      data?.user?.subscription_plan,
+      data?.user?.tier,
+      data?.purchase?.subscription?.plan,
+      data?.purchase?.subscription?.product_type,
+      data?.purchase?.subscription?.product_id,
+      data?.purchase?.subscription?.tier_name,
+      data?.purchase?.subscription?.plan_type,
+      data?.purchases?.subscription?.plan,
+      data?.purchases?.subscription?.product_type,
+      data?.purchases?.subscription?.product_id,
+      data?.purchase?.active_subscription?.plan,
+      data?.purchase?.active_subscription?.product_type,
+    ].filter(Boolean).map(s => String(s).toLowerCase()).join(' ');
+
+    if (candidateStrings.includes('platinum')) detectedPlan = 'platinum';
+    else if (candidateStrings.includes('gold')) detectedPlan = 'gold';
+    else if (candidateStrings.includes('plus')) detectedPlan = 'plus';
+  }
+
+  // 5. Deep scan fallback (excluding store catalogue and already-processed purchases)
+  if (detectedPlan === 'free' && data) {
+    try {
+      const searchData = { ...data };
+      delete searchData.products;
+      delete searchData.available_products;
+      delete searchData.store;
+      delete searchData.catalog;
+      delete searchData.upsell;
+      delete searchData.paywalls;
+      delete searchData.purchases;
+      delete searchData.purchase;
+      if (searchData.user) {
+        searchData.user = { ...searchData.user };
+        delete searchData.user.purchases;
+      }
+      if (searchData.account) {
+        searchData.account = { ...searchData.account };
+        delete searchData.account.purchases;
+      }
+
+      const raw = JSON.stringify(searchData).toLowerCase();
+      if (raw.includes('"is_platinum_subscriber":true') || raw.includes('tinder_platinum') || raw.includes('"product_type":"platinum"') || raw.includes('"product_id":"platinum')) {
+        detectedPlan = 'platinum';
+      } else if (raw.includes('"is_gold_subscriber":true') || raw.includes('tinder_gold') || raw.includes('"product_type":"gold"') || raw.includes('"product_id":"gold')) {
+        detectedPlan = 'gold';
+      } else if (raw.includes('"is_plus_subscriber":true') || raw.includes('tinder_plus') || raw.includes('"product_type":"plus"') || raw.includes('"product_id":"plus')) {
+        detectedPlan = 'plus';
+      }
+    } catch (_) {}
   }
 
   const likes = data?.likes || data?.user?.likes || null;
@@ -864,7 +989,7 @@ export const parseTinderPlan = (profileData) => {
  * Handles both v2/profile REST responses and DOM/CDP extracted payloads.
  * Accurately extracts all 20+ consumer and AI profile attributes.
  */
-export const parseTinderUserProfile = (user, planInfo = {}) => {
+export const parseTinderUserProfile = (user, planInfo = {}, existingProfile = null) => {
   if (!user || typeof user !== 'object') {
     return null;
   }
@@ -1039,8 +1164,12 @@ export const parseTinderUserProfile = (user, planInfo = {}) => {
     isTinderPro: typeof planInfo?.isPro === 'boolean' ? planInfo.isPro : Boolean(user.isTinderPro),
     likesRemaining: planInfo?.likesRemaining !== undefined ? planInfo.likesRemaining : user.likesRemaining,
     rateLimitedUntil: planInfo?.rateLimitedUntil !== undefined ? planInfo.rateLimitedUntil : user.rateLimitedUntil,
-    syncedAt: Date.now(),
-    lastSyncedAt: Date.now(),
+    syncedAt: planInfo?.forceSync
+      ? Date.now()
+      : (planInfo?.syncedAt || planInfo?.lastSyncedAt || existingProfile?.lastSyncedAt || existingProfile?.syncedAt || user?.lastSyncedAt || user?.syncedAt || Date.now()),
+    lastSyncedAt: planInfo?.forceSync
+      ? Date.now()
+      : (planInfo?.lastSyncedAt || planInfo?.syncedAt || existingProfile?.lastSyncedAt || existingProfile?.syncedAt || user?.lastSyncedAt || user?.syncedAt || Date.now()),
   };
 };
 
@@ -1049,13 +1178,13 @@ export const parseTinderUserProfile = (user, planInfo = {}) => {
  * Confirms session in ~200ms without mounting a visible browser.
  * Also extracts Tinder subscription tier (Platinum, Gold, Plus, Free) and full profile.
  */
-export const probeTinderSession = async (tokenToTest) => {
+export const probeTinderSession = async (tokenToTest, options = {}) => {
   const token = tokenToTest || tinderAuthState?.token;
   if (!token) return { ok: false, error: 'No token available' };
 
   try {
     const cleanToken = String(token).replace(/^["'](.*)["']$/, '$1').trim();
-    const res = await fetch('https://api.gotinder.com/v2/profile?include=account%2Cuser%2Clikes%2Cpurchases', {
+    const res = await fetch('https://api.gotinder.com/v2/profile?include=account%2Cuser%2Clikes%2Cplus_control%2Cpurchase%2Cpurchases%2Csuper_likes%2Cboost%2Ctravel', {
       method: 'GET',
       headers: {
         'x-auth-token': cleanToken,
@@ -1073,7 +1202,22 @@ export const probeTinderSession = async (tokenToTest) => {
       const tinderUserId = user?._id || user?.id || null;
 
       const planInfo = parseTinderPlan(data);
-      const parsedProfile = parseTinderUserProfile(user, planInfo);
+      const resolvedPlan = (planInfo.plan === 'free' && (tinderAuthState.tinderPlan === 'plus' || tinderAuthState.tinderPlan === 'gold' || tinderAuthState.tinderPlan === 'platinum'))
+        ? tinderAuthState.tinderPlan
+        : planInfo.plan;
+      const resolvedIsPro = resolvedPlan !== 'free' || planInfo.isPro;
+
+      const cachedProfile = options?.existingProfile || sharedExtensionSettings?.userProfile || null;
+      const isForceSync = Boolean(options?.forceSync);
+
+      const parsedProfile = parseTinderUserProfile(user, {
+        ...planInfo,
+        plan: resolvedPlan,
+        isPro: resolvedIsPro,
+        forceSync: isForceSync,
+        lastSyncedAt: isForceSync ? Date.now() : (cachedProfile?.lastSyncedAt || cachedProfile?.syncedAt || null),
+        syncedAt: isForceSync ? Date.now() : (cachedProfile?.syncedAt || cachedProfile?.lastSyncedAt || null),
+      }, cachedProfile);
 
       let effectiveRateLimitedUntil = planInfo.rateLimitedUntil;
       let effectiveLikesRemaining = planInfo.likesRemaining;
@@ -1090,14 +1234,17 @@ export const probeTinderSession = async (tokenToTest) => {
         } catch (_) {}
       }
 
+      const detectedPhoto = resolveTinderPhoto(parsedProfile || user) || tinderAuthState.accountPhoto || null;
+
       setTinderAuthState({
         isLoggedIn: true,
         token: cleanToken,
         tinderUserId,
         accountName: parsedProfile?.name || name || tinderAuthState.accountName || 'Tinder Account',
         accountEmail: email || tinderAuthState.accountEmail,
-        tinderPlan: planInfo.plan,
-        isTinderPro: planInfo.isPro,
+        accountPhoto: detectedPhoto,
+        tinderPlan: resolvedPlan,
+        isTinderPro: resolvedIsPro,
         likesRemaining: effectiveLikesRemaining,
         rateLimitedUntil: effectiveRateLimitedUntil,
       });
@@ -1107,10 +1254,11 @@ export const probeTinderSession = async (tokenToTest) => {
         tinderUserId,
         name: parsedProfile?.name || name,
         email,
+        photo: detectedPhoto,
         user,
         profile: parsedProfile,
-        plan: planInfo.plan,
-        isPro: planInfo.isPro,
+        plan: resolvedPlan,
+        isPro: resolvedIsPro,
         likesRemaining: effectiveLikesRemaining,
         rateLimitedUntil: effectiveRateLimitedUntil,
       };
@@ -1483,6 +1631,7 @@ export const setSharedExtensionSettings = (newSettings) => {
         ...(sharedExtensionSettings.userProfile || {}),
         ...newSettings.userProfile,
         syncedAt: newSettings.userProfile.syncedAt || sharedExtensionSettings.userProfile?.syncedAt || Date.now(),
+        lastSyncedAt: newSettings.userProfile.lastSyncedAt || sharedExtensionSettings.userProfile?.lastSyncedAt || newSettings.userProfile.syncedAt || sharedExtensionSettings.userProfile?.syncedAt || Date.now(),
       } : newSettings.userProfile)
     : sharedExtensionSettings.userProfile;
 

@@ -97,6 +97,11 @@ export const LANGUAGE_SLANG_GUIDE = {
     casual: "당신은 한국어 원어민이며 데이트 앱을 사용하고 있습니다. 자연스럽게 작성하되 완전한 단어로. 웃음에는 'ㅋㅋ' 또는 'ㅎㅎ'를 사용.",
     moderate: "당신은 한국어 원어민입니다. 자연스럽고 따뜻하게 작성합니다. 완전한 단어만.",
     formal: "당신은 한국어 원어민입니다. 존중하지만 따뜻하게 작성합니다. 완전한 단어만."
+  },
+  hi: {
+    casual: "Write in natural Hinglish (Hindi with English/Roman letters) as commonly texted on Indian dating apps, or in Devanagari if the match specifically wrote in Devanagari. Real Hinglish examples: 'kese ho?', 'kya chal raha hai', 'yaar sach mein', 'acha acha samjha', 'ekdum sahi bola'. Mix Hindi and English words naturally: 'that's actually bahut cool', 'seriously yaar', 'haha bas yahi chahiye tha'. Short, casual, real — like WhatsApp.",
+    moderate: "Write in natural conversational Hinglish or Hindi matching the script the match used. Natural mix: 'kya haal hai', 'sach mein', 'acha', 'bilkul', 'yaar'. Warm and friendly.",
+    formal: "Write in respectful, warm Hindi or Hinglish matching the script the match used. Complete words and polite tone. Examples: 'Aap kaise hain?', 'Bahut interesting laga', 'Aur kya chal raha hai aapka?'."
   }
 };
 

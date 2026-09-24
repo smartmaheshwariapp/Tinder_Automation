@@ -15,6 +15,7 @@ import { MotionTouchable } from '../common/Motion';
 import AppButton from '../ui/AppButton';
 import Badge from '../ui/Badge';
 import IconWell from '../ui/IconWell';
+import { resolveTinderPhoto } from '../../utils/tinderProfileUtils';
 
 const VITALS_CONFIG = [
   { key: 'lookingFor', label: 'Looking for', icon: 'heart-outline' },
@@ -65,7 +66,8 @@ export default function TinderProfileCard({
   const age = tinderProfile.age;
   const bio = (tinderProfile.bio || '').trim();
   const photos = Array.isArray(tinderProfile.photos) ? tinderProfile.photos : [];
-  const heroPhoto = photos[selectedPhotoIdx] || photos[0] || null;
+  const heroPhotoRaw = photos[selectedPhotoIdx] || photos[0] || tinderProfile;
+  const heroPhoto = resolveTinderPhoto(heroPhotoRaw);
 
   // ── 1. Tinder Platform Details ──
   const tinderPlan = tinderProfile.tinderPlan || 'free';
@@ -293,7 +295,7 @@ export default function TinderProfileCard({
               <View style={styles.collapsedAvatarWrap}>
                 {heroPhoto && !photoError ? (
                   <Image
-                    source={{ uri: typeof heroPhoto === 'string' ? heroPhoto : heroPhoto?.url }}
+                    source={{ uri: heroPhoto }}
                     style={styles.collapsedAvatar}
                     onError={() => setPhotoError(true)}
                   />
@@ -389,7 +391,7 @@ export default function TinderProfileCard({
           <View style={styles.avatarWrapper}>
             {heroPhoto && !photoError ? (
               <Image
-                source={{ uri: typeof heroPhoto === 'string' ? heroPhoto : heroPhoto?.url }}
+                source={{ uri: heroPhoto }}
                 style={styles.avatarImage}
                 onError={() => setPhotoError(true)}
                 accessibilityLabel={name ? `${name}'s profile photo` : 'Profile photo'}

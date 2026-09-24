@@ -388,5 +388,36 @@ describe('FlirtEasy Mobile AI Simulation Suite (All Scenarios)', () => {
       expect(result.message).toContain('Mallory');
       expect(logs.some(l => l.includes('AI generation failed'))).toBe(true);
     });
+
+    test('Scenario 17: Match Texts in Hindi/Hinglish with English App Default', async () => {
+      const matchData = {
+        name: 'Pooja',
+        detectedLanguage: { code: 'hi', name: 'Hindi' },
+        conversationHistory: [
+          { sender: 'user', text: 'hey Pooja, chai and long drives, tell me that is a daily thing' },
+          { sender: 'match', text: 'haha bilkul! kya kar rahe ho aajkal?' }
+        ]
+      };
+      // App settings default to English
+      const settings = { conversationLanguage: 'en', chattingStyle: 'casual' };
+
+      const sysPrompt = worker.buildSystemPrompt(settings, false, matchData);
+
+      // Verify Hindi/Hinglish slang guidance is injected even with English default settings
+      expect(sysPrompt).toContain('Hinglish');
+      expect(sysPrompt).toContain('MATCH TEXTING STYLE');
+      expect(sysPrompt).toContain('haha bilkul! kya kar rahe ho aajkal?');
+
+      worker.callOpenAI = jest.fn().mockResolvedValue(
+        'bas office se break leke chai pi raha hu, tum batao kya chal raha hai?'
+      );
+
+      const result = await worker.generateMessage(matchData, settings, false);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('chai');
+      expect(result.message).toContain('kya chal raha hai');
+    });
   });
 });
+

@@ -18,6 +18,7 @@ import { AppButton, AppText, Badge, CountUp, IconButton, SectionHeader } from '.
 import useResponsive from '../../hooks/useResponsive';
 import TinderProfileCard from './TinderProfileCard';
 import appConfig from '../../../app.json';
+import { resolveTinderPhoto } from '../../utils/tinderProfileUtils';
 
 const c = theme.colors;
 const sp = theme.spacing;
@@ -106,10 +107,7 @@ export default function ProfileDetails({
   // ── 2. Isolated Tinder Session & Profile ──
   const tinderProfile = settings?.userProfile || {};
   const tinderName = tinderProfile?.name || (isLoggedIn ? 'Connected User' : null);
-  const tinderPhoto =
-    typeof tinderProfile.photos?.[0] === 'string'
-      ? tinderProfile.photos[0]
-      : tinderProfile.photos?.[0]?.url;
+  const tinderPhoto = resolveTinderPhoto(tinderProfile);
   const tinderPlan = tinderProfile?.tinderPlan || 'free';
   const likesRemaining = tinderProfile?.likesRemaining;
 

@@ -281,6 +281,7 @@ export class OnDeviceBackgroundWorker {
           waitingReason: this.agentState.waitingReason || null,
           nextRunTimestamp: this.agentState.nextRunTimestamp || null,
           likesReplenishTimestamp: this.agentState.likesReplenishTimestamp || null,
+          isSafetyLocked: Boolean(this.agentState.waitingReason === 'safety_lock'),
           success: true
         };
 
@@ -394,11 +395,15 @@ export class OnDeviceBackgroundWorker {
             const detailText = stats.detail || (stats.age ? `Age ${stats.age} · Verified Profile` : 'AI Target Match · Safe Paced');
             pushProgressFeedEvent('profile_liked', detailText, targetName, 5, stats.photoUrl || null);
 
+            const target = this.settings.likesPerCycle || 50;
             if (this._currentRunLikes > 0 && this._currentRunLikes % 5 === 0) {
-              const target = this.settings.likesPerCycle || 50;
               const completedInCycle = this._currentRunLikes;
               const remainingInCycle = Math.max(0, target - completedInCycle);
               pushProgressFeedEvent('swipe_progress', `Likes progress: ${completedInCycle}/${target} · ${remainingInCycle} remaining`, null, 0);
+            }
+            if (this._currentRunLikes >= target && isAutoMessagingEnabled(this.settings)) {
+              this.agentState.currentPhase = 'messaging';
+              this.agentState.waitingReason = null;
             }
           }
         } else if (stats.swipes !== undefined) {
@@ -429,32 +434,18 @@ export class OnDeviceBackgroundWorker {
           this.agentState.stats.matchesCreated = stats.matches;
         }
 
-        // Messages tracking
+        // Messages tracking (idempotent — synchronizes with reported count without double-counting)
         if (stats.messagesProcessed !== undefined) {
-          const msgTarget = this.settings?.messagesPerCycle || 50;
-          let deltaMessages = 0;
           if (stats.messagesProcessed > this._currentRunMessages) {
-            deltaMessages = stats.messagesProcessed - this._currentRunMessages;
+            const deltaMessages = stats.messagesProcessed - this._currentRunMessages;
             this._currentRunMessages = stats.messagesProcessed;
-          } else if (this._currentRunMessages >= msgTarget) {
-            deltaMessages = stats.messagesProcessed;
-            this._currentRunMessages = stats.messagesProcessed;
-          } else {
-            deltaMessages = 1;
-            this._currentRunMessages = Math.min(msgTarget, this._currentRunMessages + 1);
-          }
-          if (deltaMessages > 0) {
             this.agentState.stats.messages = (this.agentState.stats.messages || 0) + deltaMessages;
             this.agentState.stats.messagesSent = this.agentState.stats.messages;
-            this.agentState.currentCycle = {
-              ...(this.agentState.currentCycle || {}),
-              messagesProcessed: this._currentRunMessages,
-            };
-            recordMessage(isSafetyOn);
-            const targetName = stats.currentName || 'Match';
-            const feedDetail = (stats.currentMessage || '').trim() || `Replied to ${targetName}`;
-            pushProgressFeedEvent('message_replied', feedDetail, targetName, 10);
           }
+          this.agentState.currentCycle = {
+            ...(this.agentState.currentCycle || {}),
+            messagesProcessed: this._currentRunMessages,
+          };
         } else if (stats.messages !== undefined) {
           this.agentState.stats.messages = stats.messages;
           this.agentState.stats.messagesSent = stats.messages;
@@ -738,7 +729,8 @@ export class OnDeviceBackgroundWorker {
         const rateStatus = getRateLimitStatus(isSafetyOn, {
           likesPerHour: typeof this.settings?.likesPerCycle === 'number' ? this.settings.likesPerCycle : 50,
         });
-        if (swipingEnabled && rateStatus.isSafetyLocked) {
+        const isLikesLocked = swipingEnabled && rateStatus.isSafetyLocked;
+        if (isLikesLocked && (!messagingEnabled || rateStatus.messages?.remaining <= 0)) {
           this.log(`Cannot start agent: Safety rate limit reached (locked for ${rateStatus.likesResetIn || 60}m)`);
           this.agentState.waitingReason = 'safety_lock';
           this.agentState.nextRunTimestamp = rateStatus.nextResetTimestamp;
@@ -751,13 +743,17 @@ export class OnDeviceBackgroundWorker {
         const effectiveReplenish = this.agentState.likesReplenishTimestamp || currentSession?.likesReplenishTimestamp;
         const isLikesExhausted = effectiveWaitingReason === 'likes_exhausted' && effectiveReplenish > Date.now();
 
-        // If swiping is disabled in settings OR likes are currently exhausted, start directly in messaging mode!
-        if (!swipingEnabled || isLikesExhausted) {
+        // If swiping is disabled, exhausted, or safety-locked, pivot directly to messaging mode!
+        if (!swipingEnabled || isLikesExhausted || isLikesLocked) {
           if (!messagingEnabled) {
             this.log('Cannot start agent: Swiping is unavailable/disabled and Auto-Messaging is disabled.');
             return { success: false, reason: 'automation_disabled' };
           }
-          if (!swipingEnabled) {
+          if (isLikesLocked) {
+            this.log(`Likes rate limit reached (${rateStatus.likesResetIn || 60}m reset) — Wingman starting directly in Messaging Mode`);
+            this.agentState.waitingReason = null;
+            this.agentState.nextRunTimestamp = null;
+          } else if (!swipingEnabled) {
             this.agentState.waitingReason = null;
             this.agentState.nextRunTimestamp = null;
             this.agentState.likesReplenishTimestamp = null;
@@ -789,7 +785,7 @@ export class OnDeviceBackgroundWorker {
           pushProgressFeedEvent('persona_update', bannerMsg, null, 0);
           this.notifyStateChange();
           trackingService.trackAgentStart(this.settings);
-          return { success: true, mode: 'messaging_only' };
+          return { success: true, mode: 'messaging_only', phase: 'messaging', pivotedToMessaging: isLikesLocked };
         }
 
         this.agentState.isRunning = true;
@@ -1111,6 +1107,7 @@ export class OnDeviceBackgroundWorker {
       }
     }
 
+
     // 11. Anti-Interview Guard (Questions Override)
     let questionOverride = '';
     if (mode === 'conversation') {
@@ -1199,7 +1196,7 @@ export class OnDeviceBackgroundWorker {
         historyText += `\n### YOUR PROFILE (SENDER) ###\nName: ${settings.userProfile?.name || ''}\nBio: ${senderBio}\n`;
       }
 
-      historyText += `\nRespond naturally to ${_displayName}'s last message. Keep it conversational and human-like. Write ONLY your response text - do NOT include any name prefixes or "You:" in your response.`;
+      historyText += `\n### INSTRUCTIONS FOR YOUR RESPONSE ###\n1. Respond directly and specifically to ${_displayName}'s last message in context of the conversation.\n2. DO NOT parrot or echo their exact words back at them (e.g. if they say "Going well thanks, you?", do NOT say "Going well, thanks!"). Use fresh, human phrasing.\n3. If their message is short (1-3 words, e.g. "Your country", "Haha", "Cool"), DO NOT use generic filler statements. Connect directly to what was said previously or ask a playful, curious question to keep the conversation engaging.\n4. Keep the conversation alive! If they ask "you?", "how about you?", or reciprocal questions, answer with genuine personality and leave a playful, romantic, or curious hook so they have an easy reason to respond.\n5. Avoid generic corporate clichés like "just enjoying some good vibes today". Sound warm, charming, and authentic.\n6. Keep it conversational and human-like. Write ONLY your response text - do NOT include any name prefixes or "You:" in your response.`;
       return historyText;
     }
 
@@ -1383,6 +1380,7 @@ export class OnDeviceBackgroundWorker {
       .replace(/\s*—\s*/g, ', ') // remove AI em-dash
       .replace(/—/g, ' - ')
       .replace(/^[,:;\s\-]+/, '') // trim leading punctuation/dashes
+      .replace(/(?<!\.)\.$/, '') // trim trailing single period (leave '...' intact)
       .trim();
   }
 

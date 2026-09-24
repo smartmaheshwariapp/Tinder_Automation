@@ -159,6 +159,59 @@ describe('Tinder Pro Plan Extraction (parseTinderPlan)', () => {
     expect(result.plan).toBe('platinum');
     expect(result.isPro).toBe(true);
   });
+
+  it('identifies Tinder Plus from purchase.subscription object (standard Tinder Web schema)', () => {
+    const { parseTinderPlan } = loadSessionManager();
+    const result = parseTinderPlan({
+      data: {
+        user: { name: 'Meghanshu' },
+        purchase: {
+          subscription: {
+            product_type: 'plus',
+            product_id: 'plus_1m',
+            status: 'active'
+          }
+        },
+        likes: { likes_remaining: null }
+      }
+    });
+
+    expect(result.plan).toBe('plus');
+    expect(result.isPro).toBe(true);
+  });
+
+  it('identifies Tinder Plus from plus_control settings object (exclusive paid feature block)', () => {
+    const { parseTinderPlan } = loadSessionManager();
+    const result = parseTinderPlan({
+      data: {
+        user: { name: 'Meghanshu' },
+        plus_control: {
+          discoverable_party: 'all',
+          hide_ads: true,
+          hide_age: false,
+          hide_distance: false
+        }
+      }
+    });
+
+    expect(result.plan).toBe('plus');
+    expect(result.isPro).toBe(true);
+  });
+
+  it('identifies Tinder Plus from deep JSON scan with tinder_plus indicators', () => {
+    const { parseTinderPlan } = loadSessionManager();
+    const result = parseTinderPlan({
+      data: {
+        user: { name: 'Meghanshu' },
+        account: {
+          custom_membership: 'tinder_plus_monthly'
+        }
+      }
+    });
+
+    expect(result.plan).toBe('plus');
+    expect(result.isPro).toBe(true);
+  });
 });
 
 describe('isPurchaseActive Validation', () => {
@@ -167,6 +220,13 @@ describe('isPurchaseActive Validation', () => {
     expect(isPurchaseActive({ product_type: 'platinum' })).toBe(true);
     expect(isPurchaseActive({ product_type: 'gold', status: 'active' })).toBe(true);
     expect(isPurchaseActive({ product_type: 'plus', expire_date: Date.now() + 50000 })).toBe(true);
+    expect(isPurchaseActive({ product_type: 'plus', expires_at: new Date(Date.now() + 50000).toISOString() })).toBe(true);
+  });
+
+  it('returns true for canceled auto-renew purchase if expire_date is still in the future', () => {
+    const { isPurchaseActive } = loadSessionManager();
+    expect(isPurchaseActive({ product_type: 'plus', status: 'canceled', expire_date: Date.now() + 86400000 })).toBe(true);
+    expect(isPurchaseActive({ product_type: 'plus', status: 'cancelled', expires_at: new Date(Date.now() + 86400000).toISOString() })).toBe(true);
   });
 
   it('returns false for expired or canceled purchases', () => {
@@ -207,6 +267,88 @@ describe('probeTinderSession Plan & Session Expiry', () => {
       expect(authState.tinderPlan).toBe('gold');
       expect(authState.isTinderPro).toBe(true);
       expect(authState.likesRemaining).toBe(999);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('hydrates auth state with detected Tinder Plus plan via purchase.subscription and plus_control', async () => {
+    const sm = loadSessionManager();
+    const originalFetch = global.fetch;
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          user: { name: 'Meghanshu' },
+          account: { account_email: 'meghanshu@test.com' },
+          purchase: {
+            subscription: {
+              product_type: 'plus',
+              product_id: 'plus_1m',
+              status: 'active'
+            }
+          },
+          plus_control: {
+            hide_ads: true,
+            discoverable_party: 'all'
+          }
+        }
+      })
+    });
+
+    try {
+      const result = await sm.probeTinderSession('valid_plus_token');
+      expect(result.ok).toBe(true);
+      expect(result.plan).toBe('plus');
+      expect(result.isPro).toBe(true);
+
+      const authState = sm.getTinderAuthState();
+      expect(authState.tinderPlan).toBe('plus');
+      expect(authState.isTinderPro).toBe(true);
+
+      // Verify that include URL query parameter contains purchase and plus_control
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('include=account%2Cuser%2Clikes%2Cplus_control%2Cpurchase'),
+        expect.any(Object)
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('retains active Tinder Plus plan when a subsequent probe has empty purchases', async () => {
+    const sm = loadSessionManager();
+    const originalFetch = global.fetch;
+
+    // Establish active Plus state
+    sm.setTinderAuthState({
+      isLoggedIn: true,
+      token: 'valid_plus_token',
+      tinderPlan: 'plus',
+      isTinderPro: true
+    });
+
+    // Simulate an API response that omits purchase data
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          user: { name: 'Meghanshu' },
+          account: { account_email: 'meghanshu@test.com' }
+        }
+      })
+    });
+
+    try {
+      const result = await sm.probeTinderSession('valid_plus_token');
+      expect(result.ok).toBe(true);
+      expect(result.plan).toBe('plus'); // Retained!
+      expect(result.isPro).toBe(true);
+
+      const authState = sm.getTinderAuthState();
+      expect(authState.tinderPlan).toBe('plus');
+      expect(authState.isTinderPro).toBe(true);
     } finally {
       global.fetch = originalFetch;
     }

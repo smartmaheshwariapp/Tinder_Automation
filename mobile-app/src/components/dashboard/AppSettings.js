@@ -13,6 +13,7 @@ import useResponsive from '../../hooks/useResponsive';
 import appConfig from '../../../app.json';
 import policies from '../../legal/policies.json';
 import { SUPPORT_EMAIL, SUPPORT_SUBJECT } from '../../config/contact';
+import { resolveTinderPhoto } from '../../utils/tinderProfileUtils';
 
 // Grouped settings row (iOS-settings style) built on ListRow. `busy` swaps the chevron for a spinner.
 function SettingsRow({ icon, tone = 'primary', title, description, onPress, busy = false, divider = false }) {
@@ -64,8 +65,7 @@ export default function AppSettings({ settings, isLoggedIn, environment, unreadC
   const profileName = settings?.userProfile?.name;
   // Tinder account details for the connection card (display only).
   const [failedPhoto, setFailedPhoto] = useState(null);
-  const firstPhoto = settings?.userProfile?.photos?.[0];
-  const photoUri = typeof firstPhoto === 'string' ? firstPhoto : firstPhoto?.url || firstPhoto?.processedFiles?.[0]?.url || null;
+  const photoUri = resolveTinderPhoto(settings?.userProfile || settings);
   const PLANS = {
     platinum: { label: 'Platinum', icon: 'diamond', color: theme.colors.platinum },
     gold: { label: 'Gold', icon: 'star', color: theme.colors.gold },

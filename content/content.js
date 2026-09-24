@@ -217,6 +217,12 @@ function stopAllAutomation() {
   _autoLikeGen++;
   _processChatsGen++;
   window.__flirteasy_stop = true;
+  window.__flirteasyAutoStartRequested = false;
+  try {
+    sessionStorage.removeItem('flirteasy_auto_resume');
+    sessionStorage.removeItem('flirteasy_auto_target');
+    sessionStorage.removeItem('flirteasy_auto_progress');
+  } catch (_) {}
   if (typeof removeTinderDeadStateCard === 'function') removeTinderDeadStateCard();
 }
 
@@ -1285,7 +1291,7 @@ async function autoLike(count = 50, initialProgress = undefined) {
     let errors = [];
     let profilesChecked = 0;
     let consecutiveLikeFailures = 0;
-    const maxProfilesToCheck = count * 3;
+    const maxProfilesToCheck = Math.min(count * 2, 80);
 
     while (likesCompleted < count && profilesChecked < maxProfilesToCheck) {
       if (isAutoLikeAborted()) {
@@ -1316,8 +1322,30 @@ async function autoLike(count = 50, initialProgress = undefined) {
           });
         });
 
-        if (stateCheck && stateCheck.isRunning === false) {
-          console.log('[FlirtEasy] Agent stopped, cancelling auto-like');
+        if (stateCheck && (stateCheck.isRunning === false || stateCheck.waitingReason === 'safety_lock' || stateCheck.isSafetyLocked === true)) {
+          console.log('[FlirtEasy] Agent stopped or safety locked, cancelling auto-like');
+          break;
+        }
+
+        // Live Rate Limiter Check per iteration (enforces 50 likes / hr sliding window)
+        const canLikeCheck = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ action: 'canPerformLikes', count: 1 }, (res) => {
+            if (chrome.runtime.lastError || !res) resolve({ allowed: true });
+            else resolve(res);
+          });
+        });
+
+        if (canLikeCheck && canLikeCheck.allowed === false) {
+          console.log('[FlirtEasy] 🛡️ Hourly likes safety limit reached (50/hr), halting swiping loop cleanly');
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_RATE_LIMIT_ENGAGED',
+                reason: canLikeCheck.reason || 'hourly_limit',
+                likesCompleted,
+              }));
+            }
+          } catch (_) {}
           break;
         }
 
@@ -1947,9 +1975,9 @@ async function autoLike(count = 50, initialProgress = undefined) {
 
     console.log(`[FlirtEasy] Auto-like completed: ${likesCompleted}/${count} successful`);
 
-    // Only post FE_CYCLE_DONE if the cycle completed naturally (reached target count or stack empty),
+    // Only post FE_CYCLE_DONE if the cycle completed naturally (reached target count, stack empty, or profile cap reached),
     // NEVER when aborted or interrupted by stopAutomation!
-    if (!isAutoLikeAborted() && (likesCompleted >= count || (typeof isStackEmpty === 'function' && isStackEmpty()))) {
+    if (!isAutoLikeAborted() && (likesCompleted >= count || profilesChecked >= maxProfilesToCheck || (typeof isStackEmpty === 'function' && isStackEmpty()))) {
       try {
         if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
           window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -1967,6 +1995,12 @@ async function autoLike(count = 50, initialProgress = undefined) {
     };
   } finally {
     autoLikeRunning = false;
+    try {
+      sessionStorage.removeItem('flirteasy_auto_resume');
+      sessionStorage.removeItem('flirteasy_auto_target');
+      sessionStorage.removeItem('flirteasy_auto_progress');
+      window.__flirteasyAutoStartRequested = false;
+    } catch (_) {}
   }
 }
 
@@ -2282,7 +2316,10 @@ async function navigateToMessagesPage() {
     window.location.pathname.includes('/app/my-matches') ||
     window.location.pathname.includes('/app/matches');
 
-  if (hasMessagesVisible || (isOnMessagesPath && !window.location.pathname.split('/')[3])) {
+  const pathParts = window.location.pathname.split('/');
+  const onSpecificMatch = pathParts.length >= 4 && pathParts[3] !== '';
+
+  if (!onSpecificMatch && (hasMessagesVisible || isOnMessagesPath)) {
     logAction('Messages list already visible or on messages path');
     return true;
   }
@@ -2383,6 +2420,73 @@ async function navigateToMessagesPage() {
 
   logAction('navigateToMessagesPage: all navigation strategies exhausted, no message links found', {}, 'error');
   return false;
+}
+
+async function navigateBackToMessagesList() {
+  const currentPath = window.location.pathname;
+  const pathParts = currentPath.split('/');
+  const isInsideChat = (currentPath.includes('/app/messages/') || currentPath.includes('/app/my-matches/')) && pathParts.length >= 4 && pathParts[3] !== '';
+
+  if (!isInsideChat) {
+    return true;
+  }
+
+  logAction('📱 Mobile Navigation: Returning from active chat to messages list for next conversation...');
+
+  const backSelectors = [
+    'a[href="/app/messages"]',
+    'a[href="/app/my-matches"]',
+    'a[href="/app/matches"]',
+    'button[aria-label*="Back" i]',
+    'button[aria-label*="back" i]',
+    'a[aria-label*="Back" i]',
+    '[data-testid="back-button"]',
+    'header a[href^="/app/messages"]',
+    'header button:first-child',
+    'nav a[href*="messages"]'
+  ];
+
+  let clickedBack = false;
+  for (const selector of backSelectors) {
+    const el = document.querySelector(selector);
+    if (el && typeof el.click === 'function') {
+      logAction(`Found back button: ${selector}, clicking...`);
+      el.click();
+      clickedBack = true;
+      break;
+    }
+  }
+
+  if (!clickedBack) {
+    logAction('No explicit back button found, attempting window.history.back()...');
+    window.history.back();
+  }
+
+  let waitCount = 0;
+  let stillInside = true;
+  while (waitCount < 15) {
+    await waitRandom(300, 500);
+    const parts = window.location.pathname.split('/');
+    stillInside = (window.location.pathname.includes('/app/messages/') || window.location.pathname.includes('/app/my-matches/')) && parts.length >= 4 && parts[3] !== '';
+    if (!stillInside) {
+      logAction('✓ Successfully returned to messages list');
+      break;
+    }
+    waitCount++;
+  }
+
+  if (stillInside) {
+    logAction('⚠️ Back button/history did not exit chat, forcing navigateToMessagesPage()...');
+    const navSuccess = await navigateToMessagesPage();
+    if (!navSuccess) {
+      window.location.href = 'https://tinder.com/app/messages';
+      await waitRandom(2000, 3000);
+    }
+  }
+
+  // React hydration buffer: let list and tabs re-render
+  await waitRandom(1000, 1500);
+  return true;
 }
 
 const MESSAGING_LOG_PREFIX = '[FlirtEasy][Messaging]';
@@ -2579,7 +2683,7 @@ async function processChats(settings, maxMessagesOverride = null) {
       //    unread dot after the bot opened the conversation, but she still sent the most recent msg.
       // 3. Uncontacted opener needed (no stored history + empty snippet / your move)
       // 4. Enough time passed for follow-up, not hard-stopped, not in 1-week pause
-      const isFollowupReady = (lastMessageTime > 0 && !hardStopped && !isPaused && timeSince >= followupDelay && followupCount < FOLLOWUP_HARD_STOP_COUNT);
+      const isFollowupReady = settings.enableFollowups === true && (lastMessageTime > 0 && !hardStopped && !isPaused && timeSince >= followupDelay && followupCount < FOLLOWUP_HARD_STOP_COUNT);
       const isReady = match.hasUnread || match.sheRepliedLast || isUncontactedOpener || isFollowupReady;
       if (isReady) {
         match.lastScannedAt = storedData?.lastScannedAt || 0;
@@ -2791,6 +2895,9 @@ async function processChats(settings, maxMessagesOverride = null) {
           logAction(`Already processed ${match.name} in this cycle, skipping`);
           continue;
         }
+
+        // Responsive Mobile Guard: Ensure viewport is on messages list / tabs before selecting match
+        await navigateBackToMessagesList();
 
         if (match.isNew || match.isUncontactedOpener) {
           logAction(`Navigating to new match from Matches grid...`);
@@ -3110,6 +3217,13 @@ async function processChats(settings, maxMessagesOverride = null) {
         const followupDelay = (settings.promptModes?.followup?.delay || 24) * 60 * 60 * 1000; // Convert hours to ms
 
         if (userWasLast && hasMessages) {
+          if (!settings.enableFollowups) {
+            logAction(`[FlirtEasy] ${match.name}: User sent last message, awaiting match reply. Skipping to prevent double-messaging.`);
+            skipped.push(match.name);
+            processedMatchIds.add(matchId);
+            continue;
+          }
+
           const lastMessage = conversationHistory[conversationHistory.length - 1];
           const timeSinceLastMessage = Date.now() - (lastMessage.timestamp || 0);
 
@@ -3570,9 +3684,13 @@ async function processChats(settings, maxMessagesOverride = null) {
         });
       }
 
+      // Responsive Mobile Navigation: return to messages list before advancing to next match
+      await navigateBackToMessagesList();
       await waitRandom(1000, 2000);
     }
 
+    // Ensure final viewport is returned to main messages list
+    await navigateBackToMessagesList();
     window.dispatchEvent(new CustomEvent('fe:draftingStep', { detail: { step: '' } }));
 
     // ── WATCHDOG LOOP ──
@@ -4057,25 +4175,28 @@ async function waitForTinderChatReady(matchId, timeoutMs = 6000) {
 }
 
 async function navigateToMatchWithRetry(matchId, matchName, maxRetries = 5) {
-  console.log(`[FlirtEasy] Navigating to main messages page to clear cached state`);
-  const tabsElements = Array.from(document.querySelectorAll('button[role="tab"]'));
-  const messagesTabButton = tabsElements.length > 1 ? tabsElements[1] : null;
-  if (messagesTabButton) {
-    messagesTabButton.click();
-    await waitRandom(500, 800);
-  }
-
   const currentPath = window.location.pathname;
   const pathParts = currentPath.split('/');
   const currentMatchId = pathParts.length >= 4 ? pathParts[3] : null;
 
-  console.log(`[FlirtEasy] Current path: ${currentPath}, target matchId: ${matchId}, current matchId: ${currentMatchId}`);
-
-  if (currentMatchId && currentMatchId === matchId) {
+  if (currentMatchId && currentMatchId !== matchId) {
+    console.log(`[FlirtEasy] Inside different chat (${currentMatchId}), navigating back to messages list for ${matchName}`);
+    await navigateBackToMessagesList();
+  } else if (currentMatchId && currentMatchId === matchId) {
     console.log(`[FlirtEasy] Navigating away to clear cached page_token for ${matchName}`);
     window.history.pushState({}, '', '/app/recs');
     await waitRandom(300, 500);
   }
+
+  console.log(`[FlirtEasy] Navigating to main messages page to clear cached state`);
+  const tabsElements = Array.from(document.querySelectorAll('button[role="tab"], [role="tab"]'));
+  const messagesTabButton = tabsElements.find(t => t.textContent && /messages|chat/i.test(t.textContent)) || (tabsElements.length > 1 ? tabsElements[1] : null);
+  if (messagesTabButton && messagesTabButton.getAttribute('aria-selected') !== 'true') {
+    messagesTabButton.click();
+    await waitRandom(500, 800);
+  }
+
+  console.log(`[FlirtEasy] Current path: ${window.location.pathname}, target matchId: ${matchId}, current matchId: ${currentMatchId}`);
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     console.log(`[FlirtEasy] Navigation attempt ${attempt}/${maxRetries} for ${matchName}`);
@@ -4090,6 +4211,17 @@ async function navigateToMatchWithRetry(matchId, matchName, maxRetries = 5) {
       const newPath = window.location.pathname;
       if (newPath.includes(matchId)) {
         console.log(`[FlirtEasy] Successfully navigated to ${matchName}`);
+        return true;
+      }
+    }
+
+    // Direct route fallback if element click failed on mobile or virtualized DOM
+    if (attempt >= 2 && matchId) {
+      console.log(`[FlirtEasy] Attempt ${attempt}: Match card not clicked in DOM, trying direct URL navigation for ${matchName}`);
+      window.location.href = `https://tinder.com/app/messages/${matchId}`;
+      await waitRandom(3000, 4000);
+      if (window.location.pathname.includes(matchId)) {
+        console.log(`[FlirtEasy] Successfully navigated to ${matchName} via direct URL`);
         return true;
       }
     }
@@ -4115,6 +4247,21 @@ async function scrollMatchesList(scrollAmount = 300) {
   console.log('[FlirtEasy] Attempting to scroll matches list...');
 
   const scrollCandidates = [
+    // Mobile responsive layout: walk up from visible match link to its scrollable parent
+    () => {
+      const matchLink = document.querySelector('a[href*="/app/messages/"], a[href*="/app/my-matches/"]');
+      if (matchLink) {
+        let el = matchLink.parentElement;
+        while (el && el !== document.body) {
+          if (el.scrollHeight > el.clientHeight + 20) {
+            return el;
+          }
+          el = el.parentElement;
+        }
+      }
+      return null;
+    },
+    // Desktop layout: aside scroll container
     () => {
       const aside = document.querySelector('aside');
       if (!aside) return null;
@@ -4128,6 +4275,12 @@ async function scrollMatchesList(scrollAmount = 300) {
         }
       }
       return maxScrollDiv;
+    },
+    // Mobile main container
+    () => {
+      const main = document.querySelector('main, #main-content, #content, [role="main"]');
+      if (main && main.scrollHeight > main.clientHeight + 20) return main;
+      return null;
     },
     () => document.querySelector('aside > div > div'),
     () => document.querySelector('aside > div'),
@@ -4928,35 +5081,7 @@ async function startVisualTrainingMode() {
   return { success: true };
 }
 
-function extractProfilePhotoUrl() {
-  console.log('[FlirtEasy] Searching for profile photo...');
-
-  // Find all visible image divs with Tinder URLs
-  const photoDivs = document.querySelectorAll('div[role="img"]');
-  const tinderUrls = [];
-
-  for (const div of photoDivs) {
-    if (div.style.backgroundImage?.includes('images-ssl.gotinder.com')) {
-      const match = div.style.backgroundImage.match(/url\(["']?([^"')]+)["']?\)/);
-      if (match?.[1]) {
-        tinderUrls.push(match[1]);
-      }
-    }
-  }
-
-  console.log('[FlirtEasy] Found', tinderUrls.length, 'Tinder image URLs');
-
-  // Return the LAST one (most likely the profile being viewed, not your own)
-  if (tinderUrls.length > 0) {
-    const url = tinderUrls[tinderUrls.length - 1];
-    console.log('[FlirtEasy] Using last URL:', url);
-    return url;
-  }
-
-  console.log('[FlirtEasy] No photo found');
-  return null;
-}
-
+// Note: extractProfilePhotoUrl is authoritatively defined in tinder-dom.js with multi-strategy caching and fallbacks.
 
 // ===== ACHIEVEMENT SYSTEM =====
 // Achievement tracker loading with queue for early requests
@@ -5506,6 +5631,27 @@ if (typeof window._feLogoutWatchdogStarted === 'undefined') {
           }
         } else {
           window.__lastInterventionReason = null;
+        }
+      }
+    } catch (_) {}
+
+    // ── Subscription Tier In-Page Watchdog ──
+    try {
+      if (typeof detectTinderAccountTier === 'function') {
+        const detectedTier = detectTinderAccountTier();
+        if (detectedTier && detectedTier !== 'unknown' && detectedTier !== 'free') {
+          if (window.__flirtEasyReportedTier !== detectedTier) {
+            window.__flirtEasyReportedTier = detectedTier;
+            window.__flirtEasyAccountTier = detectedTier;
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'FE_PLAN_DETECTED',
+                plan: detectedTier,
+                isPro: true,
+                source: 'dom_watchdog'
+              }));
+            }
+          }
         }
       }
     } catch (_) {}

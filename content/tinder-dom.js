@@ -518,37 +518,43 @@ function extractTinderLikesResetTimestamp() {
 
 function detectTinderAccountTier() {
   // Layer 1: API-sourced tier cached by api-interceptor.js (most reliable)
-  if (window.__flirtEasyAccountTier) return window.__flirtEasyAccountTier;
+  if (window.__flirtEasyAccountTier && window.__flirtEasyAccountTier !== 'unknown') {
+    return window.__flirtEasyAccountTier;
+  }
 
-  // Layer 2: Definitive free signal — paywall / out-of-likes popup is currently visible
-  if (hasSubscriptionPopup()) return 'free';
-
-  // Layer 3: Inspect subscription cards on profile / settings page (e.g. tinder.com/app/profile)
-  // On Tinder's profile screen, upsell cards exist for other tiers, but ONLY the active tier says "Manage Your Subscription"
+  // Layer 2: Inspect subscription cards / dialogs on profile, settings, or membership modal
+  // When an active subscription card/sheet is visible (e.g. "TINDER PLUS / Current Subscription")
   try {
-    const candidates = Array.from(document.querySelectorAll('div, a, button, [role="button"]'));
-    for (const el of candidates) {
+    const activeElements = Array.from(document.querySelectorAll('div, section, article, [role="dialog"], [aria-modal="true"], main'));
+    for (const el of activeElements) {
       const text = (el.innerText || el.textContent || '').toLowerCase();
-      if (text.includes('manage your subscription') || text.includes('manage subscription') || text.includes('current subscription') || text.includes('active subscription')) {
-        let current = el;
-        for (let i = 0; i < 6 && current; i++) {
-          const cText = (current.innerText || current.textContent || '').toLowerCase();
-          if (cText.includes('platinum')) return 'platinum';
-          if (cText.includes('gold')) return 'gold';
-          if (cText.includes('plus')) return 'plus';
-          current = current.parentElement;
-        }
+      if (
+        text.includes('current subscription') ||
+        text.includes('active subscription') ||
+        text.includes('manage your subscription') ||
+        text.includes('manage subscription') ||
+        text.includes('my subscription')
+      ) {
+        if (text.includes('platinum')) return 'platinum';
+        if (text.includes('gold')) return 'gold';
+        if (text.includes('plus')) return 'plus';
+        if (text.includes('unlimited likes')) return 'plus';
         return 'paid';
       }
     }
   } catch (_) {}
+
+  // Layer 3: Definitive free signal — paywall / out-of-likes popup is currently visible
+  // Only declare free if an explicit out-of-likes / paywall upgrade prompt is blocking swiping
+  if (hasSubscriptionPopup()) return 'free';
 
   // Layer 4: Specific active subscriber DOM badge (must NOT be an upsell / purchase button / pricing promo)
   try {
     const badgeCandidates = document.querySelectorAll(
       '[data-testid="subscriber-badge-platinum"], [data-testid="member-badge-platinum"], [class*="platinumBadge" i], ' +
       '[data-testid="subscriber-badge-gold"], [data-testid="member-badge-gold"], [class*="goldBadge" i], ' +
-      '[data-testid="subscriber-badge-plus"], [data-testid="member-badge-plus"], [class*="plusBadge" i]'
+      '[data-testid="subscriber-badge-plus"], [data-testid="member-badge-plus"], [class*="plusBadge" i], ' +
+      '[data-testid*="tinder-plus" i], [data-testid*="tinder-gold" i], [data-testid*="tinder-platinum" i]'
     );
     for (const el of badgeCandidates) {
       const parent = el.closest('button, a, [role="button"], [data-testid*="upsell" i], [data-testid*="paywall" i], [class*="upsell" i]');
@@ -556,10 +562,24 @@ function detectTinderAccountTier() {
       const isUpsell = /get |upgrade|unlock|subscribe|pricing|promo|offer|save|\$|€|£|₹|choose|select/.test(contextText);
       if (isUpsell) continue;
 
-      const badgeText = ((el.getAttribute('data-testid') || '') + ' ' + (el.className || '')).toLowerCase();
+      const badgeText = ((el.getAttribute('data-testid') || '') + ' ' + (el.className || '') + ' ' + (el.innerText || '')).toLowerCase();
       if (badgeText.includes('platinum')) return 'platinum';
       if (badgeText.includes('gold')) return 'gold';
       if (badgeText.includes('plus')) return 'plus';
+    }
+  } catch (_) {}
+
+  // Layer 5: Settings / account menu item text checks (e.g. left sidebar on desktop/web)
+  try {
+    const navItems = Array.from(document.querySelectorAll('a, button, [role="link"], [role="button"]'));
+    for (const item of navItems) {
+      const href = (item.getAttribute('href') || '').toLowerCase();
+      const label = (item.innerText || item.textContent || '').toLowerCase();
+      if (href.includes('/app/settings') || href.includes('/app/profile')) {
+        if (label.includes('tinder platinum')) return 'platinum';
+        if (label.includes('tinder gold')) return 'gold';
+        if (label.includes('tinder plus')) return 'plus';
+      }
     }
   } catch (_) {}
 
@@ -604,10 +624,13 @@ function isProfileVisible() {
     }
   }
 
-  // 3. Name or Photo element check
+  // 3. Name or card media element check (fast, silent DOM presence check)
   const cardName = typeof getSwipeCardName === 'function' ? getSwipeCardName() : null;
-  const photoUrl = typeof extractProfilePhotoUrl === 'function' ? extractProfilePhotoUrl(cardName) : null;
-  if (cardName || photoUrl) {
+  if (cardName) {
+    return true;
+  }
+  const hasCardMedia = Boolean(document.querySelector('.recsCardboard [role="img"], .recsCardboard img, div[data-testid*="Card" i] [role="img"], div[data-testid*="Card" i] img, .keen-slider__slide [role="img"]'));
+  if (hasCardMedia) {
     return true;
   }
 
@@ -1138,8 +1161,6 @@ function pickTopVisibleCardElement(nodeList) {
 }
 
 function extractProfilePhotoUrl(candidateName = null) {
-  console.log('[FlirtEasy] Searching for profile photo...');
-
   // Strategy 1: Ground-truth API recs cache (100% exact high-res URL)
   const name = candidateName || (typeof getSwipeCardName === 'function' ? getSwipeCardName() : null);
   if (name && typeof window.__flirtEasyGetRecPhoto === 'function') {

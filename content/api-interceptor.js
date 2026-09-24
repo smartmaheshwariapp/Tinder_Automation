@@ -192,15 +192,54 @@
           const data = await clone.json();
           const tier = _extractAccountTier(data);
           if (tier) {
-            window.__flirtEasyAccountTier = tier;
-            document.dispatchEvent(new CustomEvent('flirteasy:accountTierDetected', { detail: { tier } }));
-            log('[FlirtEasy] Account tier from API:', tier);
+            // Guard: do not overwrite a known paid tier with free from a partial response
+            const isCurrentlyPaid = window.__flirtEasyAccountTier === 'platinum' || window.__flirtEasyAccountTier === 'gold' || window.__flirtEasyAccountTier === 'plus';
+            if (tier === 'free' && isCurrentlyPaid) {
+              log('[FlirtEasy] Retaining verified paid tier:', window.__flirtEasyAccountTier);
+            } else {
+              window.__flirtEasyAccountTier = tier;
+              document.dispatchEvent(new CustomEvent('flirteasy:accountTierDetected', { detail: { tier } }));
+              log('[FlirtEasy] Account tier from API:', tier);
+              try {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'FE_PLAN_DETECTED',
+                    plan: tier,
+                    isPro: tier === 'platinum' || tier === 'gold' || tier === 'plus'
+                  }));
+                }
+              } catch (_) {}
+            }
+          }
+
+          // Extract user profile and photo telemetry if present
+          const userObj = data?.data?.user || data?.user;
+          if (userObj && (userObj.name || (Array.isArray(userObj.photos) && userObj.photos.length > 0))) {
+            const photoUrls = [];
+            if (Array.isArray(userObj.photos)) {
+              for (const p of userObj.photos) {
+                if (typeof p === 'string' && p.indexOf('http') === 0) {
+                  photoUrls.push(p);
+                } else if (p && typeof p === 'object') {
+                  if (typeof p.url === 'string' && p.url.indexOf('http') === 0) {
+                    photoUrls.push(p.url);
+                  } else if (Array.isArray(p.processedFiles) && p.processedFiles.length > 0) {
+                    const sorted = p.processedFiles.slice().sort((a, b) => (b.width || 0) - (a.width || 0));
+                    if (sorted[0]?.url) photoUrls.push(sorted[0].url);
+                  }
+                }
+              }
+            }
             try {
               if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'FE_PLAN_DETECTED',
+                  type: 'FE_PROFILE_DETECTED',
+                  name: userObj.name || null,
+                  photos: photoUrls,
+                  photoUrl: photoUrls[0] || null,
+                  age: userObj.age || null,
+                  bio: userObj.bio || '',
                   plan: tier,
-                  isPro: tier === 'platinum' || tier === 'gold' || tier === 'plus'
                 }));
               }
             } catch (_) {}
@@ -434,21 +473,36 @@
   function _isPurchaseActive(p) {
     if (!p || typeof p !== 'object') return false;
     if (p.is_active === false) return false;
+
+    // Check all known expiration date fields
+    const expRaw =
+      p.expire_date ||
+      p.expires_date ||
+      p.expires_at ||
+      p.expiry_date ||
+      p.expiration_date ||
+      p.ends_at;
+
+    let expTime = null;
+    if (expRaw) {
+      if (typeof expRaw === 'number') {
+        expTime = expRaw < 1e11 ? expRaw * 1000 : expRaw;
+      } else if (typeof expRaw === 'string') {
+        const parsed = Date.parse(expRaw);
+        if (!isNaN(parsed)) expTime = parsed;
+      }
+    }
+
+    if (expTime !== null && expTime > Date.now()) {
+      return true;
+    }
+    if (expTime !== null && expTime <= Date.now()) {
+      return false;
+    }
+
     if (typeof p.status === 'string') {
       const s = p.status.toLowerCase();
       if (s === 'expired' || s === 'canceled' || s === 'cancelled' || s === 'inactive' || s === 'terminated') {
-        return false;
-      }
-    }
-    if (p.expire_date) {
-      let expTime = null;
-      if (typeof p.expire_date === 'number') {
-        expTime = p.expire_date < 1e11 ? p.expire_date * 1000 : p.expire_date;
-      } else if (typeof p.expire_date === 'string') {
-        const parsed = Date.parse(p.expire_date);
-        if (!isNaN(parsed)) expTime = parsed;
-      }
-      if (expTime !== null && expTime < Date.now()) {
         return false;
       }
     }
@@ -460,39 +514,116 @@
       const d = data?.data || data;
       if (!d) return 'free';
 
-      // 1. Explicit subscriber flags on account object (highest confidence)
-      if (d.account?.is_platinum_subscriber) return 'platinum';
-      if (d.account?.is_gold_subscriber) return 'gold';
-      if (d.account?.is_plus_subscriber) return 'plus';
+      // 1. Explicit subscriber flags on account, user, and root
+      const acct = d.account || {};
+      const usr = d.user || {};
+      if (acct.is_platinum_subscriber || usr.is_platinum_subscriber || d.is_platinum_subscriber) return 'platinum';
+      if (acct.is_gold_subscriber || usr.is_gold_subscriber || d.is_gold_subscriber) return 'gold';
+      if (acct.is_plus_subscriber || usr.is_plus_subscriber || d.is_plus_subscriber) return 'plus';
 
       // 2. Active user purchases (DO NOT include d.products - that is the store catalogue)
       const purchases = [
         ...(Array.isArray(d?.purchases) ? d.purchases : []),
         ...(Array.isArray(d?.purchase?.purchases) ? d.purchase.purchases : []),
+        ...(Array.isArray(d?.purchase?.subscription_purchases) ? d.purchase.subscription_purchases : []),
+        ...(Array.isArray(d?.purchase?.active_purchases) ? d.purchase.active_purchases : []),
+        ...(d?.purchase?.subscription ? (Array.isArray(d.purchase.subscription) ? d.purchase.subscription : [d.purchase.subscription]) : []),
+        ...(d?.purchases?.subscription ? (Array.isArray(d.purchases.subscription) ? d.purchases.subscription : [d.purchases.subscription]) : []),
+        ...(d?.purchase?.active_subscription ? [d.purchase.active_subscription] : []),
         ...(Array.isArray(d?.account?.purchases) ? d.account.purchases : []),
         ...(Array.isArray(d?.user?.purchases) ? d.user.purchases : []),
       ];
 
       for (const p of purchases) {
         if (!_isPurchaseActive(p)) continue;
-        const sig = String(p?.product_type || p?.product_id || p?.product_name || p?.plan || p?.name || '').toLowerCase();
+        const sig = String(
+          p?.product_type ||
+          p?.product_id ||
+          p?.product_name ||
+          p?.plan ||
+          p?.plan_type ||
+          p?.tier_name ||
+          p?.tier ||
+          p?.name ||
+          ''
+        ).toLowerCase();
         if (sig.includes('platinum')) return 'platinum';
         if (sig.includes('gold')) return 'gold';
         if (sig.includes('plus')) return 'plus';
       }
 
-      // 3. Account membership / subscription fields
-      const acctType = String(
-        d.account?.account_type ||
-        d.account?.membership_type ||
-        d.account?.plan ||
-        d.purchase?.subscription?.plan ||
-        d.purchases?.subscription?.plan ||
-        ''
-      ).toLowerCase();
-      if (acctType.includes('platinum')) return 'platinum';
-      if (acctType.includes('gold')) return 'gold';
-      if (acctType.includes('plus')) return 'plus';
+      // 3. Check plus_control (exclusive settings block for paid subscribers)
+      const plusControl = d.plus_control || d.user?.plus_control || null;
+      if (plusControl && typeof plusControl === 'object') {
+        if (
+          plusControl.hide_ads === true ||
+          plusControl.discoverable_party ||
+          plusControl.blend ||
+          plusControl.hide_age !== undefined ||
+          plusControl.hide_distance !== undefined ||
+          Object.keys(plusControl).length > 0
+        ) {
+          return 'plus';
+        }
+      }
+
+      // 4. Account membership / subscription fields
+      const candidateStrings = [
+        d.account?.account_type,
+        d.account?.membership_type,
+        d.account?.plan,
+        d.account?.subscription_plan,
+        d.account?.tier,
+        d.user?.account_type,
+        d.user?.membership_type,
+        d.user?.plan,
+        d.user?.subscription_plan,
+        d.user?.tier,
+        d.purchase?.subscription?.plan,
+        d.purchase?.subscription?.product_type,
+        d.purchase?.subscription?.product_id,
+        d.purchase?.subscription?.tier_name,
+        d.purchase?.subscription?.plan_type,
+        d.purchases?.subscription?.plan,
+        d.purchases?.subscription?.product_type,
+        d.purchases?.subscription?.product_id,
+        d.purchase?.active_subscription?.plan,
+        d.purchase?.active_subscription?.product_type,
+      ].filter(Boolean).map(s => String(s).toLowerCase()).join(' ');
+
+      if (candidateStrings.includes('platinum')) return 'platinum';
+      if (candidateStrings.includes('gold')) return 'gold';
+      if (candidateStrings.includes('plus')) return 'plus';
+
+      // 5. Deep scan fallback (excluding store catalogue and already-processed purchases)
+      try {
+        const searchData = { ...d };
+        delete searchData.products;
+        delete searchData.available_products;
+        delete searchData.store;
+        delete searchData.catalog;
+        delete searchData.upsell;
+        delete searchData.paywalls;
+        delete searchData.purchases;
+        delete searchData.purchase;
+        if (searchData.user) {
+          searchData.user = { ...searchData.user };
+          delete searchData.user.purchases;
+        }
+        if (searchData.account) {
+          searchData.account = { ...searchData.account };
+          delete searchData.account.purchases;
+        }
+
+        const raw = JSON.stringify(searchData).toLowerCase();
+        if (raw.includes('"is_platinum_subscriber":true') || raw.includes('tinder_platinum') || raw.includes('"product_type":"platinum"') || raw.includes('"product_id":"platinum')) {
+          return 'platinum';
+        } else if (raw.includes('"is_gold_subscriber":true') || raw.includes('tinder_gold') || raw.includes('"product_type":"gold"') || raw.includes('"product_id":"gold')) {
+          return 'gold';
+        } else if (raw.includes('"is_plus_subscriber":true') || raw.includes('tinder_plus') || raw.includes('"product_type":"plus"') || raw.includes('"product_id":"plus')) {
+          return 'plus';
+        }
+      } catch (_) {}
 
       return 'free';
     } catch (_) {}

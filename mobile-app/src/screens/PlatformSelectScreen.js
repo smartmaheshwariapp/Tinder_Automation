@@ -498,8 +498,9 @@ export default function PlatformSelectScreen({ navigation, route }) {
       };
     }
 
-    const res = await probeTinderSession(auth.token);
+    const res = await probeTinderSession(auth.token, { forceSync: true });
     if (res?.ok && (res.profile || res.user)) {
+      const now = Date.now();
       const profile =
         res.profile ||
         parseTinderUserProfile(res.user, {
@@ -507,7 +508,14 @@ export default function PlatformSelectScreen({ navigation, route }) {
           isPro: res.isPro,
           likesRemaining: res.likesRemaining,
           rateLimitedUntil: res.rateLimitedUntil,
+          forceSync: true,
+          lastSyncedAt: now,
+          syncedAt: now,
         });
+      if (profile) {
+        profile.lastSyncedAt = now;
+        profile.syncedAt = now;
+      }
       await handleSaveSettings({ userProfile: profile });
       return { success: true, profile };
     }
@@ -679,9 +687,11 @@ export default function PlatformSelectScreen({ navigation, route }) {
           }
           lastAuthProbeTimeRef.current = now;
 
+          const current = getSharedExtensionSettings();
+          const prevProfile = current?.userProfile || {};
           const requestStarted = Date.now();
           try {
-            const res = await probeTinderSession(auth.token);
+            const res = await probeTinderSession(auth.token, { existingProfile: prevProfile });
             if (res?.ok) {
               setDeviceLatencyMs(Math.max(0, Date.now() - requestStarted));
               setIsLoggedIn(true);
@@ -699,10 +709,8 @@ export default function PlatformSelectScreen({ navigation, route }) {
                     isPro: res.isPro,
                     likesRemaining: res.likesRemaining,
                     rateLimitedUntil: res.rateLimitedUntil,
-                  });
+                  }, prevProfile);
                 if (profile) {
-                  const current = getSharedExtensionSettings();
-                  const prevProfile = current?.userProfile || {};
                   // Only dispatch state updates if meaningful fields actually changed
                   const hasChanged =
                     !prevProfile.lastSyncedAt ||

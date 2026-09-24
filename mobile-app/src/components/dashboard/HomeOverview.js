@@ -57,6 +57,8 @@ const FREE_PLAN_BADGE = { tone: "neutral", icon: undefined, label: "Free" };
 // Stagger step for section entrances (≤ 60ms per the motion guidelines).
 const STAGGER = 60;
 
+import { resolveTinderPhoto } from "../../utils/tinderProfileUtils";
+
 const greetingFor = (date = new Date()) => {
   const hour = date.getHours();
   if (hour < 5) return "Good night";
@@ -65,15 +67,7 @@ const greetingFor = (date = new Date()) => {
   return "Good evening";
 };
 
-const tinderPhotoFor = (settings) => {
-  const photos = settings?.userProfile?.photos;
-  if (!Array.isArray(photos)) return null;
-  for (const item of photos) {
-    const url = typeof item === "string" ? item : item?.url || item?.processedFiles?.[0]?.url;
-    if (typeof url === "string" && /^https?:\/\//.test(url)) return url;
-  }
-  return null;
-};
+const tinderPhotoFor = (settings) => resolveTinderPhoto(settings);
 
 // Round/rounded photo that falls back to `fallback` when the URL is missing or fails to load.
 function ProfilePhoto({ uri, style, fallback }) {

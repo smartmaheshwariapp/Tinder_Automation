@@ -511,11 +511,7 @@ async function getConversationHistory(limit = 50) {
         return { messages: apiMessages.slice(-limit), apiMessages };
       }
 
-      // Fallback to storage if API empty
-      if (storageMessages.length > 0) {
-        console.log(`[FlirtEasy] Using ${storageMessages.length} messages from storage (API empty)`);
-        return { messages: storageMessages.slice(-limit), apiMessages: [] };
-      }
+      // (Note: Live DOM parsing takes precedence over stale storage messages)
     } catch (error) {
       console.warn(`[FlirtEasy] Error loading from storage:`, error);
       if (apiMessages && apiMessages.length > 0) {
@@ -640,7 +636,20 @@ async function getConversationHistory(limit = 50) {
     }
   }
 
-  return { messages, apiMessages: [] };
+  if (messages.length > 0) {
+    if (matchId) {
+      saveMatchMetadata(matchId, { conversationHistory: messages.slice(-100) }).catch(() => {});
+    }
+    return { messages, apiMessages: [] };
+  }
+
+  // Fallback to storage only if live DOM yielded no messages (e.g. DOM still rendering)
+  if (storageMessages && storageMessages.length > 0) {
+    console.log(`[FlirtEasy] Using ${storageMessages.length} messages from storage (DOM empty)`);
+    return { messages: storageMessages.slice(-limit), apiMessages: [] };
+  }
+
+  return { messages: [], apiMessages: [] };
 }
 
 function extractMatchIdFromURL() {
@@ -687,23 +696,52 @@ function getMatchesFromList() {
       if (lines.length >= 2) snippet = lines[1];
     }
 
-    const unreadIndicator = item.querySelector('.unread, .badge, [data-testid="unread"], [aria-label="New Message"], .Bgc\\(\\$c-ds-background-brand\\)');
-    const hasUnread = !!unreadIndicator;
+    // Unread Indicator Detection (classes, atomic CSS, attributes, and visual badge dots)
+    const unreadIndicator = item.querySelector(
+      '.unread, .badge, [data-testid*="unread" i], [data-testid*="badge" i], [aria-label*="New Message" i], [aria-label*="unread" i], ' +
+      '.Bgc\\(\\$c-ds-background-brand\\), .Bgc\\(\\$c-ds-background-accent-red\\), [class*="background-brand" i], [class*="background-accent" i], ' +
+      'div[class*="Bdrs(50%)"][class*="Bgc("], span[class*="Bdrs(50%)"][class*="Bgc("]'
+    );
+    let hasUnread = !!unreadIndicator;
+    if (!hasUnread) {
+      // Visual inspection for small circular red/coral badge dots next to avatar
+      const dots = item.querySelectorAll('div, span');
+      for (const d of dots) {
+        const r = d.getBoundingClientRect();
+        if (r.width > 0 && r.width <= 18 && r.height > 0 && r.height <= 18) {
+          const style = window.getComputedStyle(d);
+          const bg = style.backgroundColor || '';
+          if (bg && (bg.includes('254') || bg.includes('255') || bg.includes('238') || bg.includes('rgb(25') || bg.includes('rgb(24') || bg.includes('rgb(23'))) {
+            if (style.borderRadius.includes('50%') || style.borderRadius.includes('9999px') || style.borderRadius.includes('8px')) {
+              hasUnread = true;
+              break;
+            }
+          }
+        }
+      }
+    }
 
     // 3. TINDER "YOUR MOVE" DETECTION (Cyan/Blue dot)
     const isYourMove = item.innerText.toLowerCase().includes('your move') ||
       !!item.querySelector('[class*="background-accent-cyan" i]');
 
-    // 4. SHE REPLIED LAST DETECTION via span.Hidden accessibility text
-    // Format: "Your last message was: ..."      → bot sent last → sheRepliedLast = false
-    //         "[Name]'s last message was: ..."  → she sent last → sheRepliedLast = true
-    // This is the only reliable signal — sidebar ← arrow is an SVG (not in innerText).
+    // 4. SENDER DETECTION (User Reply Arrow vs Match Reply)
+    // On Tinder Web, if the user was the last sender, a reply arrow icon (SVG or ↩ / ←) is rendered in the snippet row.
+    // If the match replied, there is NO reply arrow and the text begins directly with her message.
+    const replySvg = item.querySelector('div[class*="snippet" i] svg, .message-content svg, svg[aria-label*="reply" i]');
+    const hasReplyArrow = Boolean(replySvg) || snippet.startsWith('↩') || snippet.startsWith('←') || snippet.startsWith('↵');
+
     const hiddenText = item.querySelector('span.Hidden')?.textContent || "";
     const hiddenLower = hiddenText.toLowerCase();
-    const botSentLast = hiddenLower.includes('your last message was:');
-    const sheRepliedLast = hiddenText.length > 0 && !botSentLast && hiddenLower.includes("last message was:");
+    const hiddenSaysBotSent = hiddenLower.includes('your last message was:');
+    const hiddenSaysSheReplied = hiddenText.length > 0 && !hiddenSaysBotSent && hiddenLower.includes("last message was:");
 
-    const matchId = item.getAttribute('href').split('/').pop();
+    const botSentLast = hasReplyArrow || hiddenSaysBotSent;
+    // Match replied last if: unread badge exists, OR accessibility says so, OR snippet has text without user reply arrow (and not uncontacted / your move)
+    const sheRepliedLast = hasUnread || hiddenSaysSheReplied || (!botSentLast && snippet.length > 0 && !isYourMove);
+
+    const rawHref = item.getAttribute('href') || '';
+    const matchId = rawHref.split('?')[0].replace(/\/+$/, '').split('/').pop();
 
     // Extract photoUrl from sidebar card
     let photoUrl = null;
@@ -957,6 +995,7 @@ function navigateToMatch(matchId) {
   const selectors = [
     `a[href="/app/messages/${matchId}"]`,
     `a[href^="/app/messages/${matchId}"]`,
+    `a[href*="/app/my-matches/${matchId}"]`,
     `a[href*="${matchId}"]`
   ];
 
@@ -964,6 +1003,7 @@ function navigateToMatch(matchId) {
     const matchLink = document.querySelector(selector);
     if (matchLink) {
       console.log(`[FlirtEasy] Found match link with selector: ${selector}`);
+      try { matchLink.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (_) {}
       matchLink.click();
       return true;
     }

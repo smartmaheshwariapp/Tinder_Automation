@@ -305,6 +305,8 @@ export const canSendMessage = (isSafetyOn = true, customLimit = RATE_LIMITS.MESS
   };
 };
 
+export const canPerformMessages = canSendMessage;
+
 export const recordMessage = async (isSafetyOn = true) => {
   if (!isSafetyOn) return;
   _inMemoryRateData.messages = cleanOldEntries(_inMemoryRateData.messages, WINDOW_MS);
@@ -386,7 +388,9 @@ export const getRateLimitStatus = (isSafetyOn = true, customLimits = {}) => {
     _externalSafetyLockTs > now &&
     _externalSafetyLockReason !== 'likes_exhausted'
   );
-  const isSafetyLocked = isSafetyOn && (likesUsed >= likesLimit || isExternalSafetyLocked);
+  const isLikesLocked = isSafetyOn && (likesUsed >= likesLimit || isExternalSafetyLocked);
+  const isMessagesLocked = isSafetyOn && (msgsUsed >= msgsLimit);
+  const isSafetyLocked = isLikesLocked;
 
   if (isExternalSafetyLocked && (!nextResetTimestamp || _externalSafetyLockTs > nextResetTimestamp)) {
     nextResetTimestamp = _externalSafetyLockTs;
@@ -407,6 +411,8 @@ export const getRateLimitStatus = (isSafetyOn = true, customLimits = {}) => {
     resetIn,
     likesResetIn,
     messagesResetIn,
+    isLikesLocked,
+    isMessagesLocked,
     isSafetyLocked,
     isLikesExhausted: isExternalLikesExhausted,
     likesReplenishTimestamp: isExternalLikesExhausted ? _externalSafetyLockTs : null,

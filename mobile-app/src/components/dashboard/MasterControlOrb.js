@@ -85,9 +85,6 @@ export default function MasterControlOrb({
   // Determine active orb state
   const orbState = useMemo(() => {
     if (!isLoggedIn && !isRunning) return 'disconnected';
-    if (isSafetyLocked) return 'locked';
-    if (isStarting) return 'initializing';
-    if (isPartialLimit) return 'exhausted';
 
     if (isRunning) {
       // Subphase takes priority (most specific signal from automation)
@@ -107,7 +104,10 @@ export default function MasterControlOrb({
       }
       if (currentPhase === 'messaging') return 'messaging';
       if (currentPhase === 'transitioning') return 'transitioning';
-      if (currentPhase === 'waiting') return waitingReason === 'searching' ? 'polling' : 'waiting';
+      if (currentPhase === 'waiting') {
+        if (isSafetyLocked) return 'locked';
+        return waitingReason === 'searching' ? 'polling' : 'waiting';
+      }
       if (currentPhase === 'polling') return 'polling';
       if (['checking', 'connecting', 'initializing', 'starting'].includes(currentPhase)) return 'initializing';
 
@@ -117,6 +117,10 @@ export default function MasterControlOrb({
       if ((agentState?.currentCycle?.messagesProcessed || 0) > 0) return 'messaging';
       return swipingEnabled ? 'swiping' : 'messaging';
     }
+
+    if (isSafetyLocked) return 'locked';
+    if (isStarting) return 'initializing';
+    if (isPartialLimit) return 'exhausted';
 
     return 'idle';
   }, [isLoggedIn, isSafetyLocked, isStarting, isPartialLimit, isRunning, subPhase, currentPhase, waitingReason, agentState, swipingEnabled, messagingEnabled]);
@@ -502,7 +506,9 @@ export default function MasterControlOrb({
       default: {
         const swipingEnabled = settings?.autoSwipe !== false && (settings?.likesPerCycle ?? 50) > 0;
         const messagingEnabled = settings?.autoMessage !== false && (settings?.messagesPerCycle ?? 50) > 0;
+        const targetMsgs = typeof settings?.messagesPerCycle === 'number' && settings.messagesPerCycle > 0 ? settings.messagesPerCycle : 50;
         const hasPausedLikesProgress = swipingEnabled && currentLikes > 0 && currentLikes < targetLikes;
+        const hasPausedMessagingProgress = messagingEnabled && currentMsgs > 0 && currentMsgs < targetMsgs;
 
         if (!swipingEnabled && !messagingEnabled) {
           return {
@@ -522,9 +528,11 @@ export default function MasterControlOrb({
             ringColor: ring(c.primary),
             pulseColor: pulse(c.primary),
             icon: <Ionicons name="chatbubbles" size={38} color={c.onPrimary} />,
-            label: 'START',
-            sublabel: 'Messaging Only',
-            hint: 'Swiping disabled · Tap to chat with existing matches',
+            label: hasPausedMessagingProgress ? 'RESUME' : 'START',
+            sublabel: hasPausedMessagingProgress ? `${currentMsgs} / ${targetMsgs} chats` : 'Messaging Only',
+            hint: hasPausedMessagingProgress
+              ? `Paused at ${currentMsgs}/${targetMsgs} messages · Tap to resume`
+              : 'Swiping disabled · Tap to chat with existing matches',
           };
         }
 
@@ -542,16 +550,41 @@ export default function MasterControlOrb({
           };
         }
 
+        // Full Auto Mode (both swiping and messaging enabled)
+        // 1. Swiping was paused midway
+        if (hasPausedLikesProgress) {
+          return {
+            gradient: uiTheme.gradients.brand,
+            ringColor: ring(c.primary),
+            pulseColor: pulse(c.primary),
+            icon: <Ionicons name="play" size={38} color={c.onPrimary} style={{ marginLeft: 4 }} />,
+            label: 'RESUME',
+            sublabel: `${currentLikes} / ${targetLikes}`,
+            hint: `Paused at ${currentLikes}/${targetLikes} likes · Tap to resume`,
+          };
+        }
+
+        // 2. Swiping was completed, messaging was paused midway
+        if (hasPausedMessagingProgress && currentLikes >= targetLikes) {
+          return {
+            gradient: [c.info, c.plus],
+            ringColor: ring(c.info),
+            pulseColor: pulse(c.info),
+            icon: <Ionicons name="chatbubble" size={36} color={c.onPrimary} />,
+            label: 'RESUME',
+            sublabel: `${currentMsgs} / ${targetMsgs} chats`,
+            hint: `Swipes complete (${currentLikes}/${targetLikes}) · Paused at ${currentMsgs}/${targetMsgs} messages · Tap to resume`,
+          };
+        }
+
         return {
           gradient: uiTheme.gradients.brand,
           ringColor: ring(c.primary),
           pulseColor: pulse(c.primary),
           icon: <Ionicons name="play" size={38} color={c.onPrimary} style={{ marginLeft: 4 }} />,
-          label: hasPausedLikesProgress ? 'RESUME' : 'START',
-          sublabel: hasPausedLikesProgress ? `${currentLikes} / ${targetLikes}` : 'Full Auto',
-          hint: hasPausedLikesProgress
-            ? `Paused at ${currentLikes}/${targetLikes} likes · Tap to resume`
-            : 'Your next connection starts here · Swiping & Messaging',
+          label: 'START',
+          sublabel: 'Full Auto',
+          hint: 'Your next connection starts here · Swiping & Messaging',
         };
       }
     }
@@ -559,12 +592,22 @@ export default function MasterControlOrb({
 
   // ── 9. Interactive Action Handler ──
   const handlePress = () => {
-    if (isSafetyLocked) return;
+    // Unconditional Fail-Safe: If running in ANY active phase -> tap ALWAYS acts as stop/pause kill-switch!
+    if (isRunning) {
+      if (onToggleAgent) {
+        onToggleAgent();
+      }
+      return;
+    }
     if (!isLoggedIn) {
       if (onOpenBrowser) onOpenBrowser();
       return;
     }
-    // If running in any active phase -> click acts as stop/pause (1:1 with desktop plugin)
+    if (isSafetyLocked) {
+      // Locked and not running: still allow tapping to trigger onToggleAgent (to disarm or show lock feedback)
+      if (onToggleAgent) onToggleAgent();
+      return;
+    }
     if (onToggleAgent) {
       onToggleAgent();
     }

@@ -92,13 +92,23 @@ if (_global && _global.console) {
   const forwardLog = (level, args) => {
     if (level === 'DEBUG') return;
     if (_remoteLogCount >= MAX_REMOTE_LOGS) return;
-    const msg = typeof args[0] === 'string' ? args[0] : (args[0] != null ? String(args[0]) : null);
-    if (!msg || msg.trim() === '') return;
-    if (level === 'INFO' && !_FORWARD_PATTERN.test(msg)) return;
+    if (!args || args.length === 0) return;
+
+    const formatArg = (a) => {
+      if (a === null || a === undefined) return '';
+      if (typeof a === 'object') {
+        try { return JSON.stringify(a); } catch (_) { return String(a); }
+      }
+      return String(a);
+    };
+
+    const fullMsg = args.length === 1 ? formatArg(args[0]) : args.map(formatArg).filter(Boolean).join(' ');
+    if (!fullMsg || fullMsg.trim() === '') return;
+    if (level === 'INFO' && !_FORWARD_PATTERN.test(fullMsg)) return;
     _remoteLogCount++;
     const raw1 = args.length > 1 ? args[1] : null;
     const extra = raw1 != null ? (typeof raw1 === 'object' ? (() => { try { return JSON.stringify(raw1).slice(0, 300); } catch (_) { return String(raw1); } })() : String(raw1).slice(0, 300)) : null;
-    const payload = { level, message: msg.slice(0, 500), extra };
+    const payload = { level, message: fullMsg.slice(0, 500), extra };
     try {
       if (typeof trackEvent === 'function') {
         return;
