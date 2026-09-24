@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 600">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="80" x2="430" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF887A"/><stop offset=".48" stop-color="#F52582"/><stop offset="1" stop-color="#7138F0"/>
+    </linearGradient>
+    <linearGradient id="easy" x1="980" y1="180" x2="1690" y2="440" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF5C61"/><stop offset=".48" stop-color="#E82B9B"/><stop offset="1" stop-color="#7138F0"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="12" stdDeviation="11" flood-color="#3D073E" flood-opacity=".28"/></filter>
+    <clipPath id="clip"><rect x="70" y="95" width="390" height="390" rx="88"/></clipPath>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="70" y="95" width="390" height="390" rx="88" fill="url(#bg)"/>
+    <g clip-path="url(#clip)">
+      <circle cx="228" cy="275" r="103" fill="#FF786B" stroke="#fff" stroke-width="15"/>
+      <circle cx="342" cy="275" r="103" fill="#8439EA" stroke="#fff" stroke-width="15"/>
+      <path d="M285 197a103 103 0 0 0 0 156 103 103 0 0 0 0-156z" fill="#EFA7E8" opacity=".7"/>
+      <g fill="#fff"><circle cx="228" cy="252" r="29"/><path d="M166 354c8-44 31-67 62-67s54 23 62 67a103 103 0 0 1-124 0z"/></g>
+      <g fill="#FAF6FF"><circle cx="342" cy="252" r="29"/><path d="M280 354c8-44 31-67 62-67s54 23 62 67a103 103 0 0 1-124 0z"/></g>
+      <circle cx="285" cy="382" r="62" fill="#fff"/>
+      <path d="M285 418c-10-9-47-33-47-62 0-21 16-37 36-37 12 0 23 6 30 16 7-10 18-16 30-16 20 0 36 16 36 37 0 29-37 53-47 62l-19 18z" fill="#F52C75" transform="translate(-19)"/>
+    </g>
+  </g>
+  <text x="515" y="395" font-family="Manrope, Inter, Arial, sans-serif" font-size="235" font-weight="800" letter-spacing="-12" fill="#160E1C">Flirt</text>
+  <text x="1020" y="395" font-family="Manrope, Inter, Arial, sans-serif" font-size="235" font-weight="800" letter-spacing="-12" fill="url(#easy)">Easy</text>
+</svg>
