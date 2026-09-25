@@ -182,7 +182,7 @@ export const NotificationService = {
         // Configure native Android notification channels
         if (Notifications && Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync('default', {
-            name: 'Flirteasy Alerts',
+            name: 'FlirtEasy Alerts',
             importance: Notifications.AndroidImportance.MAX,
             vibrationPattern: [0, 250, 250, 250],
             lightColor: '#FE3C72',
@@ -230,7 +230,7 @@ export const NotificationService = {
     try {
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('default', {
-          name: 'Flirteasy Alerts',
+          name: 'FlirtEasy Alerts',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#FE3C72',
@@ -307,7 +307,7 @@ export const NotificationService = {
       const notifItem = {
         id: notification.request.identifier || `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type,
-        title: title || 'Flirteasy Update',
+        title: title || 'FlirtEasy Update',
         body: body || '',
         data: { ...data, type },
         is_read: false,
@@ -330,7 +330,7 @@ export const NotificationService = {
       const notifItem = {
         id: response?.notification?.request?.identifier || `response-${Date.now()}`,
         type: (data.type || 'new_match').toLowerCase(),
-        title: content.title || 'Flirteasy Update',
+        title: content.title || 'FlirtEasy Update',
         body: content.body || '',
         data,
         is_read: true,

@@ -391,7 +391,7 @@ export async function fetchLiveAiChatReply({
       ? 'Guide conversation naturally toward swapping Instagram handles.'
       : 'Keep banter playful, engaging, and high-chemistry with no rush.';
 
-    const systemPrompt = `You are Flirteasy, an elite modern dating wingman texting on Tinder in ${country}.
+    const systemPrompt = `You are FlirtEasy, an elite modern dating wingman texting on Tinder in ${country}.
 Personality vibe: ${personality}.
 Your goal: ${goalDesc}
 Rules:
@@ -400,7 +400,7 @@ Rules:
 - No robot speak, no quotes, no placeholders, no clichés.
 - Reply directly to the match's last message.`;
 
-    const userPrompt = `Match says: "${incomingMessage}". Write Flirteasy's outgoing charming reply:`;
+    const userPrompt = `Match says: "${incomingMessage}". Write FlirtEasy's outgoing charming reply:`;
 
     // Mode A: Direct OpenAI API Key
     if (apiKey && apiKey.startsWith('sk-')) {

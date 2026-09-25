@@ -1318,7 +1318,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
             style={homeStyles.brand}
             accessible
             accessibilityRole="header"
-            accessibilityLabel="Flirteasy, your AI dating assistant"
+            accessibilityLabel="FlirtEasy, your AI dating assistant"
           >
             <LinearGradient
               colors={uiTheme.gradients.brand}
@@ -1338,7 +1338,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                 numberOfLines={1}
                 maxFontSizeMultiplier={uiTheme.fontScale.chrome}
               >
-                Flirteasy
+                FlirtEasy
               </Text>
               <Text
                 style={homeStyles.brandCaption}
@@ -1566,7 +1566,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                     style={homeStyles.secondaryAction}
                     onPress={() => navigation.replace("Auth")}
                     accessibilityRole="button"
-                    accessibilityLabel="Back to Flirteasy login"
+                    accessibilityLabel="Back to FlirtEasy login"
                   >
                     <Ionicons
                       name="log-out-outline"
@@ -1574,7 +1574,7 @@ export default function PlatformSelectScreen({ navigation, route }) {
                       color={uiTheme.colors.accent}
                     />
                     <Text style={homeStyles.secondaryLabel}>
-                      Back to Flirteasy login
+                      Back to FlirtEasy login
                     </Text>
                   </TouchableOpacity>
                 </View>

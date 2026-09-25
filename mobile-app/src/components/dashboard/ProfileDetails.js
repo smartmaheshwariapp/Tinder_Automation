@@ -111,13 +111,13 @@ export default function ProfileDetails({
     user?.full_name ||
     user?.name ||
     settings?.accountProfile?.name ||
-    "Flirteasy Member"
+    "FlirtEasy Member"
   ).trim();
 
   const flintEmail = (
     user?.email ||
     settings?.accountProfile?.email ||
-    "Your Flirteasy account"
+    "Your FlirtEasy account"
   ).trim();
 
   const flintInitial = (flintName || "F").slice(0, 1).toUpperCase();
@@ -260,7 +260,7 @@ export default function ProfileDetails({
       iconColor: c.accent,
       iconBg: c.primarySoft,
       iconBorder: c.primaryBorder,
-      title: "Log out of Flirteasy?",
+      title: "Log out of FlirtEasy?",
       message:
         "This will disconnect your Tinder session and return you to the login screen.",
       detail: { title: flintName, subtitle: flintEmail, initial: flintInitial },
@@ -497,10 +497,10 @@ export default function ProfileDetails({
                 icon="log-out-outline"
                 iconTone="neutral"
                 title="Log out"
-                subtitle="Sign out of your Flint account"
+                subtitle="Sign out of your FlirtEasy account"
                 onPress={confirmLogout}
                 divider
-                accessibilityLabel="Log out of Flint"
+                accessibilityLabel="Log out of FlirtEasy"
               />
               <ListRow
                 icon="trash-outline"
@@ -516,11 +516,11 @@ export default function ProfileDetails({
 
         {/* ── 5. App Version Footer ── */}
         <AppText variant="caption" align="center" style={styles.versionFooter}>
-          Flirteasy · Version {appConfig.expo.version}
+          FlirtEasy · Version {appConfig.expo.version}
         </AppText>
       </ScrollView>
 
-      {/* ── Edit Flirteasy Profile Modal ── */}
+      {/* ── Edit FlirtEasy Profile Modal ── */}
       <Modal
         visible={editing}
         animationType="slide"
@@ -560,7 +560,7 @@ export default function ProfileDetails({
                 />
               </View>
               <AppText variant="callout" color="muted">
-                Update how your name appears in Flirteasy. Your email and
+                Update how your name appears in FlirtEasy. Your email and
                 connected Tinder account stay unchanged.
               </AppText>
 

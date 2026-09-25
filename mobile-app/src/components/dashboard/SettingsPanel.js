@@ -715,7 +715,7 @@ export default function SettingsPanel({
     return (
       <View style={styles.centerWrap}>
         <ActivityIndicator size="small" color={uiTheme.colors.accent} />
-        <Text style={styles.loadingText} accessibilityRole="progressbar" accessibilityLabel="Syncing Flirteasy Settings">Syncing Flirteasy Settings...</Text>
+        <Text style={styles.loadingText} accessibilityRole="progressbar" accessibilityLabel="Syncing FlirtEasy Settings">Syncing FlirtEasy Settings...</Text>
       </View>
     );
   }
@@ -1386,7 +1386,7 @@ export default function SettingsPanel({
                   <View style={styles.locationNoteRow}>
                     <Ionicons name="sparkles" size={13} color={uiTheme.colors.primary} />
                     <Text style={styles.locationNoteText}>
-                      Flirteasy synchronizes your dating location automatically so you can meet people anywhere.
+                      FlirtEasy synchronizes your dating location automatically so you can meet people anywhere.
                     </Text>
                   </View>
                 </View>

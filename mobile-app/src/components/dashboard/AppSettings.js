@@ -143,7 +143,7 @@ export default function AppSettings({
     } catch {
       Alert.alert(
         "Unable to open settings",
-        "Open your phone’s Settings app and select Flirteasy to manage permissions.",
+        "Open your phone’s Settings app and select FlirtEasy to manage permissions.",
       );
     }
   };
@@ -163,7 +163,7 @@ export default function AppSettings({
     >
       <ScreenHeader
         title="App settings"
-        subtitle="Make Flirteasy work for you."
+        subtitle="Make FlirtEasy work for you."
         onBack={onBack}
         backLabel="Back to home"
       />

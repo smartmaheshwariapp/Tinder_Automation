@@ -51,7 +51,7 @@ export default function ThemePickerSheet({ visible, onClose }) {
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, choice);
     } catch (_) {
-      Alert.alert('Theme not saved', `${selected.name} is active now, but Flirteasy could not remember it for next time.`);
+      Alert.alert('Theme not saved', `${selected.name} is active now, but FlirtEasy could not remember it for next time.`);
     }
   };
 
@@ -61,7 +61,7 @@ export default function ThemePickerSheet({ visible, onClose }) {
       onClose={applying ? undefined : onClose}
       dismissible={!applying}
       title="Appearance"
-      subtitle="Choose how Flirteasy looks"
+      subtitle="Choose how FlirtEasy looks"
       closeLabel="Close appearance"
       footer={
         <>

@@ -12,7 +12,7 @@ import { DashboardPanel } from '../components/dashboard';
 import { AppText, AppButton, IconButton, IconWell, Badge, Card } from '../components/ui';
 import { resolveLocalUrl } from '../utils/network';
 
-const LOGO_IMG = require('../../assets/flirteasy/icon_128.png');
+const LOGO_IMG = require('../../assets/icon.png');
 
 export default function CloudDashboardScreen({ route, navigation }) {
   const { orchestratorUrl: rawOrchestratorUrl = 'https://api.smartmaheshwari.com', vpsUrl, platform = 'Tinder' } = route.params || {};
@@ -49,7 +49,7 @@ export default function CloudDashboardScreen({ route, navigation }) {
           <Image source={LOGO_IMG} style={styles.headerLogo} resizeMode="contain" accessibilityIgnoresInvertColors />
           <View style={styles.headerCopy}>
             <View style={styles.headerTitleRow}>
-              <AppText variant="headline" numberOfLines={1} style={styles.headerTitle} accessibilityRole="header">Flirteasy Assistant</AppText>
+              <AppText variant="headline" numberOfLines={1} style={styles.headerTitle} accessibilityRole="header">FlirtEasy Assistant</AppText>
               <Badge label="LIVE" tone="primary" size="sm" dot />
             </View>
             {!isCompact ? (
@@ -91,7 +91,7 @@ export default function CloudDashboardScreen({ route, navigation }) {
               <AppText variant="section" style={styles.infoTitle} numberOfLines={2}>Tinder Assistant Active</AppText>
             </View>
             <AppText variant="callout" color="textSecondary">
-              Flirteasy is actively finding compatible matches and chatting in your unique personal style.
+              FlirtEasy is actively finding compatible matches and chatting in your unique personal style.
             </AppText>
             {vpsUrl && (
               <AppButton

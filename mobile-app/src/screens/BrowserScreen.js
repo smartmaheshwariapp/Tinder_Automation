@@ -837,7 +837,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
     {
       id: "log_init_1",
       time: new Date().toLocaleTimeString(),
-      text: "Flirteasy Automation Engine initialized.",
+      text: "FlirtEasy Automation Engine initialized.",
       type: "info",
     },
     {
@@ -1448,7 +1448,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
           })();
           true;
         `);
-          addLog("⏸️ Flirteasy AI Automation paused", "info");
+          addLog("⏸️ FlirtEasy AI Automation paused", "info");
         } else {
           if (worker) worker.handleMessage({ action: "startAgent" });
           dispatchStartToDOM();
@@ -1461,7 +1461,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                 ? extensionSettings.likesPerCycle
                 : 50;
             addLog(
-              `🚀 Flirteasy AI Automation started (${count} profiles target · Full Auto)`,
+              `🚀 FlirtEasy AI Automation started (${count} profiles target · Full Auto)`,
               "success",
             );
           } else if (swipingEnabled) {
@@ -1471,12 +1471,12 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
                 ? extensionSettings.likesPerCycle
                 : 50;
             addLog(
-              `🚀 Flirteasy AI Swiper started (${count} profiles target · Swiping Only)`,
+              `🚀 FlirtEasy AI Swiper started (${count} profiles target · Swiping Only)`,
               "success",
             );
           } else if (messagingEnabled) {
             addLog(
-              "💬 Flirteasy AI Wingman started (Messaging Only)",
+              "💬 FlirtEasy AI Wingman started (Messaging Only)",
               "success",
             );
           } else {
@@ -1568,7 +1568,7 @@ const BrowserScreen = React.forwardRef(function BrowserScreen(
             "success",
           );
         } else {
-          addLog("⚙️ Flirteasy settings saved and applied", "success");
+          addLog("⚙️ FlirtEasy settings saved and applied", "success");
         }
         trackingService.trackEvent("settings_change", updatedSettings);
         return true;

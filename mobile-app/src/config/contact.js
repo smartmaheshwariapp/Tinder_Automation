@@ -5,5 +5,5 @@ export const SUPPORT_EMAIL = 'support@flint.dating';
 export const PRIVACY_EMAIL = 'privacy@flint.dating';
 
 // Subject lines keep incoming mail sortable.
-export const SUPPORT_SUBJECT = 'Flirteasy support request';
-export const DELETION_SUBJECT = 'Flirteasy account deletion request';
+export const SUPPORT_SUBJECT = 'FlirtEasy support request';
+export const DELETION_SUBJECT = 'FlirtEasy account deletion request';

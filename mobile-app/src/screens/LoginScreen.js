@@ -61,7 +61,6 @@ const safeHaptic = (type) => {
 
 // Module-load window size removed: it never updates on rotation. Use useResponsive() at render time.
 // const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const FALLBACK_LOGO_IMG = require("../../assets/flirteasy/icon_128.png");
 const DOMAIN_SUGGESTIONS = [
   "@gmail.com",
   "@icloud.com",
@@ -97,8 +96,8 @@ const CAROUSEL_SLIDES = [
   },
 ];
 
-const FLINT_EMBLEM_URI =
-  "https://lh3.googleusercontent.com/aida/AEtjO1XBLBCvT6YG6NjEQtmsjtWA5j_uCps04hYP22UuacAxVsDbTJ-8aEt7FTCHe54G4532OO4W9mUziOo89_l3f1s4bw-AKSf13KLGKYwV1JM7egtBa0zRtTlt6WR24SfQmVAI4KU4-pfv8GOxG7PNQAIU6vvTe82hpcB8hAGX_4vQVn3Yns7nE5T3vr7KmRLK5K2FWS_pPKMg3gmSBbNJvIWyqdTTRyPdOnrkGYitlXO70H45WmmZI8svYw";
+// The launcher icon itself, bundled rather than fetched — this is drawn before any network.
+const EMBLEM_IMG = require("../../assets/icon.png");
 
 export default function LoginScreen({ navigation, route }) {
   const { gutter, isCompact, isShort, isLandscape, isTablet, formMax, pick } =
@@ -110,7 +109,6 @@ export default function LoginScreen({ navigation, route }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isFocusedEmail, setIsFocusedEmail] = useState(false);
   const [isFocusedPassword, setIsFocusedPassword] = useState(false);
-  const [emblemFailed, setEmblemFailed] = useState(false);
 
   // ── Auto-resolve authenticated Flint session ──
   useEffect(() => {
@@ -457,14 +455,9 @@ export default function LoginScreen({ navigation, route }) {
                   ]}
                 >
                   <Image
-                    source={
-                      emblemFailed
-                        ? FALLBACK_LOGO_IMG
-                        : { uri: FLINT_EMBLEM_URI }
-                    }
-                    onError={() => setEmblemFailed(true)}
+                    source={EMBLEM_IMG}
                     style={styles.emblemImg}
-                    resizeMode="cover"
+                    resizeMode="contain"
                     accessibilityIgnoresInvertColors
                   />
                 </View>
@@ -475,7 +468,7 @@ export default function LoginScreen({ navigation, route }) {
               style={styles.brandTitle}
               maxFontSizeMultiplier={uiTheme.fontScale.chrome}
             >
-              Flint
+              FlirtEasy
             </Text>
             <Text
               style={[styles.heroDialogue, isTablet && styles.heroDialogueWide]}
@@ -493,7 +486,7 @@ export default function LoginScreen({ navigation, route }) {
                 </Text>
                 <Text style={styles.cardSubtitle}>
                   {isSignUp
-                    ? "Join Flint to find genuine connections."
+                    ? "Join FlirtEasy to find genuine connections."
                     : "Sign in to resume finding great matches."}
                 </Text>
               </ContentTransition>
@@ -683,7 +676,7 @@ export default function LoginScreen({ navigation, route }) {
                     activeOpacity={0.7}
                     accessibilityRole="button"
                     accessibilityLabel="Forgot Password?"
-                    accessibilityHint="Get login assistance from Flint concierge"
+                    accessibilityHint="Get login assistance from FlirtEasy concierge"
                   >
                     <Text
                       style={styles.forgotPasswordText}
@@ -711,7 +704,7 @@ export default function LoginScreen({ navigation, route }) {
                   activeOpacity={0.8}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: isAgreed }}
-                  accessibilityLabel="Confirm 18+ and agree to Flint's Terms of Service and Privacy Policy"
+                  accessibilityLabel="Confirm 18+ and agree to FlirtEasy's Terms of Service and Privacy Policy"
                 >
                   <View
                     style={[
@@ -729,7 +722,7 @@ export default function LoginScreen({ navigation, route }) {
                     )}
                   </View>
                   <Text style={styles.consentText}>
-                    I confirm I am 18+ and agree to Flint's{" "}
+                    I confirm I am 18+ and agree to FlirtEasy's{" "}
                     <Text
                       style={styles.legalLink}
                       onPress={(e) => {
@@ -897,7 +890,7 @@ export default function LoginScreen({ navigation, route }) {
               {/* Legal Links for Existing Users */}
               {!isSignUp && (
                 <Text style={styles.legalDisclaimerText}>
-                  By signing in, you agree to Flint's{" "}
+                  By signing in, you agree to FlirtEasy's{" "}
                   <Text
                     style={styles.legalLink}
                     onPress={() => openLegalModal("terms")}
@@ -942,7 +935,7 @@ export default function LoginScreen({ navigation, route }) {
             hitSlop={{ top: 6, bottom: 12, left: 24, right: 24 }}
             accessibilityRole="button"
             accessibilityLabel="Continue as Guest"
-            accessibilityHint="Browse Flint without logging in"
+            accessibilityHint="Browse FlirtEasy without logging in"
           >
             <Text
               style={styles.guestBottomLinkText}
@@ -1047,7 +1040,7 @@ export default function LoginScreen({ navigation, route }) {
         onClose={() => setSupportModalVisible(false)}
         closeLabel="Close support"
         title="Sign-In Concierge"
-        subtitle="Fast assistance with your Flint account"
+        subtitle="Fast assistance with your FlirtEasy account"
         maxHeightRatio={0.8}
         footer={
           <AppButton
@@ -1097,7 +1090,7 @@ export default function LoginScreen({ navigation, route }) {
 
         {/* Direct Concierge Contact Button */}
         <AppButton
-          title="Contact Flint Concierge"
+          title="Contact FlirtEasy Concierge"
           variant="secondary"
           icon="chatbubbles"
           iconRight="open-outline"
@@ -1106,10 +1099,10 @@ export default function LoginScreen({ navigation, route }) {
           onPress={() => {
             safeHaptic("medium");
             Linking.openURL(
-              "mailto:support@flint.dating?subject=Flint%20Login%20Assistance",
+              "mailto:support@flint.dating?subject=FlirtEasy%20Login%20Assistance",
             ).catch(() => {});
           }}
-          accessibilityLabel="Email Flint Concierge Support"
+          accessibilityLabel="Email FlirtEasy Concierge Support"
         />
       </BottomSheet>
     </View>

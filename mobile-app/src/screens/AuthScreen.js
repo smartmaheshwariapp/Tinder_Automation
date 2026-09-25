@@ -77,7 +77,6 @@ const safeHaptic = (type) => {
 
 // Module-load window size removed: it never updates on rotation. Use useResponsive() at render time.
 // const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const FALLBACK_LOGO_IMG = require("../../assets/flirteasy/icon_128.png");
 const DOMAIN_SUGGESTIONS = [
   "@gmail.com",
   "@icloud.com",
@@ -119,8 +118,9 @@ const CAROUSEL_SLIDES = [
   },
 ];
 
-const AURA_EMBLEM_URI =
-  "https://lh3.googleusercontent.com/aida/AEtjO1XBLBCvT6YG6NjEQtmsjtWA5j_uCps04hYP22UuacAxVsDbTJ-8aEt7FTCHe54G4532OO4W9mUziOo89_l3f1s4bw-AKSf13KLGKYwV1JM7egtBa0zRtTlt6WR24SfQmVAI4KU4-pfv8GOxG7PNQAIU6vvTe82hpcB8hAGX_4vQVn3Yns7nE5T3vr7KmRLK5K2FWS_pPKMg3gmSBbNJvIWyqdTTRyPdOnrkGYitlXO70H45WmmZI8svYw";
+// The launcher icon itself, so the first screen shows the same mark the user tapped to get
+// here. Bundled rather than fetched: this is the first thing drawn, before any network.
+const AURA_EMBLEM_IMG = require("../../assets/icon.png");
 
 export default function AuthScreen({ navigation, route }) {
   const initialMode = route?.params?.initialMode;
@@ -143,7 +143,6 @@ export default function AuthScreen({ navigation, route }) {
   const [successNotice, setSuccessNotice] = useState("");
   const [countdown, setCountdown] = useState(45);
   const [resendActive, setResendActive] = useState(false);
-  const [emblemFailed, setEmblemFailed] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
   // ── Layout & motion preferences (UI only) ──
@@ -751,11 +750,11 @@ export default function AuthScreen({ navigation, route }) {
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#0d0b14;margin:0;padding:24px;">
   <div style="max-width:480px;margin:0 auto;background:#161324;border-radius:16px;border:1px solid rgba(255,255,255,0.1);overflow:hidden;">
     <div style="background:linear-gradient(135deg,#FE3C72,#FF655B);padding:28px;text-align:center;">
-      <h1 style="color:#FFFFFF;font-size:24px;font-weight:800;margin:0;letter-spacing:-0.5px;">Flint</h1>
+      <h1 style="color:#FFFFFF;font-size:24px;font-weight:800;margin:0;letter-spacing:-0.5px;">FlirtEasy</h1>
     </div>
     <div style="padding:32px 24px;text-align:center;color:#D8D6E8;">
       <div style="font-size:18px;font-weight:600;color:#FFFFFF;margin-bottom:12px;">Hey ${targetName || "there"},</div>
-      <div style="font-size:14px;line-height:22px;color:#8E8DA3;margin-bottom:24px;">Here is your 6-digit verification code to sign in to Flint. This code expires in 10 minutes.</div>
+      <div style="font-size:14px;line-height:22px;color:#8E8DA3;margin-bottom:24px;">Here is your 6-digit verification code to sign in to FlirtEasy. This code expires in 10 minutes.</div>
       <div style="background:#1E1A30;border:1.5px solid #FE3C72;border-radius:12px;padding:18px 24px;display:inline-block;margin-bottom:24px;">
         <span style="font-size:32px;font-weight:800;letter-spacing:8px;color:#FFFFFF;font-family:monospace;">${generatedCode}</span>
       </div>
@@ -806,10 +805,10 @@ export default function AuthScreen({ navigation, route }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: targetEmail,
-          subject: `${generatedCode} is your Flint verification code`,
+          subject: `${generatedCode} is your FlirtEasy verification code`,
           html: emailHtml,
           name: targetName || "",
-          from_name: "Flint Dating",
+          from_name: "FlirtEasy Dating",
           from_email: "aura.dating.app@gmail.com",
         }),
       });
@@ -1072,33 +1071,21 @@ export default function AuthScreen({ navigation, route }) {
             },
           ]}
         >
-          <LinearGradient
-            colors={[COLORS.primary, COLORS.secondary, COLORS.warning]}
-            start={{ x: 0, y: 1 }}
-            end={{ x: 1, y: 0 }}
+          {/* The icon artwork carries its own rounded frame and glow, so it is drawn bare —
+              a gradient ring around it only competed with the mark. */}
+          <Image
+            source={AURA_EMBLEM_IMG}
             style={[
-              styles.auraFrame,
+              styles.auraImage,
               {
                 width: emblemSize,
                 height: emblemSize,
                 borderRadius: emblemRadius,
               },
             ]}
-          >
-            <View
-              style={[styles.auraInner, { borderRadius: emblemRadius - 3 }]}
-            >
-              <Image
-                source={
-                  emblemFailed ? FALLBACK_LOGO_IMG : { uri: AURA_EMBLEM_URI }
-                }
-                onError={() => setEmblemFailed(true)}
-                style={styles.auraImage}
-                resizeMode="cover"
-                accessibilityIgnoresInvertColors
-              />
-            </View>
-          </LinearGradient>
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
         </Animated.View>
 
         {/* Reflectly-Style Companion Greeting */}
@@ -1113,7 +1100,7 @@ export default function AuthScreen({ navigation, route }) {
           maxFontSizeMultiplier={uiTheme.fontScale.chrome}
           accessibilityRole="header"
         >
-          I'm FlintAI
+          I'm FlirtEasy
         </Text>
 
         {/* Short, Warm Companion Subtitle */}
@@ -1127,7 +1114,7 @@ export default function AuthScreen({ navigation, route }) {
 
       {/* Bottom Authentication & Action Zone */}
       <View style={[styles.actionZone, columnStyle]}>
-        {/* Primary Action: HI, FlintAI! with Tactile Press Feedback & Shimmer */}
+        {/* Primary Action: HI, FlirtEasy! with Tactile Press Feedback & Shimmer */}
         <MotionTouchable
           style={styles.btnCreateAccount}
           onPress={() => {
@@ -1139,8 +1126,8 @@ export default function AuthScreen({ navigation, route }) {
           }}
           activeOpacity={0.88}
           accessibilityRole="button"
-          accessibilityLabel="Hi, FlintAI!"
-          accessibilityHint="Start your onboarding journey with FlintAI"
+          accessibilityLabel="Hi, FlirtEasy!"
+          accessibilityHint="Start your onboarding journey with FlirtEasy"
         >
           <LinearGradient
             colors={uiTheme.gradients.brand}
@@ -1185,7 +1172,7 @@ export default function AuthScreen({ navigation, route }) {
               numberOfLines={1}
               maxFontSizeMultiplier={uiTheme.fontScale.chrome}
             >
-              HI, FlintAI!
+              HI, FlirtEasy!
             </Text>
             <Animated.View style={{ transform: [{ translateX: arrowFloat }] }}>
               <Ionicons
@@ -1222,7 +1209,7 @@ export default function AuthScreen({ navigation, route }) {
 
         {/* Legal & 18+ Disclaimer with Working Interactive Sheets */}
         <Text style={styles.legalDisclaimerText}>
-          By continuing, you confirm you are 18+ and agree to Flirteasy's{" "}
+          By continuing, you confirm you are 18+ and agree to FlirtEasy's{" "}
           <Text
             style={styles.legalLink}
             onPress={() => openLegalModal("terms")}
@@ -1266,7 +1253,7 @@ export default function AuthScreen({ navigation, route }) {
           hitSlop={{ top: 6, bottom: 12, left: 24, right: 24 }}
           accessibilityRole="button"
           accessibilityLabel="Continue as Guest"
-          accessibilityHint="Browse Flirteasy without logging in"
+          accessibilityHint="Browse FlirtEasy without logging in"
         >
           <Text
             style={styles.guestLinkText}
@@ -1431,7 +1418,7 @@ export default function AuthScreen({ navigation, route }) {
                       color={COLORS.muted}
                     />
                     <Text style={styles.fieldHintText}>
-                      Visible on your Flirteasy profile
+                      Visible on your FlirtEasy profile
                     </Text>
                   </View>
                 </View>
@@ -1701,7 +1688,7 @@ export default function AuthScreen({ navigation, route }) {
                   activeOpacity={0.8}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: isAgreed }}
-                  accessibilityLabel="I confirm I am 18+ and agree to Flirteasy's Terms of Service and Privacy Policy"
+                  accessibilityLabel="I confirm I am 18+ and agree to FlirtEasy's Terms of Service and Privacy Policy"
                 >
                   <View
                     style={[
@@ -1719,7 +1706,7 @@ export default function AuthScreen({ navigation, route }) {
                     )}
                   </View>
                   <Text style={styles.consentText}>
-                    I confirm I am 18+ and agree to Flirteasy's{" "}
+                    I confirm I am 18+ and agree to FlirtEasy's{" "}
                     <Text
                       style={styles.legalLink}
                       onPress={(e) => {
@@ -1802,7 +1789,7 @@ export default function AuthScreen({ navigation, route }) {
               accessibilityLabel={
                 authMode === "signup"
                   ? "Already have an account? Sign In"
-                  : "New to Flirteasy? Create Account"
+                  : "New to FlirtEasy? Create Account"
               }
             >
               <Text
@@ -1811,7 +1798,7 @@ export default function AuthScreen({ navigation, route }) {
               >
                 {authMode === "signup"
                   ? "Already have an account?"
-                  : "New to Flirteasy?"}{" "}
+                  : "New to FlirtEasy?"}{" "}
                 <Text style={styles.modeToggleLink}>
                   {authMode === "signup" ? "Sign In" : "Create Account"}
                 </Text>
@@ -1909,7 +1896,7 @@ export default function AuthScreen({ navigation, route }) {
             pointerEvents={authMode === "login" ? "auto" : "none"}
           >
             <Text style={styles.termsText}>
-              By continuing, you agree to Flirteasy's{" "}
+              By continuing, you agree to FlirtEasy's{" "}
               <Text
                 style={styles.termsLink}
                 onPress={() => openLegalModal("terms")}
@@ -2414,7 +2401,7 @@ export default function AuthScreen({ navigation, route }) {
         onClose={() => setSupportModalVisible(false)}
         closeLabel="Close support"
         title="Sign-In Concierge"
-        subtitle="Fast assistance with your Flint account"
+        subtitle="Fast assistance with your FlirtEasy account"
         maxHeightRatio={0.8}
         footer={
           <AppButton
@@ -2468,7 +2455,7 @@ export default function AuthScreen({ navigation, route }) {
 
         {/* Direct Concierge Contact Button */}
         <AppButton
-          title="Contact Flint Concierge"
+          title="Contact FlirtEasy Concierge"
           variant="secondary"
           icon="chatbubbles"
           iconRight="open-outline"
@@ -2477,10 +2464,10 @@ export default function AuthScreen({ navigation, route }) {
           onPress={() => {
             safeHaptic("medium");
             Linking.openURL(
-              "mailto:support@flint.dating?subject=Flint%20Login%20Assistance",
+              "mailto:support@flint.dating?subject=FlirtEasy%20Login%20Assistance",
             ).catch(() => {});
           }}
-          accessibilityLabel="Email Flint Concierge Support"
+          accessibilityLabel="Email FlirtEasy Concierge Support"
         />
       </BottomSheet>
     </View>
@@ -2592,25 +2579,9 @@ const styles = createStyles(() => ({
   emblemContainerTight: {
     marginBottom: SPACE.md,
   },
-  auraFrame: {
-    padding: 3,
-    justifyContent: "center",
-    alignItems: "center",
-    ...uiTheme.shadows.md,
-  },
-  auraInner: {
-    width: "100%",
-    height: "100%",
-    overflow: "hidden",
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: alpha(COLORS.white, 0.22),
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  // Sized inline from emblemSize; the frame and inner surface that used to wrap it are gone.
   auraImage: {
-    width: "100%",
-    height: "100%",
+    alignSelf: "center",
   },
 
   // ── Companion Greeting Typography ──

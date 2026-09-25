@@ -61,7 +61,7 @@ export default function ExternalRedirectModal({
   let primaryIcon = 'heart-outline';
   let primaryColor = uiTheme.colors.tinder;
   let headline = `Open Tinder?`;
-  let description = `You are about to leave Flirteasy and open ${matchName}'s conversation in the Tinder app.`;
+  let description = `You are about to leave FlirtEasy and open ${matchName}'s conversation in the Tinder app.`;
 
   if (phone) {
     primaryApp = 'WhatsApp';
