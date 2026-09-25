@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -7,53 +7,66 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { createStyles, theme, alpha } from '../../theme';
-import AppConfirmModal from '../common/AppConfirmModal';
-import { FadeIn, FocusInput, MotionTouchable } from '../common/Motion';
-import { AppButton, AppText, Badge, CountUp, IconButton, SectionHeader } from '../ui';
-import useResponsive from '../../hooks/useResponsive';
-import TinderProfileCard from './TinderProfileCard';
-import appConfig from '../../../app.json';
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { createStyles, theme, alpha } from "../../theme";
+import AppConfirmModal from "../common/AppConfirmModal";
+import { FadeIn, FocusInput, MotionTouchable } from "../common/Motion";
+import {
+  AppButton,
+  AppText,
+  Badge,
+  CountUp,
+  IconButton,
+  SectionHeader,
+} from "../ui";
+import useResponsive from "../../hooks/useResponsive";
+import TinderProfileCard from "./TinderProfileCard";
+import appConfig from "../../../app.json";
 
 const c = theme.colors;
 const sp = theme.spacing;
 
 const tinderFields = [
-  ['bio', 'About me on Tinder'],
-  ['age', 'Age'],
-  ['interests', 'Interests & Passions'],
-  ['height', 'Height'],
-  ['lookingFor', 'Looking for'],
-  ['relationshipType', 'Relationship type'],
-  ['languages', 'Languages'],
-  ['gender', 'Gender'],
-  ['zodiac', 'Zodiac'],
-  ['drinking', 'Drinking'],
-  ['smoking', 'Smoking'],
-  ['workout', 'Workout'],
-  ['pets', 'Pets'],
-  ['communicationStyle', 'Communication style'],
-  ['loveStyle', 'Love style'],
+  ["bio", "About me on Tinder"],
+  ["age", "Age"],
+  ["interests", "Interests & Passions"],
+  ["height", "Height"],
+  ["lookingFor", "Looking for"],
+  ["relationshipType", "Relationship type"],
+  ["languages", "Languages"],
+  ["gender", "Gender"],
+  ["zodiac", "Zodiac"],
+  ["drinking", "Drinking"],
+  ["smoking", "Smoking"],
+  ["workout", "Workout"],
+  ["pets", "Pets"],
+  ["communicationStyle", "Communication style"],
+  ["loveStyle", "Love style"],
 ];
 
-const display = value =>
+const display = (value) =>
   Array.isArray(value)
     ? value
-        .map(item => (typeof item === 'string' ? item : item?.name))
+        .map((item) => (typeof item === "string" ? item : item?.name))
         .filter(Boolean)
-        .join(', ')
-    : typeof value === 'string' || typeof value === 'number'
+        .join(", ")
+    : typeof value === "string" || typeof value === "number"
       ? String(value)
-      : '';
+      : "";
 
 function Stat({ icon, label, value, color }) {
-  const formatted = Number.isFinite(Number(value)) ? Number(value).toLocaleString() : String(value);
+  const formatted = Number.isFinite(Number(value))
+    ? Number(value).toLocaleString()
+    : String(value);
   return (
-    <View style={styles.stat} accessible accessibilityLabel={`${formatted} ${label.toLowerCase()}`}>
+    <View
+      style={styles.stat}
+      accessible
+      accessibilityLabel={`${formatted} ${label.toLowerCase()}`}
+    >
       <CountUp
         value={Number.isFinite(Number(value)) ? Number(value) : formatted}
         style={styles.statValue}
@@ -65,7 +78,11 @@ function Stat({ icon, label, value, color }) {
       />
       <View style={styles.statLabelRow}>
         <Ionicons name={icon} size={13} color={color} />
-        <Text style={styles.statLabel} numberOfLines={1} maxFontSizeMultiplier={theme.fontScale.chrome}>
+        <Text
+          style={styles.statLabel}
+          numberOfLines={1}
+          maxFontSizeMultiplier={theme.fontScale.chrome}
+        >
           {label}
         </Text>
       </View>
@@ -92,25 +109,26 @@ export default function ProfileDetails({
     user?.full_name ||
     user?.name ||
     settings?.accountProfile?.name ||
-    'Flirteasy Member'
+    "Flirteasy Member"
   ).trim();
 
   const flintEmail = (
     user?.email ||
     settings?.accountProfile?.email ||
-    'Your Flirteasy account'
+    "Your Flirteasy account"
   ).trim();
 
-  const flintInitial = (flintName || 'F').slice(0, 1).toUpperCase();
+  const flintInitial = (flintName || "F").slice(0, 1).toUpperCase();
 
   // ── 2. Isolated Tinder Session & Profile ──
   const tinderProfile = settings?.userProfile || {};
-  const tinderName = tinderProfile?.name || (isLoggedIn ? 'Connected User' : null);
+  const tinderName =
+    tinderProfile?.name || (isLoggedIn ? "Connected User" : null);
   const tinderPhoto =
-    typeof tinderProfile.photos?.[0] === 'string'
+    typeof tinderProfile.photos?.[0] === "string"
       ? tinderProfile.photos[0]
       : tinderProfile.photos?.[0]?.url;
-  const tinderPlan = tinderProfile?.tinderPlan || 'free';
+  const tinderPlan = tinderProfile?.tinderPlan || "free";
   const likesRemaining = tinderProfile?.likesRemaining;
 
   // ── UI States ──
@@ -118,8 +136,8 @@ export default function ProfileDetails({
   const [personalName, setPersonalName] = useState(flintName);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [feedback, setFeedback] = useState('');
-  const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState("");
+  const [error, setError] = useState("");
 
   // ── Lifetime Stats from Flint Agent State ──
   const agentStats = stats?.agentState?.stats || stats?.stats || {};
@@ -145,25 +163,25 @@ export default function ProfileDetails({
 
   const [confirmModal, setConfirmModal] = useState({
     visible: false,
-    icon: 'log-out-outline',
+    icon: "log-out-outline",
     iconColor: c.warning,
     iconBg: c.warningSoft,
     iconBorder: c.warningBorder,
-    title: '',
-    message: '',
-    confirmText: 'Confirm',
-    cancelText: 'Cancel',
-    confirmVariant: 'warning',
+    title: "",
+    message: "",
+    confirmText: "Confirm",
+    cancelText: "Cancel",
+    confirmVariant: "warning",
     onConfirm: null,
   });
 
   const closeConfirmModal = () => {
-    setConfirmModal(prev => ({ ...prev, visible: false }));
+    setConfirmModal((prev) => ({ ...prev, visible: false }));
   };
 
   const openEditor = () => {
     setPersonalName(flintName);
-    setError('');
+    setError("");
     setEditing(true);
   };
 
@@ -172,15 +190,15 @@ export default function ProfileDetails({
     if (personalName.trim() !== flintName) {
       setConfirmModal({
         visible: true,
-        icon: 'alert-circle-outline',
+        icon: "alert-circle-outline",
         iconColor: c.accent,
         iconBg: c.primarySoft,
         iconBorder: c.primaryBorder,
-        title: 'Discard changes?',
-        message: 'Your unsaved name change will be lost.',
-        confirmText: 'Discard',
-        cancelText: 'Keep editing',
-        confirmVariant: 'destructive',
+        title: "Discard changes?",
+        message: "Your unsaved name change will be lost.",
+        confirmText: "Discard",
+        cancelText: "Keep editing",
+        confirmVariant: "destructive",
         onConfirm: () => {
           closeConfirmModal();
           setEditing(false);
@@ -194,11 +212,11 @@ export default function ProfileDetails({
   const save = async () => {
     const trimmed = personalName.trim();
     if (!trimmed) {
-      setError('Please enter your name.');
+      setError("Please enter your name.");
       return;
     }
     setSaving(true);
-    setError('');
+    setError("");
     try {
       const result = await onSave({
         accountProfile: {
@@ -208,9 +226,9 @@ export default function ProfileDetails({
       });
       if (result === false) throw new Error();
       setEditing(false);
-      setFeedback('Profile updated.');
+      setFeedback("Profile updated.");
     } catch {
-      setError('Could not save your changes. Please try again.');
+      setError("Could not save your changes. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -218,16 +236,16 @@ export default function ProfileDetails({
 
   const sync = async () => {
     setSyncing(true);
-    setFeedback('');
+    setFeedback("");
     try {
       const result = await onSync();
       setFeedback(
         result?.success
-          ? 'Tinder profile updated.'
-          : 'Could not update Tinder details. Open Tinder and check your connection.'
+          ? "Tinder profile updated."
+          : "Could not update Tinder details. Open Tinder and check your connection.",
       );
     } catch {
-      setFeedback('Could not update Tinder details. Please try again.');
+      setFeedback("Could not update Tinder details. Please try again.");
     } finally {
       setSyncing(false);
     }
@@ -236,19 +254,40 @@ export default function ProfileDetails({
   const confirmLogout = () => {
     setConfirmModal({
       visible: true,
-      icon: 'log-out-outline',
+      icon: "log-out-outline",
       iconColor: c.accent,
       iconBg: c.primarySoft,
       iconBorder: c.primaryBorder,
-      title: 'Log out of Flirteasy?',
-      message: 'This will disconnect your Tinder session and return you to the login screen.',
+      title: "Log out of Flirteasy?",
+      message:
+        "This will disconnect your Tinder session and return you to the login screen.",
       detail: { title: flintName, subtitle: flintEmail, initial: flintInitial },
-      confirmText: 'Log out',
-      cancelText: 'Cancel',
-      confirmVariant: 'primary',
+      confirmText: "Log out",
+      cancelText: "Cancel",
+      confirmVariant: "primary",
       onConfirm: () => {
         closeConfirmModal();
         onLogout();
+      },
+    });
+  };
+
+  const confirmDeleteData = () => {
+    setConfirmModal({
+      visible: true,
+      icon: "trash-outline",
+      iconColor: c.error,
+      iconBg: c.errorSoft,
+      iconBorder: c.errorBorder,
+      title: "Clear data on this device?",
+      message:
+        "This signs you out and clears local app data. It does not delete cloud records or your connected dating account. See the Privacy Policy for how to request cloud-data deletion.",
+      confirmText: "Clear Device Data",
+      cancelText: "Cancel",
+      confirmVariant: "destructive",
+      onConfirm: () => {
+        closeConfirmModal();
+        onDeleteData();
       },
     });
   };
@@ -261,20 +300,48 @@ export default function ProfileDetails({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingHorizontal: gutter, maxWidth: contentMax, paddingBottom: theme.layout.navHeight + sp.hero + sp.sm },
+          {
+            paddingHorizontal: gutter,
+            maxWidth: contentMax,
+            paddingBottom: theme.layout.navHeight + sp.hero + sp.sm,
+          },
         ]}
       >
         {/* Top bar */}
         <View style={styles.topBar}>
-          <IconButton icon="chevron-back" variant="plain" iconSize={26} onPress={onBack} accessibilityLabel="Back to home" style={styles.backButton} />
-          <AppText variant="headline" accessibilityRole="header" style={styles.topTitle}>Profile</AppText>
-          <IconButton icon="create-outline" onPress={openEditor} accessibilityLabel="Edit profile" size={40} iconSize={19} style={styles.roundButton} />
+          <IconButton
+            icon="chevron-back"
+            variant="plain"
+            iconSize={26}
+            onPress={onBack}
+            accessibilityLabel="Back to home"
+            style={styles.backButton}
+          />
+          <AppText
+            variant="headline"
+            accessibilityRole="header"
+            style={styles.topTitle}
+          >
+            Profile
+          </AppText>
+          <IconButton
+            icon="create-outline"
+            onPress={openEditor}
+            accessibilityLabel="Edit profile"
+            size={40}
+            iconSize={19}
+            style={styles.roundButton}
+          />
         </View>
 
         {/* ── 1. Identity: cover banner with overlapping avatar ── */}
         <FadeIn style={styles.identity}>
           <LinearGradient
-            colors={[alpha(c.primary, 0.55), alpha(c.accent, 0.35), alpha(c.secondary, 0.25)]}
+            colors={[
+              alpha(c.primary, 0.55),
+              alpha(c.accent, 0.35),
+              alpha(c.secondary, 0.25),
+            ]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.cover}
@@ -286,7 +353,12 @@ export default function ProfileDetails({
               end={{ x: 0.5, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            <Ionicons name="flame" size={120} color={alpha(c.white, 0.07)} style={styles.coverMark} />
+            <Ionicons
+              name="flame"
+              size={120}
+              color={alpha(c.white, 0.07)}
+              style={styles.coverMark}
+            />
           </LinearGradient>
 
           <MotionTouchable
@@ -296,9 +368,19 @@ export default function ProfileDetails({
             accessibilityLabel={`${flintName}. Edit profile`}
             style={styles.avatarWrap}
           >
-            <LinearGradient colors={theme.gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarRing}>
+            <LinearGradient
+              colors={theme.gradients.brand}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatarRing}
+            >
               <View style={styles.avatar}>
-                <Text style={styles.initial} maxFontSizeMultiplier={theme.fontScale.chrome}>{flintInitial}</Text>
+                <Text
+                  style={styles.initial}
+                  maxFontSizeMultiplier={theme.fontScale.chrome}
+                >
+                  {flintInitial}
+                </Text>
               </View>
             </LinearGradient>
             <View style={styles.avatarEdit}>
@@ -307,11 +389,20 @@ export default function ProfileDetails({
           </MotionTouchable>
 
           <View style={styles.identityCopy}>
-            <AppText variant="title" align="center" numberOfLines={2}>{flintName}</AppText>
-            <AppText variant="callout" color="muted" align="center" numberOfLines={1}>{flintEmail}</AppText>
+            <AppText variant="title" align="center" numberOfLines={2}>
+              {flintName}
+            </AppText>
+            <AppText
+              variant="callout"
+              color="muted"
+              align="center"
+              numberOfLines={1}
+            >
+              {flintEmail}
+            </AppText>
             <Badge
-              label={isLoggedIn ? 'Tinder connected' : 'Tinder not connected'}
-              tone={isLoggedIn ? 'success' : 'neutral'}
+              label={isLoggedIn ? "Tinder connected" : "Tinder not connected"}
+              tone={isLoggedIn ? "success" : "neutral"}
               dot
               style={styles.connectionBadge}
             />
@@ -319,22 +410,48 @@ export default function ProfileDetails({
 
           {/* ── 2. Lifetime stats ── */}
           <View style={styles.statsRow}>
-            <Stat icon="heart" label="Swipes" value={totalSwipes} color={c.accent} />
+            <Stat
+              icon="heart"
+              label="Swipes"
+              value={totalSwipes}
+              color={c.accent}
+            />
             <View style={styles.statDivider} />
-            <Stat icon="people" label="Matches" value={totalMatches} color={c.secondary} />
+            <Stat
+              icon="people"
+              label="Matches"
+              value={totalMatches}
+              color={c.secondary}
+            />
             <View style={styles.statDivider} />
-            <Stat icon="chatbubble" label="Messages" value={totalMessages} color={c.info} />
+            <Stat
+              icon="chatbubble"
+              label="Messages"
+              value={totalMessages}
+              color={c.info}
+            />
           </View>
         </FadeIn>
 
         {!!feedback && (
-          <View style={[styles.feedback, feedbackIsError && styles.feedbackError]}>
+          <View
+            style={[styles.feedback, feedbackIsError && styles.feedbackError]}
+          >
             <Ionicons
-              name={feedbackIsError ? 'alert-circle-outline' : 'information-circle-outline'}
+              name={
+                feedbackIsError
+                  ? "alert-circle-outline"
+                  : "information-circle-outline"
+              }
               size={19}
               color={feedbackIsError ? c.error : c.accent}
             />
-            <AppText variant="footnote" color="textSecondary" style={styles.flex} accessibilityLiveRegion="polite">
+            <AppText
+              variant="footnote"
+              color="textSecondary"
+              style={styles.flex}
+              accessibilityLiveRegion="polite"
+            >
               {feedback}
             </AppText>
           </View>
@@ -342,33 +459,57 @@ export default function ProfileDetails({
 
         {/* ── 3 + 4. Groups: stacked on phones, side by side once there is room ── */}
         <View style={[styles.groups, isTablet && styles.groupsRow]}>
-        {/* ── 3. Connected Dating Platform (Isolated Tinder Session) ── */}
-        <FadeIn delay={120} style={[styles.group, isTablet && styles.groupColumn]}>
-          <SectionHeader title="Connected accounts" style={styles.sectionHeader} />
-          <TinderProfileCard
-            profile={tinderProfile}
-            settings={settings}
-            stats={stats}
-            user={user}
-            isLoggedIn={isLoggedIn}
-            syncing={syncing}
-            onSync={sync}
-            onOpenTinder={onOpenTinder}
-          />
-        </FadeIn>
+          {/* ── 3. Connected Dating Platform (Isolated Tinder Session) ── */}
+          <FadeIn
+            delay={120}
+            style={[styles.group, isTablet && styles.groupColumn]}
+          >
+            <SectionHeader
+              title="Connected accounts"
+              style={styles.sectionHeader}
+            />
+            <TinderProfileCard
+              profile={tinderProfile}
+              settings={settings}
+              stats={stats}
+              user={user}
+              isLoggedIn={isLoggedIn}
+              syncing={syncing}
+              onSync={sync}
+              onOpenTinder={onOpenTinder}
+            />
+          </FadeIn>
 
-        {/* ── 4. Account Actions ── */}
-        {/* Delete Account lives in App settings → Legal & support. */}
-        <FadeIn delay={180} style={[styles.group, isTablet && styles.groupColumn]}>
-          <AppButton
-            title="Log out"
-            icon="log-out-outline"
-            variant="dangerSoft"
-            onPress={confirmLogout}
-            accessibilityLabel="Log out of Flirteasy"
-            accessibilityHint="Asks you to confirm before signing out"
-          />
-        </FadeIn>
+          {/* ── 4. Account Actions ── */}
+          {/* Delete Account lives in App settings → Legal & support. */}
+          <FadeIn
+            delay={180}
+            style={[styles.group, isTablet && styles.groupColumn]}
+          >
+            <SectionHeader
+              title="Account & privacy"
+              style={styles.sectionHeader}
+            />
+            <Card padding="none" style={styles.list}>
+              <ListRow
+                icon="log-out-outline"
+                iconTone="neutral"
+                title="Log out"
+                subtitle="Sign out of your Flint account"
+                onPress={confirmLogout}
+                divider
+                accessibilityLabel="Log out of Flint"
+              />
+              <ListRow
+                icon="trash-outline"
+                title="Clear app data"
+                subtitle="Sign out and erase data on this device"
+                onPress={confirmDeleteData}
+                destructive
+                accessibilityLabel="Clear app data on this device"
+              />
+            </Card>
+          </FadeIn>
         </View>
 
         {/* ── 5. App Version Footer ── */}
@@ -378,77 +519,96 @@ export default function ProfileDetails({
       </ScrollView>
 
       {/* ── Edit Flirteasy Profile Modal ── */}
-      <Modal visible={editing} animationType="slide" onRequestClose={closeEditor}>
-        <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.modal}>
-        <KeyboardAvoidingView
+      <Modal
+        visible={editing}
+        animationType="slide"
+        onRequestClose={closeEditor}
+      >
+        <SafeAreaView
+          edges={["top", "left", "right", "bottom"]}
           style={styles.modal}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            contentContainerStyle={[
-              styles.content,
-              styles.modalContent,
-              { paddingHorizontal: gutter, maxWidth: formMax, paddingTop: sp.lg, paddingBottom: sp.xxl },
-            ]}
+          <KeyboardAvoidingView
+            style={styles.modal}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
           >
-            <View style={styles.modalHeader}>
-              <AppText variant="title" style={styles.flex} numberOfLines={1}>
-                Edit Profile
-              </AppText>
-              <IconButton
-                icon="close"
-                onPress={closeEditor}
-                disabled={saving}
-                accessibilityLabel="Close editor"
-              />
-            </View>
-            <AppText variant="callout" color="muted">
-              Update how your name appears in Flirteasy. Your email and
-              connected Tinder account stay unchanged.
-            </AppText>
-
-            <View style={styles.field}>
-              <AppText variant="label" nativeID="profile-full-name-label">Full name</AppText>
-              <FocusInput
-                style={styles.input}
-                value={personalName}
-                onChangeText={setPersonalName}
-                editable={!saving}
-                accessibilityLabel="Full name"
-                accessibilityLabelledBy="profile-full-name-label"
-                maxLength={80}
-                autoCapitalize="words"
-                autoComplete="name"
-                textContentType="name"
-                placeholder="Your full name"
-                error={!!error}
-              />
-              {!!error && (
-                <AppText variant="footnote" color="error" accessibilityRole="alert" style={styles.errorText}>
-                  {error}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={[
+                styles.content,
+                styles.modalContent,
+                {
+                  paddingHorizontal: gutter,
+                  maxWidth: formMax,
+                  paddingTop: sp.lg,
+                  paddingBottom: sp.xxl,
+                },
+              ]}
+            >
+              <View style={styles.modalHeader}>
+                <AppText variant="title" style={styles.flex} numberOfLines={1}>
+                  Edit Profile
                 </AppText>
-              )}
-            </View>
+                <IconButton
+                  icon="close"
+                  onPress={closeEditor}
+                  disabled={saving}
+                  accessibilityLabel="Close editor"
+                />
+              </View>
+              <AppText variant="callout" color="muted">
+                Update how your name appears in Flirteasy. Your email and
+                connected Tinder account stay unchanged.
+              </AppText>
 
-            <View style={styles.modalActions}>
-              <AppButton
-                title={saving ? 'Saving…' : 'Save changes'}
-                icon="checkmark-outline"
-                loading={saving}
-                onPress={save}
-              />
-              <AppButton
-                title="Cancel"
-                icon="close-outline"
-                variant="secondary"
-                disabled={saving}
-                onPress={closeEditor}
-              />
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+              <View style={styles.field}>
+                <AppText variant="label" nativeID="profile-full-name-label">
+                  Full name
+                </AppText>
+                <FocusInput
+                  style={styles.input}
+                  value={personalName}
+                  onChangeText={setPersonalName}
+                  editable={!saving}
+                  accessibilityLabel="Full name"
+                  accessibilityLabelledBy="profile-full-name-label"
+                  maxLength={80}
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  textContentType="name"
+                  placeholder="Your full name"
+                  error={!!error}
+                />
+                {!!error && (
+                  <AppText
+                    variant="footnote"
+                    color="error"
+                    accessibilityRole="alert"
+                    style={styles.errorText}
+                  >
+                    {error}
+                  </AppText>
+                )}
+              </View>
+
+              <View style={styles.modalActions}>
+                <AppButton
+                  title={saving ? "Saving…" : "Save changes"}
+                  icon="checkmark-outline"
+                  loading={saving}
+                  onPress={save}
+                />
+                <AppButton
+                  title="Cancel"
+                  icon="close-outline"
+                  variant="secondary"
+                  disabled={saving}
+                  onPress={closeEditor}
+                />
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
 
@@ -474,18 +634,18 @@ export default function ProfileDetails({
 
 const styles = createStyles(() => ({
   content: {
-    width: '100%',
+    width: "100%",
     // Phone baseline; the screen overrides maxWidth with useResponsive().contentMax (page) or
     // formMax (edit sheet).
     maxWidth: theme.layout.readableMax,
-    alignSelf: 'center',
+    alignSelf: "center",
     paddingTop: sp.sm,
     gap: sp.xl,
   },
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     minHeight: 48,
   },
   backButton: {
@@ -493,7 +653,7 @@ const styles = createStyles(() => ({
   },
   topTitle: {
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   roundButton: {
     borderRadius: theme.radius.pill,
@@ -503,21 +663,21 @@ const styles = createStyles(() => ({
     backgroundColor: c.surface,
     borderWidth: 1,
     borderColor: c.hairline,
-    overflow: 'hidden',
-    alignItems: 'center',
+    overflow: "hidden",
+    alignItems: "center",
     paddingBottom: sp.lg,
     ...theme.shadows.md,
   },
   cover: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     height: 112,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   coverMark: {
-    position: 'absolute',
+    position: "absolute",
     right: -18,
     top: -14,
-    transform: [{ rotate: '12deg' }],
+    transform: [{ rotate: "12deg" }],
   },
   avatarWrap: {
     marginTop: -56,
@@ -533,15 +693,15 @@ const styles = createStyles(() => ({
     backgroundColor: c.elevated,
     borderWidth: 3,
     borderColor: c.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   initial: {
     ...theme.type.largeTitle,
     color: c.text,
   },
   avatarEdit: {
-    position: 'absolute',
+    position: "absolute",
     right: 4,
     bottom: 4,
     width: 28,
@@ -550,24 +710,24 @@ const styles = createStyles(() => ({
     backgroundColor: c.primary,
     borderWidth: 3,
     borderColor: c.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   identityCopy: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: sp.xs,
     paddingHorizontal: sp.xl,
     marginTop: sp.md,
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
   },
   connectionBadge: {
-    alignSelf: 'center',
+    alignSelf: "center",
     marginTop: sp.sm,
   },
   statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'stretch',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "stretch",
     marginTop: sp.xl,
     marginHorizontal: sp.lg,
     paddingVertical: sp.md,
@@ -579,7 +739,7 @@ const styles = createStyles(() => ({
   stat: {
     flex: 1,
     minWidth: 0,
-    alignItems: 'center',
+    alignItems: "center",
     gap: 2,
     paddingHorizontal: sp.xs,
   },
@@ -592,11 +752,11 @@ const styles = createStyles(() => ({
     ...theme.type.title2,
     fontFamily: theme.fonts.strong,
     color: c.text,
-    maxWidth: '100%',
+    maxWidth: "100%",
   },
   statLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   statLabel: {
@@ -604,8 +764,8 @@ const styles = createStyles(() => ({
     color: c.muted,
   },
   feedback: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: sp.sm,
     padding: sp.md,
     borderRadius: theme.radius.md,
@@ -629,9 +789,9 @@ const styles = createStyles(() => ({
     gap: sp.xl,
   },
   groupsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
   },
   groupColumn: {
     flexGrow: 1,
@@ -642,7 +802,7 @@ const styles = createStyles(() => ({
     marginBottom: sp.sm,
   },
   list: {
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   versionFooter: {
     paddingVertical: sp.sm,
@@ -655,8 +815,8 @@ const styles = createStyles(() => ({
     maxWidth: theme.layout.formMax,
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: sp.md,
   },
   field: {

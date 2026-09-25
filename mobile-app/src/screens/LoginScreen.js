@@ -1,7 +1,7 @@
-import { createStyles, theme as uiTheme, alpha } from '../theme';
+import { createStyles, theme as uiTheme, alpha } from "../theme";
 // src/screens/LoginScreen.js — Upgraded Luxury Dark Dating App Login Screen
 // Featuring Cinematic Background Carousel, Luminous Aura Emblem, and Modern Glassmorphic Inputs
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -16,12 +16,21 @@ import {
   Easing,
   // Dimensions, // responsiveness pass: layout now reads live sizes from useResponsive()
   Linking,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import SupabaseService from '../services/supabase';
-import { AppLogo, AppButton, IconWell, Chip, BottomSheet, MotionTouchable, ContentTransition, FadeIn } from '../components/ui';
-import useResponsive from '../hooks/useResponsive';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import SupabaseService from "../services/supabase";
+import {
+  AppButton,
+  IconWell,
+  Chip,
+  BottomSheet,
+  MotionTouchable,
+  ContentTransition,
+  FadeIn,
+} from "../components/ui";
+import LegalDocument from "../components/legal/LegalDocument";
+import useResponsive from "../hooks/useResponsive";
 
 const COLORS = uiTheme.colors;
 const SPACE = uiTheme.spacing;
@@ -31,7 +40,7 @@ const TYPE = uiTheme.type;
 // Safe haptics
 let Haptics;
 try {
-  Haptics = require('expo-haptics');
+  Haptics = require("expo-haptics");
 } catch (_) {
   Haptics = null;
 }
@@ -39,55 +48,69 @@ try {
 const safeHaptic = (type) => {
   try {
     if (!Haptics) return;
-    if (type === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    else if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    else if (type === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-  } catch (_) { }
+    if (type === "light")
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    else if (type === "medium")
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    else if (type === "success")
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    else if (type === "error")
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+  } catch (_) {}
 };
 
 // Module-load window size removed: it never updates on rotation. Use useResponsive() at render time.
 // const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const DOMAIN_SUGGESTIONS = ['@gmail.com', '@icloud.com', '@outlook.com', '@yahoo.com'];
+const FALLBACK_LOGO_IMG = require("../../assets/flirteasy/icon_128.png");
+const DOMAIN_SUGGESTIONS = [
+  "@gmail.com",
+  "@icloud.com",
+  "@outlook.com",
+  "@yahoo.com",
+];
 const isValidEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
 
 const CAROUSEL_SLIDES = [
   {
     id: 1,
-    uri: 'https://lh3.googleusercontent.com/aida/AEtjO1UQF7nuVsJrj7KpkUrmzC8VTGKdJ2F387zoU1Kco0j3dMJQmPB_ZLISug8HKEN508gw0o7BAqnmW2F8FYI1iFikv8H0YK-UAgI4t_-Wepw4aJ2ErN93wtMScV9UT1xjE4NV-0WwnH83lBjmxhH9on6Kr_ACNXIgokmYxHTnhfJxsIQDS7yBxCfCNYsBqO3zHs_U_cubDrgiDHw11_1oG8FgvUNYAfBtvRicSSvQTOFl7psgaJN0WhcCwPE',
+    uri: "https://lh3.googleusercontent.com/aida/AEtjO1UQF7nuVsJrj7KpkUrmzC8VTGKdJ2F387zoU1Kco0j3dMJQmPB_ZLISug8HKEN508gw0o7BAqnmW2F8FYI1iFikv8H0YK-UAgI4t_-Wepw4aJ2ErN93wtMScV9UT1xjE4NV-0WwnH83lBjmxhH9on6Kr_ACNXIgokmYxHTnhfJxsIQDS7yBxCfCNYsBqO3zHs_U_cubDrgiDHw11_1oG8FgvUNYAfBtvRicSSvQTOFl7psgaJN0WhcCwPE",
   },
   {
     id: 2,
-    uri: 'https://lh3.googleusercontent.com/aida/AEtjO1XpM7Egn0IVGD31arq7EDXU6Twg8PigdvrkDrzN2JLIV64N8W1p3UE8_0jSOGMZvNBMi-uCkjjSneTHu_sJwS4qB43Qn7HujFnL9E08pWCJkDZvEl8mvX1FEXBN7zzSHmSz-qxfvim8td2mHrGvp56Lar-lWTokOdrkY-Q3fjTFV2gk7BqvPfYphOGkGyx51eCs01_M8OI-GjfEdxCnGEeGRfQdvgEV8Z6S9XW0lf1rPOBDrU0UednF1tI',
+    uri: "https://lh3.googleusercontent.com/aida/AEtjO1XpM7Egn0IVGD31arq7EDXU6Twg8PigdvrkDrzN2JLIV64N8W1p3UE8_0jSOGMZvNBMi-uCkjjSneTHu_sJwS4qB43Qn7HujFnL9E08pWCJkDZvEl8mvX1FEXBN7zzSHmSz-qxfvim8td2mHrGvp56Lar-lWTokOdrkY-Q3fjTFV2gk7BqvPfYphOGkGyx51eCs01_M8OI-GjfEdxCnGEeGRfQdvgEV8Z6S9XW0lf1rPOBDrU0UednF1tI",
   },
   {
     id: 3,
-    uri: 'https://lh3.googleusercontent.com/aida/AEtjO1VJHRE0UlMXcAkRuNShuUaIDhqZNyB_nNIBgQ_hGxXFJSNA6EktIpv4oLXYw5V1_P_xdNdngtYWuBGMq7vr1tNTrjCohlE0F2V7AsX_Q2RUptEUDmM_idtiUiyUFjOjwBxOIdP8XgZxlY6Q1o3Ujsh0RT_Xz8ZzC_o_O8Lje2UMDGJic9YrliajndoytAGUWcA6-uONxJoDEwX6Hmn1KQmleLu4hhG_yGYOG6bN9L_3_JtUqOpyKNUcfus',
+    uri: "https://lh3.googleusercontent.com/aida/AEtjO1VJHRE0UlMXcAkRuNShuUaIDhqZNyB_nNIBgQ_hGxXFJSNA6EktIpv4oLXYw5V1_P_xdNdngtYWuBGMq7vr1tNTrjCohlE0F2V7AsX_Q2RUptEUDmM_idtiUiyUFjOjwBxOIdP8XgZxlY6Q1o3Ujsh0RT_Xz8ZzC_o_O8Lje2UMDGJic9YrliajndoytAGUWcA6-uONxJoDEwX6Hmn1KQmleLu4hhG_yGYOG6bN9L_3_JtUqOpyKNUcfus",
   },
   {
     id: 4,
-    uri: 'https://lh3.googleusercontent.com/aida/AEtjO1Vd18bzuNfxDzp94-ccsJbSjIyAgzW_kRXkLlPAdEZHBcJ760YeI-mk3fnyfjPSgdcUjUDvy4dYRxKycb5nEdzXIKwyUEZP-XmKwhjlfFmBgC5VKqXcjrceNAhSdWanrHodFzl7FcdAJMgaAwhgehOvM1z7TFtE7Zr3uWCuye3C1ggAQEVtCVzrIp59HlA9EHKmxFOCPP5MKP4FZIxgkhWvWv4x-Nn5FUfkE_xQYwBa-ahRuwCmemmLIAs',
+    uri: "https://lh3.googleusercontent.com/aida/AEtjO1Vd18bzuNfxDzp94-ccsJbSjIyAgzW_kRXkLlPAdEZHBcJ760YeI-mk3fnyfjPSgdcUjUDvy4dYRxKycb5nEdzXIKwyUEZP-XmKwhjlfFmBgC5VKqXcjrceNAhSdWanrHodFzl7FcdAJMgaAwhgehOvM1z7TFtE7Zr3uWCuye3C1ggAQEVtCVzrIp59HlA9EHKmxFOCPP5MKP4FZIxgkhWvWv4x-Nn5FUfkE_xQYwBa-ahRuwCmemmLIAs",
   },
   {
     id: 5,
-    uri: 'https://lh3.googleusercontent.com/aida/AEtjO1XzZXfDkDX3G4CRUt45dCNmL6JeiUA0yO7gcZigP0r5z2vSL_FewBLkb7Eo4z7SNqoJ2wRmw1-hqI1NiqOYlNPHaxgA2z8AiJYVv_vjnOAHMNCbWSkAdsKA8t-rVxDdaMy4XkfAAfFGFjAeax5ssYTk4aPu_g0ywQOM4aDZTI4OB-ocwDxeMM7SMUvysppZnztNrN2DqJxQ4hQybClfUnsiyreA-JVZFFcH_obb7yrN6pjClMBLyGWorA',
+    uri: "https://lh3.googleusercontent.com/aida/AEtjO1XzZXfDkDX3G4CRUt45dCNmL6JeiUA0yO7gcZigP0r5z2vSL_FewBLkb7Eo4z7SNqoJ2wRmw1-hqI1NiqOYlNPHaxgA2z8AiJYVv_vjnOAHMNCbWSkAdsKA8t-rVxDdaMy4XkfAAfFGFjAeax5ssYTk4aPu_g0ywQOM4aDZTI4OB-ocwDxeMM7SMUvysppZnztNrN2DqJxQ4hQybClfUnsiyreA-JVZFFcH_obb7yrN6pjClMBLyGWorA",
   },
   {
     id: 6,
-    uri: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=1287&auto=format&fit=crop',
+    uri: "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=1287&auto=format&fit=crop",
   },
 ];
 
+const FLINT_EMBLEM_URI =
+  "https://lh3.googleusercontent.com/aida/AEtjO1XBLBCvT6YG6NjEQtmsjtWA5j_uCps04hYP22UuacAxVsDbTJ-8aEt7FTCHe54G4532OO4W9mUziOo89_l3f1s4bw-AKSf13KLGKYwV1JM7egtBa0zRtTlt6WR24SfQmVAI4KU4-pfv8GOxG7PNQAIU6vvTe82hpcB8hAGX_4vQVn3Yns7nE5T3vr7KmRLK5K2FWS_pPKMg3gmSBbNJvIWyqdTTRyPdOnrkGYitlXO70H45WmmZI8svYw";
 
 export default function LoginScreen({ navigation, route }) {
-  const { gutter, isCompact, isShort, isLandscape, isTablet, formMax, pick } = useResponsive();
+  const { gutter, isCompact, isShort, isLandscape, isTablet, formMax, pick } =
+    useResponsive();
   const passwordInputRef = useRef(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [isFocusedEmail, setIsFocusedEmail] = useState(false);
   const [isFocusedPassword, setIsFocusedPassword] = useState(false);
+  const [emblemFailed, setEmblemFailed] = useState(false);
 
   // ── Auto-resolve authenticated Flint session ──
   useEffect(() => {
@@ -97,7 +120,7 @@ export default function LoginScreen({ navigation, route }) {
       try {
         const user = await SupabaseService.getCurrentUser();
         if (user && (user.email || user.id) && isMounted) {
-          navigation.replace('PlatformSelect', {
+          navigation.replace("PlatformSelect", {
             user,
             userId: user.id,
           });
@@ -111,16 +134,16 @@ export default function LoginScreen({ navigation, route }) {
 
   // ── Legal & Support In-App Sheet States (App Store & HIG Compliance) ──
   const [legalModalVisible, setLegalModalVisible] = useState(false);
-  const [legalTab, setLegalTab] = useState('terms'); // 'terms' | 'privacy'
+  const [legalTab, setLegalTab] = useState("terms"); // 'terms' | 'privacy'
   const [supportModalVisible, setSupportModalVisible] = useState(false);
   const [isAgreed, setIsAgreed] = useState(false);
   const [agreementError, setAgreementError] = useState(false);
   const [accountConflict, setAccountConflict] = useState(null); // 'exists' | 'not_found' | null
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const openLegalModal = (tab = 'terms') => {
-    safeHaptic('light');
+  const openLegalModal = (tab = "terms") => {
+    safeHaptic("light");
     setLegalTab(tab);
     setLegalModalVisible(true);
   };
@@ -132,11 +155,11 @@ export default function LoginScreen({ navigation, route }) {
 
   // Zero-glitch carousel animation values (6 slides)
   const slideOpacities = useRef(
-    CAROUSEL_SLIDES.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))
+    CAROUSEL_SLIDES.map((_, i) => new Animated.Value(i === 0 ? 1 : 0)),
   ).current;
 
   const slideScales = useRef(
-    CAROUSEL_SLIDES.map(() => new Animated.Value(1.0))
+    CAROUSEL_SLIDES.map(() => new Animated.Value(1.0)),
   ).current;
 
   const [zIndices, setZIndices] = useState([10, 1, 1, 1, 1, 1]);
@@ -146,8 +169,8 @@ export default function LoginScreen({ navigation, route }) {
   useEffect(() => {
     // 1. Pre-cache all 6 images immediately
     CAROUSEL_SLIDES.forEach((slide) => {
-      if (slide.uri && slide.uri.startsWith('http')) {
-        Image.prefetch(slide.uri).catch(() => { });
+      if (slide.uri && slide.uri.startsWith("http")) {
+        Image.prefetch(slide.uri).catch(() => {});
       }
     });
 
@@ -155,14 +178,34 @@ export default function LoginScreen({ navigation, route }) {
     Animated.loop(
       Animated.sequence([
         Animated.parallel([
-          Animated.timing(logoGlowScale, { toValue: 1.15, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(logoGlowOpacity, { toValue: 0.6, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(logoGlowScale, {
+            toValue: 1.15,
+            duration: 2200,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(logoGlowOpacity, {
+            toValue: 0.6,
+            duration: 2200,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
         ]),
         Animated.parallel([
-          Animated.timing(logoGlowScale, { toValue: 1.0, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(logoGlowOpacity, { toValue: 0.35, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(logoGlowScale, {
+            toValue: 1.0,
+            duration: 2200,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(logoGlowOpacity, {
+            toValue: 0.35,
+            duration: 2200,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
         ]),
-      ])
+      ]),
     ).start();
 
     // 3. Initial Ken-Burns zoom on slide 0
@@ -215,19 +258,19 @@ export default function LoginScreen({ navigation, route }) {
 
   const handleAuthSubmit = async () => {
     const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      safeHaptic('error');
-      setErrorMessage('Please enter a valid email address.');
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      safeHaptic("error");
+      setErrorMessage("Please enter a valid email address.");
       return;
     }
 
     if (isSignUp && !isAgreed) {
-      safeHaptic('error');
+      safeHaptic("error");
       setAgreementError(true);
       return;
     }
 
-    setErrorMessage('');
+    setErrorMessage("");
     setAccountConflict(null);
     setIsLoading(true);
 
@@ -236,65 +279,76 @@ export default function LoginScreen({ navigation, route }) {
       if (check && check.ok) {
         if (isSignUp && check.exists) {
           setIsLoading(false);
-          safeHaptic('error');
-          setAccountConflict('exists');
-          setErrorMessage('An account with this email already exists.');
+          safeHaptic("error");
+          setAccountConflict("exists");
+          setErrorMessage("An account with this email already exists.");
           return;
         }
         if (!isSignUp && !check.exists) {
           setIsLoading(false);
-          safeHaptic('error');
-          setAccountConflict('not_found');
-          setErrorMessage('No account found with this email.');
+          safeHaptic("error");
+          setAccountConflict("not_found");
+          setErrorMessage("No account found with this email.");
           return;
         }
       }
-    } catch (_) { }
+    } catch (_) {}
 
     try {
       if (isSignUp) {
-        await SupabaseService.registerUser({ email: cleanEmail, fullName: cleanEmail.split('@')[0] });
+        await SupabaseService.registerUser({
+          email: cleanEmail,
+          fullName: cleanEmail.split("@")[0],
+        });
       } else {
         await SupabaseService.loginUser({ email: cleanEmail });
       }
-    } catch (_) { }
+    } catch (_) {}
 
     setIsLoading(false);
-    safeHaptic('success');
-    navigation.replace('PlatformSelect');
+    safeHaptic("success");
+    navigation.replace("PlatformSelect");
   };
 
   const handleSwitchToLogin = () => {
-    safeHaptic('light');
+    safeHaptic("light");
     setIsSignUp(false);
     setAccountConflict(null);
-    setErrorMessage('');
+    setErrorMessage("");
     setAgreementError(false);
   };
 
   const handleSwitchToSignup = () => {
-    safeHaptic('light');
+    safeHaptic("light");
     setIsSignUp(true);
     setAccountConflict(null);
-    setErrorMessage('');
+    setErrorMessage("");
     setAgreementError(false);
   };
 
   const handleSelectDomain = (domain) => {
-    safeHaptic('light');
+    safeHaptic("light");
     let base = email.trim();
-    if (base.includes('@')) base = base.split('@')[0];
-    if (!base) base = 'user';
+    if (base.includes("@")) base = base.split("@")[0];
+    if (!base) base = "user";
     setEmail(`${base}${domain}`.toLowerCase());
-    setErrorMessage('');
+    setErrorMessage("");
     setAccountConflict(null);
   };
 
   // Hero art scales with the window: smaller when vertical space is scarce, larger on tablets.
   const compactHero = isCompact || isShort || isLandscape;
-  const emblemSize = pick({ phone: compactHero ? 72 : 84, tablet: 108, xl: 124 });
+  const emblemSize = pick({
+    phone: compactHero ? 72 : 84,
+    tablet: 108,
+    xl: 124,
+  });
   const emblemRadius = Math.round(emblemSize * 0.3);
-  const cardPadding = isCompact ? SPACE.lg : isTablet ? SPACE.section : SPACE.xxl;
+  const cardPadding = isCompact
+    ? SPACE.lg
+    : isTablet
+      ? SPACE.section
+      : SPACE.xxl;
   // Keep the column centred and bounded (formMax = 480 phone / 560 tablet).
   const columnStyle = { maxWidth: formMax };
   const heroSpacing = { marginBottom: compactHero ? SPACE.lg : SPACE.xxl };
@@ -302,7 +356,11 @@ export default function LoginScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
 
       {/* ── Background Carousel with Overlapping Crossfades ── */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -319,18 +377,31 @@ export default function LoginScreen({ navigation, route }) {
                 },
               ]}
             >
-              <Image source={{ uri: slide.uri }} style={styles.carouselImage} resizeMode="cover" accessible={false} />
+              <Image
+                source={{ uri: slide.uri }}
+                style={styles.carouselImage}
+                resizeMode="cover"
+                accessible={false}
+              />
             </Animated.View>
           ))}
         </View>
         {/* Scrim overlays with high zIndex */}
         <LinearGradient
-          colors={[alpha(COLORS.background, 0.92), alpha(COLORS.surface, 0.42), alpha(COLORS.background, 0)]}
+          colors={[
+            alpha(COLORS.background, 0.92),
+            alpha(COLORS.surface, 0.42),
+            alpha(COLORS.background, 0),
+          ]}
           locations={[0, 0.45, 1]}
           style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}
         />
         <LinearGradient
-          colors={[alpha(COLORS.background, 0), alpha(COLORS.background, 0.84), COLORS.background]}
+          colors={[
+            alpha(COLORS.background, 0),
+            alpha(COLORS.background, 0.84),
+            COLORS.background,
+          ]}
           locations={[0.35, 0.68, 1]}
           style={[StyleSheet.absoluteFill, { zIndex: 1001 }]}
         />
@@ -338,7 +409,7 @@ export default function LoginScreen({ navigation, route }) {
 
       {/* ── Main Content ── */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
         keyboardVerticalOffset={0}
         enabled
@@ -360,32 +431,81 @@ export default function LoginScreen({ navigation, route }) {
         >
           {/* Hero Branding */}
           <FadeIn style={[styles.brandContainer, heroSpacing]}>
-            <View style={[styles.emblemWrapper, compactHero && styles.emblemWrapperTight]}>
-              {/* The app mark, shared with the splash screen and the dock's centre button. */}
-              <AppLogo size={emblemSize} accessibilityLabel="Flirteasy" />
+            <View
+              style={[
+                styles.emblemWrapper,
+                compactHero && styles.emblemWrapperTight,
+              ]}
+            >
+              <LinearGradient
+                colors={[COLORS.primary, COLORS.secondary, COLORS.warning]}
+                start={{ x: 0, y: 1 }}
+                end={{ x: 1, y: 0 }}
+                style={[
+                  styles.emblemFrame,
+                  {
+                    width: emblemSize,
+                    height: emblemSize,
+                    borderRadius: emblemRadius,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.emblemInner,
+                    { borderRadius: emblemRadius - 3 },
+                  ]}
+                >
+                  <Image
+                    source={
+                      emblemFailed
+                        ? FALLBACK_LOGO_IMG
+                        : { uri: FLINT_EMBLEM_URI }
+                    }
+                    onError={() => setEmblemFailed(true)}
+                    style={styles.emblemImg}
+                    resizeMode="cover"
+                    accessibilityIgnoresInvertColors
+                  />
+                </View>
+              </LinearGradient>
             </View>
 
-            <Text style={styles.brandTitle} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Flirteasy</Text>
-            <Text style={[styles.heroDialogue, isTablet && styles.heroDialogueWide]}>Strike the spark. Ignite real chemistry.</Text>
+            <Text
+              style={styles.brandTitle}
+              maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+            >
+              Flint
+            </Text>
+            <Text
+              style={[styles.heroDialogue, isTablet && styles.heroDialogueWide]}
+            >
+              Strike the spark. Ignite real chemistry.
+            </Text>
           </FadeIn>
 
           {/* Frosted Glass Auth Card */}
           <FadeIn delay={60}>
             <View style={[styles.card, { padding: cardPadding }]}>
-              <ContentTransition transitionKey={isSignUp ? 'signup' : 'login'}>
+              <ContentTransition transitionKey={isSignUp ? "signup" : "login"}>
                 <Text style={styles.cardTitle} accessibilityRole="header">
-                  {isSignUp ? 'Create your account' : 'Welcome back'}
+                  {isSignUp ? "Create your account" : "Welcome back"}
                 </Text>
                 <Text style={styles.cardSubtitle}>
                   {isSignUp
-                    ? 'Join Flirteasy to find genuine connections.'
-                    : 'Sign in to resume finding great matches.'}
+                    ? "Join Flint to find genuine connections."
+                    : "Sign in to resume finding great matches."}
                 </Text>
               </ContentTransition>
 
               {/* Email Field */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Email Address</Text>
+                <Text
+                  style={styles.inputLabel}
+                  maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                >
+                  Email Address
+                </Text>
                 <View
                   style={[
                     styles.inputBox,
@@ -396,7 +516,13 @@ export default function LoginScreen({ navigation, route }) {
                   <Ionicons
                     name="mail-outline"
                     size={19}
-                    color={Boolean(errorMessage) ? COLORS.error : isFocusedEmail ? COLORS.accent : COLORS.muted}
+                    color={
+                      Boolean(errorMessage)
+                        ? COLORS.error
+                        : isFocusedEmail
+                          ? COLORS.accent
+                          : COLORS.muted
+                    }
                     style={styles.inputIcon}
                   />
                   <TextInput
@@ -406,7 +532,7 @@ export default function LoginScreen({ navigation, route }) {
                     value={email}
                     onChangeText={(t) => {
                       setEmail(t);
-                      setErrorMessage('');
+                      setErrorMessage("");
                       if (accountConflict) setAccountConflict(null);
                     }}
                     autoCapitalize="none"
@@ -429,8 +555,8 @@ export default function LoginScreen({ navigation, route }) {
                   {Boolean(email) && (
                     <MotionTouchable
                       onPress={() => {
-                        setEmail('');
-                        setErrorMessage('');
+                        setEmail("");
+                        setErrorMessage("");
                         if (accountConflict) setAccountConflict(null);
                       }}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -438,7 +564,11 @@ export default function LoginScreen({ navigation, route }) {
                       accessibilityRole="button"
                       accessibilityLabel="Clear email"
                     >
-                      <Ionicons name="close-circle" size={17} color={COLORS.muted} />
+                      <Ionicons
+                        name="close-circle"
+                        size={17}
+                        color={COLORS.muted}
+                      />
                     </MotionTouchable>
                   )}
                   {isValidEmail(email) && (
@@ -451,17 +581,24 @@ export default function LoginScreen({ navigation, route }) {
                   )}
                 </View>
                 {/* Privacy Microcopy for Email */}
-                <ContentTransition transitionKey={isSignUp ? 'signup' : 'login'} style={styles.fieldHintRow}>
-                  <Ionicons name="shield-checkmark-outline" size={12} color={COLORS.muted} />
+                <ContentTransition
+                  transitionKey={isSignUp ? "signup" : "login"}
+                  style={styles.fieldHintRow}
+                >
+                  <Ionicons
+                    name="shield-checkmark-outline"
+                    size={12}
+                    color={COLORS.muted}
+                  />
                   <Text style={styles.fieldHintText}>
                     {isSignUp
-                      ? 'Never shown on your profile · Used for verification'
+                      ? "Never shown on your profile · Used for verification"
                       : "We'll send a secure code to sign you in"}
                   </Text>
                 </ContentTransition>
 
                 {/* Contextual Domain Suggestions: ONLY when typing before @ */}
-                {Boolean(email.length > 0 && !email.includes('@')) && (
+                {Boolean(email.length > 0 && !email.includes("@")) && (
                   <View style={styles.domainSection}>
                     <Text style={styles.domainLabel}>Quick suggestions:</Text>
                     <View style={styles.domainChipsRow}>
@@ -480,8 +617,18 @@ export default function LoginScreen({ navigation, route }) {
 
               {/* Password Field */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Password</Text>
-                <View style={[styles.inputBox, isFocusedPassword && styles.inputBoxFocused]}>
+                <Text
+                  style={styles.inputLabel}
+                  maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                >
+                  Password
+                </Text>
+                <View
+                  style={[
+                    styles.inputBox,
+                    isFocusedPassword && styles.inputBoxFocused,
+                  ]}
+                >
                   <Ionicons
                     name="lock-closed-outline"
                     size={19}
@@ -514,10 +661,12 @@ export default function LoginScreen({ navigation, route }) {
                     hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                     style={styles.eyeButton}
                     accessibilityRole="button"
-                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                    accessibilityLabel={
+                      showPassword ? "Hide password" : "Show password"
+                    }
                   >
                     <Ionicons
-                      name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                      name={showPassword ? "eye-outline" : "eye-off-outline"}
                       size={19}
                       color={COLORS.muted}
                     />
@@ -528,15 +677,20 @@ export default function LoginScreen({ navigation, route }) {
                   <MotionTouchable
                     style={styles.forgotPasswordButton}
                     onPress={() => {
-                      safeHaptic('light');
+                      safeHaptic("light");
                       setSupportModalVisible(true);
                     }}
                     activeOpacity={0.7}
                     accessibilityRole="button"
                     accessibilityLabel="Forgot Password?"
-                    accessibilityHint="Get login assistance from Flirteasy concierge"
+                    accessibilityHint="Get login assistance from Flint concierge"
                   >
-                    <Text style={styles.forgotPasswordText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Forgot Password?</Text>
+                    <Text
+                      style={styles.forgotPasswordText}
+                      maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                    >
+                      Forgot Password?
+                    </Text>
                   </MotionTouchable>
                 )}
               </View>
@@ -550,14 +704,14 @@ export default function LoginScreen({ navigation, route }) {
                   ]}
                   pressScale={0.99}
                   onPress={() => {
-                    safeHaptic('light');
+                    safeHaptic("light");
                     setIsAgreed(!isAgreed);
                     setAgreementError(false);
                   }}
                   activeOpacity={0.8}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: isAgreed }}
-                  accessibilityLabel="Confirm 18+ and agree to Flirteasy's Terms of Service and Privacy Policy"
+                  accessibilityLabel="Confirm 18+ and agree to Flint's Terms of Service and Privacy Policy"
                 >
                   <View
                     style={[
@@ -566,52 +720,72 @@ export default function LoginScreen({ navigation, route }) {
                       agreementError && styles.consentBoxError,
                     ]}
                   >
-                    {isAgreed && <Ionicons name="checkmark" size={15} color={COLORS.onPrimary} />}
+                    {isAgreed && (
+                      <Ionicons
+                        name="checkmark"
+                        size={15}
+                        color={COLORS.onPrimary}
+                      />
+                    )}
                   </View>
                   <Text style={styles.consentText}>
-                    I confirm I am 18+ and agree to Flirteasy's{' '}
+                    I confirm I am 18+ and agree to Flint's{" "}
                     <Text
                       style={styles.legalLink}
                       onPress={(e) => {
                         e.stopPropagation?.();
-                        openLegalModal('terms');
+                        openLegalModal("terms");
                       }}
                       accessibilityRole="link"
                       accessibilityLabel="Terms of Service"
                     >
                       Terms of Service
                     </Text>
-                    {' & '}
+                    {" & "}
                     <Text
                       style={styles.legalLink}
                       onPress={(e) => {
                         e.stopPropagation?.();
-                        openLegalModal('privacy');
+                        openLegalModal("privacy");
                       }}
                       accessibilityRole="link"
                       accessibilityLabel="Privacy Policy"
                     >
                       Privacy Policy
-                    </Text>.
+                    </Text>
+                    .
                   </Text>
                 </MotionTouchable>
               )}
 
               {/* Agreement Warning if unselected */}
               {isSignUp && agreementError && (
-                <View style={styles.agreementWarningRow} accessibilityLiveRegion="polite">
-                  <Ionicons name="alert-circle" size={14} color={COLORS.error} style={styles.errorIcon} />
+                <View
+                  style={styles.agreementWarningRow}
+                  accessibilityLiveRegion="polite"
+                >
+                  <Ionicons
+                    name="alert-circle"
+                    size={14}
+                    color={COLORS.error}
+                    style={styles.errorIcon}
+                  />
                   <Text style={styles.agreementWarningText}>
-                    Please check the box to accept the Terms & 18+ policy to continue
+                    Please check the box to accept the Terms & 18+ policy to
+                    continue
                   </Text>
                 </View>
               )}
 
               {/* Inline Existing Account Conflict Banner (Option 1) */}
-              {accountConflict === 'exists' && (
+              {accountConflict === "exists" && (
                 <FadeIn style={styles.conflictBanner}>
                   <View style={styles.conflictBannerHeader}>
-                    <Ionicons name="information-circle" size={18} color={COLORS.secondary} />
+                    <Ionicons
+                      name="information-circle"
+                      size={18}
+                      color={COLORS.secondary}
+                    />
                     <Text style={styles.conflictBannerTitle}>
                       An account with this email already exists.
                     </Text>
@@ -629,10 +803,14 @@ export default function LoginScreen({ navigation, route }) {
               )}
 
               {/* Inline Account Not Found Banner (Option 1) */}
-              {accountConflict === 'not_found' && (
+              {accountConflict === "not_found" && (
                 <FadeIn style={styles.conflictBanner}>
                   <View style={styles.conflictBannerHeader}>
-                    <Ionicons name="information-circle" size={18} color={COLORS.secondary} />
+                    <Ionicons
+                      name="information-circle"
+                      size={18}
+                      color={COLORS.secondary}
+                    />
                     <Text style={styles.conflictBannerTitle}>
                       No account found with this email.
                     </Text>
@@ -651,44 +829,67 @@ export default function LoginScreen({ navigation, route }) {
 
               {/* Standard Error */}
               {Boolean(errorMessage) && !accountConflict && (
-                <View style={styles.errorRow} accessibilityRole="alert" accessibilityLiveRegion="polite">
-                  <Ionicons name="alert-circle" size={15} color={COLORS.error} style={styles.errorIcon} />
+                <View
+                  style={styles.errorRow}
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
+                >
+                  <Ionicons
+                    name="alert-circle"
+                    size={15}
+                    color={COLORS.error}
+                    style={styles.errorIcon}
+                  />
                   <Text style={styles.errorText}>{errorMessage}</Text>
                 </View>
               )}
 
               {/* Main Action Button */}
               <AppButton
-                title={isSignUp ? 'Create Account' : 'Sign In'}
+                title={isSignUp ? "Create Account" : "Sign In"}
                 iconRight="chevron-forward"
                 onPress={handleAuthSubmit}
                 loading={isLoading}
                 haptic={false}
-                accessibilityLabel={isSignUp ? 'Create Account' : 'Sign In'}
-                style={[styles.primaryButton, isSignUp && !isAgreed && !isLoading && styles.primaryButtonMuted]}
+                accessibilityLabel={isSignUp ? "Create Account" : "Sign In"}
+                style={[
+                  styles.primaryButton,
+                  isSignUp &&
+                    !isAgreed &&
+                    !isLoading &&
+                    styles.primaryButtonMuted,
+                ]}
               />
 
               {/* Footer Prompt */}
               <View style={styles.footerContainer}>
-                <Text style={styles.footerText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                  {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                <Text
+                  style={styles.footerText}
+                  maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                >
+                  {isSignUp
+                    ? "Already have an account? "
+                    : "Don't have an account? "}
                 </Text>
                 <MotionTouchable
                   style={styles.footerAction}
                   onPress={() => {
-                    safeHaptic('light');
+                    safeHaptic("light");
                     setIsSignUp(!isSignUp);
-                    setErrorMessage('');
+                    setErrorMessage("");
                     setAccountConflict(null);
                     setAgreementError(false);
                   }}
                   activeOpacity={0.7}
                   hitSlop={{ left: 8, right: 8 }}
                   accessibilityRole="button"
-                  accessibilityLabel={isSignUp ? 'Sign In' : 'Join Now'}
+                  accessibilityLabel={isSignUp ? "Sign In" : "Join Now"}
                 >
-                  <Text style={styles.footerActionText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>
-                    {isSignUp ? 'Sign In' : 'Join Now'}
+                  <Text
+                    style={styles.footerActionText}
+                    maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+                  >
+                    {isSignUp ? "Sign In" : "Join Now"}
                   </Text>
                 </MotionTouchable>
               </View>
@@ -696,22 +897,23 @@ export default function LoginScreen({ navigation, route }) {
               {/* Legal Links for Existing Users */}
               {!isSignUp && (
                 <Text style={styles.legalDisclaimerText}>
-                  By signing in, you agree to Flirteasy's{' '}
+                  By signing in, you agree to Flint's{" "}
                   <Text
                     style={styles.legalLink}
-                    onPress={() => openLegalModal('terms')}
+                    onPress={() => openLegalModal("terms")}
                     accessibilityRole="link"
                   >
                     Terms
                   </Text>
-                  {' & '}
+                  {" & "}
                   <Text
                     style={styles.legalLink}
-                    onPress={() => openLegalModal('privacy')}
+                    onPress={() => openLegalModal("privacy")}
                     accessibilityRole="link"
                   >
                     Privacy Policy
-                  </Text>.
+                  </Text>
+                  .
                 </Text>
               )}
             </View>
@@ -721,23 +923,33 @@ export default function LoginScreen({ navigation, route }) {
           <MotionTouchable
             style={styles.guestBottomLink}
             onPress={async () => {
-              safeHaptic('light');
+              safeHaptic("light");
               let guestUser = null;
               try {
                 guestUser = await SupabaseService.saveGuestSession();
               } catch (_) {}
-              navigation.replace('PlatformSelect', {
-                user: guestUser || { id: 'guest_user', email: 'guest@flint.ai', fullName: 'Guest User', isGuest: true },
-                userId: guestUser?.id || 'guest_user',
+              navigation.replace("PlatformSelect", {
+                user: guestUser || {
+                  id: "guest_user",
+                  email: "guest@flint.ai",
+                  fullName: "Guest User",
+                  isGuest: true,
+                },
+                userId: guestUser?.id || "guest_user",
               });
             }}
             activeOpacity={0.6}
             hitSlop={{ top: 6, bottom: 12, left: 24, right: 24 }}
             accessibilityRole="button"
             accessibilityLabel="Continue as Guest"
-            accessibilityHint="Browse Flirteasy without logging in"
+            accessibilityHint="Browse Flint without logging in"
           >
-            <Text style={styles.guestBottomLinkText} maxFontSizeMultiplier={uiTheme.fontScale.chrome}>Continue as Guest</Text>
+            <Text
+              style={styles.guestBottomLinkText}
+              maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+            >
+              Continue as Guest
+            </Text>
           </MotionTouchable>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -750,17 +962,15 @@ export default function LoginScreen({ navigation, route }) {
         onClose={() => setLegalModalVisible(false)}
         closeLabel="Close legal document"
         title="Legal & Privacy"
-        subtitle="Flirteasy Trust, Safety & Compliance"
+        subtitle="Terms and privacy information"
         maxHeightRatio={0.86}
         footer={
           <AppButton
-            title="I Understand & Agree"
-            accessibilityLabel="I Understand and Accept"
+            title="Close"
+            accessibilityLabel="Close legal document"
             haptic={false}
             onPress={() => {
-              safeHaptic('medium');
-              setIsAgreed(true);
-              setAgreementError(false);
+              safeHaptic("medium");
               setLegalModalVisible(false);
             }}
           />
@@ -771,22 +981,22 @@ export default function LoginScreen({ navigation, route }) {
           <MotionTouchable
             style={[
               styles.modalTabBtn,
-              legalTab === 'terms' && styles.modalTabBtnActive,
+              legalTab === "terms" && styles.modalTabBtnActive,
             ]}
             pressScale={0.98}
             onPress={() => {
-              safeHaptic('light');
-              setLegalTab('terms');
+              safeHaptic("light");
+              setLegalTab("terms");
             }}
             activeOpacity={0.8}
             accessibilityRole="tab"
             accessibilityLabel="Terms of Service"
-            accessibilityState={{ selected: legalTab === 'terms' }}
+            accessibilityState={{ selected: legalTab === "terms" }}
           >
             <Text
               style={[
                 styles.modalTabText,
-                legalTab === 'terms' && styles.modalTabTextActive,
+                legalTab === "terms" && styles.modalTabTextActive,
               ]}
               numberOfLines={1}
               maxFontSizeMultiplier={uiTheme.fontScale.chrome}
@@ -798,22 +1008,22 @@ export default function LoginScreen({ navigation, route }) {
           <MotionTouchable
             style={[
               styles.modalTabBtn,
-              legalTab === 'privacy' && styles.modalTabBtnActive,
+              legalTab === "privacy" && styles.modalTabBtnActive,
             ]}
             pressScale={0.98}
             onPress={() => {
-              safeHaptic('light');
-              setLegalTab('privacy');
+              safeHaptic("light");
+              setLegalTab("privacy");
             }}
             activeOpacity={0.8}
             accessibilityRole="tab"
             accessibilityLabel="Privacy Policy"
-            accessibilityState={{ selected: legalTab === 'privacy' }}
+            accessibilityState={{ selected: legalTab === "privacy" }}
           >
             <Text
               style={[
                 styles.modalTabText,
-                legalTab === 'privacy' && styles.modalTabTextActive,
+                legalTab === "privacy" && styles.modalTabTextActive,
               ]}
               numberOfLines={1}
               maxFontSizeMultiplier={uiTheme.fontScale.chrome}
@@ -825,61 +1035,7 @@ export default function LoginScreen({ navigation, route }) {
 
         {/* Legal Document Body */}
         <ContentTransition transitionKey={legalTab}>
-          {legalTab === 'terms' ? (
-            <View style={styles.legalSection}>
-              <View style={styles.legalBadgeRow}>
-                <Ionicons name="shield-checkmark" size={14} color={COLORS.secondary} />
-                <Text style={styles.legalBadgeText}>18+ Age Requirement & Community Honor Code</Text>
-              </View>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">1. Eligibility & Age Restriction</Text>
-              <Text style={styles.legalParagraph}>
-                You must be at least 18 years of age to create an account on Flirteasy and use our service. By creating an account or signing in, you affirm, represent, and warrant that you are at least 18 years old and are legally capable of entering into this binding agreement. Any account found to be operated by a minor will be immediately and permanently terminated.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">2. Member Conduct & Mutual Respect</Text>
-              <Text style={styles.legalParagraph}>
-                Flirteasy is a community dedicated to real romantic chemistry, dignity, and authentic connections. We enforce a zero-tolerance policy against hate speech, harassment, impersonation, commercial solicitation, unsolicited explicit media, and scamming. Every profile is subject to automated and human trust screening.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">3. Safety & Profile Authenticity</Text>
-              <Text style={styles.legalParagraph}>
-                To maintain an authentic network, Flirteasy may require live biometric liveness selfie checks to verify your identity. You agree to upload only your own authentic, recent photos and to represent yourself truthfully.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">4. Subscriptions & Account Termination</Text>
-              <Text style={styles.legalParagraph}>
-                You retain the right to delete your Flirteasy account at any time in App Settings. Any premium subscriptions or boosts are managed through Apple App Store or Google Play Store billing terms.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.legalSection}>
-              <View style={styles.legalBadgeRow}>
-                <Ionicons name="lock-closed" size={14} color={COLORS.secondary} />
-                <Text style={styles.legalBadgeText}>256-Bit TLS Encryption & GDPR / CCPA Compliant</Text>
-              </View>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">1. Personal Data We Collect</Text>
-              <Text style={styles.legalParagraph}>
-                We only collect information necessary to create your romantic match profile: your name, verified email, dating preferences, approximate geolocation (strictly while using the app, never tracked continuously in the background), and photos you explicitly upload.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">2. Zero Third-Party Data Brokers</Text>
-              <Text style={styles.legalParagraph}>
-                Flirteasy does not sell, rent, or trade your personal data to advertisers or third-party data brokers. Your private chat messages are encrypted and only accessible to you and your match.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">3. Data Ownership & Deletion Rights</Text>
-              <Text style={styles.legalParagraph}>
-                Under GDPR, CCPA, and global privacy standards, you maintain total ownership over your data. You may request a complete export of your account data or trigger immediate permanent erasure by tapping "Delete Account" in Flirteasy Settings.
-              </Text>
-
-              <Text style={styles.legalParagraphHead} accessibilityRole="header">4. Data Protection Contact</Text>
-              <Text style={styles.legalParagraph}>
-                Questions regarding data security or privacy compliance may be addressed directly to our Data Protection Officer at privacy@flint.dating.
-              </Text>
-            </View>
-          )}
+          <LegalDocument type={legalTab} />
         </ContentTransition>
       </BottomSheet>
 
@@ -891,7 +1047,7 @@ export default function LoginScreen({ navigation, route }) {
         onClose={() => setSupportModalVisible(false)}
         closeLabel="Close support"
         title="Sign-In Concierge"
-        subtitle="Fast assistance with your Flirteasy account"
+        subtitle="Fast assistance with your Flint account"
         maxHeightRatio={0.8}
         footer={
           <AppButton
@@ -907,7 +1063,8 @@ export default function LoginScreen({ navigation, route }) {
           <View style={styles.supportTipBody}>
             <Text style={styles.supportTipTitle}>Trouble Signing In?</Text>
             <Text style={styles.supportTipText}>
-              Ensure you are using the exact email associated with your account. If you registered via Google or Apple, select the matching option.
+              Ensure you are using the exact email associated with your account.
+              If you registered via Google or Apple, select the matching option.
             </Text>
           </View>
         </View>
@@ -918,7 +1075,8 @@ export default function LoginScreen({ navigation, route }) {
           <View style={styles.supportTipBody}>
             <Text style={styles.supportTipTitle}>Forgot Your Password?</Text>
             <Text style={styles.supportTipText}>
-              We can dispatch a secure single-use magic reset link or 6-digit OTP directly to your inbox.
+              We can dispatch a secure single-use magic reset link or 6-digit
+              OTP directly to your inbox.
             </Text>
           </View>
         </View>
@@ -927,26 +1085,31 @@ export default function LoginScreen({ navigation, route }) {
         <View style={styles.supportTipCard}>
           <IconWell icon="shield-checkmark" tone="secondary" size={36} />
           <View style={styles.supportTipBody}>
-            <Text style={styles.supportTipTitle}>Account Status & Inquiries</Text>
+            <Text style={styles.supportTipTitle}>
+              Account Status & Inquiries
+            </Text>
             <Text style={styles.supportTipText}>
-              If your account was temporarily locked or flagged for verification, our concierge team will assist you immediately.
+              If your account was temporarily locked or flagged for
+              verification, our concierge team will assist you immediately.
             </Text>
           </View>
         </View>
 
         {/* Direct Concierge Contact Button */}
         <AppButton
-          title="Contact Flirteasy Concierge"
+          title="Contact Flint Concierge"
           variant="secondary"
           icon="chatbubbles"
           iconRight="open-outline"
           haptic={false}
           style={styles.conciergeContactBtn}
           onPress={() => {
-            safeHaptic('medium');
-            Linking.openURL('mailto:support@flint.dating?subject=Flint%20Login%20Assistance').catch(() => { });
+            safeHaptic("medium");
+            Linking.openURL(
+              "mailto:support@flint.dating?subject=Flint%20Login%20Assistance",
+            ).catch(() => {});
           }}
-          accessibilityLabel="Email Flirteasy Concierge Support"
+          accessibilityLabel="Email Flint Concierge Support"
         />
       </BottomSheet>
     </View>
@@ -957,36 +1120,56 @@ const styles = createStyles(() => ({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   carouselImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
-    width: '100%',
+    width: "100%",
     // maxWidth comes from useResponsive().formMax (480 phone / 560 tablet) at render time.
-    alignSelf: 'center',
+    alignSelf: "center",
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
 
   // ── Brand Header ──
   brandContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: SPACE.xxl,
   },
   emblemWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: SPACE.lg,
   },
   emblemWrapperTight: {
     marginBottom: SPACE.sm,
-  },
+  },
+  emblemFrame: {
+    padding: 3,
+    justifyContent: "center",
+    alignItems: "center",
+    ...uiTheme.shadows.md,
+  },
+  emblemInner: {
+    width: "100%",
+    height: "100%",
+    overflow: "hidden",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: alpha(COLORS.white, 0.2),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emblemImg: {
+    width: "100%",
+    height: "100%",
+  },
   brandTitle: {
     ...TYPE.largeTitle,
     color: COLORS.text,
@@ -997,7 +1180,7 @@ const styles = createStyles(() => ({
   heroDialogue: {
     ...TYPE.bodyStrong,
     color: COLORS.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: SPACE.xs,
     maxWidth: 320,
     textShadowColor: alpha(COLORS.black, 0.65),
@@ -1021,12 +1204,12 @@ const styles = createStyles(() => ({
     ...TYPE.title,
     color: COLORS.text,
     marginBottom: SPACE.xs,
-    textAlign: 'center',
+    textAlign: "center",
   },
   cardSubtitle: {
     ...TYPE.callout,
     color: COLORS.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: SPACE.xxl,
   },
 
@@ -1040,8 +1223,8 @@ const styles = createStyles(() => ({
     marginBottom: SPACE.sm,
   },
   fieldHintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: SPACE.xs + 2,
     marginTop: SPACE.sm,
     paddingLeft: SPACE.xxs,
@@ -1063,13 +1246,13 @@ const styles = createStyles(() => ({
     marginBottom: SPACE.sm,
   },
   domainChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: SPACE.sm,
   },
   inputBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.elevated,
     borderWidth: 1.5,
     borderColor: COLORS.border,
@@ -1095,13 +1278,13 @@ const styles = createStyles(() => ({
     minWidth: 0,
     color: COLORS.text,
     paddingVertical: 0,
-    height: '100%',
+    height: "100%",
   },
   iconAction: {
     width: 32,
     height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   validIcon: {
     marginLeft: SPACE.xxs,
@@ -1110,13 +1293,13 @@ const styles = createStyles(() => ({
   eyeButton: {
     width: 40,
     height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   forgotPasswordButton: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
     minHeight: uiTheme.layout.touchTarget,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingLeft: SPACE.md,
     marginTop: SPACE.xs,
     marginBottom: -SPACE.sm,
@@ -1137,8 +1320,8 @@ const styles = createStyles(() => ({
 
   // ── Mandatory Consent Checkbox & Warning ──
   consentCheckboxRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: SPACE.md,
     minHeight: uiTheme.layout.touchTarget,
     paddingVertical: SPACE.sm,
@@ -1152,8 +1335,8 @@ const styles = createStyles(() => ({
     borderWidth: 1.5,
     borderColor: COLORS.borderStrong,
     backgroundColor: COLORS.elevated,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 1,
   },
   consentBoxChecked: {
@@ -1171,8 +1354,8 @@ const styles = createStyles(() => ({
     color: COLORS.textSecondary,
   },
   agreementWarningRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: SPACE.xs + 2,
     marginBottom: SPACE.md,
   },
@@ -1193,8 +1376,8 @@ const styles = createStyles(() => ({
     gap: SPACE.md,
   },
   conflictBannerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: SPACE.sm,
   },
   conflictBannerTitle: {
@@ -1204,8 +1387,8 @@ const styles = createStyles(() => ({
     flex: 1,
   },
   errorRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: SPACE.xs + 2,
     marginBottom: SPACE.md,
   },
@@ -1221,10 +1404,10 @@ const styles = createStyles(() => ({
 
   // ── Guest Link ──
   guestBottomLink: {
-    alignItems: 'center',
-    alignSelf: 'center',
+    alignItems: "center",
+    alignSelf: "center",
     minHeight: uiTheme.layout.touchTarget,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: SPACE.md,
     marginTop: SPACE.md,
   },
@@ -1236,10 +1419,10 @@ const styles = createStyles(() => ({
 
   // ── Footer ──
   footerContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: SPACE.md,
     marginBottom: SPACE.xs,
   },
@@ -1249,7 +1432,7 @@ const styles = createStyles(() => ({
   },
   footerAction: {
     minHeight: uiTheme.layout.touchTarget,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   footerActionText: {
     ...TYPE.callout,
@@ -1261,7 +1444,7 @@ const styles = createStyles(() => ({
   legalDisclaimerText: {
     ...TYPE.footnote,
     color: COLORS.muted,
-    textAlign: 'center',
+    textAlign: "center",
     paddingHorizontal: SPACE.sm,
   },
   legalLink: {
@@ -1271,7 +1454,7 @@ const styles = createStyles(() => ({
 
   // ── Sheets (legal + support) ──
   modalTabRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: COLORS.elevated,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
@@ -1283,8 +1466,8 @@ const styles = createStyles(() => ({
     flex: 1,
     minHeight: 40,
     paddingHorizontal: SPACE.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: RADIUS.sm,
   },
   modalTabBtnActive: {
@@ -1304,8 +1487,8 @@ const styles = createStyles(() => ({
     gap: SPACE.sm,
   },
   legalBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: SPACE.sm,
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
@@ -1331,8 +1514,8 @@ const styles = createStyles(() => ({
     color: COLORS.textSecondary,
   },
   supportTipCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     backgroundColor: COLORS.elevated,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
