@@ -1,15 +1,15 @@
 # Privacy Policy
 
 **Effective date:** 2026-09-22
-**Operator:** [LEGAL_PUBLISHER_NAME]
+**Operator:** MIISCO LLP
 
 > Publication draft: replace all bracketed business details and complete the publishing checklist before release.
 
-This Privacy Policy explains how [LEGAL_PUBLISHER_NAME] ("we", "us") handles information when you use this mobile dating-assistant application (the App) and the cloud services it connects to. It does not cover the privacy practices of Tinder or any other service you connect; those services have their own policies. The App processes dating preferences, private conversations and information about other people, some of which can be sensitive. Please read this Policy before creating an account, connecting a dating account or turning on AI and automation features.
+This Privacy Policy explains how MIISCO LLP ("we", "us") handles information when you use this mobile dating-assistant application (the App) and the cloud services it connects to. It does not cover the privacy practices of Tinder or any other service you connect; those services have their own policies. The App processes dating preferences, private conversations and information about other people, some of which can be sensitive. Please read this Policy before creating an account, connecting a dating account or turning on AI and automation features.
 
 ## 1. Who is responsible and how to contact us
 
-[LEGAL_PUBLISHER_NAME] is responsible for the handling of personal information described in this Policy. To ask a question or exercise a privacy right, email [PRIVACY_AND_SUPPORT_EMAIL]. Our business address and any representative or privacy-officer details required in your region will be provided before the App is offered there.
+MIISCO LLP is responsible for the handling of personal information described in this Policy. To ask a question or exercise a privacy right, email [PRIVACY_AND_SUPPORT_EMAIL]. Our business address and any representative or privacy-officer details required in your region will be provided before the App is offered there.
 
 ## 2. Information you give us
 

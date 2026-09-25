@@ -128,7 +128,7 @@ export default function LegalPageLayout({ doc, eyebrow }: LegalPageLayoutProps) 
   const effective = siteConfig.legal.effectiveDate;
   return (
     <>
-      <PageHero eyebrow={eyebrow} title={doc.title} description={doc.summary} align="left">
+      <PageHero eyebrow={eyebrow} title={doc.title} description={renderText(doc.summary)} align="left">
         <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
           Effective date:{' '}
           {effective ? (

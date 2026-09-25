@@ -1,11 +1,11 @@
 # Terms and Conditions
 
 **Effective date:** 2026-09-22
-**Operator:** [LEGAL_PUBLISHER_NAME]
+**Operator:** MIISCO LLP
 
 > Publication draft: replace all bracketed business details and complete the publishing checklist before release.
 
-These Terms govern your use of this mobile dating-assistant application (the App), operated by [LEGAL_PUBLISHER_NAME] ("we", "us"). Please read these Terms and the Privacy Policy before creating an account, connecting a dating service or turning on automation. If you do not agree, do not use the App.
+These Terms govern your use of this mobile dating-assistant application (the App), operated by MIISCO LLP ("we", "us"). Please read these Terms and the Privacy Policy before creating an account, connecting a dating service or turning on automation. If you do not agree, do not use the App.
 
 ## 1. Who may use the App
 
@@ -103,4 +103,4 @@ We may revise these Terms. We will post the new effective date and give addition
 
 ## 14. Contact
 
-The App is operated by [LEGAL_PUBLISHER_NAME]. Send questions about these Terms to [PRIVACY_AND_SUPPORT_EMAIL].
+The App is operated by MIISCO LLP. Send questions about these Terms to [PRIVACY_AND_SUPPORT_EMAIL].

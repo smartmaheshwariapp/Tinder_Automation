@@ -1,11 +1,11 @@
 {
   "effectiveDate": "2026-09-22",
-  "operator": "[LEGAL_PUBLISHER_NAME]",
+  "operator": "MIISCO LLP",
   "contactEmail": "[PRIVACY_AND_SUPPORT_EMAIL]",
   "jurisdiction": "[GOVERNING_LAW_JURISDICTION]",
   "terms": {
     "title": "Terms and Conditions",
-    "intro": "These Terms govern your use of this mobile dating-assistant application (the App), operated by [LEGAL_PUBLISHER_NAME] (\"we\", \"us\"). Please read these Terms and the Privacy Policy before creating an account, connecting a dating service or turning on automation. If you do not agree, do not use the App.",
+    "intro": "These Terms govern your use of this mobile dating-assistant application (the App), operated by MIISCO LLP (\"we\", \"us\"). Please read these Terms and the Privacy Policy before creating an account, connecting a dating service or turning on automation. If you do not agree, do not use the App.",
     "sections": [
       {
         "heading": "1. Who may use the App",
@@ -109,19 +109,19 @@
       {
         "heading": "14. Contact",
         "paragraphs": [
-          "The App is operated by [LEGAL_PUBLISHER_NAME]. Send questions about these Terms to [PRIVACY_AND_SUPPORT_EMAIL]."
+          "The App is operated by MIISCO LLP. Send questions about these Terms to [PRIVACY_AND_SUPPORT_EMAIL]."
         ]
       }
     ]
   },
   "privacy": {
     "title": "Privacy Policy",
-    "intro": "This Privacy Policy explains how [LEGAL_PUBLISHER_NAME] (\"we\", \"us\") handles information when you use this mobile dating-assistant application (the App) and the cloud services it connects to. It does not cover the privacy practices of Tinder or any other service you connect; those services have their own policies. The App processes dating preferences, private conversations and information about other people, some of which can be sensitive. Please read this Policy before creating an account, connecting a dating account or turning on AI and automation features.",
+    "intro": "This Privacy Policy explains how MIISCO LLP (\"we\", \"us\") handles information when you use this mobile dating-assistant application (the App) and the cloud services it connects to. It does not cover the privacy practices of Tinder or any other service you connect; those services have their own policies. The App processes dating preferences, private conversations and information about other people, some of which can be sensitive. Please read this Policy before creating an account, connecting a dating account or turning on AI and automation features.",
     "sections": [
       {
         "heading": "1. Who is responsible and how to contact us",
         "paragraphs": [
-          "[LEGAL_PUBLISHER_NAME] is responsible for the handling of personal information described in this Policy. To ask a question or exercise a privacy right, email [PRIVACY_AND_SUPPORT_EMAIL]. Our business address and any representative or privacy-officer details required in your region will be provided before the App is offered there."
+          "MIISCO LLP is responsible for the handling of personal information described in this Policy. To ask a question or exercise a privacy right, email [PRIVACY_AND_SUPPORT_EMAIL]. Our business address and any representative or privacy-officer details required in your region will be provided before the App is offered there."
         ]
       },
       {

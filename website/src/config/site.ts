@@ -48,8 +48,8 @@ export const siteConfig = {
   /** No official social profiles were found in the repository. */
   socialLinks: [] as { label: string; href: string }[],
   legal: {
-    operatorName: null,
-    postalAddress: null,
+    operatorName: 'MIISCO LLP',
+    postalAddress: 'Goverdhan, Mathura, Uttar Pradesh',
     governingLaw: null,
     effectiveDate: '2026-09-22',
   } satisfies LegalEntity as LegalEntity,
