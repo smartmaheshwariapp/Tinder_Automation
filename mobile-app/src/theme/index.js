@@ -403,7 +403,10 @@ export function applyTheme(name) {
   activeThemeName = name;
   Object.assign(theme.colors, buildColors(next.palette, next.borderStrong));
   Object.assign(theme.gradients, buildGradients(next));
-  theme.shadows.glow.shadowColor = next.palette.primary;
+  // Replaced, not mutated, for the same reason rebuildStyles() replaces its sheets: AppLogo
+  // and AppButton pass this object straight into a style array, so React Native freezes it
+  // on first render and writing `.shadowColor` into it throws on the next theme switch.
+  theme.shadows.glow = { ...theme.shadows.glow, shadowColor: next.palette.primary };
   rebuildStyles();
   themeListeners.forEach((listener) => {
     try { listener(name); } catch (_) {}

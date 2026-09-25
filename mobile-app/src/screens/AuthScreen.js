@@ -35,6 +35,7 @@ import trackingService from "../services/trackingService";
 import { switchUserSession } from "../utils/sessionManager";
 import {
   AppButton,
+  AppLogo,
   IconButton,
   IconWell,
   Chip,
@@ -1221,7 +1222,7 @@ export default function AuthScreen({ navigation, route }) {
 
         {/* Legal & 18+ Disclaimer with Working Interactive Sheets */}
         <Text style={styles.legalDisclaimerText}>
-          By continuing, you confirm you are 18+ and agree to Flint's{" "}
+          By continuing, you confirm you are 18+ and agree to Flirteasy's{" "}
           <Text
             style={styles.legalLink}
             onPress={() => openLegalModal("terms")}
@@ -1265,7 +1266,7 @@ export default function AuthScreen({ navigation, route }) {
           hitSlop={{ top: 6, bottom: 12, left: 24, right: 24 }}
           accessibilityRole="button"
           accessibilityLabel="Continue as Guest"
-          accessibilityHint="Browse Flint without logging in"
+          accessibilityHint="Browse Flirteasy without logging in"
         >
           <Text
             style={styles.guestLinkText}
@@ -1294,13 +1295,16 @@ export default function AuthScreen({ navigation, route }) {
         <View style={[styles.formContainer, columnStyle]}>
           {/* Header: back control, then the screen title for the current mode */}
           <View style={styles.heroWrap}>
-            <IconButton
-              icon="arrow-back"
-              iconSize={22}
-              onPress={goBackToWelcome}
-              accessibilityLabel="Go back"
-              style={styles.backArrowBtn}
-            />
+            {/* Back control and the app mark share one band, so the header reads as a unit. */}
+            <View style={styles.heroTopRow}>
+              <IconButton
+                icon="arrow-back"
+                iconSize={22}
+                onPress={goBackToWelcome}
+                accessibilityLabel="Go back"
+              />
+              <AppLogo size={38} glow={false} />
+            </View>
             <ContentTransition
               transitionKey={authMode}
               style={styles.heroTextWrap}
@@ -1427,7 +1431,7 @@ export default function AuthScreen({ navigation, route }) {
                       color={COLORS.muted}
                     />
                     <Text style={styles.fieldHintText}>
-                      Visible on your Flint profile
+                      Visible on your Flirteasy profile
                     </Text>
                   </View>
                 </View>
@@ -1697,7 +1701,7 @@ export default function AuthScreen({ navigation, route }) {
                   activeOpacity={0.8}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: isAgreed }}
-                  accessibilityLabel="I confirm I am 18+ and agree to Flint's Terms of Service and Privacy Policy"
+                  accessibilityLabel="I confirm I am 18+ and agree to Flirteasy's Terms of Service and Privacy Policy"
                 >
                   <View
                     style={[
@@ -1715,7 +1719,7 @@ export default function AuthScreen({ navigation, route }) {
                     )}
                   </View>
                   <Text style={styles.consentText}>
-                    I confirm I am 18+ and agree to Flint's{" "}
+                    I confirm I am 18+ and agree to Flirteasy's{" "}
                     <Text
                       style={styles.legalLink}
                       onPress={(e) => {
@@ -1779,6 +1783,10 @@ export default function AuthScreen({ navigation, route }) {
             </View>
           </FadeIn>
 
+          {/* The card sits near the top; this lifts the secondary actions toward the bottom
+              instead of leaving a dead gap under them on tall screens. */}
+          <View style={styles.footerSpacer} />
+
           {/* Mode Toggle */}
           <ContentTransition
             transitionKey={authMode}
@@ -1794,7 +1802,7 @@ export default function AuthScreen({ navigation, route }) {
               accessibilityLabel={
                 authMode === "signup"
                   ? "Already have an account? Sign In"
-                  : "New to Flint? Create Account"
+                  : "New to Flirteasy? Create Account"
               }
             >
               <Text
@@ -1803,13 +1811,16 @@ export default function AuthScreen({ navigation, route }) {
               >
                 {authMode === "signup"
                   ? "Already have an account?"
-                  : "New to Flint?"}{" "}
+                  : "New to Flirteasy?"}{" "}
                 <Text style={styles.modeToggleLink}>
                   {authMode === "signup" ? "Sign In" : "Create Account"}
                 </Text>
               </Text>
             </MotionTouchable>
           </ContentTransition>
+
+          {/* Separates the account actions above from the no-account escape hatch below. */}
+          <View style={styles.footerDivider} />
 
           {/* Guest Link in Form mode */}
           <MotionTouchable
@@ -1835,6 +1846,11 @@ export default function AuthScreen({ navigation, route }) {
             accessibilityRole="button"
             accessibilityLabel="Continue as Guest"
           >
+            <Ionicons
+              name="person-outline"
+              size={15}
+              color={COLORS.textSecondary}
+            />
             <Text
               style={styles.formGuestLinkText}
               maxFontSizeMultiplier={uiTheme.fontScale.chrome}
@@ -1843,26 +1859,29 @@ export default function AuthScreen({ navigation, route }) {
             </Text>
           </MotionTouchable>
 
-          {/* Dev Option: Preview Onboarding Steps */}
-          <MotionTouchable
-            style={styles.devOnboardingBtn}
-            onPress={() => {
-              safeHaptic("light");
-              navigation.navigate("Onboarding");
-            }}
-            activeOpacity={0.75}
-            hitSlop={{ top: 4, bottom: 4, left: 16, right: 16 }}
-            accessibilityRole="button"
-            accessibilityLabel="Preview Onboarding Steps"
-          >
-            <Ionicons name="sparkles" size={13} color={COLORS.secondary} />
-            <Text
-              style={styles.devOnboardingBtnText}
-              maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+          {/* Dev Option: Preview Onboarding Steps. Debug builds only — a control labelled
+              "(Dev)" in a store build reads as unfinished to reviewers and users alike. */}
+          {__DEV__ && (
+            <MotionTouchable
+              style={styles.devOnboardingBtn}
+              onPress={() => {
+                safeHaptic("light");
+                navigation.navigate("Onboarding");
+              }}
+              activeOpacity={0.75}
+              hitSlop={{ top: 4, bottom: 4, left: 16, right: 16 }}
+              accessibilityRole="button"
+              accessibilityLabel="Preview Onboarding Steps"
             >
-              Preview Onboarding Steps (Dev)
-            </Text>
-          </MotionTouchable>
+              <Ionicons name="sparkles" size={13} color={COLORS.secondary} />
+              <Text
+                style={styles.devOnboardingBtnText}
+                maxFontSizeMultiplier={uiTheme.fontScale.chrome}
+              >
+                Preview Onboarding Steps (Dev)
+              </Text>
+            </MotionTouchable>
+          )}
 
           {/* Terms for Login Mode — Animated In-Place Collapse/Expand */}
           <Animated.View
@@ -1890,7 +1909,7 @@ export default function AuthScreen({ navigation, route }) {
             pointerEvents={authMode === "login" ? "auto" : "none"}
           >
             <Text style={styles.termsText}>
-              By continuing, you agree to Flint's{" "}
+              By continuing, you agree to Flirteasy's{" "}
               <Text
                 style={styles.termsLink}
                 onPress={() => openLegalModal("terms")}
@@ -2762,7 +2781,15 @@ const styles = createStyles(() => ({
     paddingBottom: SPACE.section,
   },
   heroWrap: {
-    marginBottom: SPACE.xxl,
+    marginBottom: SPACE.xl,
+  },
+  // Back control on the left, app mark on the right: the row is balanced and the
+  // screen is branded without spending a whole block of vertical space on a logo.
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: SPACE.xl,
   },
   backArrowBtn: {
     marginBottom: SPACE.lg,
@@ -2957,13 +2984,36 @@ const styles = createStyles(() => ({
     color: COLORS.secondary,
   },
 
+  // ── Footer ──
+  // Absorbs the slack between the card and the secondary actions so the actions sit
+  // low on tall screens rather than leaving a dead band beneath them.
+  footerSpacer: {
+    flex: 1,
+    minHeight: SPACE.xl,
+  },
+  footerDivider: {
+    height: 1,
+    alignSelf: "stretch",
+    backgroundColor: COLORS.hairline,
+    marginTop: SPACE.md,
+    marginBottom: SPACE.lg,
+  },
+
   // ── Form Guest Link ──
+  // An outlined pill, not centred bold text: as plain text this read as a section
+  // heading for the button beneath it rather than as something tappable.
   formGuestLink: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: SPACE.sm,
     minHeight: uiTheme.layout.touchTarget,
     alignSelf: "center",
-    paddingHorizontal: SPACE.md,
+    paddingHorizontal: SPACE.xl,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: alpha(COLORS.surface, 0.6),
     marginBottom: SPACE.sm,
   },
   formGuestLinkText: {

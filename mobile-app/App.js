@@ -17,6 +17,9 @@ import AppNavigator from "./src/navigation/AppNavigator";
 import AppLogo from "./src/components/ui/AppLogo";
 // The name, cropped from the brand lockup, with "Flirt" lifted to white for the dark splash.
 const SPLASH_WORDMARK = require("./assets/wordmark-text.png");
+// Boot often finishes in a few hundred ms, which makes the splash flash past. Hold it for
+// long enough to read the mark, then hand over to the app.
+const MIN_SPLASH_MS = 2000;
 import InAppNotificationBanner from "./src/components/InAppNotificationBanner";
 import ExternalRedirectModal from "./src/components/ExternalRedirectModal";
 import NotificationService from "./src/services/notifications";
@@ -68,6 +71,7 @@ function AppShell({ children }) {
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
+  const [minSplashElapsed, setMinSplashElapsed] = useState(false);
   const [initialRoute, setInitialRoute] = useState("Auth");
   const [initialUser, setInitialUser] = useState(null);
   const [updateStatus, setUpdateStatus] = useState("Checking for updates...");
@@ -86,6 +90,13 @@ export default function App() {
     Inter_700Bold,
     Inter_800ExtraBold,
   });
+
+  // Runs alongside boot rather than after it, so the floor overlaps the work instead of
+  // being added to it: a slow start-up still costs the user nothing extra.
+  useEffect(() => {
+    const timer = setTimeout(() => setMinSplashElapsed(true), MIN_SPLASH_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     NotificationService.initialize();
@@ -173,7 +184,7 @@ export default function App() {
     boot();
   }, []);
 
-  if (!isReady || (!fontsLoaded && !fontError)) {
+  if (!minSplashElapsed || !isReady || (!fontsLoaded && !fontError)) {
     return (
       <AppShell>
         <View style={styles.splashContainer}>
